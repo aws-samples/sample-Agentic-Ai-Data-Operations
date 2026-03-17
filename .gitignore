@@ -208,4 +208,29 @@ demo_*.py
 GITHUB_SUCCESS.md
 GITHUB_RELEASE_LOG.txt
 CLEANUP_SUMMARY.md
+POST_PUBLISH_CHECKLIST.md
+push-to-github.sh
+pre-commit-check.sh
+
+# Redundant documentation (covered in core docs)
+*_QUICK_REF*.md
+*_QUICK_REFERENCE*.md
+*_VISUAL_DIAGRAM*.md
+*_USAGE_EXAMPLES*.md
+PROMPT_WORKFLOW_GUIDE.md
+
+# Test/demo scripts (not production code)
+test_pii_detection.py
+run_pipeline.py
+
+# Status and fix files (temporary/internal)
+*_STATUS.md
+*_FIX.md
+*_DEPLOYED.md
+*_FINAL.md
+QUICKSIGHT_*.md
+
+# User-specific scripts (not generic)
+grant_access_*.sh
+*_hcherian*.sh
 
