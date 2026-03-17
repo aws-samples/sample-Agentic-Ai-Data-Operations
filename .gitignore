@@ -204,3 +204,8 @@ grant_demo_role_access.py
 demo_*.py
 *_demo_*.py
 
+# Internal publication process files (not for public repo)
+GITHUB_SUCCESS.md
+GITHUB_RELEASE_LOG.txt
+CLEANUP_SUMMARY.md
+
