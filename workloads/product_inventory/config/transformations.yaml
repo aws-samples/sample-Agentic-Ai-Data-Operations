@@ -1,0 +1,316 @@
+# Transformation Configuration for product_inventory
+# Defines cleaning rules (Bronze → Silver) and modeling (Silver → Gold)
+
+workload_name: product_inventory
+version: "1.0"
+last_updated: "2026-03-16"
+
+# Bronze to Silver: Data Cleaning & Validation
+bronze_to_silver:
+  description: "Clean and validate raw product inventory data"
+  input:
+    zone: bronze
+    format: csv
+    path: "s3://{bucket}/bronze/product_inventory/"
+  output:
+    zone: silver
+    format: iceberg
+    table: "silver_product_inventory"
+    path: "s3://{bucket}/silver/product_inventory/"
+  quarantine:
+    enabled: true
+    path: "s3://{bucket}/quarantine/product_inventory/"
+
+  transformations:
+    - order: 1
+      name: "deduplicate_records"
+      type: "deduplication"
+      description: "Remove duplicate rows based on product_id + sku, keeping first occurrence"
+      columns: ["product_id", "sku"]
+      strategy: "keep_first"
+
+    - order: 2
+      name: "quarantine_negative_quantities"
+      type: "validation"
+      description: "Quarantine records with negative quantity_on_hand"
+      condition: "quantity_on_hand < 0"
+      action: "quarantine"
+      reason: "negative_quantity"
+
+    - order: 3
+      name: "quarantine_future_restock_dates"
+      type: "validation"
+      description: "Quarantine records with last_restocked_date in the future"
+      condition: "last_restocked_date > CURRENT_DATE"
+      action: "quarantine"
+      reason: "future_restock_date"
+
+    - order: 4
+      name: "normalize_category_casing"
+      type: "normalization"
+      description: "Standardize category names to title case"
+      column: "category"
+      function: "title_case"
+
+    - order: 5
+      name: "trim_product_name_whitespace"
+      type: "normalization"
+      description: "Remove leading and trailing whitespace from product_name"
+      column: "product_name"
+      function: "strip"
+
+    - order: 6
+      name: "fix_invalid_status"
+      type: "mapping"
+      description: "Map invalid status 'aktive' to 'active'"
+      column: "status"
+      mappings:
+        "aktive": "active"
+        "Aktive": "active"
+        "AKTIVE": "active"
+
+    - order: 7
+      name: "flag_missing_supplier"
+      type: "flagging"
+      description: "Flag records with missing supplier_id or supplier_name"
+      condition: "supplier_id IS NULL OR supplier_name IS NULL"
+      flag_column: "is_supplier_missing"
+      flag_value: true
+      null_fill:
+        supplier_id: null
+        supplier_name: "Unknown Supplier"
+
+    - order: 8
+      name: "flag_margin_anomaly"
+      type: "flagging"
+      description: "Flag records where cost_price exceeds unit_price (negative margin)"
+      condition: "cost_price > unit_price"
+      flag_column: "is_margin_anomaly"
+      flag_value: true
+      action: "keep"
+
+    - order: 9
+      name: "flag_missing_expiry_grocery"
+      type: "flagging"
+      description: "Flag Grocery items with missing expiry_date"
+      condition: "category = 'Grocery' AND expiry_date IS NULL"
+      flag_column: "is_expiry_missing"
+      flag_value: true
+
+    - order: 10
+      name: "fill_missing_reorder_level"
+      type: "null_filling"
+      description: "Set missing reorder_level to 0 and flag"
+      column: "reorder_level"
+      fill_value: 0
+      flag_column: "is_reorder_missing"
+      flag_value: true
+
+  derived_columns:
+    - name: "processing_timestamp"
+      type: "timestamp"
+      expression: "CURRENT_TIMESTAMP"
+      description: "When the record was processed into Silver"
+
+    - name: "data_quality_score"
+      type: "float"
+      expression: "1.0 - (CAST(is_supplier_missing AS INT) * 0.1 + CAST(is_margin_anomaly AS INT) * 0.2 + CAST(is_expiry_missing AS INT) * 0.1 + CAST(is_reorder_missing AS INT) * 0.05)"
+      description: "Quality score 0-1 based on flags"
+
+# Silver to Gold: Business Modeling (Star Schema)
+silver_to_gold:
+  description: "Transform cleaned data into star schema for reporting and analytics"
+  gold_format: "star_schema"
+
+  fact_table:
+    name: "fact_inventory"
+    description: "Inventory snapshot fact table with measures and foreign keys"
+    grain: "One row per product per warehouse location"
+    source: "silver_product_inventory"
+
+    columns:
+      # Foreign Keys
+      - name: "product_key"
+        type: "integer"
+        description: "Surrogate key to dim_product"
+        source: "JOIN dim_product ON silver.product_id = dim_product.product_id"
+
+      - name: "supplier_key"
+        type: "integer"
+        description: "Surrogate key to dim_supplier"
+        source: "JOIN dim_supplier ON silver.supplier_id = dim_supplier.supplier_id"
+
+      - name: "warehouse_key"
+        type: "integer"
+        description: "Surrogate key to dim_warehouse"
+        source: "JOIN dim_warehouse ON silver.warehouse_location = dim_warehouse.warehouse_location"
+
+      # Measures
+      - name: "unit_price"
+        type: "decimal(10,2)"
+        description: "Selling price per unit"
+        source: "silver.unit_price"
+
+      - name: "cost_price"
+        type: "decimal(10,2)"
+        description: "Cost per unit"
+        source: "silver.cost_price"
+
+      - name: "margin"
+        type: "decimal(10,2)"
+        description: "Profit margin per unit (unit_price - cost_price)"
+        derived: "unit_price - cost_price"
+
+      - name: "margin_pct"
+        type: "decimal(5,2)"
+        description: "Margin as percentage of unit price"
+        derived: "CASE WHEN unit_price > 0 THEN (margin / unit_price) * 100 ELSE 0 END"
+
+      - name: "quantity_on_hand"
+        type: "integer"
+        description: "Current inventory quantity"
+        source: "silver.quantity_on_hand"
+
+      - name: "reorder_level"
+        type: "integer"
+        description: "Minimum quantity before reorder"
+        source: "silver.reorder_level"
+
+      - name: "reorder_quantity"
+        type: "integer"
+        description: "Quantity to order when restocking"
+        source: "silver.reorder_quantity"
+
+      - name: "weight_kg"
+        type: "decimal(8,2)"
+        description: "Product weight in kilograms"
+        source: "silver.weight_kg"
+
+      - name: "inventory_value"
+        type: "decimal(12,2)"
+        description: "Total value of inventory (unit_price * quantity_on_hand)"
+        derived: "unit_price * quantity_on_hand"
+
+      - name: "needs_reorder"
+        type: "boolean"
+        description: "True if quantity_on_hand <= reorder_level"
+        derived: "quantity_on_hand <= reorder_level"
+
+    partitioning:
+      columns: ["warehouse_key"]
+      strategy: "hash"
+
+  dimension_tables:
+    - name: "dim_product"
+      description: "Product master dimension"
+      type: "SCD_TYPE_1"
+      source: "silver_product_inventory"
+
+      columns:
+        - name: "product_key"
+          type: "integer"
+          description: "Surrogate key (auto-increment)"
+          surrogate_key: true
+
+        - name: "product_id"
+          type: "string"
+          description: "Natural key from source"
+          source: "silver.product_id"
+          business_key: true
+
+        - name: "sku"
+          type: "string"
+          description: "Stock keeping unit"
+          source: "silver.sku"
+          business_key: true
+
+        - name: "product_name"
+          type: "string"
+          description: "Product display name"
+          source: "silver.product_name"
+
+        - name: "category"
+          type: "string"
+          description: "Product category"
+          source: "silver.category"
+
+        - name: "subcategory"
+          type: "string"
+          description: "Product subcategory"
+          source: "silver.subcategory"
+
+        - name: "brand"
+          type: "string"
+          description: "Product brand"
+          source: "silver.brand"
+
+        - name: "status"
+          type: "string"
+          description: "Product status (active/discontinued/seasonal)"
+          source: "silver.status"
+
+    - name: "dim_supplier"
+      description: "Supplier dimension"
+      type: "SCD_TYPE_1"
+      source: "silver_product_inventory"
+
+      columns:
+        - name: "supplier_key"
+          type: "integer"
+          description: "Surrogate key (auto-increment)"
+          surrogate_key: true
+
+        - name: "supplier_id"
+          type: "string"
+          description: "Natural key from source"
+          source: "silver.supplier_id"
+          business_key: true
+
+        - name: "supplier_name"
+          type: "string"
+          description: "Supplier company name"
+          source: "silver.supplier_name"
+
+    - name: "dim_warehouse"
+      description: "Warehouse location dimension"
+      type: "SCD_TYPE_1"
+      source: "silver_product_inventory"
+
+      columns:
+        - name: "warehouse_key"
+          type: "integer"
+          description: "Surrogate key (auto-increment)"
+          surrogate_key: true
+
+        - name: "warehouse_location"
+          type: "string"
+          description: "Warehouse location code"
+          source: "silver.warehouse_location"
+          business_key: true
+
+        - name: "region"
+          type: "string"
+          description: "Geographic region (EAST/WEST/CENTRAL)"
+          derived: |
+            CASE
+              WHEN warehouse_location LIKE '%EAST%' THEN 'EAST'
+              WHEN warehouse_location LIKE '%WEST%' THEN 'WEST'
+              WHEN warehouse_location LIKE '%CENTRAL%' THEN 'CENTRAL'
+              ELSE 'UNKNOWN'
+            END
+
+# Lineage Tracking
+lineage:
+  bronze_to_silver:
+    source_dataset: "bronze_product_inventory"
+    target_dataset: "silver_product_inventory"
+    transformation_type: "cleaning_and_validation"
+
+  silver_to_gold:
+    source_dataset: "silver_product_inventory"
+    target_datasets:
+      - "fact_inventory"
+      - "dim_product"
+      - "dim_supplier"
+      - "dim_warehouse"
+    transformation_type: "dimensional_modeling"

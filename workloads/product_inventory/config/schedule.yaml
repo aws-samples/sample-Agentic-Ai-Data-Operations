@@ -1,0 +1,22 @@
+schedule:
+  dag_id: product_inventory_pipeline
+  description: "Daily product inventory pipeline: Bronze → Silver → Gold"
+  schedule_interval: "0 6 * * *"
+  start_date: "2026-03-01"
+  catchup: false
+  max_active_runs: 1
+  default_args:
+    owner: data-engineering
+    retries: 3
+    retry_delay_seconds: 300
+    retry_exponential_backoff: true
+    email_on_failure: true
+    sla_seconds: 3600
+  failure_notification:
+    type: sns
+    topic_arn: "{{ var.value.sns_alert_topic_arn }}"
+  tags:
+    - product
+    - inventory
+    - daily
+    - star-schema

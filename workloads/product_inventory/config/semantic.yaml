@@ -1,0 +1,299 @@
+# semantic.yaml — Semantic layer configuration for Product Inventory
+# Loaded into SageMaker Catalog + SynoDB at deploy time
+# Created: 2026-03-16
+
+dataset:
+  name: product_inventory
+  business_name: "Product Inventory"
+  domain: "Supply Chain & Inventory Management"
+  owner: "Inventory Operations Team"
+  steward: "Supply Chain Analytics"
+  description: "Real-time product inventory snapshot powering stock monitoring, replenishment planning, and margin analysis dashboards"
+  tags: [inventory, warehouse, stock, products, supply-chain, replenishment]
+
+columns:
+  product_id:
+    role: dimension
+    description: "Unique product identifier"
+    is_primary_key: true
+    pii: false
+    default_aggregation: count_distinct
+    business_terms: [product, product ID, item ID]
+
+  sku:
+    role: dimension
+    description: "Stock Keeping Unit — business key for product lookup"
+    pii: false
+    default_aggregation: count_distinct
+    business_terms: [SKU, stock code, item code, product code]
+
+  product_name:
+    role: attribute
+    description: "Human-readable product name"
+    pii: false
+    business_terms: [product name, item name, product description]
+
+  category:
+    role: dimension
+    description: "Top-level product category"
+    pii: false
+    default_aggregation: count
+    business_terms: [category, product category, product type, product group]
+    dimension_hierarchy:
+      name: product_hierarchy
+      levels: [category, subcategory]
+
+  subcategory:
+    role: dimension
+    description: "Second-level product subcategory"
+    pii: false
+    default_aggregation: count
+    business_terms: [subcategory, subgroup, product subtype]
+    dimension_hierarchy:
+      name: product_hierarchy
+      levels: [category, subcategory]
+
+  brand:
+    role: dimension
+    description: "Product brand or manufacturer"
+    pii: false
+    default_aggregation: count
+    business_terms: [brand, manufacturer, supplier brand]
+
+  unit_price:
+    role: measure
+    description: "Retail selling price per unit in USD"
+    pii: false
+    default_aggregation: avg
+    unit: USD
+    business_terms: [price, selling price, retail price, unit price, list price]
+    derived_from: "unit_price column as-is"
+
+  cost_price:
+    role: measure
+    description: "Purchase cost per unit in USD"
+    pii: false
+    default_aggregation: avg
+    unit: USD
+    business_terms: [cost, purchase cost, unit cost, COGS]
+    derived_from: "cost_price column as-is"
+
+  quantity_on_hand:
+    role: measure
+    description: "Current inventory quantity available"
+    pii: false
+    default_aggregation: sum
+    unit: units
+    business_terms: [quantity, stock level, inventory level, on hand, available quantity, QOH]
+    derived_from: "quantity_on_hand column as-is"
+
+  reorder_level:
+    role: measure
+    description: "Inventory threshold that triggers reorder"
+    pii: false
+    default_aggregation: avg
+    unit: units
+    business_terms: [reorder level, reorder point, minimum stock, safety stock]
+    derived_from: "reorder_level column as-is"
+
+  reorder_quantity:
+    role: measure
+    description: "Quantity to reorder when threshold reached"
+    pii: false
+    default_aggregation: sum
+    unit: units
+    business_terms: [reorder quantity, order quantity, EOQ]
+    derived_from: "reorder_quantity column as-is"
+
+  warehouse_location:
+    role: dimension
+    description: "Physical warehouse location code"
+    pii: false
+    default_aggregation: count
+    business_terms: [warehouse, location, warehouse location, facility, distribution center, DC]
+
+  supplier_id:
+    role: dimension
+    description: "Supplier identifier"
+    pii: false
+    default_aggregation: count_distinct
+    business_terms: [supplier, supplier ID, vendor, vendor ID]
+    dimension_hierarchy:
+      name: supplier_hierarchy
+      levels: [supplier_id, supplier_name]
+
+  supplier_name:
+    role: attribute
+    description: "Supplier company name"
+    pii: false
+    business_terms: [supplier name, vendor name, manufacturer name]
+
+  last_restocked_date:
+    role: temporal
+    description: "Date of most recent stock replenishment"
+    pii: false
+    format: "YYYY-MM-DD"
+    default_aggregation: max
+    business_terms: [restock date, last restock, replenishment date, last delivery]
+    time_intelligence:
+      fiscal_year_start: "January"
+      week_start: "Monday"
+      timezone: "UTC"
+
+  expiry_date:
+    role: temporal
+    description: "Product expiration date (null for non-perishable items)"
+    pii: false
+    format: "YYYY-MM-DD"
+    default_aggregation: min
+    business_terms: [expiry, expiration date, best before, use by date]
+    time_intelligence:
+      fiscal_year_start: "January"
+      week_start: "Monday"
+      timezone: "UTC"
+
+  weight_kg:
+    role: measure
+    description: "Product weight in kilograms"
+    pii: false
+    default_aggregation: avg
+    unit: kg
+    business_terms: [weight, product weight, mass]
+    derived_from: "weight_kg column as-is"
+
+  status:
+    role: dimension
+    description: "Product lifecycle status"
+    pii: false
+    allowed_values: [active, out_of_stock, discontinued, backordered]
+    default_aggregation: count
+    business_terms: [status, product status, inventory status, stock status]
+
+# Fact table grain
+grain:
+  description: "One row per product snapshot — grain is product_id at a point in time"
+  grain_columns: [product_id]
+  dedup_strategy: "Keep most recent snapshot per product_id"
+
+# Gold zone star schema
+gold_schema:
+  format: star_schema
+  use_case: "Reporting & Dashboards"
+  scd_type: 1
+  tables:
+    fact_inventory:
+      type: fact
+      grain: [product_id]
+      measures: [unit_price, cost_price, quantity_on_hand, reorder_level, reorder_quantity, weight_kg]
+      dimensions: [category, subcategory, brand, warehouse_location, supplier_id, status]
+      temporal: [last_restocked_date, expiry_date]
+      attributes: [sku, product_name, supplier_name]
+      derived_measures:
+        margin: "unit_price - cost_price"
+        margin_pct: "(unit_price - cost_price) / unit_price * 100"
+        inventory_value: "quantity_on_hand * cost_price"
+        needs_reorder: "CASE WHEN quantity_on_hand <= reorder_level THEN 1 ELSE 0 END"
+    dim_product:
+      type: dimension
+      key: product_id
+      attributes: [sku, product_name, category, subcategory, brand, weight_kg]
+    dim_supplier:
+      type: dimension
+      key: supplier_id
+      attributes: [supplier_name]
+    dim_warehouse:
+      type: dimension
+      key: warehouse_location
+      attributes: [warehouse_location]
+    inventory_summary_by_category:
+      type: aggregate
+      grain: [category]
+      measures: [product_count, total_inventory_value, avg_margin_pct, total_quantity_on_hand]
+
+# Default filters for Analysis Agent
+default_filters:
+  active_inventory: "status IN ('active', 'out_of_stock')"
+  exclude_discontinued: "status != 'discontinued'"
+
+# Business terms with synonyms and SQL expressions
+business_terms:
+  stock_level:
+    synonyms: [inventory level, stock, on hand quantity, available stock]
+    sql_expression: "quantity_on_hand"
+  margin:
+    synonyms: [gross margin, profit margin, markup]
+    sql_expression: "unit_price - cost_price"
+  margin_percentage:
+    synonyms: [margin %, profit %, markup %]
+    sql_expression: "(unit_price - cost_price) / unit_price * 100"
+  inventory_value:
+    synonyms: [stock value, inventory worth, total cost]
+    sql_expression: "quantity_on_hand * cost_price"
+  needs_reordering:
+    synonyms: [reorder needed, below threshold, low stock]
+    sql_expression: "quantity_on_hand <= reorder_level"
+
+# Time intelligence
+time_intelligence:
+  fiscal_year_start: "January"
+  week_start: "Monday"
+  timezone: "UTC"
+  data_freshness: "Daily snapshots at 00:00 UTC"
+
+# Seed questions for SynoDB
+seed_questions:
+  - question: "What is the total inventory value by category?"
+    sql: >
+      SELECT category,
+             SUM(quantity_on_hand * cost_price) as total_inventory_value,
+             COUNT(product_id) as product_count
+      FROM demo_database_ai_agents_goldzone.fact_inventory
+      WHERE status IN ('active', 'out_of_stock')
+      GROUP BY category
+      ORDER BY total_inventory_value DESC
+      LIMIT 100
+  - question: "Which products need reordering?"
+    sql: >
+      SELECT product_id, sku, product_name, category,
+             quantity_on_hand, reorder_level, reorder_quantity,
+             warehouse_location
+      FROM demo_database_ai_agents_goldzone.fact_inventory
+      WHERE quantity_on_hand <= reorder_level
+        AND status IN ('active', 'out_of_stock')
+      ORDER BY (reorder_level - quantity_on_hand) DESC
+      LIMIT 100
+  - question: "What is the average margin by brand?"
+    sql: >
+      SELECT brand,
+             AVG(unit_price - cost_price) as avg_margin,
+             AVG((unit_price - cost_price) / unit_price * 100) as avg_margin_pct,
+             COUNT(product_id) as product_count
+      FROM demo_database_ai_agents_goldzone.fact_inventory
+      WHERE status IN ('active', 'out_of_stock')
+        AND brand IS NOT NULL
+      GROUP BY brand
+      ORDER BY avg_margin DESC
+      LIMIT 100
+  - question: "What is the distribution of inventory by warehouse location?"
+    sql: >
+      SELECT warehouse_location,
+             COUNT(product_id) as product_count,
+             SUM(quantity_on_hand) as total_quantity,
+             SUM(quantity_on_hand * cost_price) as total_value
+      FROM demo_database_ai_agents_goldzone.fact_inventory
+      WHERE status IN ('active', 'out_of_stock')
+      GROUP BY warehouse_location
+      ORDER BY total_value DESC
+      LIMIT 100
+  - question: "Which products are expiring soon?"
+    sql: >
+      SELECT product_id, sku, product_name, category,
+             expiry_date,
+             DATEDIFF(day, CURRENT_DATE, expiry_date) as days_until_expiry,
+             quantity_on_hand
+      FROM demo_database_ai_agents_goldzone.fact_inventory
+      WHERE expiry_date IS NOT NULL
+        AND expiry_date <= DATE_ADD(CURRENT_DATE, 30)
+        AND status IN ('active', 'out_of_stock')
+      ORDER BY expiry_date ASC
+      LIMIT 100

@@ -1,0 +1,98 @@
+# source.yaml — Product Inventory data source configuration
+# Owner: Supply Chain / Inventory Management
+# Created: 2026-03-16
+
+source:
+  name: product_inventory
+  description: "Product inventory snapshot from warehouse management system for stock monitoring and replenishment planning"
+  type: file
+  format: csv
+  location: "s3://aws-glue-assets-123456789012-us-east-1/demo-ai-agents/bronze/product_inventory/"
+  delimiter: ","
+  header: true
+  encoding: utf-8
+  row_count_expected: 123
+
+  schema:
+    columns:
+      - name: product_id
+        type: string
+        description: "Primary key, unique product identifier"
+        nullable: false
+        primary_key: true
+      - name: sku
+        type: string
+        description: "Stock Keeping Unit, business key for product lookup"
+        nullable: false
+        business_key: true
+      - name: product_name
+        type: string
+        description: "Human-readable product name"
+        nullable: false
+      - name: category
+        type: string
+        description: "Top-level product category"
+        nullable: false
+      - name: subcategory
+        type: string
+        description: "Second-level product subcategory within category"
+        nullable: true
+      - name: brand
+        type: string
+        description: "Product brand or manufacturer"
+        nullable: true
+      - name: unit_price
+        type: decimal
+        description: "Retail selling price per unit in USD"
+        nullable: false
+      - name: cost_price
+        type: decimal
+        description: "Purchase cost per unit in USD"
+        nullable: false
+      - name: quantity_on_hand
+        type: integer
+        description: "Current inventory quantity available"
+        nullable: false
+      - name: reorder_level
+        type: integer
+        description: "Inventory threshold that triggers reorder"
+        nullable: false
+      - name: reorder_quantity
+        type: integer
+        description: "Quantity to reorder when threshold reached"
+        nullable: false
+      - name: warehouse_location
+        type: string
+        description: "Physical warehouse location code"
+        nullable: false
+      - name: supplier_id
+        type: string
+        description: "Supplier identifier"
+        nullable: true
+      - name: supplier_name
+        type: string
+        description: "Supplier company name"
+        nullable: true
+      - name: last_restocked_date
+        type: date
+        description: "Date of most recent stock replenishment"
+        nullable: true
+        format: "YYYY-MM-DD"
+      - name: expiry_date
+        type: date
+        description: "Product expiration date (null for non-perishable items)"
+        nullable: true
+        format: "YYYY-MM-DD"
+      - name: weight_kg
+        type: decimal
+        description: "Product weight in kilograms"
+        nullable: true
+      - name: status
+        type: string
+        description: "Product lifecycle status"
+        nullable: false
+        allowed_values: [active, out_of_stock, discontinued, backordered]
+
+  credentials:
+    # Reference Airflow Connection ID — no secrets in config
+    connection_id: "aws_default"

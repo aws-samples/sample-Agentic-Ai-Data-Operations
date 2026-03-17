@@ -1,0 +1,39 @@
+# schedule.yaml — Airflow DAG schedule for Customer Master
+# Created: 2026-03-15
+
+workload: customer_master
+
+schedule:
+  cron: "0 6 * * *"  # Daily at 06:00 UTC
+  timezone: UTC
+  catchup: false
+  max_active_runs: 1
+  start_date: "2026-03-15"
+
+retries:
+  count: 3
+  delay_seconds: 300
+  backoff_factor: 2  # exponential backoff
+
+sla:
+  pipeline_max_minutes: 60
+  critical_tasks:
+    - name: bronze_quality_check
+      max_minutes: 10
+    - name: transform_bronze_to_gold
+      max_minutes: 30
+    - name: gold_quality_check
+      max_minutes: 10
+
+failure_handling:
+  on_failure_callback: "shared.utils.notifications.send_failure_alert"
+  alert_channels:
+    - type: email
+      recipients: ["crm-team@example.com"]
+    - type: slack
+      channel: "#data-alerts"
+
+dependencies:
+  upstream: []  # No upstream dependencies
+  downstream:
+    - "order_transactions_dag"  # Order pipeline may depend on customer dims

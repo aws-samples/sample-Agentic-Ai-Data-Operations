@@ -1,0 +1,238 @@
+{
+  "workload": "sales_transactions",
+  "generated_at": "2026-03-02T22:17:10Z",
+  "row_count": 50,
+  "overall": {
+    "score": 1.0,
+    "passed": 17,
+    "total": 17
+  },
+  "thresholds": {
+    "bronze_to_silver": 0.8,
+    "silver_to_gold": 0.95
+  },
+  "critical_failures": [],
+  "has_critical_failures": false,
+  "dimensions": {
+    "completeness": {
+      "score": 1.0,
+      "passed": 6,
+      "total": 6,
+      "rules": [
+        {
+          "rule_id": "COMP-001",
+          "name": "order_id_not_null",
+          "passed": true,
+          "severity": "critical",
+          "details": {
+            "actual_null_rate": 0.0,
+            "threshold": 0.0,
+            "operator": "<="
+          }
+        },
+        {
+          "rule_id": "COMP-002",
+          "name": "email_null_rate",
+          "passed": true,
+          "severity": "warning",
+          "details": {
+            "actual_null_rate": 0.06,
+            "threshold": 0.1,
+            "operator": "<="
+          }
+        },
+        {
+          "rule_id": "COMP-003",
+          "name": "phone_null_rate",
+          "passed": true,
+          "severity": "warning",
+          "details": {
+            "actual_null_rate": 0.02,
+            "threshold": 0.05,
+            "operator": "<="
+          }
+        },
+        {
+          "rule_id": "COMP-004",
+          "name": "order_date_not_null",
+          "passed": true,
+          "severity": "critical",
+          "details": {
+            "actual_null_rate": 0.0,
+            "threshold": 0.0,
+            "operator": "<="
+          }
+        },
+        {
+          "rule_id": "COMP-005",
+          "name": "revenue_not_null",
+          "passed": true,
+          "severity": "critical",
+          "details": {
+            "actual_null_rate": 0.0,
+            "threshold": 0.0,
+            "operator": "<="
+          }
+        },
+        {
+          "rule_id": "COMP-006",
+          "name": "quantity_not_null",
+          "passed": true,
+          "severity": "critical",
+          "details": {
+            "actual_null_rate": 0.0,
+            "threshold": 0.0,
+            "operator": "<="
+          }
+        }
+      ]
+    },
+    "accuracy": {
+      "score": 1.0,
+      "passed": 5,
+      "total": 5,
+      "rules": [
+        {
+          "rule_id": "ACC-001",
+          "name": "revenue_positive",
+          "passed": true,
+          "severity": "critical",
+          "details": {
+            "actual_min": 29.98,
+            "threshold": 0,
+            "operator": ">"
+          }
+        },
+        {
+          "rule_id": "ACC-002",
+          "name": "quantity_at_least_one",
+          "passed": true,
+          "severity": "critical",
+          "details": {
+            "actual_min": 1.0,
+            "threshold": 1,
+            "operator": ">="
+          }
+        },
+        {
+          "rule_id": "ACC-003",
+          "name": "discount_pct_lower_bound",
+          "passed": true,
+          "severity": "critical",
+          "details": {
+            "actual_min": 0.0,
+            "threshold": 0.0,
+            "operator": ">="
+          }
+        },
+        {
+          "rule_id": "ACC-004",
+          "name": "discount_pct_upper_bound",
+          "passed": true,
+          "severity": "critical",
+          "details": {
+            "actual_max": 0.2,
+            "threshold": 1.0,
+            "operator": "<="
+          }
+        },
+        {
+          "rule_id": "ACC-005",
+          "name": "revenue_within_max",
+          "passed": true,
+          "severity": "warning",
+          "details": {
+            "expression": "revenue <= quantity * unit_price",
+            "failing_count": 0
+          }
+        }
+      ]
+    },
+    "consistency": {
+      "score": 1.0,
+      "passed": 2,
+      "total": 2,
+      "rules": [
+        {
+          "rule_id": "CON-001",
+          "name": "pending_no_ship_date",
+          "passed": true,
+          "severity": "warning",
+          "details": {
+            "condition": "status == 'pending'",
+            "expectation": "ship_date == ''",
+            "failing_count": 0
+          }
+        },
+        {
+          "rule_id": "CON-002",
+          "name": "region_valid_values",
+          "passed": true,
+          "severity": "critical",
+          "details": {
+            "allowed_values": [
+              "East",
+              "West",
+              "Central",
+              "South"
+            ],
+            "failing_count": 0
+          }
+        }
+      ]
+    },
+    "validity": {
+      "score": 1.0,
+      "passed": 3,
+      "total": 3,
+      "rules": [
+        {
+          "rule_id": "VAL-001",
+          "name": "order_date_iso_format",
+          "passed": true,
+          "severity": "critical",
+          "details": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "failing_count": 0
+          }
+        },
+        {
+          "rule_id": "VAL-002",
+          "name": "email_format",
+          "passed": true,
+          "severity": "warning",
+          "details": {
+            "pattern": "^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+$",
+            "failing_count": 0
+          }
+        },
+        {
+          "rule_id": "VAL-003",
+          "name": "order_id_pattern",
+          "passed": true,
+          "severity": "critical",
+          "details": {
+            "pattern": "^ORD-\\d{5}$",
+            "failing_count": 0
+          }
+        }
+      ]
+    },
+    "uniqueness": {
+      "score": 1.0,
+      "passed": 1,
+      "total": 1,
+      "rules": [
+        {
+          "rule_id": "UNQ-001",
+          "name": "order_id_unique",
+          "passed": true,
+          "severity": "critical",
+          "details": {
+            "duplicate_count": 0
+          }
+        }
+      ]
+    }
+  }
+}

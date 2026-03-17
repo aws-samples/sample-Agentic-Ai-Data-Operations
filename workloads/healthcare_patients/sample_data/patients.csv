@@ -1,0 +1,21 @@
+patient_id,patient_name,dob,ssn,email,phone,address,city,state,zip,blood_type,diagnosis,visit_date,treatment_cost,insurance_provider,medical_record_number
+P001,John Smith,1985-03-15,123-45-6789,john.smith@email.com,555-123-4567,123 Main St,Boston,MA,02101,O+,Hypertension,2025-01-15,450.00,Blue Cross,MRN-2025-001
+P002,Maria Garcia,1990-07-22,234-56-7890,maria.garcia@email.com,555-234-5678,456 Oak Ave,Los Angeles,CA,90001,A+,Diabetes Type 2,2025-01-18,680.00,Aetna,MRN-2025-002
+P003,Robert Johnson,1978-11-30,345-67-8901,robert.j@email.com,555-345-6789,789 Pine Rd,Chicago,IL,60601,B-,Asthma,2025-01-20,320.00,UnitedHealth,MRN-2025-003
+P004,Emily Chen,1995-02-14,456-78-9012,emily.chen@email.com,555-456-7890,321 Elm St,Houston,TX,77001,AB+,Migraine,2025-01-22,275.00,Cigna,MRN-2025-004
+P005,James Wilson,1982-09-08,567-89-0123,james.w@email.com,555-567-8901,654 Maple Dr,Phoenix,AZ,85001,O-,Back Pain,2025-01-25,520.00,Humana,MRN-2025-005
+P006,Sarah Martinez,1988-05-19,678-90-1234,sarah.m@email.com,555-678-9012,987 Birch Ln,Philadelphia,PA,19101,A-,Allergies,2025-01-28,180.00,Kaiser,MRN-2025-006
+P007,Michael Brown,1975-12-03,789-01-2345,michael.brown@email.com,555-789-0123,147 Cedar Ave,San Antonio,TX,78201,B+,Hypertension,2025-02-01,495.00,Blue Cross,MRN-2025-007
+P008,Lisa Anderson,1992-08-27,890-12-3456,lisa.a@email.com,555-890-1234,258 Willow St,San Diego,CA,92101,O+,Anxiety,2025-02-03,380.00,Aetna,MRN-2025-008
+P009,David Taylor,1980-04-11,901-23-4567,david.taylor@email.com,555-901-2345,369 Spruce Rd,Dallas,TX,75201,AB-,Arthritis,2025-02-05,725.00,UnitedHealth,MRN-2025-009
+P010,Jennifer Lee,1998-10-25,012-34-5678,jennifer.lee@email.com,555-012-3456,741 Ash Dr,San Jose,CA,95101,A+,Depression,2025-02-08,420.00,Cigna,MRN-2025-010
+P011,Christopher Davis,1987-06-17,123-98-7654,chris.davis@email.com,555-123-9876,852 Hickory Ln,Austin,TX,78701,O-,Diabetes Type 1,2025-02-10,890.00,Humana,MRN-2025-011
+P012,Amanda Rodriguez,1993-01-29,234-87-6543,amanda.r@email.com,555-234-8765,963 Poplar Ave,Jacksonville,FL,32099,B+,COPD,2025-02-12,615.00,Kaiser,MRN-2025-012
+P013,Matthew Miller,1979-09-14,345-76-5432,matt.miller@email.com,555-345-7654,159 Walnut St,Fort Worth,TX,76101,A-,Insomnia,2025-02-15,290.00,Blue Cross,MRN-2025-013
+P014,Jessica White,1991-03-06,456-65-4321,jessica.white@email.com,555-456-6543,357 Chestnut Rd,Columbus,OH,43085,O+,Hypothyroidism,2025-02-18,540.00,Aetna,MRN-2025-014
+P015,Daniel Harris,1984-11-22,567-54-3210,daniel.h@email.com,555-567-5432,486 Dogwood Dr,Charlotte,NC,28201,AB+,High Cholesterol,2025-02-20,385.00,UnitedHealth,MRN-2025-015
+P016,Ashley Clark,1996-07-08,678-43-2109,ashley.clark@email.com,555-678-4321,624 Magnolia Ln,San Francisco,CA,94102,B-,Eczema,2025-02-22,225.00,Cigna,MRN-2025-016
+P017,Joshua Lewis,1977-02-18,789-32-1098,joshua.lewis@email.com,555-789-3210,735 Sycamore Ave,Indianapolis,IN,46201,O-,Sleep Apnea,2025-02-25,670.00,Humana,MRN-2025-017
+P018,Stephanie Walker,1989-12-31,890-21-0987,steph.walker@email.com,555-890-2109,846 Redwood St,Seattle,WA,98101,A+,Vitamin D Deficiency,2025-02-28,195.00,Kaiser,MRN-2025-018
+P019,Ryan Hall,1983-05-24,901-10-9876,ryan.hall@email.com,555-901-1098,957 Beech Rd,Denver,CO,80201,B+,Gastritis,2025-03-01,425.00,Blue Cross,MRN-2025-019
+P020,Nicole Young,1994-08-13,012-09-8765,nicole.young@email.com,555-012-0987,168 Elm Dr,Washington,DC,20001,O+,Anemia,2025-03-03,340.00,Aetna,MRN-2025-020

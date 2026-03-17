@@ -1,0 +1,187 @@
+# Semantic layer configuration for order_transactions
+# Defines column roles, aggregation semantics, join context for Analysis Agent
+# Created: 2026-03-15
+
+dataset:
+  name: order_transactions
+  domain: Sales & Marketing
+  description: "Sales order transactions with product, pricing, discount, and regional data"
+  grain: "One row per order (order_id is unique after dedup)"
+  owner: Sales Operations
+  steward: Data Engineering Team
+
+# Column roles for Analysis Agent
+columns:
+  order_id:
+    role: primary_key
+    description: "Unique order identifier"
+    business_term: "Order ID"
+  customer_id:
+    role: foreign_key
+    description: "Customer who placed the order"
+    references: "customer_master.customer_id"
+    business_term: "Customer ID"
+  order_date:
+    role: temporal
+    description: "Date the order was placed"
+    business_term: "Order Date"
+    time_grain: day
+  product_name:
+    role: dimension
+    description: "Name of the product ordered"
+    business_term: "Product"
+    synonyms: ["item", "product name", "sku"]
+  category:
+    role: dimension
+    description: "Product category"
+    business_term: "Category"
+    allowed_values: ["Electronics", "Furniture", "Supplies"]
+    synonyms: ["product category", "product type"]
+  quantity:
+    role: measure
+    description: "Number of units ordered"
+    business_term: "Quantity"
+    default_aggregation: SUM
+    synonyms: ["units", "qty", "count of items"]
+  unit_price:
+    role: measure
+    description: "Price per unit before discount"
+    business_term: "Unit Price"
+    default_aggregation: AVG
+    format: currency_usd
+    synonyms: ["price", "list price"]
+  discount_pct:
+    role: measure
+    description: "Discount percentage applied (0 to 0.25)"
+    business_term: "Discount"
+    default_aggregation: AVG
+    format: percentage
+    synonyms: ["discount", "discount rate", "markdown"]
+  revenue:
+    role: measure
+    description: "Total revenue for the order line (quantity * unit_price * (1 - discount_pct))"
+    business_term: "Revenue"
+    default_aggregation: SUM
+    format: currency_usd
+    derived_from: "quantity * unit_price * (1 - discount_pct)"
+    synonyms: ["sales", "total sales", "turnover", "amount", "order value"]
+  status:
+    role: dimension
+    description: "Order fulfillment status"
+    business_term: "Order Status"
+    allowed_values: ["Completed", "Pending", "Cancelled"]
+    synonyms: ["order status", "fulfillment status"]
+  region:
+    role: dimension
+    description: "Geographic sales region"
+    business_term: "Region"
+    allowed_values: ["East", "West", "Central", "South"]
+    synonyms: ["area", "territory", "geographic region"]
+
+# Dimension hierarchies
+dimension_hierarchies:
+  product_hierarchy:
+    levels: [category, product_name]
+    description: "Category > Product"
+  geography:
+    levels: [region]
+    description: "Sales region (flat)"
+
+# Default filters (encode business logic)
+default_filters:
+  completed_orders_only:
+    description: "Revenue calculations should use completed orders only"
+    sql: "status = 'Completed'"
+    applies_to: [revenue, quantity]
+
+# Business terms / synonyms for NLP
+business_terms:
+  revenue:
+    synonyms: ["sales", "total sales", "turnover", "income", "order value"]
+    sql_expression: "SUM(revenue)"
+    default_filter: "status = 'Completed'"
+  average_order_value:
+    synonyms: ["AOV", "avg order", "average order"]
+    sql_expression: "AVG(revenue)"
+    default_filter: "status = 'Completed'"
+  order_count:
+    synonyms: ["number of orders", "total orders", "order volume"]
+    sql_expression: "COUNT(DISTINCT order_id)"
+  discount_rate:
+    synonyms: ["average discount", "markdown rate"]
+    sql_expression: "AVG(discount_pct)"
+
+# Time intelligence
+time_intelligence:
+  temporal_column: order_date
+  fiscal_year_start: January
+  week_start: Monday
+  timezone: UTC
+  data_freshness: daily
+
+# Join semantics for Analysis Agent
+join_semantics:
+  customer_master:
+    join_type: LEFT
+    join_key: "customer_id"
+    target_table: "demo_database_ai_agents_goldzone.dim_customer"
+    when_to_join: "When user asks about customer attributes (segment, industry, name)"
+    pre_aggregation_rule: "Join BEFORE aggregating to avoid fan-out"
+    fan_out_warning: false  # many-to-one is safe
+    columns_available_after_join:
+      - customer_name
+      - segment
+      - industry
+      - country
+      - customer_status
+      - join_date
+      - annual_value
+    sample_queries:
+      - description: "Revenue by customer segment"
+        sql: >
+          SELECT c.segment, SUM(f.revenue) as total_revenue
+          FROM demo_database_ai_agents_goldzone.order_fact f
+          LEFT JOIN demo_database_ai_agents_goldzone.dim_customer c ON f.customer_id = c.customer_id
+          WHERE f.status_name = 'Completed'
+          GROUP BY c.segment
+          ORDER BY total_revenue DESC
+
+# Seed SQL examples for SynoDB
+seed_queries:
+  - question: "What is total revenue by region?"
+    sql: >
+      SELECT r.region_name, SUM(f.revenue) as total_revenue
+      FROM demo_database_ai_agents_goldzone.order_fact f
+      JOIN demo_database_ai_agents_goldzone.dim_region r ON f.region_id = r.region_id
+      WHERE f.status_name = 'Completed'
+      GROUP BY r.region_name
+      ORDER BY total_revenue DESC
+      LIMIT 100
+  - question: "What are the top 10 products by revenue?"
+    sql: >
+      SELECT p.product_name, p.category, SUM(f.revenue) as total_revenue
+      FROM demo_database_ai_agents_goldzone.order_fact f
+      JOIN demo_database_ai_agents_goldzone.dim_product p ON f.product_id = p.product_id
+      WHERE f.status_name = 'Completed'
+      GROUP BY p.product_name, p.category
+      ORDER BY total_revenue DESC
+      LIMIT 10
+  - question: "What is the monthly revenue trend?"
+    sql: >
+      SELECT DATE_TRUNC('month', f.order_date) as month, SUM(f.revenue) as total_revenue
+      FROM demo_database_ai_agents_goldzone.order_fact f
+      WHERE f.status_name = 'Completed'
+      GROUP BY DATE_TRUNC('month', f.order_date)
+      ORDER BY month
+      LIMIT 100
+
+# Gold zone schema
+gold_zone:
+  format: star_schema
+  fact_table: order_fact
+  dimension_tables:
+    - dim_product
+    - dim_region
+    - dim_status
+  aggregate_tables:
+    - order_summary_by_region_category
