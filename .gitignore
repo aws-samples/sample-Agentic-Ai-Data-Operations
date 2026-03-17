@@ -192,3 +192,15 @@ workloads/*/input/*.csv
 # Runtime lineage files
 *_lineage_*.json
 
+# Test reports and status files (generated during testing/demo)
+PII_DETECTION_TEST_RESULTS.md
+PII_DETECTION_TEST_REPORT.md
+REPOSITORY_STATUS.md
+DEPLOYMENT_SUMMARY.md
+DEMO_GUIDE.md
+
+# Demo scripts (for testing only, not for production)
+grant_demo_role_access.py
+demo_*.py
+*_demo_*.py
+
