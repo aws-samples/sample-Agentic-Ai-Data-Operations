@@ -1,0 +1,51 @@
+order_id,customer_id,customer_name,email,phone,order_date,ship_date,region,product_category,product_name,quantity,unit_price,discount_pct,revenue,payment_method,status
+ORD-10001,CUST-501,Alice Smith,alice.smith@gmail.com,(225) 859-5506,2024-07-02,2024-07-04,East,Furniture,Lamp,2,120.15,0.0,240.3,credit_card,completed
+ORD-10002,CUST-502,Bob Johnson,bob.johnson@gmail.com,(423) 338-9279,2024-08-17,2024-08-22,West,Furniture,Lamp,7,47.99,0.15,285.54,paypal,completed
+ORD-10003,CUST-503,Charlie Williams,charlie.williams@gmail.com,(977) 925-3615,2024-08-29,2024-09-01,Central,Electronics,Keyboard,6,24.93,0.1,134.62,credit_card,cancelled
+ORD-10004,CUST-504,Diana Brown,diana.brown@outlook.com,(552) 718-5333,2024-06-06,,South,Furniture,Desk Chair,7,20.37,0.05,135.46,paypal,pending
+ORD-10005,CUST-505,Eve Jones,eve.jones@yahoo.com,(921) 171-1750,2024-08-24,2024-08-31,Central,Electronics,Keyboard,2,79.12,0.1,142.42,paypal,completed
+ORD-10006,CUST-506,Frank Garcia,,(366) 479-6820,2024-06-27,2024-07-03,East,Furniture,Standing Desk,9,147.18,0.0,1324.62,bank_transfer,completed
+ORD-10007,CUST-507,Grace Miller,grace.miller@company.com,(476) 755-4598,2024-08-27,2024-09-03,East,Electronics,Wireless Mouse,6,83.23,0.0,499.38,debit_card,completed
+ORD-10008,CUST-508,Henry Davis,henry.davis@outlook.com,(417) 771-9179,2024-07-21,2024-07-23,Central,Electronics,Keyboard,9,110.1,0.2,792.72,bank_transfer,cancelled
+ORD-10009,CUST-509,Iris Rodriguez,iris.rodriguez@company.com,(570) 324-3266,2024-08-05,,South,Electronics,Wireless Mouse,2,34.8,0.0,69.6,bank_transfer,pending
+ORD-10010,CUST-510,Jack Martinez,jack.martinez@gmail.com,(594) 490-8668,2024-08-07,2024-08-12,East,Furniture,Desk Chair,9,151.42,0.2,1090.22,paypal,completed
+ORD-10011,CUST-511,Karen Smith,karen.smith@gmail.com,,2024-07-08,2024-07-10,South,Electronics,Monitor,9,153.58,0.15,1174.89,credit_card,cancelled
+ORD-10012,CUST-512,Leo Johnson,leo.johnson@outlook.com,(854) 619-4258,2024-06-20,2024-06-27,West,Furniture,Lamp,1,121.79,0.1,109.61,credit_card,completed
+ORD-10013,CUST-513,Mia Williams,mia.williams@gmail.com,(571) 999-6038,2024-07-01,2024-07-03,East,Electronics,USB Hub,2,195.71,0.15,332.71,debit_card,completed
+ORD-10014,CUST-514,Nick Brown,nick.brown@yahoo.com,(875) 586-3705,2024-07-04,2024-07-06,West,Furniture,Bookshelf,7,199.05,0.2,1114.68,paypal,cancelled
+ORD-10015,CUST-515,Olivia Jones,olivia.jones@company.com,(729) 562-2982,2024-07-02,,West,Electronics,Monitor,1,119.72,0.0,119.72,debit_card,pending
+ORD-10016,CUST-516,Paul Garcia,,(207) 172-1964,2024-06-30,2024-07-01,Central,Electronics,Webcam,4,59.3,0.1,213.48,debit_card,completed
+ORD-10017,CUST-517,Quinn Miller,quinn.miller@yahoo.com,(940) 684-8744,2024-07-02,2024-07-09,South,Electronics,Wireless Mouse,2,133.5,0.05,253.65,bank_transfer,cancelled
+ORD-10018,CUST-518,Rita Davis,rita.davis@company.com,(678) 984-1887,2024-08-26,2024-08-27,South,Furniture,Bookshelf,2,53.49,0.0,106.98,bank_transfer,completed
+ORD-10019,CUST-519,Sam Rodriguez,sam.rodriguez@yahoo.com,(632) 287-5563,2024-07-30,2024-08-06,East,Office Supplies,Tape,2,14.86,0.15,25.26,credit_card,completed
+ORD-10020,CUST-520,Tina Martinez,tina.martinez@gmail.com,(971) 969-4872,2024-06-22,2024-06-26,South,Electronics,USB Hub,1,37.1,0.0,37.1,bank_transfer,cancelled
+ORD-10021,CUST-501,Alice Smith,alice.smith@outlook.com,(665) 392-7930,2024-08-29,2024-08-31,West,Office Supplies,Pen Set,1,117.94,0.15,100.25,credit_card,cancelled
+ORD-10022,CUST-502,Bob Johnson,bob.johnson@outlook.com,(258) 151-8811,2024-08-04,2024-08-05,East,Electronics,Wireless Mouse,10,18.25,0.0,182.5,bank_transfer,completed
+ORD-10023,CUST-503,Charlie Williams,charlie.williams@gmail.com,(783) 352-1651,2024-08-19,,East,Office Supplies,Tape,10,106.94,0.05,1015.93,debit_card,pending
+ORD-10024,CUST-504,Diana Brown,diana.brown@outlook.com,(444) 371-7484,2024-06-17,2024-06-21,Central,Electronics,Wireless Mouse,8,126.13,0.15,857.68,credit_card,completed
+ORD-10025,CUST-505,Eve Jones,eve.jones@gmail.com,(750) 318-9288,2024-07-04,2024-07-07,East,Electronics,Monitor,5,35.76,0.15,151.98,paypal,completed
+ORD-10026,CUST-506,Frank Garcia,,(826) 926-9666,2024-06-02,2024-06-08,East,Electronics,Monitor,2,178.49,0.2,285.58,debit_card,completed
+ORD-10027,CUST-507,Grace Miller,grace.miller@outlook.com,(488) 719-4450,2024-07-14,2024-07-20,Central,Furniture,Filing Cabinet,5,181.54,0.0,907.7,credit_card,completed
+ORD-10028,CUST-508,Henry Davis,henry.davis@company.com,(483) 145-1058,2024-07-13,2024-07-19,Central,Electronics,USB Hub,9,142.61,0.15,1090.97,credit_card,completed
+ORD-10029,CUST-509,Iris Rodriguez,iris.rodriguez@gmail.com,(277) 807-3442,2024-08-09,2024-08-16,Central,Furniture,Lamp,3,88.81,0.0,266.43,paypal,completed
+ORD-10030,CUST-510,Jack Martinez,jack.martinez@outlook.com,(240) 466-4441,2024-08-27,2024-09-02,East,Office Supplies,Tape,7,194.9,0.2,1091.44,debit_card,completed
+ORD-10031,CUST-511,Karen Smith,karen.smith@yahoo.com,(366) 919-3900,2024-07-23,,East,Electronics,Monitor,7,161.44,0.2,904.06,debit_card,pending
+ORD-10032,CUST-512,Leo Johnson,leo.johnson@outlook.com,(363) 906-2771,2024-07-19,2024-07-26,South,Electronics,Keyboard,8,73.18,0.0,585.44,debit_card,completed
+ORD-10033,CUST-513,Mia Williams,mia.williams@gmail.com,(875) 297-7528,2024-07-13,2024-07-20,East,Office Supplies,Stapler,9,82.94,0.15,634.49,paypal,completed
+ORD-10034,CUST-514,Nick Brown,nick.brown@gmail.com,(318) 998-5279,2024-06-23,2024-06-24,East,Furniture,Filing Cabinet,6,147.07,0.05,838.3,bank_transfer,completed
+ORD-10035,CUST-515,Olivia Jones,olivia.jones@gmail.com,(594) 690-4114,2024-07-03,2024-07-09,South,Electronics,Webcam,9,138.94,0.2,1000.37,debit_card,completed
+ORD-10036,CUST-516,Paul Garcia,paul.garcia@outlook.com,(641) 171-6409,2024-08-19,2024-08-25,East,Furniture,Bookshelf,9,65.31,0.1,529.01,paypal,completed
+ORD-10037,CUST-517,Quinn Miller,quinn.miller@company.com,(913) 402-3085,2024-06-25,2024-07-01,South,Furniture,Standing Desk,10,115.98,0.1,1043.82,credit_card,cancelled
+ORD-10038,CUST-518,Rita Davis,rita.davis@outlook.com,(493) 315-8043,2024-08-14,2024-08-18,South,Office Supplies,Pen Set,9,97.27,0.2,700.34,debit_card,completed
+ORD-10039,CUST-519,Sam Rodriguez,sam.rodriguez@gmail.com,(490) 627-6491,2024-06-12,,West,Furniture,Bookshelf,4,162.28,0.0,649.12,credit_card,pending
+ORD-10040,CUST-520,Tina Martinez,tina.martinez@gmail.com,(450) 586-2193,2024-07-29,2024-08-04,West,Furniture,Filing Cabinet,8,82.93,0.0,663.44,credit_card,cancelled
+ORD-10041,CUST-501,Alice Smith,alice.smith@gmail.com,(997) 535-4585,2024-06-23,2024-06-24,West,Electronics,USB Hub,3,161.28,0.2,387.07,paypal,cancelled
+ORD-10042,CUST-502,Bob Johnson,bob.johnson@company.com,(827) 934-9270,2024-07-25,2024-07-27,South,Office Supplies,Stapler,4,168.77,0.05,641.33,bank_transfer,cancelled
+ORD-10043,CUST-503,Charlie Williams,charlie.williams@yahoo.com,(481) 550-2269,2024-07-07,2024-07-10,Central,Office Supplies,Tape,2,31.98,0.0,63.96,bank_transfer,completed
+ORD-10044,CUST-504,Diana Brown,diana.brown@yahoo.com,(923) 319-2052,2024-07-24,2024-07-27,South,Office Supplies,Notebook Pack,4,167.41,0.1,602.68,credit_card,cancelled
+ORD-10045,CUST-505,Eve Jones,eve.jones@company.com,(688) 106-6763,2024-07-09,2024-07-16,South,Furniture,Lamp,10,180.07,0.1,1620.63,debit_card,cancelled
+ORD-10046,CUST-506,Frank Garcia,frank.garcia@outlook.com,(646) 597-1475,2024-07-20,,Central,Furniture,Filing Cabinet,3,168.9,0.0,506.7,credit_card,pending
+ORD-10047,CUST-507,Grace Miller,grace.miller@company.com,(806) 677-1444,2024-06-11,2024-06-13,South,Electronics,Wireless Mouse,5,78.93,0.0,394.65,bank_transfer,cancelled
+ORD-10048,CUST-508,Henry Davis,henry.davis@outlook.com,(545) 879-7211,2024-07-06,2024-07-09,East,Office Supplies,Notebook Pack,9,15.16,0.05,129.62,debit_card,cancelled
+ORD-10049,CUST-509,Iris Rodriguez,iris.rodriguez@gmail.com,(999) 767-1659,2024-06-04,2024-06-06,East,Furniture,Standing Desk,4,29.61,0.2,94.75,credit_card,completed
+ORD-10050,CUST-510,Jack Martinez,jack.martinez@yahoo.com,(676) 816-5198,2024-07-18,2024-07-23,East,Electronics,Monitor,2,117.84,0.05,223.9,bank_transfer,completed
