@@ -142,9 +142,9 @@ python3 mcp-servers/pii-detection-server/server.py
 
 ## Documentation
 
-- **Full Test Report**: `PII_DETECTION_TEST_REPORT.md`
-- **Usage Examples**: `MCP_PII_USAGE_EXAMPLES.md`
 - **Server README**: `mcp-servers/pii-detection-server/README.md`
+- **MCP Guardrails**: `MCP_GUARDRAILS.md` (tool selection rules per phase)
+- **PII Detection Utility**: `shared/utils/pii_detection_and_tagging.py`
 
 ---
 
