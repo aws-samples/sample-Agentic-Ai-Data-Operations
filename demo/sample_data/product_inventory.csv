@@ -1,0 +1,124 @@
+product_id,sku,product_name,category,subcategory,brand,unit_price,cost_price,quantity_on_hand,reorder_level,reorder_quantity,warehouse_location,supplier_id,supplier_name,last_restocked_date,expiry_date,weight_kg,status
+PROD-1073,SKU-47667,TopShelf Fitness Basic,Sports,Fitness,TopShelf,246.63,118.92,740,121,150,WH-EAST-01,SUP-002,Pacific Trading Ltd,2025-03-30,,4.2,discontinued
+PROD-1065,SKU-57419,RapidFlow Fitness Plus,Sports,Fitness,RapidFlow,291.59,207.8,4083,170,502,WH-EAST-01,SUP-008,Fresh Farm Direct,2024-07-27,,6.71,active
+PROD-1113,SKU-68222,BrightStar Canned Goods Plus,Grocery,Canned Goods,BrightStar,389.11,183.42,2334,124,289,WH-CENTRAL-01,SUP-007,Eastern Markets Corp,2024-09-01,2026-06-08,24.14,discontinued
+PROD-1115,SKU-26341,RapidFlow Lighting Elite,Home & Garden,Lighting,RapidFlow,657.86,356.28,687,51,329,WH-WEST-02,SUP-002,Pacific Trading Ltd,2025-06-09,,3.73,discontinued
+PROD-1091,SKU-66387,TopShelf Footwear Pro,Clothing,Footwear,TopShelf,272.79,148.86,937,177,716,WH-CENTRAL-01,SUP-009,TechSource Partners,2026-01-08,,21.64,discontinued
+PROD-1071,SKU-23154,BrightStar Canned Goods Standard,Grocery,Canned Goods,BrightStar,490.85,252.14,816,144,982,WH-WEST-02,SUP-003,Atlantic Distributors,2024-01-16,2027-01-05,3.65,out_of_stock
+PROD-1068,SKU-19150,GlobeMax Canned Goods Elite,Grocery,Canned Goods,GlobeMax,596.19,255.1,3399,97,856,WH-CENTRAL-01,SUP-010,Heritage Brands Co,2024-09-30,2027-02-25,0.11,out_of_stock
+PROD-1099,SKU-61807,PrimePick Accessories Plus,CLOTHING,Accessories,PrimePick,404.86,334.23,448,11,259,WH-WEST-01,SUP-009,TechSource Partners,2024-08-04,,19.2,discontinued
+PROD-1098,SKU-67939,IronClad Smartphones Standard,Electronics,Smartphones,IronClad,598.84,331.65,2237,65,823,WH-CENTRAL-01,SUP-008,Fresh Farm Direct,2024-04-26,,8.66,active
+PROD-1021,SKU-62923,CoreTech Laptops Pro,Electronics,Laptops,CoreTech,82.91,35.84,4666,73,642,WH-CENTRAL-01,SUP-010,Heritage Brands Co,2024-02-10,,15.5,discontinued
+PROD-1036,SKU-19545,BrightStar Dairy Standard,Grocery,Dairy,BrightStar,971.81,492.0,3395,171,639,WH-EAST-02,SUP-004,Midwest Wholesale Inc,2026-01-05,2026-12-23,9.63,discontinued
+PROD-1034,SKU-47606,JustRight Cycling Basic,Sports,Cycling,JustRight,316.25,274.87,3521,158,671,WH-WEST-01,SUP-007,Eastern Markets Corp,2025-04-21,,11.07,out_of_stock
+PROD-1031,SKU-55309,SilverEdge Women Max,Clothing,Women,SilverEdge,41.16,21.05,2569,121,670,WH-CENTRAL-01,,,2024-04-28,,9.66,out_of_stock
+PROD-1001,SKU-98696,IronClad Smartphones Max,Electronics,Smartphones,IronClad,242.64,113.16,4467,32,654,WH-WEST-02,SUP-004,Midwest Wholesale Inc,2024-02-02,,0.79,active
+PROD-1089,SKU-96363,OptiGear Fitness Plus,Sports,Fitness,OptiGear,222.46,112.33,2470,127,708,WH-EAST-01,SUP-009,TechSource Partners,2024-03-03,,24.96,discontinued
+PROD-1008,SKU-44438,IronClad Kitchen Max,Home & Garden,Kitchen,IronClad,238.14,124.82,4788,119,969,WH-CENTRAL-01,SUP-003,Atlantic Distributors,2025-02-12,,9.08,active
+PROD-1076,SKU-49210,CoreTech Outdoor Max,Sports,Outdoor,CoreTech,1173.94,472.73,3475,186,306,WH-WEST-02,SUP-008,Fresh Farm Direct,2024-11-05,,5.02,discontinued
+PROD-1085,SKU-17936,LuxLine Men Standard,clothing,Men,LuxLine,911.33,451.04,2260,58,175,WH-WEST-02,SUP-009,TechSource Partners,2024-04-03,,16.59,out_of_stock
+PROD-1013,SKU-31643,EverGreen Audio Elite,Electronics,Audio,EverGreen,802.68,330.56,4322,165,483,WH-EAST-02,SUP-003,Atlantic Distributors,2025-07-06,,18.89,out_of_stock
+PROD-1103,SKU-92998,HomeNest Kids Pro,Clothing,Kids,HomeNest,488.71,390.0,4346,140,248,WH-WEST-01,SUP-006,Nordic Imports AB,2024-12-25,,18.2,out_of_stock
+PROD-1017,SKU-24322,BrightStar Smartphones Basic,Electronics,Smartphones,BrightStar,813.46,364.65,1569,58,599,WH-WEST-02,SUP-007,Eastern Markets Corp,2024-05-23,,10.58,discontinued
+PROD-1030,SKU-94080,IronClad Lighting Plus,Home & Garden,Lighting,IronClad,738.23,483.51,3274,183,913,WH-CENTRAL-01,SUP-002,Pacific Trading Ltd,2024-12-05,,23.48,active
+PROD-1019,SKU-44760,BrightStar Canned Goods Standard,Grocery,Canned Goods,BrightStar,473.04,190.73,2336,118,763,WH-CENTRAL-01,SUP-003,Atlantic Distributors,2025-11-08,2027-01-03,12.19,active
+PROD-1032,SKU-80575,BrightStar Beverages Max,Grocery,Beverages,BrightStar,6.81,2.84,1614,103,491,WH-EAST-01,SUP-007,Eastern Markets Corp,2025-11-11,2026-06-19,15.6,out_of_stock
+PROD-1060,SKU-94886,SilverEdge Beverages Basic,Grocery,Beverages,SilverEdge,402.9,213.72,2176,46,123,WH-EAST-01,SUP-004,Midwest Wholesale Inc,2024-06-18,2027-02-10,7.72,out_of_stock
+PROD-1027,SKU-26704,BrightStar Condiments Pro,Grocery,Condiments,BrightStar,394.3,292.09,2525,103,970,WH-EAST-01,SUP-006,Nordic Imports AB,2025-01-01,2026-04-18,17.07,out_of_stock
+PROD-1012,SKU-57576,TopShelf Fitness Elite,Sports,Fitness,TopShelf,319.18,245.33,1961,24,296,WH-CENTRAL-01,SUP-006,Nordic Imports AB,2024-03-21,,2.19,discontinued
+PROD-1015,SKU-53309,BrightStar Smartphones Pro,Electronics,Smartphones,BrightStar,42.41,35.57,4211,70,335,WH-WEST-02,SUP-004,Midwest Wholesale Inc,2024-08-07,,13.5,out_of_stock
+PROD-1110,SKU-21104,JustRight Beverages Elite,Grocery,Beverages,JustRight,139.52,66.22,4578,106,708,WH-WEST-01,SUP-007,Eastern Markets Corp,2024-05-10,,17.59,out_of_stock
+PROD-1061,SKU-62757,OptiGear Team Sports Elite,Sports,Team Sports,OptiGear,367.36,235.41,4099,148,555,WH-WEST-02,SUP-002,Pacific Trading Ltd,2024-03-23,,14.97,discontinued
+PROD-1020,SKU-51104,BrightStar Women Pro,Clothing,Women,BrightStar,453.98,368.4,410,159,538,WH-CENTRAL-01,SUP-010,Heritage Brands Co,2025-06-27,,3.98,out_of_stock
+PROD-1049,SKU-87656,TopShelf Team Sports Elite,Sports,Team Sports,TopShelf,689.29,387.77,2640,72,900,WH-EAST-01,SUP-009,TechSource Partners,2024-10-12,,22.05,active
+PROD-1101,SKU-51033,BrightStar Accessories Plus,Electronics,Accessories,BrightStar,27.12,11.33,3516,156,464,WH-WEST-02,,,2024-10-23,,2.92,active
+PROD-1082,SKU-83584,HomeNest Men Elite,Clothing,Men,HomeNest,33.89,14.46,4997,66,713,WH-EAST-01,SUP-008,Fresh Farm Direct,2025-10-12,,20.61,out_of_stock
+PROD-1106,SKU-47627,JustRight Fitness Pro,Sports,Fitness,JustRight,278.55,227.05,739,167,658,WH-CENTRAL-01,SUP-008,Fresh Farm Direct,2025-01-28,,11.59,out_of_stock
+PROD-1094,SKU-56090,NaturePlus Lighting Pro,home & garden,Lighting,NaturePlus,949.42,484.26,4734,139,267,WH-EAST-02,SUP-001,Global Supply Co,2025-11-03,,12.08,active
+PROD-1053,SKU-25814,LuxLine Team Sports Max,Sports,Team Sports,LuxLine,203.93,136.92,1577,90,172,WH-CENTRAL-01,SUP-008,Fresh Farm Direct,2026-02-19,,17.27,active
+PROD-1050,SKU-52600,TopShelf Tools Basic,Home & Garden,Tools,TopShelf,308.09,169.53,3994,64,413,WH-WEST-01,SUP-007,Eastern Markets Corp,2024-12-14,,7.03,out_of_stock
+PROD-1062,SKU-85392,  IronClad Accessories Plus  ,Clothing,Accessories,IronClad,116.26,47.48,169,182,891,WH-WEST-01,SUP-001,Global Supply Co,2025-08-13,,1.05,active
+PROD-1063,SKU-93202,OptiGear Tools Standard,Home & Garden,Tools,OptiGear,179.24,92.38,747,130,406,WH-WEST-02,SUP-005,Southern Goods LLC,2024-12-07,,8.06,active
+PROD-1039,SKU-78327,IronClad Decor Standard,Home & Garden,Decor,IronClad,640.62,420.25,1959,80,500,WH-EAST-01,SUP-004,Midwest Wholesale Inc,2025-12-31,,7.18,discontinued
+PROD-1010,SKU-80381,RapidFlow Team Sports Elite,Sports,Team Sports,RapidFlow,444.6,340.78,2786,38,350,WH-WEST-02,SUP-001,Global Supply Co,2024-06-10,,11.37,out_of_stock
+PROD-1002,SKU-81426,TopShelf Condiments Standard,Grocery,Condiments,TopShelf,595.83,281.5,1805,124,653,WH-WEST-01,SUP-001,Global Supply Co,2024-01-07,2027-01-24,20.16,out_of_stock
+PROD-1072,SKU-95175,PrimePick Dairy Pro,Grocery,Dairy,PrimePick,355.73,170.6,2691,182,929,WH-CENTRAL-01,SUP-005,Southern Goods LLC,2025-01-24,2026-06-12,15.69,discontinued
+PROD-1088,SKU-65176,AcmeCo Team Sports Plus,Sports,Team Sports,AcmeCo,177.23,134.15,931,200,115,WH-WEST-02,SUP-003,Atlantic Distributors,2025-04-04,,19.46,out_of_stock
+PROD-1108,SKU-89928,HomeNest Dairy Basic,Grocery,Dairy,HomeNest,920.41,495.51,2981,105,989,WH-WEST-01,SUP-008,Fresh Farm Direct,2025-01-31,2026-07-29,19.37,out_of_stock
+PROD-1077,SKU-48696,HomeNest Furniture Pro,Home & Garden,Furniture,HomeNest,552.41,286.82,3242,80,58,WH-CENTRAL-01,SUP-007,Eastern Markets Corp,2025-12-03,,19.47,active
+PROD-1114,SKU-60052,SilverEdge Beverages Plus,Grocery,Beverages,SilverEdge,354.93,231.92,4320,117,215,WH-EAST-02,SUP-008,Fresh Farm Direct,2025-09-11,2026-03-12,21.83,active
+PROD-1054,SKU-47093,IronClad Canned Goods Pro,Grocery,Canned Goods,IronClad,907.48,488.35,1590,85,282,WH-WEST-01,SUP-010,Heritage Brands Co,2024-07-02,2026-06-04,0.4,out_of_stock
+PROD-1096,SKU-96159,LuxLine Kids Standard,Clothing,Kids,LuxLine,124.05,92.34,570,46,808,WH-EAST-01,SUP-001,Global Supply Co,2024-04-03,,18.67,active
+PROD-1104,SKU-30036,DailyFresh Snacks Max,Grocery,Snacks,DailyFresh,179.22,129.47,617,,841,WH-WEST-02,SUP-003,Atlantic Distributors,2025-04-20,2027-01-22,14.12,out_of_stock
+PROD-1004,SKU-92397,DailyFresh Tools Plus,Home & Garden,Tools,DailyFresh,63.75,41.24,2962,157,246,WH-EAST-01,SUP-007,Eastern Markets Corp,2024-02-16,,16.55,discontinued
+PROD-1109,SKU-60667,KingSize Fitness Elite,Sports,Fitness,KingSize,316.3,166.19,2064,195,922,WH-CENTRAL-01,SUP-002,Pacific Trading Ltd,2024-06-02,,8.37,out_of_stock
+PROD-1112,SKU-91006,RapidFlow Audio Basic,Electronics,Audio,RapidFlow,33.38,20.8,4892,106,207,WH-EAST-02,SUP-009,TechSource Partners,2024-07-04,,20.79,out_of_stock
+PROD-1018,SKU-22833,CoreTech Kitchen Pro,Home & Garden,Kitchen,CoreTech,932.37,404.4,4428,,145,WH-EAST-02,SUP-008,Fresh Farm Direct,2024-06-19,,10.19,discontinued
+PROD-1028,SKU-41029,RapidFlow Tablets Basic,Electronics,Tablets,RapidFlow,1052.73,486.97,1450,115,75,WH-EAST-02,SUP-007,Eastern Markets Corp,2026-01-24,,23.12,discontinued
+PROD-1069,SKU-73483,SilverEdge Accessories Elite,Clothing,Accessories,SilverEdge,758.8,432.9,2723,151,831,WH-CENTRAL-01,SUP-008,Fresh Farm Direct,2025-01-21,,11.41,discontinued
+PROD-1023,SKU-37938,TopShelf Accessories Plus,Electronics,Accessories,TopShelf,622.03,498.06,2172,43,407,WH-EAST-01,SUP-010,Heritage Brands Co,2024-09-07,,9.27,active
+PROD-1120,SKU-78614,SilverEdge Women Elite,Clothing,Women,SilverEdge,195.52,95.28,554,144,607,WH-CENTRAL-01,SUP-007,Eastern Markets Corp,2025-06-03,,13.88,discontinued
+PROD-1078,SKU-93442,JustRight Water Sports Basic,Sports,Water Sports,JustRight,494.71,304.32,2053,183,823,WH-EAST-02,SUP-004,Midwest Wholesale Inc,2025-10-05,,2.47,out_of_stock
+PROD-1047,SKU-23356,CoreTech Kitchen Max,Home & Garden,Kitchen,CoreTech,690.75,345.93,2470,185,664,WH-EAST-01,SUP-010,Heritage Brands Co,2025-08-02,,19.58,discontinued
+PROD-1003,SKU-23396,IronClad Lighting Pro,Home & Garden,Lighting,IronClad,238.2,109.23,3112,34,417,WH-WEST-01,SUP-003,Atlantic Distributors,2025-09-10,,6.65,active
+PROD-1029,SKU-71694,FitPro Beverages Basic,Grocery,Beverages,FitPro,231.45,192.51,1634,127,408,WH-WEST-01,SUP-002,Pacific Trading Ltd,2024-08-21,2026-04-25,0.64,active
+PROD-1045,SKU-12671,BrightStar Dairy Plus,Grocery,Dairy,BrightStar,673.96,474.91,1248,71,179,WH-WEST-02,,,2025-11-16,2026-02-28,14.12,active
+PROD-1090,SKU-89730,  PrimePick Furniture Basic  ,Home & Garden,Furniture,PrimePick,48.6,38.6,538,42,331,WH-CENTRAL-01,SUP-008,Fresh Farm Direct,2025-10-10,,14.65,out_of_stock
+PROD-1022,SKU-51180,QuickServe Cycling Basic,Sports,Cycling,QuickServe,666.51,467.48,2175,111,184,WH-WEST-01,SUP-006,Nordic Imports AB,2025-04-13,,7.94,active
+PROD-1080,SKU-73156,IronClad Cycling Elite,Sports,Cycling,IronClad,294.17,129.97,2774,39,529,WH-EAST-01,SUP-003,Atlantic Distributors,2024-05-24,,18.87,active
+PROD-1058,SKU-23006,SilverEdge Lighting Basic,Home & Garden,Lighting,SilverEdge,78.25,31.99,1728,77,726,WH-EAST-01,SUP-010,Heritage Brands Co,2024-06-09,,6.03,out_of_stock
+PROD-1111,SKU-33627,NaturePlus Fitness Basic,Sports,Fitness,NaturePlus,298.7,182.19,2799,134,246,WH-EAST-02,SUP-009,TechSource Partners,2024-05-20,,3.92,discontinued
+PROD-1075,SKU-70443,HomeNest Tools Max,HOME & GARDEN,Tools,HomeNest,613.3,456.59,2080,127,311,WH-EAST-01,SUP-008,Fresh Farm Direct,2025-04-21,,22.54,out_of_stock
+PROD-1074,SKU-29080,KingSize Smartphones Basic,Electronics,Smartphones,KingSize,245.26,148.1,4351,115,629,WH-EAST-02,SUP-001,Global Supply Co,2024-06-23,,4.42,out_of_stock
+PROD-1079,SKU-21813,OptiGear Tablets Elite,Electronics,Tablets,OptiGear,621.57,290.63,2676,116,229,WH-EAST-02,SUP-001,Global Supply Co,2024-05-15,,19.67,discontinued
+PROD-1014,SKU-25860,MegaByte Beverages Basic,GROCERY,Beverages,MegaByte,407.03,220.17,1840,26,396,WH-EAST-01,SUP-006,Nordic Imports AB,2025-08-25,2026-10-11,5.79,active
+PROD-1042,SKU-73654,TopShelf Cycling Pro,Sports,Cycling,TopShelf,372.24,245.14,3185,96,734,WH-WEST-02,SUP-004,Midwest Wholesale Inc,2026-01-11,,4.17,discontinued
+PROD-1118,SKU-79176,GlobeMax Tablets Standard,Electronics,Tablets,GlobeMax,586.88,275.3,910,83,293,WH-WEST-01,SUP-003,Atlantic Distributors,2024-05-04,,1.24,discontinued
+PROD-1107,SKU-29773,SilverEdge Accessories Pro,Electronics,Accessories,SilverEdge,290.54,162.12,3690,36,880,WH-WEST-01,SUP-004,Midwest Wholesale Inc,2026-01-01,,2.15,out_of_stock
+PROD-1087,SKU-27038,TopShelf Women Plus,Clothing,Women,TopShelf,347.18,140.08,2053,54,162,WH-EAST-01,SUP-001,Global Supply Co,2024-05-14,,0.42,active
+PROD-1006,SKU-59735,FitPro Audio Elite,Electronics,Audio,FitPro,500.42,365.11,4562,66,751,WH-WEST-01,SUP-009,TechSource Partners,2026-02-25,,19.41,active
+PROD-1081,SKU-80329,  LuxLine Tools Pro  ,home & garden,Tools,LuxLine,462.56,395.76,3725,104,738,WH-WEST-01,SUP-002,Pacific Trading Ltd,2025-08-21,,9.56,out_of_stock
+PROD-1055,SKU-26551,BrightStar Beverages Max,Grocery,Beverages,BrightStar,580.54,277.57,4021,36,943,WH-EAST-01,SUP-001,Global Supply Co,2025-08-10,2026-05-26,11.76,discontinued
+PROD-1011,SKU-49117,FitPro Accessories Max,Clothing,Accessories,FitPro,1061.43,456.49,4158,165,253,WH-EAST-02,SUP-009,TechSource Partners,2025-01-17,,19.07,out_of_stock
+PROD-1095,SKU-66244,LuxLine Accessories Plus,Clothing,Accessories,LuxLine,734.94,381.78,4560,16,673,WH-WEST-01,SUP-002,Pacific Trading Ltd,2026-08-26,,4.55,out_of_stock
+PROD-1067,SKU-76698,DailyFresh Accessories Max,Electronics,Accessories,DailyFresh,529.76,250.19,2239,116,904,WH-WEST-02,SUP-003,Atlantic Distributors,2025-04-28,,6.13,out_of_stock
+PROD-1093,SKU-58843,CoreTech Furniture Basic,Home & Garden,Furniture,CoreTech,62.01,48.43,4557,25,650,WH-CENTRAL-01,SUP-002,Pacific Trading Ltd,2025-07-29,,8.27,active
+PROD-1086,SKU-84000,BrightStar Fitness Basic,Sports,Fitness,BrightStar,162.76,123.3,562,151,262,WH-CENTRAL-01,SUP-006,Nordic Imports AB,2024-08-09,,20.34,active
+PROD-1064,SKU-82102,NaturePlus Beverages Pro,Grocery,Beverages,NaturePlus,353.06,145.53,3725,32,372,WH-WEST-01,SUP-008,Fresh Farm Direct,2024-11-27,,24.26,discontinued
+PROD-1024,SKU-79329,JustRight Tools Pro,Home & Garden,Tools,JustRight,1101.79,491.96,4543,86,729,WH-EAST-01,SUP-010,Heritage Brands Co,2024-05-17,,6.65,aktive
+PROD-1044,SKU-46471,OptiGear Women Standard,Clothing,Women,OptiGear,397.56,170.08,2066,30,531,WH-EAST-01,SUP-006,Nordic Imports AB,2026-02-06,,13.51,discontinued
+PROD-1050,SKU-52600,TopShelf Tools Basic,Home & Garden,Tools,TopShelf,308.09,169.53,3994,64,413,WH-WEST-01,SUP-007,Eastern Markets Corp,2024-12-14,,7.03,out_of_stock
+PROD-1057,SKU-88135,HomeNest Men Plus,Clothing,Men,HomeNest,479.18,279.92,1848,143,439,WH-WEST-02,SUP-002,Pacific Trading Ltd,2025-03-29,,7.47,out_of_stock
+PROD-1052,SKU-97026,JustRight Smartphones Plus,Electronics,Smartphones,JustRight,300.7,203.39,3023,131,616,WH-CENTRAL-01,SUP-004,Midwest Wholesale Inc,2024-12-18,,10.67,out_of_stock
+PROD-1056,SKU-18564,BrightStar Women Standard,Clothing,Women,BrightStar,844.79,470.65,4028,28,640,WH-EAST-01,SUP-005,Southern Goods LLC,2024-06-04,,3.77,out_of_stock
+PROD-1048,SKU-65057,LuxLine Water Sports Standard,Sports,Water Sports,LuxLine,409.06,253.97,-48,120,420,WH-WEST-02,SUP-002,Pacific Trading Ltd,2025-12-25,,3.87,active
+PROD-1016,SKU-34957,PrimePick Cycling Pro,Sports,Cycling,PrimePick,879.79,392.74,794,178,491,WH-WEST-01,SUP-004,Midwest Wholesale Inc,2025-03-09,,10.31,out_of_stock
+PROD-1035,SKU-97012,PrimePick Condiments Max,Grocery,Condiments,PrimePick,506.1,330.11,2745,33,888,WH-EAST-02,SUP-003,Atlantic Distributors,2025-11-19,2026-06-08,5.65,active
+PROD-1043,SKU-96900,RapidFlow Condiments Pro,Grocery,Condiments,RapidFlow,884.19,453.65,687,174,488,WH-EAST-02,SUP-001,Global Supply Co,2025-04-17,2026-04-04,1.3,discontinued
+PROD-1084,SKU-74139,SilverEdge Water Sports Plus,Sports,Water Sports,SilverEdge,901.0,442.94,3343,81,83,WH-WEST-01,SUP-003,Atlantic Distributors,2024-08-10,,11.11,active
+PROD-1007,SKU-84341,MegaByte Tablets Max,Electronics,Tablets,MegaByte,83.3,34.96,2577,64,721,WH-WEST-02,SUP-005,Southern Goods LLC,2025-02-09,,22.12,out_of_stock
+PROD-1046,SKU-25012,LuxLine Lighting Basic,Home & Garden,Lighting,LuxLine,744.45,1010.31,2548,37,642,WH-EAST-01,,,2024-11-15,,14.42,discontinued
+PROD-1037,SKU-77889,AcmeCo Snacks Standard,Grocery,Snacks,AcmeCo,563.21,389.65,411,152,305,WH-EAST-01,SUP-002,Pacific Trading Ltd,2025-04-12,2026-03-10,20.05,out_of_stock
+PROD-1025,SKU-36685,IronClad Outdoor Max,Sports,Outdoor,IronClad,642.43,303.21,2162,139,550,WH-WEST-01,SUP-005,Southern Goods LLC,2024-02-22,,2.35,discontinued
+PROD-1083,SKU-74569,DailyFresh Footwear Pro,Clothing,Footwear,DailyFresh,29.5,24.58,796,70,958,WH-CENTRAL-01,SUP-003,Atlantic Distributors,2024-05-18,,9.75,discontinued
+PROD-1097,SKU-52517,OptiGear Decor Plus,Home & Garden,Decor,OptiGear,126.27,80.39,4884,31,954,WH-EAST-01,SUP-006,Nordic Imports AB,2026-07-06,,3.98,out_of_stock
+PROD-1119,SKU-80261,CoreTech Water Sports Pro,Sports,Water Sports,CoreTech,763.98,418.67,4221,157,297,WH-EAST-02,SUP-002,Pacific Trading Ltd,2024-10-25,,10.76,out_of_stock
+PROD-1033,SKU-48752,QuickServe Tablets Plus,Electronics,Tablets,QuickServe,531.35,334.11,-2,59,480,WH-WEST-02,SUP-005,Southern Goods LLC,2025-11-24,,18.72,active
+PROD-1061,SKU-62757,OptiGear Team Sports Elite,Sports,Team Sports,OptiGear,367.36,235.41,4099,148,555,WH-WEST-02,SUP-002,Pacific Trading Ltd,2024-03-23,,14.97,discontinued
+PROD-1070,SKU-15720,SilverEdge Snacks Elite,Grocery,Snacks,SilverEdge,259.93,372.26,3874,190,985,WH-WEST-02,SUP-007,Eastern Markets Corp,2025-01-30,2026-12-06,19.82,out_of_stock
+PROD-1105,SKU-29786,TopShelf Tools Standard,Home & Garden,Tools,TopShelf,863.37,432.39,559,130,502,WH-WEST-01,SUP-006,Nordic Imports AB,2024-10-08,,14.81,discontinued
+PROD-1051,SKU-63271,AcmeCo Accessories Standard,Clothing,Accessories,AcmeCo,600.06,474.14,4548,71,757,WH-WEST-02,SUP-009,TechSource Partners,2025-10-23,,17.81,discontinued
+PROD-1066,SKU-41365,PrimePick Footwear Max,Clothing,Footwear,PrimePick,32.77,16.38,1297,89,614,WH-EAST-01,SUP-002,Pacific Trading Ltd,2025-07-19,,10.23,active
+PROD-1040,SKU-30028,RapidFlow Kids Max,Clothing,Kids,RapidFlow,103.68,70.91,1752,26,474,WH-WEST-02,SUP-002,Pacific Trading Ltd,2024-12-04,,13.59,discontinued
+PROD-1041,SKU-12560,NaturePlus Laptops Plus,Electronics,Laptops,NaturePlus,877.39,452.61,3116,132,56,WH-WEST-01,SUP-007,Eastern Markets Corp,2024-11-01,,18.85,discontinued
+PROD-1116,SKU-61964,OptiGear Laptops Plus,Electronics,Laptops,OptiGear,795.85,465.38,3063,70,445,WH-EAST-01,SUP-006,Nordic Imports AB,2025-01-18,,5.65,discontinued
+PROD-1117,SKU-71925,EverGreen Tablets Max,Electronics,Tablets,EverGreen,50.33,21.07,1136,190,530,WH-WEST-02,SUP-003,Atlantic Distributors,2025-09-22,,0.18,active
+PROD-1102,SKU-21551,TopShelf Women Standard,Clothing,Women,TopShelf,995.78,416.35,867,72,496,WH-CENTRAL-01,SUP-008,Fresh Farm Direct,2025-02-14,,13.12,discontinued
+PROD-1006,SKU-59735,FitPro Audio Elite,Electronics,Audio,FitPro,500.42,618.23,4562,66,751,WH-WEST-01,SUP-009,TechSource Partners,2026-02-25,,19.41,active
+PROD-1026,SKU-44335,AcmeCo Men Basic,Clothing,Men,AcmeCo,775.94,386.02,3619,151,772,WH-WEST-02,SUP-006,Nordic Imports AB,2025-07-28,,0.29,active
+PROD-1038,SKU-90301,TopShelf Cycling Max,Sports,Cycling,TopShelf,1118.16,475.12,4135,119,900,WH-CENTRAL-01,SUP-006,Nordic Imports AB,2025-04-01,,22.44,out_of_stock
+PROD-1005,SKU-57819,DailyFresh Laptops Basic,Electronics,Laptops,DailyFresh,282.01,140.43,3032,100,264,WH-WEST-01,SUP-007,Eastern Markets Corp,2025-12-19,,23.42,out_of_stock
+PROD-1059,SKU-48175,AcmeCo Laptops Pro,Electronics,Laptops,AcmeCo,441.75,226.35,1896,83,773,WH-WEST-01,SUP-007,Eastern Markets Corp,2025-12-20,,21.5,active
+PROD-1100,SKU-26932,DailyFresh Kids Standard,Clothing,Kids,DailyFresh,432.33,249.7,4362,190,285,WH-CENTRAL-01,SUP-001,Global Supply Co,2025-07-26,,20.84,discontinued
+PROD-1092,SKU-22463,NaturePlus Kitchen Elite,Home & Garden,Kitchen,NaturePlus,699.03,414.05,3496,90,731,WH-WEST-01,SUP-006,Nordic Imports AB,2025-01-18,,23.84,out_of_stock
+PROD-1009,SKU-30969,CoreTech Water Sports Max,Sports,Water Sports,CoreTech,584.35,430.83,3458,162,115,WH-WEST-02,,,2025-01-25,,14.92,discontinued

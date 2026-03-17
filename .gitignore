@@ -199,10 +199,8 @@ REPOSITORY_STATUS.md
 DEPLOYMENT_SUMMARY.md
 DEMO_GUIDE.md
 
-# Demo scripts (for testing only, not for production)
+# Demo scripts in root (for testing only, not for production)
 grant_demo_role_access.py
-demo_*.py
-*_demo_*.py
 
 # Internal publication process files (not for public repo)
 GITHUB_SUCCESS.md
@@ -233,4 +231,7 @@ QUICKSIGHT_*.md
 # User-specific scripts (not generic)
 grant_access_*.sh
 *_hcherian*.sh
+
+# Demo folder (synthetic data generation - optional, comment out to include in repo)
+# demo/
 
