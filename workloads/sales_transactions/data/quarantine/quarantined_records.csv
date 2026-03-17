@@ -1,1 +1,0 @@
-order_id,customer_id,customer_name,email,phone,order_date,ship_date,region,product_category,product_name,quantity,unit_price,discount_pct,revenue,payment_method,status,_quarantine_reason

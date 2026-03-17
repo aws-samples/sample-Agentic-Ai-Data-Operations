@@ -165,3 +165,30 @@ demo_real_data_*.csv
 # ICEberg metadata (local simulation)
 .iceberg_metadata
 *.iceberg_metadata
+
+# ============================================================================
+# Test Results & Runtime Output (Updated 2024-03-17)
+# ============================================================================
+
+# All workload output directories (generated at runtime)
+workloads/*/output/
+workloads/*/data/bronze/
+workloads/*/data/silver/
+workloads/*/data/gold/
+workloads/*/data/quarantine/
+workloads/*/data/quality_reports/
+
+# Dashboard preview files (generated)
+dashboard_preview.html
+workloads/*/dashboard_preview.html
+
+# Test-generated data files
+workloads/*/input/*.csv
+!workloads/healthcare_patients/sample_data/patients.csv
+
+# Runtime quality reports
+*_quality_report_*.json
+
+# Runtime lineage files
+*_lineage_*.json
+
