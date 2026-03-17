@@ -1,0 +1,174 @@
+# semantic.yaml — Semantic layer configuration for Customer Master
+# Loaded into SageMaker Catalog + SynoDB at deploy time
+# Created: 2026-03-15
+
+dataset:
+  name: customer_master
+  business_name: "Customer Master"
+  domain: "Sales & Marketing"
+  owner: "CRM Team"
+  steward: "Sales Operations"
+  description: "Canonical customer reference data powering Sales & Marketing dashboards"
+  tags: [customer, crm, sales, marketing, master-data]
+
+columns:
+  customer_id:
+    role: dimension
+    description: "Unique customer identifier (CUST-NNN)"
+    is_primary_key: true
+    pii: false
+    default_aggregation: count_distinct
+    business_terms: [customer, account]
+
+  name:
+    role: attribute
+    description: "Customer full name"
+    pii: true
+    pii_treatment: "Keep as-is for reporting (not hashed)"
+    business_terms: [customer name, account name]
+
+  email:
+    role: attribute
+    description: "Customer email address"
+    pii: true
+    pii_treatment: "SHA-256 hash in Gold zone"
+    business_terms: [email, contact email]
+
+  phone:
+    role: attribute
+    description: "Customer phone number"
+    pii: true
+    pii_treatment: "Mask all but last 4 digits in Gold zone"
+    business_terms: [phone, telephone, contact number]
+
+  segment:
+    role: dimension
+    description: "Customer segment classification"
+    pii: false
+    allowed_values: [Enterprise, SMB, Individual]
+    default_aggregation: count
+    business_terms: [segment, customer type, tier]
+    dimension_hierarchy:
+      name: segment_hierarchy
+      levels: [segment]
+
+  industry:
+    role: dimension
+    description: "Industry vertical"
+    pii: false
+    default_aggregation: count
+    business_terms: [industry, vertical, sector]
+
+  country:
+    role: dimension
+    description: "Customer country"
+    pii: false
+    allowed_values: [US, UK, CA, DE]
+    default_aggregation: count
+    business_terms: [country, region, geography, geo]
+    dimension_hierarchy:
+      name: geography_hierarchy
+      levels: [country]
+    value_labels:
+      US: "United States"
+      UK: "United Kingdom"
+      CA: "Canada"
+      DE: "Germany"
+
+  status:
+    role: dimension
+    description: "Customer lifecycle status"
+    pii: false
+    allowed_values: [Active, Inactive, Churned]
+    default_aggregation: count
+    business_terms: [status, lifecycle, state]
+
+  join_date:
+    role: temporal
+    description: "Date customer was onboarded"
+    pii: false
+    format: "YYYY-MM-DD"
+    default_aggregation: min
+    business_terms: [join date, onboard date, signup date, start date]
+    time_intelligence:
+      fiscal_year_start: "January"
+      week_start: "Monday"
+      timezone: "UTC"
+
+  annual_value:
+    role: measure
+    description: "Annual contract value in USD"
+    pii: false
+    default_aggregation: sum
+    unit: USD
+    business_terms: [annual value, ACV, contract value, revenue, ARR]
+
+  credit_limit:
+    role: measure
+    description: "Assigned credit limit in USD"
+    pii: false
+    default_aggregation: sum
+    unit: USD
+    business_terms: [credit limit, credit, limit]
+
+# Fact table grain
+grain:
+  description: "One row per unique customer"
+  grain_columns: [customer_id]
+  dedup_strategy: "Keep first occurrence on customer_id"
+
+# Gold zone star schema
+gold_schema:
+  format: star_schema
+  use_case: "Reporting & Dashboards"
+  tables:
+    customer_fact:
+      type: fact
+      grain: [customer_id]
+      measures: [annual_value, credit_limit]
+      dimensions: [segment, country, status]
+      temporal: [join_date]
+      attributes: [name, email_hash, phone_masked, industry]
+    dim_segment:
+      type: dimension
+      key: segment_id
+      attributes: [segment_name]
+    dim_country:
+      type: dimension
+      key: country_code
+      attributes: [country_name]
+    dim_status:
+      type: dimension
+      key: status_id
+      attributes: [status_name]
+    customer_summary_by_segment:
+      type: aggregate
+      grain: [segment]
+      measures: [customer_count, total_annual_value, avg_annual_value, total_credit_limit]
+
+# Default filters for Analysis Agent
+default_filters:
+  active_customers: "status = 'Active'"
+  high_value: "annual_value >= 100000"
+
+# Seed questions for SynoDB
+seed_questions:
+  - question: "How many customers do we have by segment?"
+    sql: >
+      SELECT segment_name, customer_count
+      FROM demo_database_ai_agents_goldzone.customer_summary_by_segment
+      ORDER BY customer_count DESC
+  - question: "What is the total annual value by country?"
+    sql: >
+      SELECT dc.country_name, SUM(cf.annual_value) as total_value
+      FROM demo_database_ai_agents_goldzone.customer_fact cf
+      JOIN demo_database_ai_agents_goldzone.dim_country dc ON cf.country_code = dc.country_code
+      GROUP BY dc.country_name
+      ORDER BY total_value DESC
+      LIMIT 100
+  - question: "Who are the top 10 customers by annual value?"
+    sql: >
+      SELECT cf.customer_id, cf.name, cf.annual_value, cf.credit_limit
+      FROM demo_database_ai_agents_goldzone.customer_fact cf
+      ORDER BY cf.annual_value DESC
+      LIMIT 10

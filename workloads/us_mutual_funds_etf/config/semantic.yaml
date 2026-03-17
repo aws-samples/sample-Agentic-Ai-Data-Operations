@@ -1,0 +1,606 @@
+workload_name: us_mutual_funds_etf
+version: "1.0"
+created_at: "2026-03-16"
+
+# Technical metadata (from known schema)
+tables:
+  silver:
+    funds_clean:
+      primary_key: fund_ticker
+      columns:
+        fund_ticker:
+          type: string
+          nullable: false
+          pii: false
+          role: dimension
+          description: "Unique fund identifier (ticker symbol)"
+        fund_name:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "Full legal fund name"
+        fund_type:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "ETF or Mutual Fund"
+        management_company:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "Asset management firm operating the fund"
+        inception_date:
+          type: date
+          nullable: true
+          pii: false
+          role: temporal
+          description: "Date fund was launched"
+        fund_category:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "Investment category (Large Cap, Bond, etc.)"
+        geographic_focus:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "Geographic investment region"
+        sector_focus:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "Sector or industry focus"
+
+    market_data_clean:
+      primary_key: fund_ticker
+      columns:
+        fund_ticker:
+          type: string
+          nullable: false
+          pii: false
+          role: dimension
+          description: "Fund identifier"
+        asset_class:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "Asset class (Equity, Fixed Income, etc.)"
+        benchmark_index:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "Benchmark index for performance comparison"
+        morningstar_category:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "Morningstar categorization"
+        expense_ratio_pct:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: AVG
+          description: "Annual management fee as percentage of AUM"
+        dividend_yield_pct:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: AVG
+          description: "Dividend yield percentage"
+        beta:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: AVG
+          description: "Volatility relative to benchmark (1.0 = same as benchmark)"
+        sharpe_ratio:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: AVG
+          description: "Risk-adjusted return (higher is better)"
+        morningstar_rating:
+          type: int
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: AVG
+          description: "Morningstar star rating (1-5 stars)"
+
+    nav_clean:
+      primary_key: [fund_ticker, price_date]
+      partitioned_by: year(price_date)
+      columns:
+        fund_ticker:
+          type: string
+          nullable: false
+          pii: false
+          role: dimension
+          description: "Fund identifier"
+        price_date:
+          type: date
+          nullable: false
+          pii: false
+          role: temporal
+          description: "NAV pricing date"
+        nav:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: LAST
+          description: "Net Asset Value per share"
+        total_assets_millions:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: SUM
+          description: "Assets Under Management in millions USD"
+        return_1mo_pct:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: AVG
+          description: "1-month return percentage"
+        return_3mo_pct:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: AVG
+          description: "3-month return percentage"
+        return_ytd_pct:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: AVG
+          description: "Year-to-date return percentage"
+        return_1yr_pct:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: AVG
+          description: "1-year return percentage"
+        return_3yr_pct:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: AVG
+          description: "3-year annualized return percentage"
+        return_5yr_pct:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: AVG
+          description: "5-year annualized return percentage"
+
+  gold:
+    dim_fund:
+      primary_key: fund_ticker
+      columns:
+        fund_ticker:
+          type: string
+          nullable: false
+          pii: false
+          role: dimension
+          description: "Unique fund identifier"
+        fund_name:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "Full fund name"
+        fund_type:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "ETF or Mutual Fund"
+        management_company:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "Management firm"
+        inception_date:
+          type: date
+          nullable: true
+          pii: false
+          role: temporal
+          description: "Fund launch date"
+        fund_category:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "Investment category"
+        geographic_focus:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "Geographic region"
+        sector_focus:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "Sector focus"
+        asset_class:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "Asset class"
+        benchmark_index:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "Benchmark index"
+        morningstar_category:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "Morningstar category"
+
+    dim_category:
+      primary_key: category_key
+      columns:
+        category_key:
+          type: int
+          nullable: false
+          pii: false
+          role: dimension
+          description: "Surrogate key for category dimension"
+        fund_category:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "Investment category"
+        asset_class:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "Asset class"
+        morningstar_category:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "Morningstar category"
+        benchmark_index:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "Typical benchmark"
+        geographic_focus:
+          type: string
+          nullable: true
+          pii: false
+          role: dimension
+          description: "Geographic focus"
+        typical_expense_min:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: MIN
+          description: "Minimum typical expense ratio for category"
+        typical_expense_max:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: MAX
+          description: "Maximum typical expense ratio for category"
+
+    dim_date:
+      primary_key: date_key
+      columns:
+        date_key:
+          type: int
+          nullable: false
+          pii: false
+          role: dimension
+          description: "Date surrogate key (YYYYMMDD format)"
+        as_of_date:
+          type: date
+          nullable: false
+          pii: false
+          role: temporal
+          description: "Actual calendar date"
+        month:
+          type: int
+          nullable: true
+          pii: false
+          role: temporal
+          description: "Month number (1-12)"
+        month_name:
+          type: string
+          nullable: true
+          pii: false
+          role: temporal
+          description: "Month name (January, February, etc.)"
+        quarter:
+          type: int
+          nullable: true
+          pii: false
+          role: temporal
+          description: "Quarter number (1-4)"
+        year:
+          type: int
+          nullable: true
+          pii: false
+          role: temporal
+          description: "Year (YYYY)"
+
+    fact_fund_performance:
+      primary_key: fact_id
+      grain: [fund_ticker, price_date]
+      partitioned_by: year(price_date)
+      columns:
+        fact_id:
+          type: long
+          nullable: false
+          pii: false
+          role: identifier
+          description: "Surrogate key for fact table"
+        fund_ticker:
+          type: string
+          nullable: false
+          pii: false
+          role: foreign_key
+          references: dim_fund.fund_ticker
+          description: "Foreign key to dim_fund"
+        category_key:
+          type: int
+          nullable: true
+          pii: false
+          role: foreign_key
+          references: dim_category.category_key
+          description: "Foreign key to dim_category"
+        date_key:
+          type: int
+          nullable: false
+          pii: false
+          role: foreign_key
+          references: dim_date.date_key
+          description: "Foreign key to dim_date"
+        nav:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: LAST
+          description: "Net Asset Value per share"
+        total_assets_millions:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: SUM
+          description: "Assets Under Management in millions USD"
+        expense_ratio_pct:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: AVG
+          description: "Annual fee as percentage of AUM"
+        dividend_yield_pct:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: AVG
+          description: "Dividend yield percentage"
+        beta:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: AVG
+          description: "Volatility vs benchmark (1.0 = same as benchmark)"
+        sharpe_ratio:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: AVG
+          description: "Risk-adjusted return (higher is better)"
+        morningstar_rating:
+          type: int
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: AVG
+          description: "1-5 star rating"
+        return_1mo_pct:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: AVG
+          description: "1-month return percentage"
+        return_3mo_pct:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: AVG
+          description: "3-month return percentage"
+        return_ytd_pct:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: AVG
+          description: "Year-to-date return percentage"
+        return_1yr_pct:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: AVG
+          description: "1-year return percentage"
+        return_3yr_pct:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: AVG
+          description: "3-year annualized return percentage"
+        return_5yr_pct:
+          type: double
+          nullable: true
+          pii: false
+          role: measure
+          default_aggregation: AVG
+          description: "5-year annualized return percentage"
+
+# Business context
+business_context:
+  fact_grain: "One row per fund_ticker per price_date (monthly snapshot)"
+
+  default_filters:
+    - name: most_recent_date
+      description: "Use MAX(price_date) per fund for current snapshot queries"
+      sql_expression: "price_date = (SELECT MAX(price_date) FROM fact_fund_performance WHERE fund_ticker = f.fund_ticker)"
+
+    - name: exclude_null_ratings
+      description: "Filter out unrated funds when rating is the focus"
+      sql_expression: "morningstar_rating IS NOT NULL"
+
+  dimension_hierarchies:
+    - name: org_hierarchy
+      levels:
+        - management_company
+        - asset_class
+        - fund_category
+        - fund_ticker
+      description: "Organizational drill-down from company to individual fund"
+
+  business_terms:
+    - term: AUM
+      synonyms: [assets under management, total assets, fund size]
+      maps_to_column: total_assets_millions
+      sql_expression: "SUM(total_assets_millions)"
+      unit: millions USD
+
+    - term: returns
+      synonyms: [performance, gains]
+      maps_to_column: return_1yr_pct
+      sql_expression: "AVG(return_1yr_pct)"
+      unit: percentage
+      note: "Default to 1-year returns unless specified"
+
+    - term: fees
+      synonyms: [expense ratio, cost, charges]
+      maps_to_column: expense_ratio_pct
+      sql_expression: "AVG(expense_ratio_pct)"
+      unit: percentage
+
+    - term: risk
+      synonyms: [volatility, beta]
+      maps_to_column: beta
+      sql_expression: "AVG(beta)"
+      note: "Beta measures volatility vs benchmark"
+
+    - term: risk-adjusted performance
+      synonyms: [sharpe ratio, efficiency]
+      maps_to_column: sharpe_ratio
+      sql_expression: "AVG(sharpe_ratio)"
+      note: "Higher is better - return per unit of risk"
+
+    - term: rating
+      synonyms: [morningstar rating, star rating, quality]
+      maps_to_column: morningstar_rating
+      sql_expression: "AVG(morningstar_rating)"
+      unit: 1-5 stars
+
+  time_intelligence:
+    fiscal_year_start: "2025-01-01"
+    week_start: monday
+    timezone: America/New_York
+    data_freshness: monthly
+    default_period: 1Y
+
+  seed_questions:
+    - question: "Which funds have the highest Sharpe ratio?"
+      sql_hint: "SELECT fund_name, AVG(sharpe_ratio) FROM fact_fund_performance f JOIN dim_fund d ON f.fund_ticker=d.fund_ticker WHERE sharpe_ratio IS NOT NULL GROUP BY fund_name ORDER BY 2 DESC LIMIT 10"
+
+    - question: "Show me total AUM by management company"
+      sql_hint: "SELECT management_company, SUM(total_assets_millions)/1000 as aum_billions FROM fact_fund_performance f JOIN dim_fund d ON f.fund_ticker=d.fund_ticker WHERE price_date = (SELECT MAX(price_date) FROM fact_fund_performance) GROUP BY 1 ORDER BY 2 DESC"
+
+    - question: "Compare average returns for ETFs vs Mutual Funds"
+      sql_hint: "SELECT fund_type, AVG(return_1yr_pct) as avg_return_1y FROM fact_fund_performance f JOIN dim_fund d ON f.fund_ticker=d.fund_ticker GROUP BY 1"
+
+    - question: "What are the top 10 performing funds by 1-year return?"
+      sql_hint: "SELECT fund_name, AVG(return_1yr_pct) FROM fact_fund_performance f JOIN dim_fund d ON f.fund_ticker=d.fund_ticker GROUP BY fund_name ORDER BY 2 DESC LIMIT 10"
+
+    - question: "Show me the average expense ratio by asset class"
+      sql_hint: "SELECT asset_class, AVG(expense_ratio_pct) FROM fact_fund_performance f JOIN dim_fund d ON f.fund_ticker=d.fund_ticker GROUP BY 1 ORDER BY 2"
+
+    - question: "Which funds have the highest Morningstar ratings?"
+      sql_hint: "SELECT fund_name, AVG(morningstar_rating) as avg_rating FROM fact_fund_performance f JOIN dim_fund d ON f.fund_ticker=d.fund_ticker WHERE morningstar_rating IS NOT NULL GROUP BY fund_name ORDER BY 2 DESC LIMIT 10"
+
+  join_semantics:
+    - join_name: fact_to_fund
+      left_table: fact_fund_performance
+      right_table: dim_fund
+      join_type: INNER
+      join_condition: "fact.fund_ticker = dim_fund.fund_ticker"
+      when_to_join: "Always - every fact row must have fund details"
+      pre_aggregation_rule: "Join before aggregating measures"
+      columns_available_after_join: [fund_name, fund_type, management_company, asset_class, fund_category, geographic_focus, sector_focus]
+
+    - join_name: fact_to_category
+      left_table: fact_fund_performance
+      right_table: dim_category
+      join_type: LEFT
+      join_condition: "fact.category_key = dim_category.category_key"
+      when_to_join: "Only when grouping by category attributes"
+      pre_aggregation_rule: "Join before aggregating measures"
+      fan_out_warning: "None - 1:1 relationship"
+      columns_available_after_join: [fund_category, asset_class, morningstar_category, benchmark_index, geographic_focus, typical_expense_min, typical_expense_max]
+
+    - join_name: fact_to_date
+      left_table: fact_fund_performance
+      right_table: dim_date
+      join_type: INNER
+      join_condition: "fact.date_key = dim_date.date_key"
+      when_to_join: "When filtering by month/quarter/year or grouping by time"
+      pre_aggregation_rule: "Join before aggregating"
+      columns_available_after_join: [as_of_date, month, month_name, quarter, year]
+
+data_stewardship:
+  owner: Data Engineering Team
+  domain: Finance
+  contact: data-eng@company.com
+  last_updated: "2026-03-16"
+  update_frequency: monthly
+  data_quality_sla: 95%

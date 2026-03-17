@@ -1,0 +1,167 @@
+# ============================================================================
+# Data Onboarding Platform - Git Ignore
+# ============================================================================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+ENV/
+env/
+.venv
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+*.cover
+*.log
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# AWS & Credentials
+.aws/
+*.pem
+*.key
+credentials
+secrets.yml
+secrets.json
+.env
+.env.local
+
+# MCP Configuration (contains local paths)
+.mcp.json
+
+# Test Results & Outputs
+pii_detection_test_results_*.json
+test_results_*.json
+test_output_*.json
+*_test_results_*.json
+
+# Logs & Agent Runs
+logs/
+agent_run_logs/
+*.log
+*.log.*
+
+# Data Output Files
+output/
+**/output/bronze/
+**/output/silver/
+**/output/gold/
+**/output/staging/
+**/output/publish/
+**/output/landing/
+**/output/quality/
+**/output/lineage/
+**/output/quarantine/
+
+# Governance & PII Reports
+**/governance/pii_report_*.json
+
+# Temporary Files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.cache
+.cache/
+
+# Database Files
+*.db
+*.sqlite
+*.sqlite3
+
+# Airflow
+airflow.cfg
+airflow.db
+airflow-webserver.pid
+unittests.cfg
+
+# Node modules (if any)
+node_modules/
+
+# Cloned repositories (should not be in this repo)
+mcp-main/
+
+# OS Files
+Thumbs.db
+.DS_Store
+
+# Compiled files
+*.com
+*.class
+*.dll
+*.exe
+*.o
+
+# Archives
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Large data files (should be in S3, not Git)
+*.csv.gz
+*.parquet
+*.orc
+*.avro
+data/*.csv
+sample_data/*.csv
+!sample_data/sales_transactions.csv
+!sample_data/customer_pii_test.csv
+
+# Sensitive information markers
+*secret*
+*password*
+*credential*
+*token*
+*apikey*
+
+# Ignore specific test/demo files with real data
+test_real_data_*.csv
+demo_real_data_*.csv
+
+# ICEberg metadata (local simulation)
+.iceberg_metadata
+*.iceberg_metadata

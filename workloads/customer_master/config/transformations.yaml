@@ -1,0 +1,124 @@
+# transformations.yaml — Bronze-to-Gold transformation rules
+# Created: 2026-03-15
+
+workload: customer_master
+
+bronze_to_gold:
+  # Step 1: Deduplication
+  deduplication:
+    key: customer_id
+    strategy: keep_first
+    # Quarantine duplicates, never drop silently
+
+  # Step 2: Null handling
+  null_handling:
+    customer_id:
+      action: quarantine  # PK cannot be null
+    email:
+      action: keep_null   # ~13% nulls, acceptable
+    phone:
+      action: keep_null
+    name:
+      action: quarantine
+    segment:
+      action: quarantine
+    country:
+      action: quarantine
+    status:
+      action: quarantine
+    join_date:
+      action: quarantine
+    annual_value:
+      action: default
+      default_value: 0.0
+    credit_limit:
+      action: default
+      default_value: 0.0
+
+  # Step 3: PII masking
+  pii_masking:
+    email:
+      method: sha256_hash
+      description: "SHA-256 hash for pseudonymization"
+    phone:
+      method: mask_except_last_n
+      n: 4
+      mask_char: "*"
+      description: "Mask all but last 4 digits"
+    name:
+      method: keep
+      description: "Retain for reporting — access controlled via IAM"
+
+  # Step 4: Enum validation
+  enum_validation:
+    segment:
+      allowed: [Enterprise, SMB, Individual]
+      on_invalid: quarantine
+    status:
+      allowed: [Active, Inactive, Churned]
+      on_invalid: quarantine
+    country:
+      allowed: [US, UK, CA, DE]
+      on_invalid: quarantine
+
+  # Step 5: Type casting
+  type_casting:
+    annual_value:
+      target_type: decimal
+      on_error: quarantine
+    credit_limit:
+      target_type: decimal
+      on_error: quarantine
+    join_date:
+      target_type: date
+      format: "YYYY-MM-DD"
+      on_error: quarantine
+
+  # Step 6: Star schema construction
+  gold_format: star_schema
+  fact_table:
+    name: customer_fact
+    grain: [customer_id]
+    columns:
+      - customer_id
+      - name
+      - email_hash       # from PII masking
+      - phone_masked     # from PII masking
+      - segment          # FK to dim_segment
+      - industry
+      - country_code     # FK to dim_country (renamed from country)
+      - status           # FK to dim_status
+      - join_date
+      - annual_value
+      - credit_limit
+
+  dimension_tables:
+    - name: dim_segment
+      source_column: segment
+      key: segment_id
+      attributes:
+        - segment_name
+    - name: dim_country
+      source_column: country
+      key: country_code
+      attributes:
+        - country_name
+      value_map:
+        US: "United States"
+        UK: "United Kingdom"
+        CA: "Canada"
+        DE: "Germany"
+    - name: dim_status
+      source_column: status
+      key: status_id
+      attributes:
+        - status_name
+
+  aggregate_tables:
+    - name: customer_summary_by_segment
+      group_by: [segment]
+      measures:
+        customer_count: "COUNT(DISTINCT customer_id)"
+        total_annual_value: "SUM(annual_value)"
+        avg_annual_value: "AVG(annual_value)"
+        total_credit_limit: "SUM(credit_limit)"

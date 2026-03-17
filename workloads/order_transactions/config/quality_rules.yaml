@@ -1,0 +1,116 @@
+# Quality rules for order_transactions workload
+# Created: 2026-03-15
+
+workload: order_transactions
+version: "1.0"
+
+# Bronze zone quality checks (raw data)
+bronze:
+  completeness:
+    - column: order_id
+      rule: not_null
+      severity: critical
+    - column: customer_id
+      rule: not_null
+      severity: critical
+    - column: order_date
+      rule: not_null
+      severity: critical
+    - column: revenue
+      rule: not_null
+      severity: warning
+
+  uniqueness:
+    - column: order_id
+      rule: unique
+      severity: warning  # duplicates expected, will be deduped
+
+  validity:
+    - column: category
+      rule: in_set
+      values: ["Electronics", "Furniture", "Supplies"]
+      severity: critical
+    - column: status
+      rule: in_set
+      values: ["Completed", "Pending", "Cancelled"]
+      severity: critical
+    - column: region
+      rule: in_set
+      values: ["East", "West", "Central", "South"]
+      severity: critical
+    - column: quantity
+      rule: positive
+      severity: critical
+    - column: unit_price
+      rule: positive
+      severity: critical
+    - column: discount_pct
+      rule: range
+      min: 0
+      max: 1
+      severity: critical
+
+  consistency:
+    - rule: revenue_formula
+      description: "revenue ~ quantity * unit_price * (1 - discount_pct)"
+      tolerance: 0.01
+      severity: warning
+
+# Gold zone quality checks
+gold:
+  threshold: 0.95  # Gold zone requires >= 95% quality score
+
+  completeness:
+    - table: order_fact
+      column: order_id
+      rule: not_null
+      severity: critical
+    - table: order_fact
+      column: customer_id
+      rule: not_null
+      severity: critical
+
+  uniqueness:
+    - table: order_fact
+      column: order_id
+      rule: unique
+      severity: critical
+    - table: dim_product
+      column: product_id
+      rule: unique
+      severity: critical
+    - table: dim_region
+      column: region_id
+      rule: unique
+      severity: critical
+    - table: dim_status
+      column: status_id
+      rule: unique
+      severity: critical
+
+  referential_integrity:
+    - fact_table: order_fact
+      fact_column: product_id
+      dim_table: dim_product
+      dim_column: product_id
+      severity: critical
+    - fact_table: order_fact
+      fact_column: region_id
+      dim_table: dim_region
+      dim_column: region_id
+      severity: critical
+    - fact_table: order_fact
+      fact_column: status_id
+      dim_table: dim_status
+      dim_column: status_id
+      severity: critical
+
+  accuracy:
+    - table: order_fact
+      rule: no_future_dates
+      column: order_date
+      severity: critical
+    - table: order_fact
+      rule: no_orphan_customers
+      description: "All customer_ids must exist in customer_master"
+      severity: critical

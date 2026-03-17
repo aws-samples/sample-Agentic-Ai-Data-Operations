@@ -1,0 +1,175 @@
+# quality_rules.yaml — Data quality rules for Customer Master
+# Created: 2026-03-15
+
+workload: customer_master
+
+# Bronze quality gate (raw data checks)
+bronze:
+  minimum_score: 0.80
+  critical_rules:
+    - name: pk_not_null
+      dimension: completeness
+      description: "customer_id must not be null"
+      column: customer_id
+      check: not_null
+      severity: critical
+
+    - name: pk_unique
+      dimension: uniqueness
+      description: "customer_id must be unique (after dedup)"
+      column: customer_id
+      check: unique
+      severity: critical
+
+    - name: pk_format
+      dimension: validity
+      description: "customer_id must match CUST-NNN pattern"
+      column: customer_id
+      check: regex
+      pattern: "^CUST-\\d{3}$"
+      severity: critical
+
+  warning_rules:
+    - name: email_completeness
+      dimension: completeness
+      description: "email should be populated"
+      column: email
+      check: not_null
+      threshold: 0.85  # accept up to 15% nulls
+      severity: warning
+
+    - name: segment_valid
+      dimension: validity
+      description: "segment must be a valid enum"
+      column: segment
+      check: in_set
+      values: [Enterprise, SMB, Individual]
+      severity: warning
+
+    - name: status_valid
+      dimension: validity
+      description: "status must be a valid enum"
+      column: status
+      check: in_set
+      values: [Active, Inactive, Churned]
+      severity: warning
+
+    - name: country_valid
+      dimension: validity
+      description: "country must be a known code"
+      column: country
+      check: in_set
+      values: [US, UK, CA, DE]
+      severity: warning
+
+    - name: annual_value_positive
+      dimension: accuracy
+      description: "annual_value should be >= 0"
+      column: annual_value
+      check: gte
+      value: 0
+      severity: warning
+
+    - name: credit_limit_positive
+      dimension: accuracy
+      description: "credit_limit should be >= 0"
+      column: credit_limit
+      check: gte
+      value: 0
+      severity: warning
+
+# Gold quality gate (curated data checks)
+gold:
+  minimum_score: 0.95
+  critical_rules:
+    - name: fact_pk_unique
+      dimension: uniqueness
+      description: "customer_fact must have unique customer_id"
+      table: customer_fact
+      column: customer_id
+      check: unique
+      severity: critical
+
+    - name: fact_no_null_pk
+      dimension: completeness
+      description: "customer_fact.customer_id must not be null"
+      table: customer_fact
+      column: customer_id
+      check: not_null
+      severity: critical
+
+    - name: dim_segment_complete
+      dimension: completeness
+      description: "dim_segment must cover all segments in fact"
+      table: dim_segment
+      check: referential_integrity
+      parent_column: segment_name
+      child_table: customer_fact
+      child_column: segment
+      severity: critical
+
+    - name: dim_country_complete
+      dimension: completeness
+      description: "dim_country must cover all countries in fact"
+      table: dim_country
+      check: referential_integrity
+      parent_column: country_code
+      child_table: customer_fact
+      child_column: country_code
+      severity: critical
+
+    - name: dim_status_complete
+      dimension: completeness
+      description: "dim_status must cover all statuses in fact"
+      table: dim_status
+      check: referential_integrity
+      parent_column: status_name
+      child_table: customer_fact
+      child_column: status
+      severity: critical
+
+    - name: no_duplicate_facts
+      dimension: uniqueness
+      description: "No duplicate rows in customer_fact"
+      table: customer_fact
+      check: row_count_match
+      expected_source: "distinct customer_id count from bronze after dedup"
+      severity: critical
+
+  warning_rules:
+    - name: summary_matches_fact
+      dimension: consistency
+      description: "Summary table counts must match fact table"
+      table: customer_summary_by_segment
+      check: aggregate_consistency
+      reference_table: customer_fact
+      group_by: segment
+      severity: warning
+
+    - name: pii_masked
+      dimension: validity
+      description: "email_hash should not contain @ symbol (must be hashed)"
+      table: customer_fact
+      column: email_hash
+      check: not_contains
+      value: "@"
+      severity: critical
+
+    - name: phone_masked
+      dimension: validity
+      description: "phone_masked should contain mask characters"
+      table: customer_fact
+      column: phone_masked
+      check: contains
+      value: "*"
+      severity: warning
+
+# Anomaly detection
+anomaly_detection:
+  volume:
+    expected_row_count: 50
+    tolerance_pct: 20
+  distribution:
+    segment:
+      expected: {Enterprise: 0.15, SMB: 0.65, Individual: 0.20}
+      tolerance_pct: 10

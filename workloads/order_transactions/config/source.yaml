@@ -1,0 +1,77 @@
+# Source configuration for order_transactions workload
+# Created: 2026-03-15
+source:
+  name: order_transactions
+  description: "Sales order transactions with product, pricing, and regional data"
+  type: csv
+  location: "s3://aws-glue-assets-123456789012-us-east-1/demo-ai-agents/bronze/orders/"
+  format: csv
+  delimiter: ","
+  has_header: true
+  encoding: utf-8
+
+  # Schema
+  columns:
+    - name: order_id
+      type: string
+      role: primary_key
+      nullable: false
+    - name: customer_id
+      type: string
+      role: foreign_key
+      reference: "customer_master.customer_id"
+      nullable: false
+    - name: order_date
+      type: string  # cast to date in Silver/Gold
+      role: temporal
+      nullable: false
+    - name: product_name
+      type: string
+      role: dimension
+      nullable: false
+    - name: category
+      type: string
+      role: dimension
+      allowed_values: ["Electronics", "Furniture", "Supplies"]
+      nullable: false
+    - name: quantity
+      type: int
+      role: measure
+      nullable: false
+    - name: unit_price
+      type: double
+      role: measure
+      nullable: false
+    - name: discount_pct
+      type: double
+      role: measure
+      nullable: false
+    - name: revenue
+      type: double
+      role: measure
+      nullable: false
+    - name: status
+      type: string
+      role: dimension
+      allowed_values: ["Completed", "Pending", "Cancelled"]
+      nullable: false
+    - name: region
+      type: string
+      role: dimension
+      allowed_values: ["East", "West", "Central", "South"]
+      nullable: false
+
+  # Foreign key relationships
+  foreign_keys:
+    - column: customer_id
+      references:
+        workload: customer_master
+        table: customers
+        column: customer_id
+      cardinality: many-to-one
+      orphan_handling: quarantine
+
+  # Ingestion metadata
+  frequency: daily
+  expected_row_count_range: [100, 500]
+  pii_columns: []  # No PII in orders data

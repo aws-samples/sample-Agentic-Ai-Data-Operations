@@ -1,0 +1,131 @@
+# Transformation rules for order_transactions
+# Bronze -> Gold (direct, no Silver intermediate for demo)
+# Created: 2026-03-15
+
+workload: order_transactions
+version: "1.0"
+
+bronze_to_gold:
+  # Deduplication
+  deduplication:
+    enabled: true
+    key: order_id
+    strategy: keep_first  # keep first occurrence
+
+  # Null handling
+  null_checks:
+    - column: order_id
+      action: quarantine  # null PKs are quarantined
+    - column: customer_id
+      action: quarantine
+    - column: order_date
+      action: quarantine
+
+  # Foreign key validation
+  foreign_key_validation:
+    - column: customer_id
+      reference_source: "shared/fixtures/customers.csv"
+      reference_column: customer_id
+      on_orphan: quarantine
+
+  # Date validation
+  date_validation:
+    - column: order_date
+      format: "%Y-%m-%d"
+      future_date_action: quarantine  # quarantine orders with future dates
+
+  # Revenue validation
+  revenue_validation:
+    formula: "quantity * unit_price * (1 - discount_pct)"
+    target_column: revenue
+    tolerance: 0.01  # absolute tolerance
+    on_mismatch: flag  # flag but don't quarantine
+
+  # Enum validation
+  enum_validation:
+    - column: category
+      allowed: ["Electronics", "Furniture", "Supplies"]
+      on_invalid: quarantine
+    - column: status
+      allowed: ["Completed", "Pending", "Cancelled"]
+      on_invalid: quarantine
+    - column: region
+      allowed: ["East", "West", "Central", "South"]
+      on_invalid: quarantine
+
+  # Type casting
+  type_casting:
+    - column: order_date
+      from: string
+      to: date
+      format: "%Y-%m-%d"
+    - column: quantity
+      from: string
+      to: int
+    - column: unit_price
+      from: string
+      to: float
+    - column: discount_pct
+      from: string
+      to: float
+    - column: revenue
+      from: string
+      to: float
+
+  # Gold zone star schema
+  gold_schema:
+    format: star_schema
+
+    fact_table:
+      name: order_fact
+      columns:
+        - order_id
+        - customer_id
+        - order_date
+        - product_id   # FK to dim_product
+        - region_id    # FK to dim_region
+        - status_id    # FK to dim_status
+        - status_name  # denormalized for convenience
+        - quantity
+        - unit_price
+        - discount_pct
+        - revenue
+
+    dimension_tables:
+      - name: dim_product
+        source_columns: [product_name, category]
+        surrogate_key: product_id
+        attributes:
+          - product_id
+          - product_name
+          - category
+
+      - name: dim_region
+        source_columns: [region]
+        surrogate_key: region_id
+        attributes:
+          - region_id
+          - region_name
+
+      - name: dim_status
+        source_columns: [status]
+        surrogate_key: status_id
+        attributes:
+          - status_id
+          - status_name
+
+    aggregate_tables:
+      - name: order_summary_by_region_category
+        description: "Pre-aggregated order metrics by region and category"
+        group_by: [region, category]
+        metrics:
+          - name: total_revenue
+            expression: "SUM(revenue)"
+          - name: total_quantity
+            expression: "SUM(quantity)"
+          - name: order_count
+            expression: "COUNT(*)"
+          - name: avg_unit_price
+            expression: "AVG(unit_price)"
+          - name: avg_discount_pct
+            expression: "AVG(discount_pct)"

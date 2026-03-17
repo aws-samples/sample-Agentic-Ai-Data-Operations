@@ -1,0 +1,74 @@
+# source.yaml — Customer Master data source configuration
+# Owner: CRM Team / Sales
+# Created: 2026-03-15
+
+source:
+  name: customer_master
+  description: "Customer master data from CRM system for Sales & Marketing reporting"
+  type: file
+  format: csv
+  location: "s3://aws-glue-assets-123456789012-us-east-1/demo-ai-agents/bronze/customers/"
+  local_path: "shared/fixtures/customers.csv"
+  delimiter: ","
+  header: true
+  encoding: utf-8
+  row_count_expected: 52  # includes 2 duplicate pairs
+
+  schema:
+    columns:
+      - name: customer_id
+        type: string
+        description: "Primary key, format CUST-NNN"
+        nullable: false
+        primary_key: true
+      - name: name
+        type: string
+        description: "Customer full name"
+        nullable: false
+        pii: true
+      - name: email
+        type: string
+        description: "Customer email address"
+        nullable: true
+        pii: true
+      - name: phone
+        type: string
+        description: "Customer phone number, format (555) NNN-NNNN"
+        nullable: true
+        pii: true
+      - name: segment
+        type: string
+        description: "Customer segment"
+        nullable: false
+        allowed_values: [Enterprise, SMB, Individual]
+      - name: industry
+        type: string
+        description: "Industry vertical"
+        nullable: true
+      - name: country
+        type: string
+        description: "Country code"
+        nullable: false
+        allowed_values: [US, UK, CA, DE]
+      - name: status
+        type: string
+        description: "Customer lifecycle status"
+        nullable: false
+        allowed_values: [Active, Inactive, Churned]
+      - name: join_date
+        type: date
+        description: "Date customer was onboarded"
+        nullable: false
+        format: "YYYY-MM-DD"
+      - name: annual_value
+        type: decimal
+        description: "Annual contract value in USD"
+        nullable: false
+      - name: credit_limit
+        type: decimal
+        description: "Assigned credit limit in USD"
+        nullable: false
+
+  credentials:
+    # Reference Airflow Connection ID — no secrets in config
+    connection_id: "aws_default"

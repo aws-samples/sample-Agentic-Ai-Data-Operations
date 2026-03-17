@@ -1,0 +1,318 @@
+# Quality rules for product_inventory workload
+# Created: 2026-03-16
+
+workload: product_inventory
+version: "1.0"
+
+# Silver zone quality checks (cleaned data from Bronze)
+silver:
+  threshold: 0.80  # Silver zone requires >= 80% quality score
+  critical_rules:
+    - unique_product_id
+    - unique_sku
+    - not_null_product_id
+    - not_null_sku
+    - not_null_product_name
+    - positive_unit_price
+    - positive_cost_price
+    - valid_status
+
+  rules:
+    # --- Completeness (Dimension 1) ---
+    - name: not_null_product_id
+      dimension: completeness
+      severity: critical
+      description: "Product ID must be present"
+      sql: "SELECT COUNT(*) as failures FROM silver_product_inventory WHERE product_id IS NULL OR product_id = ''"
+
+    - name: not_null_sku
+      dimension: completeness
+      severity: critical
+      description: "SKU must be present"
+      sql: "SELECT COUNT(*) as failures FROM silver_product_inventory WHERE sku IS NULL OR sku = ''"
+
+    - name: not_null_product_name
+      dimension: completeness
+      severity: critical
+      description: "Product name must be present"
+      sql: "SELECT COUNT(*) as failures FROM silver_product_inventory WHERE product_name IS NULL OR product_name = ''"
+
+    - name: not_null_category
+      dimension: completeness
+      severity: warning
+      description: "Category should be present"
+      sql: "SELECT COUNT(*) as failures FROM silver_product_inventory WHERE category IS NULL OR category = ''"
+
+    - name: not_null_brand
+      dimension: completeness
+      severity: warning
+      description: "Brand should be present"
+      sql: "SELECT COUNT(*) as failures FROM silver_product_inventory WHERE brand IS NULL OR brand = ''"
+
+    # --- Accuracy (Dimension 2) ---
+    - name: positive_unit_price
+      dimension: accuracy
+      severity: critical
+      description: "Unit price must be positive"
+      sql: "SELECT COUNT(*) as failures FROM silver_product_inventory WHERE unit_price <= 0"
+
+    - name: positive_cost_price
+      dimension: accuracy
+      severity: critical
+      description: "Cost price must be positive"
+      sql: "SELECT COUNT(*) as failures FROM silver_product_inventory WHERE cost_price <= 0"
+
+    - name: non_negative_quantity
+      dimension: accuracy
+      severity: warning
+      description: "Quantity on hand must be >= 0"
+      sql: "SELECT COUNT(*) as failures FROM silver_product_inventory WHERE quantity_on_hand < 0"
+
+    - name: non_negative_reorder_level
+      dimension: accuracy
+      severity: warning
+      description: "Reorder level must be >= 0"
+      sql: "SELECT COUNT(*) as failures FROM silver_product_inventory WHERE reorder_level < 0"
+
+    - name: positive_reorder_quantity
+      dimension: accuracy
+      severity: warning
+      description: "Reorder quantity must be positive"
+      sql: "SELECT COUNT(*) as failures FROM silver_product_inventory WHERE reorder_quantity <= 0"
+
+    - name: positive_weight
+      dimension: accuracy
+      severity: warning
+      description: "Weight must be positive when present"
+      sql: "SELECT COUNT(*) as failures FROM silver_product_inventory WHERE weight_kg IS NOT NULL AND weight_kg <= 0"
+
+    - name: valid_last_restocked_date
+      dimension: accuracy
+      severity: warning
+      description: "Last restocked date must not be in the future"
+      sql: "SELECT COUNT(*) as failures FROM silver_product_inventory WHERE last_restocked_date > CURRENT_DATE"
+
+    - name: valid_expiry_date
+      dimension: accuracy
+      severity: warning
+      description: "Expiry date must be after last restocked date"
+      sql: "SELECT COUNT(*) as failures FROM silver_product_inventory WHERE expiry_date IS NOT NULL AND last_restocked_date IS NOT NULL AND expiry_date < last_restocked_date"
+
+    # --- Consistency (Dimension 3) ---
+    - name: category_casing
+      dimension: consistency
+      severity: warning
+      description: "Category names should be consistently cased"
+      sql: "SELECT COUNT(DISTINCT category) - COUNT(DISTINCT UPPER(category)) as failures FROM silver_product_inventory WHERE category IS NOT NULL"
+
+    - name: supplier_consistency
+      dimension: consistency
+      severity: warning
+      description: "If supplier_id is present, supplier_name must be present"
+      sql: "SELECT COUNT(*) as failures FROM silver_product_inventory WHERE (supplier_id IS NOT NULL AND supplier_id != '' AND (supplier_name IS NULL OR supplier_name = '')) OR (supplier_name IS NOT NULL AND supplier_name != '' AND (supplier_id IS NULL OR supplier_id = ''))"
+
+    # --- Validity (Dimension 4) ---
+    - name: valid_status
+      dimension: validity
+      severity: critical
+      description: "Status must be one of: active, discontinued, out_of_stock"
+      sql: "SELECT COUNT(*) as failures FROM silver_product_inventory WHERE status NOT IN ('active', 'discontinued', 'out_of_stock')"
+
+    - name: valid_product_id_format
+      dimension: validity
+      severity: warning
+      description: "Product ID should follow PROD-NNNN format"
+      sql: "SELECT COUNT(*) as failures FROM silver_product_inventory WHERE product_id NOT LIKE 'PROD-%'"
+
+    - name: valid_sku_format
+      dimension: validity
+      severity: warning
+      description: "SKU should follow SKU-NNNNN format"
+      sql: "SELECT COUNT(*) as failures FROM silver_product_inventory WHERE sku NOT LIKE 'SKU-%'"
+
+    - name: valid_supplier_id_format
+      dimension: validity
+      severity: warning
+      description: "Supplier ID should follow SUP-NNN format when present"
+      sql: "SELECT COUNT(*) as failures FROM silver_product_inventory WHERE supplier_id IS NOT NULL AND supplier_id != '' AND supplier_id NOT LIKE 'SUP-%'"
+
+    - name: valid_warehouse_location_format
+      dimension: validity
+      severity: warning
+      description: "Warehouse location should follow WH-REGION-NN format"
+      sql: "SELECT COUNT(*) as failures FROM silver_product_inventory WHERE warehouse_location IS NOT NULL AND warehouse_location NOT LIKE 'WH-%'"
+
+    # --- Uniqueness (Dimension 5) ---
+    - name: unique_product_id
+      dimension: uniqueness
+      severity: critical
+      description: "Product ID must be unique"
+      sql: "SELECT COUNT(*) - COUNT(DISTINCT product_id) as failures FROM silver_product_inventory"
+
+    - name: unique_sku
+      dimension: uniqueness
+      severity: critical
+      description: "SKU must be unique (after deduplication)"
+      sql: "SELECT COUNT(*) - COUNT(DISTINCT sku) as failures FROM silver_product_inventory"
+
+
+# Gold zone quality checks (star schema)
+gold:
+  threshold: 0.95  # Gold zone requires >= 95% quality score
+  critical_rules:
+    - fk_product_exists
+    - fk_supplier_exists
+    - fk_warehouse_exists
+    - unique_product_fact_pk
+    - unique_dim_supplier_pk
+    - unique_dim_warehouse_pk
+    - unique_dim_product_pk
+    - valid_margin_pct
+    - valid_inventory_value
+
+  rules:
+    # --- Completeness (PKs and FKs) ---
+    - name: not_null_product_fact_pk
+      dimension: completeness
+      severity: critical
+      description: "Fact inventory table PK must be present"
+      table: fact_inventory
+      sql: "SELECT COUNT(*) as failures FROM fact_inventory WHERE product_key IS NULL"
+
+    - name: not_null_product_fact_fks
+      dimension: completeness
+      severity: critical
+      description: "Fact inventory warehouse_key must be present (supplier_key is optional)"
+      table: fact_inventory
+      sql: "SELECT COUNT(*) as failures FROM fact_inventory WHERE warehouse_key IS NULL"
+
+    - name: not_null_dim_supplier_pk
+      dimension: completeness
+      severity: critical
+      description: "Supplier dimension PK must be present"
+      table: dim_supplier
+      sql: "SELECT COUNT(*) as failures FROM dim_supplier WHERE supplier_key IS NULL"
+
+    - name: not_null_dim_warehouse_pk
+      dimension: completeness
+      severity: critical
+      description: "Warehouse dimension PK must be present"
+      table: dim_warehouse
+      sql: "SELECT COUNT(*) as failures FROM dim_warehouse WHERE warehouse_key IS NULL"
+
+    - name: not_null_dim_product_pk
+      dimension: completeness
+      severity: critical
+      description: "Product dimension PK must be present"
+      table: dim_product
+      sql: "SELECT COUNT(*) as failures FROM dim_product WHERE product_key IS NULL"
+
+    # --- Uniqueness (PKs) ---
+    - name: unique_product_fact_pk
+      dimension: uniqueness
+      severity: critical
+      description: "Fact inventory PK must be unique"
+      table: fact_inventory
+      sql: "SELECT COUNT(*) - COUNT(DISTINCT product_key) as failures FROM fact_inventory"
+
+    - name: unique_dim_supplier_pk
+      dimension: uniqueness
+      severity: critical
+      description: "Supplier dimension PK must be unique"
+      table: dim_supplier
+      sql: "SELECT COUNT(*) - COUNT(DISTINCT supplier_key) as failures FROM dim_supplier"
+
+    - name: unique_dim_warehouse_pk
+      dimension: uniqueness
+      severity: critical
+      description: "Warehouse dimension PK must be unique"
+      table: dim_warehouse
+      sql: "SELECT COUNT(*) - COUNT(DISTINCT warehouse_key) as failures FROM dim_warehouse"
+
+    - name: unique_dim_product_pk
+      dimension: uniqueness
+      severity: critical
+      description: "Product dimension PK must be unique"
+      table: dim_product
+      sql: "SELECT COUNT(*) - COUNT(DISTINCT product_key) as failures FROM dim_product"
+
+    # --- Referential Integrity ---
+    - name: fk_product_exists
+      dimension: referential_integrity
+      severity: critical
+      description: "Fact inventory product_key must exist in dim_product"
+      fact_table: fact_inventory
+      fact_column: product_key
+      dim_table: dim_product
+      dim_column: product_key
+      sql: "Validated via join check"
+
+    - name: fk_supplier_exists
+      dimension: referential_integrity
+      severity: critical
+      description: "Fact inventory supplier_key must exist in dim_supplier"
+      fact_table: fact_inventory
+      fact_column: supplier_key
+      dim_table: dim_supplier
+      dim_column: supplier_key
+      sql: "SELECT COUNT(*) as failures FROM fact_inventory f WHERE NOT EXISTS (SELECT 1 FROM dim_supplier d WHERE d.supplier_key = f.supplier_key)"
+
+    - name: fk_warehouse_exists
+      dimension: referential_integrity
+      severity: critical
+      description: "Fact inventory warehouse_key must exist in dim_warehouse"
+      fact_table: fact_inventory
+      fact_column: warehouse_key
+      dim_table: dim_warehouse
+      dim_column: warehouse_key
+      sql: "SELECT COUNT(*) as failures FROM fact_inventory f WHERE NOT EXISTS (SELECT 1 FROM dim_warehouse d WHERE d.warehouse_key = f.warehouse_key)"
+
+    # --- Accuracy (Derived Fields) ---
+    - name: not_null_margin
+      dimension: accuracy
+      severity: warning
+      description: "Margin field should be present"
+      table: fact_inventory
+      sql: "SELECT COUNT(*) as failures FROM fact_inventory WHERE margin IS NULL"
+
+    - name: not_null_margin_pct
+      dimension: accuracy
+      severity: warning
+      description: "Margin percentage should be present"
+      table: fact_inventory
+      sql: "SELECT COUNT(*) as failures FROM fact_inventory WHERE margin_pct IS NULL"
+
+    - name: not_null_inventory_value
+      dimension: accuracy
+      severity: warning
+      description: "Inventory value should be present"
+      table: fact_inventory
+      sql: "SELECT COUNT(*) as failures FROM fact_inventory WHERE inventory_value IS NULL"
+
+    - name: valid_margin_pct
+      dimension: accuracy
+      severity: critical
+      description: "Margin percentage should be between -100% and 1000%"
+      table: fact_inventory
+      sql: "SELECT COUNT(*) as failures FROM fact_inventory WHERE margin_pct < -100 OR margin_pct > 1000"
+
+    - name: valid_inventory_value
+      dimension: accuracy
+      severity: critical
+      description: "Inventory value must be >= 0"
+      table: fact_inventory
+      sql: "SELECT COUNT(*) as failures FROM fact_inventory WHERE inventory_value < 0"
+
+    - name: margin_formula_check
+      dimension: accuracy
+      severity: warning
+      description: "Margin should equal unit_price - cost_price"
+      table: fact_inventory
+      sql: "SELECT COUNT(*) as failures FROM fact_inventory WHERE ABS(margin - (unit_price - cost_price)) > 0.01"
+
+    - name: inventory_value_formula_check
+      dimension: accuracy
+      severity: warning
+      description: "Inventory value should equal quantity_on_hand * unit_price (retail value, not cost)"
+      table: fact_inventory
+      sql: "SELECT COUNT(*) as failures FROM fact_inventory WHERE ABS(inventory_value - (quantity_on_hand * unit_price)) > 0.01"

@@ -1,0 +1,123 @@
+# analytics.yaml — QuickSight Dashboard Configuration for Product Inventory
+# Created: 2026-03-16
+# Data source: demo_ai_agents Glue Catalog (Athena)
+
+dashboard:
+  name: "Regional Inventory Intelligence"
+  description: "Comprehensive regional analysis of product inventory — value distribution, category mix, brand performance, and stock health across EAST, WEST, and CENTRAL warehouses"
+  owner: "Inventory Operations Team"
+  refresh: "Daily at 06:00 UTC (after pipeline completes)"
+
+datasets:
+  - name: fact_inventory
+    source: "demo_ai_agents.gold_fact_inventory"
+    mode: DIRECT_QUERY
+    join:
+      - table: "demo_ai_agents.gold_dim_warehouse"
+        on: "warehouse_key"
+        type: LEFT
+      - table: "demo_ai_agents.gold_dim_product"
+        on: "product_key"
+        type: LEFT
+      - table: "demo_ai_agents.gold_dim_supplier"
+        on: "supplier_key"
+        type: LEFT
+
+visuals:
+  - id: inventory_value_by_region
+    title: "Inventory Value by Region"
+    type: bar_horizontal
+    description: "Total inventory value across EAST, WEST, CENTRAL — highlights which region holds the most capital"
+    dataset: fact_inventory
+    measures:
+      - "SUM(inventory_value) AS total_value"
+    dimensions: [region]
+    sort: total_value DESC
+    filters:
+      - "status IN ('active', 'out_of_stock')"
+
+  - id: category_mix_by_region
+    title: "Category Distribution by Region"
+    type: bar_stacked
+    description: "Stacked bar showing product count per category in each region — reveals regional category concentration"
+    dataset: fact_inventory
+    measures:
+      - "COUNT(*) AS product_count"
+    dimensions: [region, category]
+    sort: region ASC
+    color_by: category
+
+  - id: stock_status_pie
+    title: "Stock Health by Region"
+    type: pie_donut
+    description: "Three donut charts showing active/out_of_stock/discontinued proportions per region"
+    dataset: fact_inventory
+    measures:
+      - "COUNT(*) AS product_count"
+    dimensions: [region, status]
+    group_by: region
+
+  - id: margin_by_brand
+    title: "Brand Margin Comparison by Region"
+    type: bar_grouped
+    description: "Grouped bar chart comparing average margin % across top brands, colored by region"
+    dataset: fact_inventory
+    measures:
+      - "AVG(margin_pct) AS avg_margin_pct"
+    dimensions: [brand, region]
+    sort: avg_margin_pct DESC
+    filters:
+      - "brand IS NOT NULL"
+    limit: 10
+
+  - id: category_value_trend
+    title: "Inventory Value: Category x Region Heatmap"
+    type: bar_stacked_horizontal
+    description: "Horizontal stacked bars showing inventory value breakdown by category within each region"
+    dataset: fact_inventory
+    measures:
+      - "SUM(inventory_value) AS total_value"
+    dimensions: [region, category]
+    sort: total_value DESC
+    color_by: category
+
+  - id: regional_kpi_summary
+    title: "Regional KPI Summary"
+    type: table
+    description: "Summary table with key metrics per region — products, total value, avg margin, total quantity"
+    dataset: fact_inventory
+    columns:
+      - "region"
+      - "COUNT(DISTINCT product_key) AS products"
+      - "SUM(inventory_value) AS total_value"
+      - "AVG(margin_pct) AS avg_margin_pct"
+      - "SUM(quantity_on_hand) AS total_quantity"
+    sort: total_value DESC
+
+color_scheme:
+  name: "Ocean Gradient"
+  background: "#0f172a"
+  card_background: "rgba(30, 41, 59, 0.85)"
+  text_primary: "#f1f5f9"
+  text_secondary: "#94a3b8"
+  accent: "#38bdf8"
+  regions:
+    EAST: "#38bdf8"
+    WEST: "#a78bfa"
+    CENTRAL: "#34d399"
+  categories:
+    Electronics: "#60a5fa"
+    Clothing: "#f472b6"
+    Grocery: "#34d399"
+    Home & Garden: "#fbbf24"
+    Sports: "#fb923c"
+  status:
+    active: "#34d399"
+    out_of_stock: "#f87171"
+    discontinued: "#94a3b8"
+
+permissions:
+  - group: "InventoryAnalysts"
+    access: VIEWER
+  - group: "SupplyChainOps"
+    access: AUTHOR

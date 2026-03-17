@@ -1,0 +1,45 @@
+source_id: us_mutual_funds_etf_synthetic
+source_name: US Mutual Funds & ETF Dataset
+source_type: synthetic_generation
+description: Synthetic US mutual fund and ETF performance data for finance analytics
+
+connection:
+  type: glue_pyspark_generation
+  bucket: your-datalake-bucket
+  bronze_prefix: bronze/
+  glue_version: "4.0"
+  worker_type: G.1X
+
+tables:
+  - name: raw_funds
+    format: parquet
+    path: s3://your-datalake-bucket/bronze/raw_funds/
+    row_count: 130
+    description: Fund master data with identifiers and classifications
+
+  - name: raw_market_data
+    format: parquet
+    path: s3://your-datalake-bucket/bronze/raw_market_data/
+    row_count: 130
+    description: Market metrics, benchmarks, and ratings per fund
+
+  - name: raw_nav_prices
+    format: parquet
+    path: s3://your-datalake-bucket/bronze/raw_nav_prices/
+    row_count: 150
+    description: Historical NAV prices and performance returns
+
+credentials:
+  method: iam_role
+  secrets_manager_arn: null
+
+ingestion:
+  frequency: one_time_generation
+  schedule: null
+  incremental: false
+
+metadata:
+  owner: Data Engineering Team
+  domain: Finance
+  classification: Internal
+  retention_days: 2555

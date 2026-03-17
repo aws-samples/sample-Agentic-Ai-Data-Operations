@@ -1,0 +1,309 @@
+workload_name: us_mutual_funds_etf
+version: "1.0"
+
+# Silver Zone Quality Rules (Threshold: 0.80, 0 critical failures)
+silver_rules:
+  finsights_silver.funds_clean:
+    completeness:
+      - column: fund_ticker
+        rule: NOT NULL
+        severity: critical
+        threshold: 1.0
+        description: "Every row must have a fund ticker"
+
+      - column: fund_name
+        rule: NOT NULL
+        severity: warning
+        threshold: 0.95
+        description: "Fund name should be present (allow 5% Unknown Fund)"
+
+      - column: fund_type
+        rule: NOT NULL
+        severity: critical
+        threshold: 1.0
+        description: "Fund type must be classified"
+
+    validity:
+      - column: fund_type
+        rule: IN ('ETF', 'Mutual Fund')
+        severity: critical
+        threshold: 1.0
+        description: "Only two valid fund types after standardization"
+
+      - column: inception_date
+        rule: BETWEEN '1985-01-01' AND CURRENT_DATE
+        severity: warning
+        threshold: 0.98
+        description: "Inception date must be realistic (post-1985, not future)"
+
+    uniqueness:
+      - column: fund_ticker
+        rule: DISTINCT
+        severity: critical
+        threshold: 1.0
+        description: "No duplicate fund tickers allowed in cleaned data"
+
+  finsights_silver.market_data_clean:
+    completeness:
+      - column: fund_ticker
+        rule: NOT NULL
+        severity: critical
+        threshold: 1.0
+
+      - column: expense_ratio_pct
+        rule: NOT NULL
+        severity: warning
+        threshold: 0.90
+        description: "Expense ratio should be known for most funds"
+
+    accuracy:
+      - column: expense_ratio_pct
+        rule: BETWEEN 0.0 AND 3.0
+        severity: critical
+        threshold: 1.0
+        description: "Expense ratio must be realistic (0-3%)"
+
+      - column: beta
+        rule: BETWEEN 0.0 AND 3.0
+        severity: warning
+        threshold: 0.95
+        description: "Beta typically 0-3 (allow some outliers)"
+
+      - column: sharpe_ratio
+        rule: BETWEEN -2.0 AND 5.0
+        severity: warning
+        threshold: 0.95
+        description: "Sharpe ratio typically -2 to 5"
+
+      - column: morningstar_rating
+        rule: BETWEEN 1 AND 5
+        severity: critical
+        threshold: 1.0
+        description: "Morningstar rating must be 1-5 stars or NULL"
+
+    validity:
+      - column: dividend_yield_pct
+        rule: BETWEEN 0.0 AND 15.0
+        severity: warning
+        threshold: 0.98
+        description: "Dividend yield typically 0-15%"
+
+  finsights_silver.nav_clean:
+    completeness:
+      - column: fund_ticker
+        rule: NOT NULL
+        severity: critical
+        threshold: 1.0
+
+      - column: price_date
+        rule: NOT NULL
+        severity: critical
+        threshold: 1.0
+
+      - column: nav
+        rule: NOT NULL
+        severity: critical
+        threshold: 1.0
+
+    accuracy:
+      - column: nav
+        rule: GREATER THAN 0
+        severity: critical
+        threshold: 1.0
+        description: "NAV must be positive"
+
+      - column: return_1yr_pct
+        rule: BETWEEN -50 AND 100
+        severity: warning
+        threshold: 1.0
+        description: "1-year return outliers clamped during cleaning"
+
+      - column: return_5yr_pct
+        rule: BETWEEN -50 AND 100
+        severity: warning
+        threshold: 1.0
+        description: "5-year return outliers clamped during cleaning"
+
+    consistency:
+      - rule: return_5yr_pct IS NULL OR return_1yr_pct IS NOT NULL
+        severity: warning
+        threshold: 0.90
+        description: "If 5Y return exists, 1Y return should too"
+
+    referential_integrity:
+      - foreign_key: fund_ticker
+        references: finsights_silver.funds_clean.fund_ticker
+        severity: critical
+        threshold: 1.0
+        description: "Every NAV record must reference a valid fund"
+
+# Gold Zone Quality Rules (Threshold: 0.95, 0 critical failures)
+gold_rules:
+  finsights_gold.dim_fund:
+    completeness:
+      - column: fund_ticker
+        rule: NOT NULL
+        severity: critical
+        threshold: 1.0
+
+      - column: fund_name
+        rule: NOT NULL
+        severity: critical
+        threshold: 1.0
+
+      - column: asset_class
+        rule: NOT NULL
+        severity: critical
+        threshold: 1.0
+
+    uniqueness:
+      - column: fund_ticker
+        rule: DISTINCT
+        severity: critical
+        threshold: 1.0
+        description: "Primary key must be unique"
+
+  finsights_gold.dim_category:
+    completeness:
+      - column: category_key
+        rule: NOT NULL
+        severity: critical
+        threshold: 1.0
+
+      - column: fund_category
+        rule: NOT NULL
+        severity: critical
+        threshold: 1.0
+
+    uniqueness:
+      - column: category_key
+        rule: DISTINCT
+        severity: critical
+        threshold: 1.0
+        description: "Surrogate key must be unique"
+
+    accuracy:
+      - column: typical_expense_min
+        rule: LESS THAN OR EQUAL TO typical_expense_max
+        severity: critical
+        threshold: 1.0
+        description: "Min expense must not exceed max"
+
+  finsights_gold.dim_date:
+    completeness:
+      - column: date_key
+        rule: NOT NULL
+        severity: critical
+        threshold: 1.0
+
+      - column: as_of_date
+        rule: NOT NULL
+        severity: critical
+        threshold: 1.0
+
+    uniqueness:
+      - column: date_key
+        rule: DISTINCT
+        severity: critical
+        threshold: 1.0
+
+      - column: as_of_date
+        rule: DISTINCT
+        severity: critical
+        threshold: 1.0
+
+    validity:
+      - column: month
+        rule: BETWEEN 1 AND 12
+        severity: critical
+        threshold: 1.0
+
+      - column: quarter
+        rule: BETWEEN 1 AND 4
+        severity: critical
+        threshold: 1.0
+
+  finsights_gold.fact_fund_performance:
+    completeness:
+      - column: fact_id
+        rule: NOT NULL
+        severity: critical
+        threshold: 1.0
+
+      - column: fund_ticker
+        rule: NOT NULL
+        severity: critical
+        threshold: 1.0
+
+      - column: date_key
+        rule: NOT NULL
+        severity: critical
+        threshold: 1.0
+
+    uniqueness:
+      - column: fact_id
+        rule: DISTINCT
+        severity: critical
+        threshold: 1.0
+        description: "Primary key must be unique"
+
+    referential_integrity:
+      - foreign_key: fund_ticker
+        references: finsights_gold.dim_fund.fund_ticker
+        severity: critical
+        threshold: 1.0
+
+      - foreign_key: category_key
+        references: finsights_gold.dim_category.category_key
+        severity: warning
+        threshold: 0.95
+        description: "Allow some nulls in category FK"
+
+      - foreign_key: date_key
+        references: finsights_gold.dim_date.date_key
+        severity: critical
+        threshold: 1.0
+
+    accuracy:
+      - column: nav
+        rule: GREATER THAN 0
+        severity: critical
+        threshold: 1.0
+
+      - column: total_assets_millions
+        rule: GREATER THAN 0
+        severity: warning
+        threshold: 0.95
+
+      - column: expense_ratio_pct
+        rule: BETWEEN 0.0 AND 3.0
+        severity: warning
+        threshold: 0.95
+
+# Anomaly Detection Rules
+anomaly_detection:
+  statistical_outliers:
+    - table: finsights_silver.market_data_clean
+      column: beta
+      method: z_score
+      threshold: 3.0
+      description: "Flag beta values > 3 std dev from mean"
+
+    - table: finsights_silver.nav_clean
+      column: total_assets_millions
+      method: iqr
+      threshold: 1.5
+      description: "Flag AUM outliers using interquartile range"
+
+  volume_anomalies:
+    - table: finsights_silver.nav_clean
+      rule: row_count_vs_baseline
+      threshold: 0.20
+      description: "Alert if row count deviates >20% from historical average"
+
+  distribution_shift:
+    - table: finsights_gold.fact_fund_performance
+      column: return_1yr_pct
+      method: kolmogorov_smirnov
+      threshold: 0.05
+      description: "Detect significant shifts in return distribution"

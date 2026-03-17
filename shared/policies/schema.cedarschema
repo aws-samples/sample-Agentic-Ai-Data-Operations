@@ -1,0 +1,167 @@
+// Cedar schema for the Agentic Data Onboarding Platform
+// Defines entity types, actions, and context shapes for:
+//   1. Agent authorization (which agent can do what)
+//   2. Guardrail enforcement (16 SEC/DQ/INT/OPS policies)
+
+namespace DataOnboarding {
+
+    // -----------------------------------------------------------------------
+    // Entity Types
+    // -----------------------------------------------------------------------
+
+    entity AgentPrincipal = {
+        // router | onboarding | metadata | transformation | quality | dag | analysis
+        "agentType": String,
+        // main_conversation | sub_agent
+        "executionContext": String,
+        "workloadName": String,
+    };
+
+    entity UserPrincipal = {
+        "email": String,
+        // data_engineer | analyst | admin
+        "role": String,
+    };
+
+    entity DataZone = {
+        // landing | staging | publish
+        "zone": String,
+        "workloadName": String,
+        "encryptionKeyAlias": String,
+    };
+
+    entity WorkloadFile = {
+        // config | script | dag | sql | test
+        "fileType": String,
+        "zone": String,
+    };
+
+    entity McpTool = {
+        "serverName": String,
+        "toolName": String,
+    };
+
+    entity PipelineStep = {
+        "stepNumber": Long,
+        "stepName": String,
+        "sourceZone": String,
+        "targetZone": String,
+    };
+
+    // -----------------------------------------------------------------------
+    // Actions
+    // -----------------------------------------------------------------------
+
+    // Data zone access
+    action ReadData appliesTo {
+        principal: [AgentPrincipal, UserPrincipal],
+        resource: [DataZone],
+    };
+
+    action WriteData appliesTo {
+        principal: [AgentPrincipal, UserPrincipal],
+        resource: [DataZone],
+    };
+
+    action PromoteData appliesTo {
+        principal: [AgentPrincipal],
+        resource: [DataZone],
+    };
+
+    // File access
+    action ReadFile appliesTo {
+        principal: [AgentPrincipal, UserPrincipal],
+        resource: [WorkloadFile],
+    };
+
+    action WriteFile appliesTo {
+        principal: [AgentPrincipal, UserPrincipal],
+        resource: [WorkloadFile],
+    };
+
+    // MCP tool invocation
+    action InvokeTool appliesTo {
+        principal: [AgentPrincipal],
+        resource: [McpTool],
+    };
+
+    // Guardrail checks — one action per category
+    action PassSecurityCheck appliesTo {
+        principal: [AgentPrincipal, UserPrincipal],
+        resource: [PipelineStep],
+        context: {
+            "guardrailCode": String,
+            // SEC-001 context
+            "secretPatternFound"?: Bool,
+            "filePath"?: String,
+            // SEC-002 context
+            "kmsAlias"?: String,
+            "kmsAliasValid"?: Bool,
+            // SEC-003 context
+            "piiColumnsMasked"?: Bool,
+            // SEC-004 context
+            "tlsEnforced"?: Bool,
+        },
+    };
+
+    action PassQualityGate appliesTo {
+        principal: [AgentPrincipal, UserPrincipal],
+        resource: [PipelineStep],
+        context: {
+            "guardrailCode": String,
+            // DQ-001 context
+            "qualityScore"?: Long,
+            "qualityThreshold"?: Long,
+            // DQ-002 context
+            "criticalFailureCount"?: Long,
+            // DQ-003 context
+            "inputRows"?: Long,
+            "outputRows"?: Long,
+            "quarantineRows"?: Long,
+            "rowAccountingBalances"?: Bool,
+            // DQ-004 context
+            "rowCount"?: Long,
+            "rowCountAboveZero"?: Bool,
+        },
+    };
+
+    action PassIntegrityCheck appliesTo {
+        principal: [AgentPrincipal, UserPrincipal],
+        resource: [PipelineStep],
+        context: {
+            "guardrailCode": String,
+            // INT-001 context
+            "fileAlreadyExists"?: Bool,
+            "landingFileWritten"?: Bool,
+            // INT-002 context
+            "fkPassRate"?: Long,
+            "fkThreshold"?: Long,
+            // INT-003 context
+            "formulaVerified"?: Bool,
+            "maxDeviation"?: Long,
+            // INT-004 context
+            "schemaMatches"?: Bool,
+            "expectedColumns"?: Long,
+            "actualColumns"?: Long,
+        },
+    };
+
+    action PassOperationalCheck appliesTo {
+        principal: [AgentPrincipal, UserPrincipal],
+        resource: [PipelineStep],
+        context: {
+            "guardrailCode": String,
+            // OPS-001 context
+            "checksumMatch"?: Bool,
+            // OPS-002 context
+            "sourceKeyAlias"?: String,
+            "targetKeyAlias"?: String,
+            "keysAreDifferent"?: Bool,
+            // OPS-003 context
+            "auditLogWritten"?: Bool,
+            // OPS-004 context
+            "icebergMetadataExists"?: Bool,
+        },
+    };
+
+}

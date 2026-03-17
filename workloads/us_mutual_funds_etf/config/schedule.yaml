@@ -1,0 +1,77 @@
+workload_name: us_mutual_funds_etf
+version: "1.0"
+
+schedule:
+  frequency: monthly
+  cron_expression: "0 2 1 * *"  # 1st of month, 02:00 UTC
+  timezone: UTC
+  enabled: true
+  description: "Monthly refresh of mutual fund and ETF performance data"
+
+execution:
+  max_active_runs: 1
+  catchup: false
+  depends_on_past: false
+  retries: 3
+  retry_delay_minutes: 5
+  retry_exponential_backoff: true
+  max_retry_delay_minutes: 30
+  execution_timeout_minutes: 90
+
+sla:
+  bronze_zone_minutes: 30
+  silver_zone_minutes: 45
+  gold_zone_minutes: 60
+  total_pipeline_hours: 2
+  description: "SLA thresholds per zone - triggers Slack alerts on miss"
+
+notifications:
+  email:
+    - data-eng@company.com
+  slack_channel: "#data-alerts"
+  on_failure: true
+  on_retry: false
+  on_sla_miss: true
+  custom_message: "US Mutual Funds & ETF pipeline alert"
+
+dependencies:
+  upstream_dags: []
+  downstream_dags: []
+  external_triggers: []
+  dataset_dependencies: []
+  description: "No external dependencies - this is a standalone synthetic data pipeline"
+
+tags:
+  - finance
+  - iceberg
+  - medallion
+  - funds
+  - synthetic
+
+airflow_variables:
+  required:
+    - finsights_s3_bucket
+    - finsights_glue_role
+    - aws_region
+    - glue_version
+    - glue_worker_type
+    - slack_connection_id
+  optional:
+    - notification_email_list
+
+airflow_connections:
+  required:
+    - aws_default
+    - slack_data_alerts
+  description: "AWS connection for Glue jobs, Slack connection for alerts"
+
+metadata:
+  owner: Data Engineering Team
+  domain: Finance
+  classification: Internal
+  data_sensitivity: Low
+  retention_days: 2555
+  compliance_requirements: []
+  created_at: "2026-03-16"
+  last_updated: "2026-03-16"
+  documentation_url: "https://wiki.company.com/data/us_mutual_funds_etf"

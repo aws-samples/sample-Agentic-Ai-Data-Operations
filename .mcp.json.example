@@ -1,0 +1,38 @@
+{
+  "mcpServers": {
+    "pii-detection": {
+      "command": "python3",
+      "args": [
+        "/absolute/path/to/mcp-servers/pii-detection-server/server.py"
+      ],
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "PYTHONUNBUFFERED": "1"
+      }
+    },
+    "iam": {
+      "command": "uvx",
+      "args": [
+        "awslabs.iam-mcp-server@latest"
+      ]
+    },
+    "redshift": {
+      "command": "uvx",
+      "args": [
+        "awslabs.redshift-mcp-server@latest"
+      ]
+    },
+    "cloudtrail": {
+      "command": "uvx",
+      "args": [
+        "awslabs.cloudtrail-mcp-server@latest"
+      ]
+    },
+    "lambda": {
+      "command": "uvx",
+      "args": [
+        "awslabs.lambda-mcp-server@latest"
+      ]
+    }
+  }
+}

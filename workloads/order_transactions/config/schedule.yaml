@@ -1,0 +1,54 @@
+# Schedule configuration for order_transactions workload
+# Created: 2026-03-15
+
+workload: order_transactions
+version: "1.0"
+
+dag:
+  dag_id: order_transactions_pipeline
+  description: "Order transactions Bronze-to-Gold pipeline with star schema"
+  schedule_interval: "0 7 * * *"  # Daily at 07:00 UTC
+  catchup: false
+  max_active_runs: 1
+  start_date: "2026-03-01"
+  tags:
+    - order_transactions
+    - sales
+    - star_schema
+
+  # Dependencies
+  depends_on:
+    - dag_id: customer_master_pipeline
+      task_id: end  # Wait for customer_master to complete
+      timeout_minutes: 60
+
+  # Default task args
+  default_args:
+    retries: 3
+    retry_delay_seconds: 300
+    retry_exponential_backoff: true
+    execution_timeout_minutes: 60
+    on_failure_callback: "shared.utils.notifications.slack_alert"
+
+  # SLA
+  sla:
+    critical_path_minutes: 45
+    alert_channels:
+      - slack
+      - email
+
+  # Task groups
+  task_groups:
+    - name: ingest
+      tasks:
+        - extract_orders
+    - name: transform
+      tasks:
+        - bronze_to_gold
+    - name: quality
+      tasks:
+        - check_bronze
+        - check_gold
+    - name: register
+      tasks:
+        - register_glue_tables
