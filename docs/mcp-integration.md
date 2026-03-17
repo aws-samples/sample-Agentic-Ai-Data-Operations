@@ -54,7 +54,7 @@ The Agentic Data Onboarding System now routes **ALL** AWS operations through Mod
 
 ### Core Files
 
-1. **`MCP_SERVERS.md`** - Complete mapping of all operations to MCP servers
+1. **`MCP_GUARDRAILS.md`** - MCP tool selection rules per phase
 2. **`.mcp.json`** - Configuration for all MCP servers (AWS + custom)
 3. **`shared/mcp/orchestrator.py`** - Python orchestration layer with visual logging
 4. **`shared/mcp/README.md`** - Usage guide and examples
@@ -374,4 +374,4 @@ pip install -r requirements.txt
 - **MCP Specification**: https://modelcontextprotocol.io
 - **AWS MCP Servers**: https://github.com/awslabs/mcp
 - **FastMCP Framework**: https://github.com/jlowin/fastmcp
-- **Project Documentation**: See `MCP_SERVERS.md`, `shared/mcp/README.md`
+- **Project Documentation**: See `MCP_GUARDRAILS.md`, `MCP_SETUP.md`

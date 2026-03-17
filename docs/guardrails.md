@@ -317,7 +317,7 @@ All 16 guardrails are implemented as **Cedar policies** evaluated via Amazon Ver
 ### Architecture
 
 ```
-run_pipeline.py  -->  CedarPolicyEvaluator  -->  AVP (production) / cedarpy (local)
+Pipeline Runner  -->  CedarPolicyEvaluator  -->  AVP (production) / cedarpy (local)
                            |
                       CloudTrail (automatic decision logging)
 ```
@@ -335,7 +335,7 @@ run_pipeline.py  -->  CedarPolicyEvaluator  -->  AVP (production) / cedarpy (loc
 
 | Mode | Env Var | Engine | Usage |
 |---|---|---|---|
-| `local` (default) | `CEDAR_MODE=local` | cedarpy / JSON fallback | Dev, tests, `run_pipeline.py` |
+| `local` (default) | `CEDAR_MODE=local` | cedarpy / JSON fallback | Dev, tests, local pipelines |
 | `avp` | `CEDAR_MODE=avp` | boto3 `verifiedpermissions.is_authorized()` | Deployed Airflow DAGs |
 
 ### How It Works
