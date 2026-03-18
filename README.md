@@ -95,6 +95,8 @@ Sub-agents do NOT execute AWS operations — they generate artifacts and tests o
 │   ├── orchestrator_examples/        # Multi-workload DAG examples
 │   └── workflows/                    # Demo governance workflows
 │
+├── mcp-servers/                      # Custom MCP servers (PII detection)
+├── sample_data/                      # Sample CSV files for sales_transactions
 ├── docs/                             # Setup guides and architecture docs
 ├── prompts/                          # Reusable prompt patterns (ROUTE → ONBOARD → ENRICH → CONSUME → GOVERN)
 │
@@ -106,7 +108,7 @@ Sub-agents do NOT execute AWS operations — they generate artifacts and tests o
 ├── WORKFLOW.md                       # Visual workflow diagrams
 ├── MCP_SETUP.md                      # MCP server configuration guide
 ├── SECURITY.md                       # Security practices and sanitization
-├── RUNNING_TESTS.md                  # Test execution guide (649 tests)
+├── RUNNING_TESTS.md                  # Test execution guide
 ├── conftest.py                       # Pytest configuration
 └── pyproject.toml                    # Python project config
 ```
@@ -154,7 +156,7 @@ workloads/{dataset_name}/
 # Install dependencies
 pip install -r requirements.txt
 
-# Run all 649 tests (no AWS required)
+# Run all tests (no AWS required)
 pytest workloads/ -v
 
 # Run specific workload
@@ -219,7 +221,7 @@ See [docs/aws-account-setup.md](docs/aws-account-setup.md) for AWS configuration
 ### Test-Driven Pipeline Generation
 - Every sub-agent writes unit + integration tests alongside artifacts
 - Tests must pass before the orchestrator proceeds (max 2 retries)
-- 649 tests across 6 workloads, all runnable locally without AWS
+- 728 passing tests across 6 workloads, all runnable locally without AWS
 
 ---
 
@@ -228,11 +230,13 @@ See [docs/aws-account-setup.md](docs/aws-account-setup.md) for AWS configuration
 | Workload | Tests | Key Features |
 |----------|-------|-------------|
 | `sales_transactions` | 196 | Basic Bronze→Silver→Gold, quality checks |
-| `customer_master` | 211 | KMS encryption, PII masking, Iceberg tables |
-| `order_transactions` | 242 | FK validation, star schema, aggregate calculations |
-| `product_inventory` | — | Advanced quality rules, quarantine handling |
-| `us_mutual_funds_etf` | Full suite | PII detection, QuickSight dashboards, complete DAG |
+| `customer_master` | 118 | KMS encryption, PII masking, Iceberg tables |
+| `order_transactions` | 70 | FK validation, star schema, aggregate calculations |
+| `product_inventory` | 23 + 18* | Advanced quality rules, quarantine handling |
+| `us_mutual_funds_etf` | 321 + 44* | PII detection, QuickSight dashboards, complete DAG |
 | `healthcare_patients` | — | HIPAA compliance, Cedar policy enforcement |
+
+*Some tests require PySpark (Java) or pipeline output to be generated first. See [RUNNING_TESTS.md](RUNNING_TESTS.md).
 
 ---
 
