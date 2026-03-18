@@ -1,6 +1,6 @@
 # Running Tests - Complete Guide
 
-This repository contains **649 tests** across multiple workloads. Tests verify the data pipeline functionality without requiring AWS services.
+This repository contains **792 tests** across multiple workloads (728 passing). Tests verify the data pipeline functionality without requiring AWS services.
 
 ---
 
@@ -11,7 +11,7 @@ This repository contains **649 tests** across multiple workloads. Tests verify t
 # From repository root
 pytest workloads/ -v
 
-# Expected: 649 tests (some may be skipped if data not generated)
+# Expected: 728 passing (some errors if PySpark/Java not installed)
 ```
 
 ### Run Specific Workload
@@ -19,10 +19,10 @@ pytest workloads/ -v
 # Sales transactions (196 tests)
 pytest workloads/sales_transactions/tests/ -v
 
-# Customer master (211 tests)
+# Customer master (118 tests)
 pytest workloads/customer_master/tests/ -v
 
-# Order transactions (242 tests)
+# Order transactions (70 tests)
 pytest workloads/order_transactions/tests/ -v
 ```
 
@@ -135,7 +135,7 @@ pytest tests/integration/ -v
 
 ---
 
-### Customer Master (211 tests)
+### Customer Master (118 tests)
 ```bash
 cd workloads/customer_master
 
@@ -147,7 +147,7 @@ python scripts/transform/bronze_to_gold.py --local
 
 # Run all tests
 pytest tests/ -v
-# Expected: 211 tests passing
+# Expected: 118 tests passing
 ```
 
 **Coverage**:
@@ -159,7 +159,7 @@ pytest tests/ -v
 
 ---
 
-### Order Transactions (242 tests)
+### Order Transactions (70 tests)
 ```bash
 cd workloads/order_transactions
 
@@ -171,7 +171,7 @@ python scripts/transform/bronze_to_gold.py --local
 
 # Run all tests
 pytest tests/ -v
-# Expected: 242 tests passing
+# Expected: 70 tests passing
 ```
 
 **Coverage**:
