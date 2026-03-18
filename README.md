@@ -100,6 +100,7 @@ Sub-agents do NOT execute AWS operations — they generate artifacts and tests o
 │
 ├── CLAUDE.md                         # Agent configuration and conventions
 ├── SKILLS.md                         # Agent skill definitions and prompts
+├── TOOL_ROUTING.md                   # Which tool to pick (read first)
 ├── TOOLS.md                          # AWS service mapping per agent phase
 ├── MCP_GUARDRAILS.md                 # MCP tool selection rules
 ├── WORKFLOW.md                       # Visual workflow diagrams
@@ -241,8 +242,9 @@ See [docs/aws-account-setup.md](docs/aws-account-setup.md) for AWS configuration
 |----------|---------|
 | [CLAUDE.md](CLAUDE.md) | Agent configuration, security rules, data zone rules |
 | [SKILLS.md](SKILLS.md) | Agent skill definitions, spawn prompts, workflows |
-| [TOOLS.md](TOOLS.md) | AWS service mapping per pipeline phase |
-| [MCP_GUARDRAILS.md](MCP_GUARDRAILS.md) | MCP tool selection rules per phase |
+| [TOOL_ROUTING.md](TOOL_ROUTING.md) | **Read first** — which tool to pick and why (intent-based) |
+| [TOOLS.md](TOOLS.md) | AWS service mapping per pipeline phase (how to use each tool) |
+| [MCP_GUARDRAILS.md](MCP_GUARDRAILS.md) | MCP tool selection rules per phase (actual tool names) |
 | [WORKFLOW.md](WORKFLOW.md) | Visual workflow and data flow diagrams |
 | [MCP_SETUP.md](MCP_SETUP.md) | MCP server configuration |
 | [SECURITY.md](SECURITY.md) | Security practices |
