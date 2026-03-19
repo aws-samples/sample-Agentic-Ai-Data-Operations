@@ -83,6 +83,7 @@ Sub-agents do NOT execute AWS operations — they generate artifacts and tests o
 │   └── healthcare_patients/          # Example: HIPAA governance demo
 │
 ├── shared/                           # Reusable code across workloads
+│   ├── reic/                         # REIC intent classification (vector search + agent selection)
 │   ├── utils/                        # pii_detection, quality_checks, encryption
 │   ├── policies/                     # Cedar policies (guardrails + authorization)
 │   ├── mcp/                          # MCP orchestrator + custom servers
@@ -218,6 +219,24 @@ See [docs/aws-account-setup.md](docs/aws-account-setup.md) for AWS configuration
 - 7 agent authorization policies controlling which agent can do what
 - Dual-mode: local evaluation (cedarpy) or AWS Verified Permissions
 
+### REIC: RAG-Enhanced Intent Classification
+Inspired by the REIC research paper on improving intent routing for multi-agent systems:
+
+- **Problem**: The Router Agent used exact string matching — "CRM data" wouldn't find `customer_master` because the words don't literally match
+- **Solution**: Vector similarity search (TF-IDF with FAISS upgrade path) over workload metadata — compares *meaning*, not exact strings
+- **How it works**: Reads every workload's `source.yaml` + `semantic.yaml`, extracts keywords (column names, descriptions, tags, business terms), and builds a searchable index. Incoming intents are scored against all workloads using cosine similarity.
+- **3-level hierarchical routing**: Phase (discovery/build/deploy) → Agent (constrained by phase) → Action (specific operation) — each level uses softmax probabilities for deterministic, ranked selection
+- **No heavy dependencies**: Real ML embeddings (sentence-transformers + FAISS) are optional. Falls back to TF-IDF (stdlib only, no installs). Set `REIC_ENABLED=false` to disable entirely — existing routing still works.
+- **74 tests** validating determinism, confidence bounds, phase constraints, and end-to-end intent classification
+
+```
+# Before REIC                          # After REIC
+User: "CRM data"                       User: "CRM data"
+→ grep for "CRM data"                  → TF-IDF similarity search
+→ no match                             → customer_master (score: 0.82)
+→ "not onboarded" (wrong)              → "Found customer_master" (correct)
+```
+
 ### Test-Driven Pipeline Generation
 - Every sub-agent writes unit + integration tests alongside artifacts
 - Tests must pass before the orchestrator proceeds (max 2 retries)
@@ -265,6 +284,7 @@ See [docs/aws-account-setup.md](docs/aws-account-setup.md) for AWS configuration
 - **Orchestration**: Apache Airflow (MWAA)
 - **Cloud**: AWS (S3, Glue, Athena, Lake Formation, KMS, MWAA)
 - **Testing**: pytest (unit + integration, property-based with fast-check)
+- **Intent Routing**: REIC (TF-IDF / FAISS vector similarity + hierarchical classification)
 - **Policy Engine**: Cedar (via Amazon Verified Permissions)
 - **AI Integration**: MCP (Model Context Protocol) for standardized AWS access
 
