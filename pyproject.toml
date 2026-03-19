@@ -9,6 +9,7 @@ dependencies = [
 [project.optional-dependencies]
 cedar = ["cedarpy"]
 avp = ["boto3"]
+reic = ["sentence-transformers>=2.2.0", "faiss-cpu>=1.7.0"]
 
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"

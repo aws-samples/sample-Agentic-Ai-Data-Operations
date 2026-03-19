@@ -1,0 +1,164 @@
+# REIC Agent Hierarchy — 3-level routing: Phase -> Agent -> Action
+# Used by HierarchicalClassifier to constrain agent selection by phase.
+
+phases:
+  discovery:
+    description: "Gather source details, column roles, business context"
+    keywords:
+      - discover
+      - onboard
+      - new data
+      - new source
+      - ingest
+      - what data
+      - tell me about
+      - source details
+      - connect to
+      - add dataset
+    agents:
+      router:
+        description: "Check if workload already exists"
+        actions:
+          check_existing:
+            intents: [check existing, already onboarded, find workload, search workloads, duplicate check]
+            tool_routing_ref: "TOOL_ROUTING.md#router"
+      data_onboarding:
+        description: "Gather requirements from human"
+        actions:
+          gather_source:
+            intents: [new source, add source, connect source, ingest data, onboard dataset]
+            tool_routing_ref: "TOOL_ROUTING.md#data-onboarding"
+          gather_columns:
+            intents: [column roles, identify columns, primary key, pii columns, classify columns]
+            tool_routing_ref: "TOOL_ROUTING.md#data-onboarding"
+          gather_quality:
+            intents: [quality rules, quality thresholds, data quality, compliance requirements]
+            tool_routing_ref: "TOOL_ROUTING.md#data-onboarding"
+
+  validation:
+    description: "Deduplicate sources, validate configuration"
+    keywords:
+      - validate
+      - deduplicate
+      - check source
+      - verify
+      - overlap
+      - duplicate
+      - already exists
+    agents:
+      data_onboarding:
+        description: "Scan existing workloads for overlap"
+        actions:
+          dedup_source:
+            intents: [deduplicate, check overlap, source already exists, prevent duplicate]
+            tool_routing_ref: "TOOL_ROUTING.md#validation"
+          validate_config:
+            intents: [validate config, check configuration, verify settings, config review]
+            tool_routing_ref: "TOOL_ROUTING.md#validation"
+
+  profiling:
+    description: "Sample data, detect schema, identify PII"
+    keywords:
+      - profile
+      - sample
+      - schema
+      - detect
+      - crawl
+      - pii
+      - scan
+      - statistics
+      - null rate
+      - distinct values
+    agents:
+      metadata:
+        description: "Run Glue Crawler, Athena profiling, PII detection"
+        actions:
+          run_profiler:
+            intents: [profile data, run profiler, sample data, data statistics, null rates]
+            tool_routing_ref: "TOOL_ROUTING.md#profiling"
+          detect_schema:
+            intents: [detect schema, infer types, crawl data, discover schema]
+            tool_routing_ref: "TOOL_ROUTING.md#profiling"
+          detect_pii:
+            intents: [detect pii, find sensitive data, pii scan, classify sensitive, find personal data]
+            tool_routing_ref: "TOOL_ROUTING.md#profiling"
+
+  build:
+    description: "Generate pipeline code, transformations, quality checks, DAG"
+    keywords:
+      - build
+      - generate
+      - create pipeline
+      - transform
+      - clean
+      - quality check
+      - dag
+      - schedule
+      - etl
+      - bronze
+      - silver
+      - gold
+    agents:
+      metadata:
+        description: "Generate config YAML, semantic.yaml"
+        actions:
+          generate_config:
+            intents: [generate config, create source yaml, create semantic yaml, write metadata]
+            tool_routing_ref: "TOOL_ROUTING.md#metadata"
+      transformation:
+        description: "Generate ETL scripts for Bronze->Silver->Gold"
+        actions:
+          bronze_to_silver:
+            intents: [clean data, bronze to silver, deduplicate, null handling, type casting, transform silver]
+            tool_routing_ref: "TOOL_ROUTING.md#transformation"
+          silver_to_gold:
+            intents: [silver to gold, aggregate, star schema, create facts, create dimensions, gold zone]
+            tool_routing_ref: "TOOL_ROUTING.md#transformation"
+      quality:
+        description: "Generate quality rules and checks"
+        actions:
+          define_rules:
+            intents: [quality rules, define checks, quality thresholds, data validation, anomaly detection]
+            tool_routing_ref: "TOOL_ROUTING.md#quality"
+          run_checks:
+            intents: [run quality, execute checks, validate data, quality gate, check score]
+            tool_routing_ref: "TOOL_ROUTING.md#quality"
+      dag:
+        description: "Generate Airflow DAG"
+        actions:
+          generate_dag:
+            intents: [create dag, generate dag, airflow dag, schedule pipeline, orchestrate, workflow]
+            tool_routing_ref: "TOOL_ROUTING.md#dag"
+
+  deploy:
+    description: "Deploy pipeline to AWS (S3, Glue, IAM, Lake Formation)"
+    keywords:
+      - deploy
+      - publish
+      - push
+      - register
+      - catalog
+      - permissions
+      - iam
+      - lake formation
+      - go live
+      - production
+    agents:
+      data_onboarding:
+        description: "Execute deployment via MCP tools in main conversation"
+        actions:
+          upload_s3:
+            intents: [upload to s3, push scripts, deploy code, upload artifacts]
+            tool_routing_ref: "TOOL_ROUTING.md#deploy-s3"
+          register_glue:
+            intents: [register glue, create catalog, catalog table, glue database, register table]
+            tool_routing_ref: "TOOL_ROUTING.md#deploy-glue"
+          configure_iam:
+            intents: [configure iam, set permissions, create role, iam policy, least privilege]
+            tool_routing_ref: "TOOL_ROUTING.md#deploy-iam"
+          grant_lakeformation:
+            intents: [lake formation, lf tags, grant access, column security, tag access control]
+            tool_routing_ref: "TOOL_ROUTING.md#deploy-lakeformation"
+          verify_query:
+            intents: [verify query, test query, redshift spectrum, athena query, validate deploy]
+            tool_routing_ref: "TOOL_ROUTING.md#deploy-verify"
