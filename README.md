@@ -290,6 +290,10 @@ User: "CRM data"                       User: "CRM data"
 
 ---
 
+## Security
+
+See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
+
 ## License
 
-MIT License - See [LICENSE](LICENSE) for details.
+This project is licensed under the MIT-0 License. See the [LICENSE](LICENSE) file for details.
