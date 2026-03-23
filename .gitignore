@@ -26,7 +26,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-
+workloads/
 # Virtual Environments
 venv/
 ENV/
@@ -172,6 +172,9 @@ demo_real_data_*.csv
 
 # All workload output directories (generated at runtime)
 workloads/*/output/
+
+# Agent trace logs (generated per-run, timestamped)
+workloads/*/logs/
 workloads/*/data/bronze/
 workloads/*/data/silver/
 workloads/*/data/gold/

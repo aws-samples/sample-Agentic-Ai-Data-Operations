@@ -237,6 +237,67 @@ User: "CRM data"                       User: "CRM data"
 → "not onboarded" (wrong)              → "Found customer_master" (correct)
 ```
 
+### Deep Agent Tracing (Three-Layer Observability)
+Inspired by the **AgentTrace** research paper (Gao et al., 2025) on debugging and understanding multi-agent systems, adapted for our LLM sub-agent architecture where you cannot instrument agent reasoning externally.
+
+**Problem**: Traditional agent tracing assumes Python classes you can wrap with decorators. Our agents are Claude Code LLM sub-agents (prompt templates in SKILLS.md) — their reasoning is a black box.
+
+**Solution**: Three instrumentable layers, linked by `run_id` + `parent_span_id`:
+
+| Layer | What It Captures | How |
+|-------|-----------------|-----|
+| **1. Orchestrator** | Phase transitions, test gates, retries, span hierarchy | `OrchestratorLogger` + `AgentTracer` (Python, fully instrumentable) |
+| **2. Generated Scripts** | Row counts, transforms applied, quality scores, errors | `StructuredLogger` wired into Glue ETL scripts |
+| **3. LLM Self-Reporting** | Reasoning, alternatives considered, rejection reasons, confidence | `AgentOutput.decisions[]` array (prompt engineering, not instrumentation) |
+
+**Three-surface event model** (from AgentTrace): Every trace event is classified as **operational** (what happened), **cognitive** (why it happened), or **contextual** (what surrounded it). This lets you filter traces by concern — debugging failed pipelines vs. understanding agent decisions vs. correlating across workloads.
+
+**OTel-compatible fields**: ~15 fields per event (slimmed from AgentTrace's 30+ to only fields we can actually populate — no token counts from Claude Code sub-agents). Output is JSONL, parseable by jq, CloudWatch, Splunk.
+
+**CLI viewer** (`shared/logging/trace_viewer.py`): `--summary`, `--decisions`, `--timeline`, `--failures`, `--export-md` (narrative), `--export-map` (decision tree).
+
+```
+# View agent reasoning for a pipeline run
+python3 -m shared.logging.trace_viewer trace_events.jsonl --decisions
+
+  [1] schema_inference — Metadata Agent (phase 4)
+      Reasoning: CSV headers suggest financial data. ticker is PK, current_price is decimal.
+      Choice:    12 columns: 2 identifiers, 6 measures, 3 dimensions, 1 temporal
+      Confidence: high
+
+  [2] transformation_choice — Transformation Agent (phase 4)
+      Reasoning: Dedup by ticker, type-cast to decimal, validate positive prices.
+      Alternatives: dedup by composite key (rejected: no date column for freshness)
+      Confidence: high
+```
+
+### Deterministic Agent Output
+Inspired by the **GCC (Guardrails, Cognitive traces, Checksums)** pattern for making LLM-based multi-agent systems reproducible and auditable:
+
+- **Input/Output Hashing**: SHA-256 checksums on all inputs and generated artifacts. Same inputs must produce identical outputs — verified by comparing hashes across runs.
+- **Ordered Outputs**: Dictionary keys sorted alphabetically, lists sorted by stable keys (column name, rule_id). Deterministic YAML serialization via `shared/utils/deterministic_yaml.py`.
+- **Fixed Timestamps**: Generated artifacts use run start time (`started_at`), not `datetime.now()`, preventing timestamp drift between identical runs.
+- **Seeded Randomness**: Any randomness uses `random_seed` from run context. Never `random()` without a seed.
+- **Idempotency Checks**: Before writing any file — same checksum skips, different checksum overwrites + logs diff, missing file creates.
+- **Template Versioning**: Every generated file includes a header with agent name, template version, and input hash for traceability.
+- **Cognitive Traces**: Every sub-agent must include a `decisions[]` array documenting every significant choice, alternatives considered, and rejection reasons — making LLM "thinking" auditable.
+
+### Cedar Policy Guardrails
+Uses **Amazon Cedar** (the policy language behind Amazon Verified Permissions) to enforce safety invariants across the pipeline — 23 policies total:
+
+**16 Forbid Policies** (guardrails — things that must NEVER happen):
+| Category | Policies | Examples |
+|----------|----------|---------|
+| **Data Quality** (4) | Quality gate thresholds, no critical failures, no silent row drops, row count range checks | `dq_001`: Silver requires score >= 0.80, Gold >= 0.95 |
+| **Security** (4) | KMS key validation, PII masking, TLS enforcement, credential protection | `sec_003`: PII columns must be masked in logs and query results |
+| **Integrity** (4) | Landing/Bronze immutability, FK integrity, derived column formulas, schema enforcement | `int_001`: Bronze zone data is NEVER modified after ingestion |
+| **Operations** (4) | Idempotency, encryption re-keying at zone boundaries, audit log immutability, Iceberg metadata | `ops_001`: Running a transform twice must produce identical output |
+
+**7 Agent Authorization Policies** (who can do what):
+Each agent (Router, Onboarding, Metadata, Transformation, Quality, DAG, Analysis) has a Cedar permit policy defining exactly which actions it can perform on which resources — enforcing least-privilege at the agent level.
+
+**Dual-mode evaluation**: `shared/utils/cedar_client.py` evaluates policies locally (cedarpy) for testing or via AWS Verified Permissions (boto3) for production. Setup script at `shared/scripts/setup_avp.py` syncs all policies to AVP.
+
 ### Test-Driven Pipeline Generation
 - Every sub-agent writes unit + integration tests alongside artifacts
 - Tests must pass before the orchestrator proceeds (max 2 retries)
@@ -285,7 +346,9 @@ User: "CRM data"                       User: "CRM data"
 - **Cloud**: AWS (S3, Glue, Athena, Lake Formation, KMS, MWAA)
 - **Testing**: pytest (unit + integration, property-based with fast-check)
 - **Intent Routing**: REIC (TF-IDF / FAISS vector similarity + hierarchical classification)
-- **Policy Engine**: Cedar (via Amazon Verified Permissions)
+- **Policy Engine**: Cedar (23 policies via Amazon Verified Permissions)
+- **Agent Tracing**: AgentTrace-inspired three-layer observability (OTel-compatible JSONL)
+- **Determinism**: GCC pattern (guardrails + cognitive traces + checksums)
 - **AI Integration**: MCP (Model Context Protocol) for standardized AWS access
 
 ---

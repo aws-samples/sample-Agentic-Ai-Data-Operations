@@ -32,7 +32,7 @@ import hashlib
 import json
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
-from typing import Dict, List
+from typing import Any, Dict, List, Optional
 
 
 VALID_AGENT_TYPES = {"metadata", "transformation", "quality", "dag", "analysis"}
@@ -63,6 +63,11 @@ class AgentOutput:
     blocking_issues: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
     next_steps: List[str] = field(default_factory=list)
+
+    # Cognitive trace — LLM self-reported decisions (Layer 3 logging)
+    # Each dict: {decision_id, category, reasoning, choice_made,
+    #             alternatives_considered, rejection_reasons, confidence, context}
+    decisions: List[Dict[str, Any]] = field(default_factory=list)
 
     # Determinism
     input_hash: str = ""  # SHA-256 of inputs
@@ -108,6 +113,25 @@ class AgentOutput:
     @property
     def needs_retry(self) -> bool:
         return self.status == "failed" and len(self.blocking_issues) > 0
+
+    def add_decision(self, category: str, reasoning: str, choice: str,
+                     alternatives: Optional[List[str]] = None,
+                     rejection_reasons: Optional[Dict[str, str]] = None,
+                     confidence: str = "high",
+                     context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Add a cognitive trace decision. Returns the decision dict."""
+        decision = {
+            "decision_id": f"d-{len(self.decisions) + 1:03d}",
+            "category": category,
+            "reasoning": reasoning,
+            "choice_made": choice,
+            "alternatives_considered": alternatives or [],
+            "rejection_reasons": rejection_reasons or {},
+            "confidence": confidence,
+            "context": context or {},
+        }
+        self.decisions.append(decision)
+        return decision
 
     @property
     def total_tests_passed(self) -> int:

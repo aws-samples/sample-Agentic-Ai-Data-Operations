@@ -105,6 +105,28 @@ Every sub-agent MUST structure its final response using this format. The orchest
 ## WARNINGS (non-blocking)
 - None | List warnings
 
+## DECISIONS (cognitive trace — MANDATORY)
+You MUST include a `decisions` array documenting every significant choice you made.
+For each decision, explain your reasoning, what alternatives you considered,
+and why you rejected them. This is critical for audit trails and debugging.
+
+| decision_id | category | choice_made | confidence |
+|-------------|----------|-------------|------------|
+| d-001 | {schema_inference|rule_selection|transformation_choice|format_selection|partition_strategy} | {what you chose} | {high|medium|low} |
+
+Each decision must include:
+- **reasoning**: Free text explaining your thought process
+- **choice_made**: What was actually chosen
+- **alternatives_considered**: List of other options you evaluated
+- **rejection_reasons**: Why each alternative was rejected
+- **confidence**: high (clear best choice), medium (trade-offs), low (uncertain)
+
+Example decisions by agent type:
+- Metadata Agent: schema inference, PII classification, column role assignment
+- Transformation Agent: cleaning approach, null handling strategy, type casting, Gold format
+- Quality Agent: threshold selection, rule priority, anomaly detection config
+- DAG Agent: task grouping, retry strategy, dependency ordering, parallelism
+
 ## NEXT STEPS FOR ORCHESTRATOR
 1. Proceed to {next_agent}
 2. OR: Retry with {context}
@@ -112,7 +134,7 @@ Every sub-agent MUST structure its final response using this format. The orchest
 ================================================================
 ```
 
-Schema implementation: `shared/templates/agent_output_schema.py` (AgentOutput dataclass).
+Schema implementation: `shared/templates/agent_output_schema.py` (AgentOutput dataclass, includes `decisions` field and `add_decision()` helper).
 
 ### Determinism Requirements (MANDATORY)
 

@@ -295,6 +295,24 @@ Errors fall into three categories. The Data Onboarding Agent decides escalation:
 
 Never silently swallow errors. Log full context (agent, operation, input summary, error type) and escalate appropriately.
 
+## Agent Logging Protocol
+
+Every pipeline run produces a structured trace across three layers, linked by `run_id`:
+
+| Layer | What | Source | How |
+|-------|------|--------|-----|
+| **1. Orchestrator** | Phase transitions, test gates, retries | `OrchestratorLogger` + `AgentTracer` | Automatic — wired into orchestrator |
+| **2. Generated Scripts** | Row counts, transforms, quality scores | `StructuredLogger` in ETL scripts | Wire into every `workloads/*/scripts/` file |
+| **3. LLM Self-Reporting** | Reasoning, alternatives, confidence | `AgentOutput.decisions` array | Required in SKILLS.md spawn prompts |
+
+**Rules:**
+- Every pipeline run MUST produce a `trace_events.jsonl` (via `AgentTracer`)
+- Every sub-agent MUST include a `decisions` array in its `AgentOutput`
+- Every ETL script MUST use `StructuredLogger` for structured log output
+- All trace events use three surfaces: **operational** (what), **cognitive** (why), **contextual** (where)
+
+**Key files:** `shared/logging/agent_tracer.py`, `shared/logging/trace_viewer.py`, `shared/utils/orchestrator_logger.py`, `shared/utils/structured_logger.py`
+
 ## Glossary
 
 | Term | Meaning |
