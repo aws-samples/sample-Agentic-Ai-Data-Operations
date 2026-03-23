@@ -144,6 +144,7 @@ Schedule:
 - Frequency: [cron expression]
 - Dependencies: [Other DAGs / ExternalTaskSensor]
 - SLA: [minutes]
+- MWAA bucket: [S3 bucket for Airflow DAG deployment, e.g., s3://my-mwaa-environment-bucket]
 
 Testing:
 - Use [FIXTURE_PATH] as data source for integration tests
@@ -231,10 +232,20 @@ workloads/{dataset_name}/
 ├── tests/
 │   ├── unit/
 │   └── integration/
+├── deploy_to_aws.py              # Full deployment script (S3, Glue, IAM, MWAA, QuickSight)
 └── README.md
 ```
 
 Plus 50+ tests (unit + integration) that must all pass.
+
+The `deploy_to_aws.py` script MUST include:
+- All Glue job creation + execution (Bronze → Silver → Gold)
+- IAM role setup
+- Athena workgroup creation
+- QuickSight dashboard setup
+- **MWAA DAG deployment** (Step 13): uploads DAG file, shared utils, workload config, and workload scripts to MWAA S3 bucket
+- `--dry-run` mode for safe testing
+- `--mwaa-bucket=BUCKET` parameter for MWAA deployment
 
 ## Phase 7: Deploy to AWS Glue
 
@@ -280,6 +291,34 @@ After artifacts pass all tests and get human approval, deploy to AWS:
    - Grant to: current IAM user, Glue ETL role, Athena execution role, QuickSight service role
    - Repeat for `Data_Sensitivity` and `PII_Type` tags with matching values
    - Verify: `SELECT * FROM {gold_table} LIMIT 5` in Athena — should return columns
+
+9. **Deploy DAG + shared utils to MWAA** (if MWAA is configured):
+   ```bash
+   # Upload DAG file
+   aws s3 cp workloads/{WORKLOAD}/dags/{WORKLOAD}_dag.py \
+     s3://{MWAA_BUCKET}/dags/
+
+   # Upload shared utilities (required by DAG imports)
+   aws s3 sync shared/utils/ s3://{MWAA_BUCKET}/dags/shared/utils/ \
+     --exclude '__pycache__/*' --exclude '*.pyc'
+   aws s3 sync shared/logging/ s3://{MWAA_BUCKET}/dags/shared/logging/ \
+     --exclude '__pycache__/*' --exclude '*.pyc'
+
+   # Upload __init__.py files for import chain
+   aws s3 cp shared/__init__.py s3://{MWAA_BUCKET}/dags/shared/__init__.py
+
+   # Upload workload config (referenced by DAG)
+   aws s3 sync workloads/{WORKLOAD}/config/ \
+     s3://{MWAA_BUCKET}/dags/workloads/{WORKLOAD}/config/
+
+   # Upload workload scripts (called by DAG operators)
+   aws s3 sync workloads/{WORKLOAD}/scripts/ \
+     s3://{MWAA_BUCKET}/dags/workloads/{WORKLOAD}/scripts/ \
+     --exclude '__pycache__/*' --exclude '*.pyc'
+   ```
+   - Verify: DAG appears in Airflow UI within ~30 seconds
+   - Check: No import errors in Airflow DAG processing logs
+   - The DAG file must be at the **root** of the `dags/` prefix (not nested in workloads/)
 
 ### Known Glue 4.0 + Iceberg Rules
 - Use `.saveAsTable("glue_catalog.db.table")` — NOT `.save(s3_path)`

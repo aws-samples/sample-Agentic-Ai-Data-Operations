@@ -1602,6 +1602,19 @@ Step 5.6: Query Verification (MCP available)
 Step 5.7: Audit Trail (MCP available)
   → `mcp__cloudtrail__lookup_events` — verify PutObject, CreateTable, GrantPermissions, PutRolePolicy
   → `mcp__cloudtrail__lake_query` — complex audit analytics via CloudTrail Lake SQL
+
+Step 5.8: Deploy DAG to MWAA (if MWAA configured)
+  → CLI: `aws s3 cp` (upload DAG + shared utils + workload scripts to MWAA bucket)
+  → Upload order:
+    1. DAG file → s3://{MWAA_BUCKET}/dags/{workload}_dag.py (root of dags/ prefix)
+    2. shared/utils/*.py → s3://{MWAA_BUCKET}/dags/shared/utils/ (DAG imports these)
+    3. shared/logging/*.py → s3://{MWAA_BUCKET}/dags/shared/logging/
+    4. shared/__init__.py → s3://{MWAA_BUCKET}/dags/shared/__init__.py (import chain)
+    5. workloads/{name}/config/*.yaml → s3://{MWAA_BUCKET}/dags/workloads/{name}/config/
+    6. workloads/{name}/scripts/**/*.py → s3://{MWAA_BUCKET}/dags/workloads/{name}/scripts/
+  → Exclude: __pycache__/, *.pyc
+  → Verify: DAG appears in Airflow UI (check DAG processing logs for import errors)
+  → Note: MWAA bucket is DIFFERENT from data lake bucket — ask during discovery or use Airflow Variable
 ```
 
 **Fallback logging**: If any step falls back to CLI, log the reason:
