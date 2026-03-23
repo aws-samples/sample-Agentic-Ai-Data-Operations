@@ -29,14 +29,18 @@ These are the **actually loaded** MCP servers. Do not assume others work.
 |---|---|---|---|
 | ✅ **LOADED** | `iam` | `list_roles`, `simulate_principal_policy`, `list_role_policies`, `get_role_policy`, `put_role_policy`, `create_role` | Role lookup, permission simulation, policy management |
 | ✅ **LOADED** | `lambda` | `AWS_LambdaFn_LF_access_grant_new`, `AWS_Lambda_LF_revoke_access_new`, `spark_on_aws_lambda`, `tagging_finder`, `LF_access_grant` | Lake Formation grants/revokes, Spark execution, resource tagging |
-| ✅ **LOADED** | `redshift` | `list_clusters`, `list_databases`, `list_schemas`, `list_tables`, `list_columns`, `execute_query` | Schema verification, Gold zone validation, catalog checks via Spectrum |
+| ✅ **LOADED** | `s3-tables` | S3 Tables (Iceberg) operations | S3 Tables management, Iceberg table operations |
 | ✅ **LOADED** | `cloudtrail` | `lookup_events`, `lake_query`, `list_event_data_stores`, `get_query_results`, `get_query_status` | Audit verification, security checks, compliance |
-| ❌ **NOT LOADED** | `aws-dataprocessing` | — | → Fall back to `aws glue` / `aws athena` CLI |
-| ❌ **NOT LOADED** | `s3-tables` | — | → Fall back to `aws s3` CLI |
-| ❌ **NOT LOADED** | `core` | — | → Fall back to `aws s3` / `aws kms` / `aws secretsmanager` CLI |
-| ❌ **NOT LOADED** | `sagemaker-catalog` | — | → Fall back to `aws glue` CLI with custom properties |
-| ❌ **NOT LOADED** | `lakeformation` | — | → Use `lambda` MCP (`LF_access_grant_new`) or `aws lakeformation` CLI |
-| ❌ **NOT LOADED** | `cloudwatch`, `sns-sqs`, `eventbridge`, `dynamodb`, `stepfunctions` | — | → Fall back to respective `aws` CLI commands |
+| ✅ **LOADED** | `redshift` | `list_clusters`, `list_databases`, `list_schemas`, `list_tables`, `list_columns`, `execute_query` | Schema verification, Gold zone validation, catalog checks via Spectrum |
+| ✅ **LOADED** | `cloudwatch` | Logs, metrics, alarms, dashboards | Monitoring, log queries, metric alarms |
+| ✅ **LOADED** | `cost-explorer` | Cost and usage data | Cost tracking, budget analysis |
+| ✅ **LOADED** | `dynamodb` | Table CRUD, query, scan | SynoDB metrics store, DynamoDB operations |
+| ✅ **LOADED** | `core` | S3, KMS, Secrets Manager | S3 operations, KMS key management, secrets (slow startup — may timeout on health check but works in conversation) |
+| ✅ **LOADED** | `pii-detection` | `detect_pii_in_table`, `scan_database_for_pii`, `create_lf_tags`, `get_pii_columns`, `apply_column_security`, `get_pii_report` | PII detection + LF-Tag application (custom server, slow startup) |
+| ❌ **NOT ON PyPI** | `aws-dataprocessing` | — | → Fall back to `aws glue` / `aws athena` CLI (no package exists) |
+| ❌ **NOT ON PyPI** | `sagemaker-catalog` | — | → Fall back to `aws glue` CLI with custom properties (no package exists) |
+| ❌ **DEPENDENCY CONFLICT** | `lakeformation` | — | → Use `lambda` MCP (`LF_access_grant_new`) or `aws lakeformation` CLI |
+| ❌ **DEPENDENCY CONFLICT** | `sns-sqs`, `eventbridge`, `stepfunctions` | — | → Fall back to respective `aws` CLI commands |
 
 ---
 
@@ -88,7 +92,7 @@ not_when: >
   Source is a stream (Kafka/Kinesis) → use schema registry |
   Need results in under 1 minute → use Athena DDL instead
 fallback: Athena DDL (faster, no partition auto-detection)
-mcp_server: aws-dataprocessing ❌ → CLI fallback
+mcp_server: aws-dataprocessing ❌ → CLI fallback (no PyPI package)
 details: TOOLS.md → Phase 3: Step 3.1
 ```
 
@@ -112,7 +116,7 @@ use: aws athena start-query-execution CLI with TABLESAMPLE BERNOULLI(5) query
 not_when: >
   Source is not in S3 yet → use Glue JDBC job instead |
   Redshift Spectrum external schema exists → prefer mcp__redshift__execute_query (synchronous, no polling)
-mcp_server: aws-dataprocessing ❌ → CLI fallback; OR redshift ✅ if Spectrum schema exists
+mcp_server: aws-dataprocessing ❌ → CLI fallback (no PyPI package); OR redshift ✅ if Spectrum schema exists
 details: TOOLS.md → Phase 3: Step 3.2
 ```
 
@@ -123,9 +127,9 @@ details: TOOLS.md → Phase 3: Step 3.2
 ```yaml
 tool: s3-copy-sync
 intent: ["ingest raw data", "copy to Bronze", "land raw files", "S3 to S3 copy"]
-use: aws s3 sync or aws s3 cp CLI
+use: core MCP (S3 operations) or aws s3 sync / aws s3 cp CLI
 not_when: Transformation is needed — use Glue ETL instead; source is NOT already in S3
-mcp_server: core ❌ → CLI fallback
+mcp_server: core ✅ LOADED (slow startup) — prefer MCP; fall back to CLI if timeout
 details: TOOLS.md → Bronze Zone Tools
 ```
 
@@ -134,7 +138,7 @@ tool: glue-jdbc-etl
 intent: ["ingest from database", "extract from RDS", "pull from Postgres", "copy from Redshift to Bronze"]
 use: aws glue create-job CLI with JDBC source → writes raw extract (no transforms) to S3 Bronze
 not_when: Source is already in S3 — use s3 sync instead
-mcp_server: aws-dataprocessing ❌ → CLI fallback
+mcp_server: aws-dataprocessing ❌ → CLI fallback (no PyPI package)
 details: TOOLS.md → Bronze Zone Tools
 ```
 
@@ -157,7 +161,7 @@ intent: ["transform Bronze to Silver", "clean the data", "apply schema", "dedupl
 use: aws glue create-job CLI (PySpark + Iceberg) — MUST include --enable-data-lineage true
 not_when: Simple file copy with no transforms — use s3 sync instead (cheaper)
 mandatory_flag: "--enable-data-lineage: true — NON-NEGOTIABLE on every Glue ETL job"
-mcp_server: aws-dataprocessing ❌ → CLI fallback
+mcp_server: aws-dataprocessing ❌ → CLI fallback (no PyPI package)
 details: TOOLS.md → Silver Zone Tools
 ```
 
@@ -166,7 +170,7 @@ tool: glue-data-quality
 intent: ["run quality rules", "check completeness", "validate Silver data", "quality gate", "DQDL rules"]
 use: aws glue start-data-quality-ruleset-evaluation-run CLI (DQDL syntax)
 not_when: Quick one-off check — Athena SQL is faster; Silver score threshold is 80%, Gold is 95%
-mcp_server: aws-dataprocessing ❌ → CLI fallback
+mcp_server: aws-dataprocessing ❌ → CLI fallback (no PyPI package)
 details: TOOLS.md → Silver Zone Tools → Glue Data Quality rule example
 ```
 
@@ -180,7 +184,7 @@ intent: ["transform Silver to Gold", "build star schema", "create fact table", "
 use: aws glue create-job CLI (PySpark + Iceberg) — MUST include --enable-data-lineage true
 not_when: Format decision not yet made — run Phase 1 discovery first (see Gold format decision tree in TOOLS.md)
 mandatory_flag: "--enable-data-lineage: true — NON-NEGOTIABLE"
-mcp_server: aws-dataprocessing ❌ → CLI fallback
+mcp_server: aws-dataprocessing ❌ → CLI fallback (no PyPI package)
 details: TOOLS.md → Gold Zone Tools
 ```
 
@@ -211,7 +215,7 @@ tool: kms-encryption
 intent: ["encrypt zone data", "create KMS key", "zone-specific key", "at-rest encryption"]
 use: aws kms create-key + create-alias CLI — one CMK per zone: {workload}_bronze_key, _silver_key, _gold_key
 not_when: Sharing a key across zones — always use separate zone-scoped keys
-mcp_server: core ❌ → CLI fallback
+mcp_server: core ✅ LOADED (slow startup)
 details: TOOLS.md → Security Tools
 ```
 
@@ -219,7 +223,7 @@ details: TOOLS.md → Security Tools
 tool: secrets-manager
 intent: ["store database credentials", "store API key", "connection secrets", "don't hardcode password"]
 use: aws secretsmanager create-secret CLI — never store credentials in code or config files
-mcp_server: core ❌ → CLI fallback
+mcp_server: core ✅ LOADED (slow startup)
 details: TOOLS.md → Security Tools
 ```
 
@@ -232,7 +236,7 @@ tool: glue-data-catalog
 intent: ["register table schema", "update catalog", "add table to catalog", "schema registration"]
 use: aws glue create-table / update-table CLI (automatic for Iceberg via S3 Tables integration)
 not_when: Table is Iceberg on S3 Tables — registration is automatic, no manual step needed
-mcp_server: aws-dataprocessing ❌ → CLI fallback
+mcp_server: aws-dataprocessing ❌ → CLI fallback (no PyPI package)
 details: TOOLS.md → Metadata & Catalog Tools
 ```
 
