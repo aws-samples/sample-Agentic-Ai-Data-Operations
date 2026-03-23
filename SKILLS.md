@@ -1569,7 +1569,10 @@ Step 5.4.5: PII Detection + LF-Tag Application (MANDATORY)
     → Current IAM user (for Athena console queries)
     → Glue ETL role (for Glue jobs reading tagged tables)
     → Athena workgroup execution role (if using workgroup-level role)
-    → QuickSight service role (if dashboards query these tables)
+    → **QuickSight service role** (CRITICAL — without this, dashboards get "database generated SQL exception"):
+      Find it: `aws iam list-roles --query 'Roles[?contains(RoleName,`quicksight`)].Arn'`
+      Typically: `arn:aws:iam::ACCOUNT:role/service-role/aws-quicksight-service-role-v0`
+      Also grant DESCRIBE on the database so QuickSight can discover tables
     → Any application roles consuming Gold zone data
 
     Verify: Run a test query in Athena after granting:
