@@ -10,6 +10,7 @@ Each prompt is named with a **phase prefix** that indicates when it runs in the 
 
 | Prompt ID | Phase | Name | Purpose |
 |-----------|-------|------|---------|
+| `SETUP` | Bootstrap | **Setup: First-Time AWS Environment** | Create IAM, S3, KMS, Glue, LF-Tags — run ONCE per account |
 | `ROUTE` | Pre-flight | **Route: Check Existing Source** | Prevent duplicate onboarding |
 | `GENERATE` | Pre-flight | **Generate: Create Synthetic Data** | Produce test/demo fixtures |
 | `ONBOARD` | Core | **Onboard: Build Data Pipeline** | Master orchestrator (Bronze -> Silver -> Gold) |
