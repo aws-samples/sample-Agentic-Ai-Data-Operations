@@ -320,6 +320,143 @@ After artifacts pass all tests and get human approval, deploy to AWS:
    - Check: No import errors in Airflow DAG processing logs
    - The DAG file must be at the **root** of the `dags/` prefix (not nested in workloads/)
 
+10. **Post-Deployment Verification** (MANDATORY — run after all steps complete):
+
+    This is a comprehensive smoke test across all deployed services. Do NOT skip.
+
+    **10a. Glue Catalog — tables exist with correct schema:**
+    ```bash
+    # List all tables in the database
+    aws glue get-tables --database-name {DATABASE} \
+      --query 'TableList[].{Name:Name,Type:Parameters.table_type,Cols:StorageDescriptor.Columns|length(@)}' \
+      --output table
+
+    # Verify each table has expected columns (spot-check silver + gold)
+    aws glue get-table --database-name {DATABASE} --name {SILVER_TABLE} \
+      --query 'Table.StorageDescriptor.Columns[].{Name:Name,Type:Type}' --output table
+    aws glue get-table --database-name {DATABASE} --name {GOLD_TABLE} \
+      --query 'Table.StorageDescriptor.Columns[].{Name:Name,Type:Type}' --output table
+    ```
+    Expected: All Silver + Gold tables present, column names and types match semantic.yaml.
+
+    **10b. Athena — data is queryable and row counts are sane:**
+    ```bash
+    # Query each Gold table (must return rows, not errors)
+    aws athena start-query-execution \
+      --query-string "SELECT COUNT(*) AS row_count FROM {DATABASE}.{GOLD_TABLE}" \
+      --work-group {WORKGROUP} \
+      --result-configuration "OutputLocation=s3://{BUCKET}/athena-results/"
+
+    # Spot-check a star schema join (if applicable)
+    aws athena start-query-execution \
+      --query-string "SELECT f.*, d.column_name FROM {DATABASE}.{FACT_TABLE} f JOIN {DATABASE}.{DIM_TABLE} d ON f.fk = d.pk LIMIT 5" \
+      --work-group {WORKGROUP} \
+      --result-configuration "OutputLocation=s3://{BUCKET}/athena-results/"
+    ```
+    Expected: Row counts > 0, joins return data, no COLUMN_NOT_FOUND errors.
+
+    **10c. LF-Tags — all PII/non-PII columns tagged:**
+    ```bash
+    # Check tags on every table
+    for TABLE in {SILVER_TABLE_1} {SILVER_TABLE_2} {GOLD_TABLE_1} {GOLD_TABLE_2}; do
+      echo "--- $TABLE ---"
+      aws lakeformation get-resource-lf-tags \
+        --resource "{\"Table\":{\"DatabaseName\":\"${DATABASE}\",\"Name\":\"$TABLE\"}}" \
+        --query 'LFTagOnDatabase || LFTagsOnTable || LFTagsOnColumns' --output table
+    done
+    ```
+    Expected: Every column has PII_Classification + Data_Sensitivity tags.
+
+    **10d. TBAC — access grants are correct per role:**
+    ```bash
+    # Verify each principal's grants
+    for ROLE in {GLUE_ROLE} {ATHENA_ROLE} {QUICKSIGHT_ROLE}; do
+      echo "--- $ROLE ---"
+      aws lakeformation list-permissions \
+        --principal "{\"DataLakePrincipalIdentifier\":\"arn:aws:iam::${ACCOUNT}:role/$ROLE\"}" \
+        --query 'PrincipalResourcePermissions[].{Resource:Resource,Permissions:Permissions}' \
+        --output table
+    done
+
+    # Test restricted role sees NULL for high-sensitivity columns
+    # (assume analyst role and query — HIGH/CRITICAL columns should be NULL)
+    ```
+    Expected: Each role has grants matching its sensitivity level. Restricted roles cannot see PII.
+
+    **10e. KMS — encryption active on all zones:**
+    ```bash
+    # Verify S3 bucket encryption
+    aws s3api get-bucket-encryption --bucket {DATA_LAKE_BUCKET}
+
+    # Verify KMS key exists and rotation enabled
+    aws kms describe-key --key-id alias/{WORKLOAD}-key
+    aws kms get-key-rotation-status --key-id alias/{WORKLOAD}-key
+    ```
+    Expected: SSE-KMS enabled, key rotation active.
+
+    **10f. MWAA DAG — loaded without errors (if MWAA configured):**
+    ```bash
+    # Check DAG exists in MWAA S3 bucket
+    aws s3 ls s3://{MWAA_BUCKET}/dags/{WORKLOAD}_dag.py
+
+    # Check shared utils uploaded
+    aws s3 ls s3://{MWAA_BUCKET}/dags/shared/utils/ --recursive | head -10
+
+    # Verify DAG parsed successfully (via MWAA CLI or Airflow REST API)
+    # If using MWAA CLI:
+    aws mwaa create-cli-token --name {MWAA_ENV_NAME} | \
+      jq -r '.CliToken' | \
+      xargs -I{} curl -s "https://{MWAA_WEBSERVER}/aws_mwaa/cli" \
+        -H "Authorization: Bearer {}" \
+        -H "Content-Type: text/plain" \
+        -d "dags list" | base64 -d | grep {WORKLOAD}
+    ```
+    Expected: DAG listed, no import errors in DAG processing logs.
+
+    **10g. QuickSight — datasets accessible (if QuickSight configured):**
+    ```bash
+    # List datasets
+    aws quicksight list-data-sets --aws-account-id {ACCOUNT} \
+      --query "DataSetSummaries[?contains(Name,'{WORKLOAD}')].{Name:Name,Id:DataSetId}" \
+      --output table
+
+    # Check data source connection
+    aws quicksight describe-data-source --aws-account-id {ACCOUNT} \
+      --data-source-id {WORKLOAD}_athena_source \
+      --query 'DataSource.Status'
+    ```
+    Expected: Data source status = CREATION_SUCCESSFUL, datasets listed.
+
+    **10h. CloudTrail — audit trail active:**
+    ```bash
+    # Verify recent deployment events logged
+    aws cloudtrail lookup-events \
+      --lookup-attributes AttributeKey=EventSource,AttributeValue=lakeformation.amazonaws.com \
+      --max-results 10 \
+      --query 'Events[].{Time:EventTime,Name:EventName,User:Username}' \
+      --output table
+    ```
+    Expected: CreateTable, AddLFTagsToResource, GrantPermissions events visible.
+
+    **10i. Summary report — present to human:**
+    After running all checks, present a summary table:
+    ```
+    POST-DEPLOYMENT VERIFICATION: {WORKLOAD}
+    ──────────────────────────────────────────
+    Glue Catalog:    {N} tables verified       [PASS/FAIL]
+    Athena Queries:  {N} tables queryable      [PASS/FAIL]
+    LF-Tags:         {N} columns tagged        [PASS/FAIL]
+    TBAC Grants:     {N} roles verified        [PASS/FAIL]
+    KMS Encryption:  Key active, rotation on   [PASS/FAIL]
+    MWAA DAG:        Loaded, no import errors  [PASS/FAIL/SKIP]
+    QuickSight:      {N} datasets accessible   [PASS/FAIL/SKIP]
+    CloudTrail:      Audit events logged       [PASS/FAIL]
+    ──────────────────────────────────────────
+    Overall: [ALL PASS / {N} FAILURES]
+    ```
+    If ANY check fails, report the failure details and ask the human how to proceed.
+    Do NOT consider the deployment complete until all checks pass.
+
 ### Known Glue 4.0 + Iceberg Rules
 - Use `.saveAsTable("glue_catalog.db.table")` — NOT `.save(s3_path)`
 - Use `spark.table("glue_catalog.db.table")` — NOT `spark.read.parquet()`
