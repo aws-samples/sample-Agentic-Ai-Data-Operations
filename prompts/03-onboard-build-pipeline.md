@@ -259,6 +259,27 @@ After artifacts pass all tests and get human approval, deploy to AWS:
    - Scans all tables, applies column-level tags
    - Even non-PII columns get tagged `PII_Classification=NONE`
    - Verify: `aws lakeformation get-resource-lf-tags --resource '{"Table":{"DatabaseName":"DB","Name":"TABLE"}}'`
+8. **Grant TBAC permissions to querying principals** (CRITICAL — without this, Athena returns `COLUMN_NOT_FOUND`):
+   Applying LF-Tags activates Tag-Based Access Control. All principals (Athena users, Glue roles,
+   QuickSight) need explicit grants on the tag values to see columns.
+   ```bash
+   # Full access (all sensitivity levels)
+   aws lakeformation grant-permissions \
+     --principal '{"DataLakePrincipalIdentifier":"arn:aws:iam::ACCOUNT:role/ROLE"}' \
+     --permissions SELECT DESCRIBE \
+     --resource '{"LFTagPolicy":{"ResourceType":"TABLE","Expression":[{"TagKey":"PII_Classification","TagValues":["NONE","LOW","MEDIUM"]}]}}' \
+     --region us-east-1
+
+   # Restricted access (hide MEDIUM columns like manager_name)
+   aws lakeformation grant-permissions \
+     --principal '{"DataLakePrincipalIdentifier":"arn:aws:iam::ACCOUNT:role/analyst"}' \
+     --permissions SELECT DESCRIBE \
+     --resource '{"LFTagPolicy":{"ResourceType":"TABLE","Expression":[{"TagKey":"PII_Classification","TagValues":["NONE","LOW"]}]}}' \
+     --region us-east-1
+   ```
+   - Grant to: current IAM user, Glue ETL role, Athena execution role, QuickSight service role
+   - Repeat for `Data_Sensitivity` and `PII_Type` tags with matching values
+   - Verify: `SELECT * FROM {gold_table} LIMIT 5` in Athena — should return columns
 
 ### Known Glue 4.0 + Iceberg Rules
 - Use `.saveAsTable("glue_catalog.db.table")` — NOT `.save(s3_path)`

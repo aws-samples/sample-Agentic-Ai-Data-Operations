@@ -1531,6 +1531,51 @@ Step 5.4.5: PII Detection + LF-Tag Application (MANDATORY)
     → Log warning: "PII column {col} in Gold zone — ensure masking/hashing in transform"
     → Do NOT block deployment — the tag enables downstream access control
 
+  5.4.5e: Grant TBAC permissions to querying principals (CRITICAL)
+    ⚠️ Applying LF-Tags activates Tag-Based Access Control (TBAC).
+    Before tagging: Lake Formation is permissive (no tags = no column restrictions).
+    After tagging: EVERY column is governed — no TBAC grant = "COLUMN_NOT_FOUND" in Athena.
+
+    You MUST grant LF-Tag expression permissions to ALL principals that query these tables:
+    → Athena users/roles, Glue ETL roles, Redshift Spectrum roles, QuickSight service role
+
+    For each principal that needs full access:
+    → CLI: `aws lakeformation grant-permissions` with LFTagPolicy resource
+    → Grant SELECT + DESCRIBE on PII_Classification=NONE,LOW,MEDIUM (or whichever levels they need)
+    → Grant SELECT + DESCRIBE on Data_Sensitivity=LOW,MEDIUM (match the levels above)
+    → Grant SELECT + DESCRIBE on PII_Type=NONE,NAME (or whichever types exist in the dataset)
+
+    Example (grant full access to a role):
+    ```bash
+    aws lakeformation grant-permissions \
+      --principal '{"DataLakePrincipalIdentifier":"arn:aws:iam::ACCOUNT:role/ROLE_NAME"}' \
+      --permissions SELECT DESCRIBE \
+      --resource '{"LFTagPolicy":{"ResourceType":"TABLE","Expression":[{"TagKey":"PII_Classification","TagValues":["NONE","LOW","MEDIUM"]}]}}' \
+      --region us-east-1
+    ```
+
+    For restricted access (e.g., analyst who should NOT see MEDIUM/SOX columns like manager_name):
+    ```bash
+    aws lakeformation grant-permissions \
+      --principal '{"DataLakePrincipalIdentifier":"arn:aws:iam::ACCOUNT:role/analyst-role"}' \
+      --permissions SELECT DESCRIBE \
+      --resource '{"LFTagPolicy":{"ResourceType":"TABLE","Expression":[{"TagKey":"PII_Classification","TagValues":["NONE","LOW"]}]}}' \
+      --region us-east-1
+    ```
+    → This analyst sees company_name (LOW) but gets COLUMN_NOT_FOUND for manager_name (MEDIUM)
+    → Column-level security without any code changes — just tag values control visibility
+
+    Principals to grant (ask during discovery or derive from IAM):
+    → Current IAM user (for Athena console queries)
+    → Glue ETL role (for Glue jobs reading tagged tables)
+    → Athena workgroup execution role (if using workgroup-level role)
+    → QuickSight service role (if dashboards query these tables)
+    → Any application roles consuming Gold zone data
+
+    Verify: Run a test query in Athena after granting:
+    → `SELECT * FROM {gold_table} LIMIT 5` — should return all columns the principal has access to
+    → If "COLUMN_NOT_FOUND" persists: check which tag values are missing from the principal's grants
+
 Step 5.5: Encryption (KMS)
   → CLI: `aws kms create-key`, `aws kms create-alias` (core MCP not loaded)
   → Audit: `mcp__cloudtrail__lookup_events` (EventName=CreateKey)
