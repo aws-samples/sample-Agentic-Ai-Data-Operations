@@ -230,45 +230,102 @@ Based on production QuickSight dark-theme dashboards:
 
 ## Deployment
 
-No QuickSight MCP server is available. Deploy via CLI:
+No QuickSight MCP server is available. Deploy via CLI in this exact order:
+
+### Prerequisites (do these FIRST or everything fails)
 
 ```bash
-# Create custom theme
-aws quicksight create-theme \
-  --aws-account-id ACCOUNT_ID \
-  --theme-id midnight_executive \
-  --name "Midnight Executive" \
-  --configuration '{...}'
+# 1. Find QuickSight user (NOT Admin/{region} — look up the actual user)
+aws quicksight list-users --aws-account-id ACCOUNT_ID --namespace default --region REGION
+# Use the UserName and Arn from the output for all --permissions below
 
-# Create data source (Athena)
+# 2. Grant QuickSight service role S3 + Athena + Glue + LF access
+#    The default AWSQuickSightS3Policy is often a deny-all placeholder.
+#    Without this, data source creation fails: "Unable to verify/create output bucket"
+aws iam put-role-policy \
+  --role-name aws-quicksight-service-role-v0 \
+  --policy-name DataLakeAccess \
+  --policy-document '{
+    "Version":"2012-10-17",
+    "Statement":[
+      {"Effect":"Allow","Action":["s3:GetObject","s3:ListBucket","s3:GetBucketLocation",
+        "s3:PutObject","s3:ListBucketMultipartUploads","s3:ListMultipartUploadParts",
+        "s3:AbortMultipartUpload"],
+       "Resource":["arn:aws:s3:::BUCKET","arn:aws:s3:::BUCKET/*"]},
+      {"Effect":"Allow","Action":["athena:StartQueryExecution","athena:GetQueryExecution",
+        "athena:GetQueryResults","athena:StopQueryExecution","athena:GetWorkGroup"],
+       "Resource":"*"},
+      {"Effect":"Allow","Action":["glue:GetTable","glue:GetTables","glue:GetDatabase",
+        "glue:GetDatabases","glue:GetPartitions"],"Resource":"*"},
+      {"Effect":"Allow","Action":["lakeformation:GetDataAccess"],"Resource":"*"}
+    ]}'
+
+# 3. If tables have LF-Tags (TBAC), grant QuickSight service role access to tag values
+#    Without this: "database generated SQL exception" in dashboard visuals
+aws lakeformation grant-permissions \
+  --principal '{"DataLakePrincipalIdentifier":"arn:aws:iam::ACCOUNT:role/service-role/aws-quicksight-service-role-v0"}' \
+  --permissions SELECT DESCRIBE \
+  --resource '{"LFTagPolicy":{"ResourceType":"TABLE","Expression":[{"TagKey":"PII_Classification","TagValues":["NONE","LOW","MEDIUM"]}]}}' \
+  --region REGION
+# Repeat for Data_Sensitivity and PII_Type tags
+
+# 4. Grant QuickSight service role DESCRIBE on the database
+aws lakeformation grant-permissions \
+  --principal '{"DataLakePrincipalIdentifier":"arn:aws:iam::ACCOUNT:role/service-role/aws-quicksight-service-role-v0"}' \
+  --permissions DESCRIBE \
+  --resource '{"Database":{"Name":"DATABASE_NAME"}}' \
+  --region REGION
+```
+
+### Create QuickSight Resources (in order — each depends on the previous)
+
+```bash
+# Step 1: Data source (Athena connection)
 aws quicksight create-data-source \
   --aws-account-id ACCOUNT_ID \
-  --data-source-id gold_athena \
+  --data-source-id {workload}_athena_source \
+  --name "{Workload} - Athena" \
   --type ATHENA \
-  --data-source-parameters '{"AthenaParameters":{"WorkGroup":"primary"}}'
+  --data-source-parameters '{"AthenaParameters":{"WorkGroup":"WORKGROUP_NAME"}}' \
+  --permissions '[{"Principal":"QS_USER_ARN","Actions":["quicksight:DescribeDataSource","quicksight:DescribeDataSourcePermissions","quicksight:PassDataSource","quicksight:UpdateDataSource","quicksight:DeleteDataSource","quicksight:UpdateDataSourcePermissions"]}]'
+# VERIFY status is CREATION_SUCCESSFUL before proceeding:
+aws quicksight describe-data-source --aws-account-id ACCOUNT_ID --data-source-id {workload}_athena_source --query 'DataSource.Status'
 
-# Create dataset with joins
+# Step 2: Datasets (one per Gold table, use CustomSql with explicit column list)
 aws quicksight create-data-set \
   --aws-account-id ACCOUNT_ID \
-  --data-set-id fact_inventory \
+  --data-set-id {workload}_{table} \
+  --name "{Workload} - {Table}" \
   --import-mode DIRECT_QUERY \
-  --physical-table-map '{...}' \
-  --logical-table-map '{...}'
+  --physical-table-map '{"t1":{"CustomSql":{"DataSourceArn":"DATA_SOURCE_ARN","Name":"{table}","SqlQuery":"SELECT col1, col2, ... FROM db.table","Columns":[{"Name":"col1","Type":"STRING"},...]}}}'
+  --permissions '[...]'
 
-# Create dashboard from template
+# Step 3: Analysis (use --definition with DataSetIdentifierDeclarations + Sheets + Visuals)
+aws quicksight create-analysis \
+  --aws-account-id ACCOUNT_ID \
+  --analysis-id {workload}_analysis \
+  --name "{Workload} Analysis" \
+  --definition file://definition.json \
+  --permissions '[...]'
+
+# Step 4: Dashboard (same --definition as analysis)
 aws quicksight create-dashboard \
   --aws-account-id ACCOUNT_ID \
-  --dashboard-id dashboard_id \
-  --name "Dashboard Name" \
-  --source-entity '{...}' \
-  --theme-arn "arn:aws:quicksight:REGION:ACCOUNT_ID:theme/midnight_executive"
-
-# Grant permissions
-aws quicksight update-dashboard-permissions \
-  --aws-account-id ACCOUNT_ID \
-  --dashboard-id dashboard_id \
-  --grant-permissions '[...]'
+  --dashboard-id {workload}_dashboard \
+  --name "{Workload} Dashboard" \
+  --definition file://definition.json \
+  --permissions '[...]'
 ```
+
+### Known Issues (from production deployment)
+
+| Issue | Symptom | Fix |
+|-------|---------|-----|
+| **S3 deny-all policy** | Data source: "Unable to verify/create output bucket" | Add inline S3+Athena+Glue policy to QS service role |
+| **Missing TBAC grants** | Dashboard: "database generated SQL exception" | Grant QS service role LF-Tag permissions |
+| **Wrong QS username** | describe_user fails, script exits silently | Use `list-users` to find actual username |
+| **Orphaned datasets** | Deleting data source breaks datasets | Must recreate datasets + analysis + dashboard (full chain) |
+| **source-entity vs definition** | CLI error on create-analysis | Use `--definition file://` (not `--source-entity`) for programmatic creation |
 
 ## Validation
 
