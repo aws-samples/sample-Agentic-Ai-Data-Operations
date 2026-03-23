@@ -1503,6 +1503,34 @@ Step 5.4: Lake Formation Grants (MCP via Lambda)
   → `mcp__lambda__AWS_Lambda_LF_revoke_access_new` — revoke if needed
   → Audit: `mcp__cloudtrail__lookup_events` (EventName=GrantPermissions)
 
+Step 5.4.5: PII Detection + LF-Tag Application (MANDATORY)
+  This step MUST run after Silver tables are registered and before Gold promotion.
+  Uses: `shared/utils/pii_detection_and_tagging.py`
+
+  5.4.5a: Create LF-Tags (if they don't exist)
+    → CLI: `aws lakeformation create-lf-tag` (lakeformation MCP not loaded)
+    → Creates 3 tags: PII_Classification, PII_Type, Data_Sensitivity
+    → Idempotent — skips if tags already exist
+
+  5.4.5b: Run PII detection on all Silver + Gold tables
+    → Scans column names (pattern-based) + samples content (regex-based)
+    → Detects 12 PII types: EMAIL, PHONE, SSN, CREDIT_CARD, NAME, ADDRESS, DOB, etc.
+    → Even if no PII found: tag ALL columns with PII_Classification=NONE, Data_Sensitivity=LOW
+
+  5.4.5c: Apply LF-Tags to Glue Catalog columns
+    → CLI: `aws lakeformation add-lf-tags-to-resource` per column
+    → PII columns: PII_Classification={sensitivity}, PII_Type={type}, Data_Sensitivity={sensitivity}
+    → Non-PII columns: PII_Classification=NONE, Data_Sensitivity=LOW
+    → Audit: `mcp__cloudtrail__lookup_events` (EventName=AddLFTagsToResource)
+
+  5.4.5d: Verify tags applied
+    → CLI: `aws lakeformation get-resource-lf-tags` per table
+    → Report: {table}.{column} → PII_Classification={value}, Data_Sensitivity={value}
+
+  If PII detected in a column already in Gold zone:
+    → Log warning: "PII column {col} in Gold zone — ensure masking/hashing in transform"
+    → Do NOT block deployment — the tag enables downstream access control
+
 Step 5.5: Encryption (KMS)
   → CLI: `aws kms create-key`, `aws kms create-alias` (core MCP not loaded)
   → Audit: `mcp__cloudtrail__lookup_events` (EventName=CreateKey)

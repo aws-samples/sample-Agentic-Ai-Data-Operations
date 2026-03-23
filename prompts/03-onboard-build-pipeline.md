@@ -244,12 +244,21 @@ After artifacts pass all tests and get human approval, deploy to AWS:
 1. **Create Glue database** (if new workload)
 2. **Grant Lake Formation permissions** (CREATE_TABLE, ALTER, DROP on database; ALL on tables)
 3. **Create Glue jobs** (one per ETL script, Glue 4.0, `--datalake-formats: iceberg`)
-4. **⚠️ Upload scripts to CORRECT S3 path** — verify each job's `ScriptLocation`:
+4. **Upload scripts to CORRECT S3 path** — verify each job's `ScriptLocation`:
    ```bash
    aws glue get-job --job-name MY_JOB --query 'Job.Command.ScriptLocation' --output text
    ```
-5. **Run Bronze→Silver jobs first**, then Silver→Gold after Silver succeeds
+5. **Run Bronze to Silver jobs first**, then Silver to Gold after Silver succeeds
 6. **Verify all Iceberg tables** exist in Glue Data Catalog
+7. **PII Detection + LF-Tag Application** (MANDATORY — runs after tables registered):
+   ```bash
+   python3 -m shared.utils.pii_detection_and_tagging \
+     --database {DATABASE_NAME} --region us-east-1
+   ```
+   - Creates 3 LF-Tags: `PII_Classification`, `PII_Type`, `Data_Sensitivity`
+   - Scans all tables, applies column-level tags
+   - Even non-PII columns get tagged `PII_Classification=NONE`
+   - Verify: `aws lakeformation get-resource-lf-tags --resource '{"Table":{"DatabaseName":"DB","Name":"TABLE"}}'`
 
 ### Known Glue 4.0 + Iceberg Rules
 - Use `.saveAsTable("glue_catalog.db.table")` — NOT `.save(s3_path)`
