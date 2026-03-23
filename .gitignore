@@ -65,8 +65,8 @@ secrets.json
 .env
 .env.local
 
-# MCP Configuration (contains local paths)
-.mcp.json
+# MCP Configuration — .mcp.json is now committed (portable, no local paths)
+# Override locally via .mcp.local.json if needed
 
 # Test Results & Outputs
 pii_detection_test_results_*.json
