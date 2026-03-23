@@ -1,0 +1,93 @@
+{
+  "mcpServers": {
+    "core": {
+      "command": "uvx",
+      "args": ["--from", "awslabs-core-mcp-server", "awslabs.core-mcp-server"],
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "AWS_PROFILE": "default",
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      }
+    },
+    "iam": {
+      "command": "uvx",
+      "args": ["--from", "awslabs-iam-mcp-server", "awslabs.iam-mcp-server"],
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "AWS_PROFILE": "default",
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      }
+    },
+    "lambda": {
+      "command": "uvx",
+      "args": ["--from", "awslabs-lambda-mcp-server", "awslabs.lambda-mcp-server"],
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "AWS_PROFILE": "default",
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      }
+    },
+    "s3-tables": {
+      "command": "uvx",
+      "args": ["--from", "awslabs-s3-tables-mcp-server", "awslabs.s3-tables-mcp-server"],
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "AWS_PROFILE": "default",
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      }
+    },
+    "cloudtrail": {
+      "command": "uvx",
+      "args": ["--from", "awslabs-cloudtrail-mcp-server", "awslabs.cloudtrail-mcp-server"],
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "AWS_PROFILE": "default",
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      }
+    },
+    "redshift": {
+      "command": "uvx",
+      "args": ["--from", "awslabs-redshift-mcp-server", "awslabs.redshift-mcp-server"],
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "AWS_PROFILE": "default",
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      }
+    },
+    "cloudwatch": {
+      "command": "uvx",
+      "args": ["--from", "awslabs-cloudwatch-mcp-server", "awslabs.cloudwatch-mcp-server"],
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "AWS_PROFILE": "default",
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      }
+    },
+    "cost-explorer": {
+      "command": "uvx",
+      "args": ["--from", "awslabs-cost-explorer-mcp-server", "awslabs.cost-explorer-mcp-server"],
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "AWS_PROFILE": "default",
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      }
+    },
+    "dynamodb": {
+      "command": "uvx",
+      "args": ["--from", "awslabs-dynamodb-mcp-server", "awslabs.dynamodb-mcp-server"],
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "AWS_PROFILE": "default",
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      }
+    },
+    "pii-detection": {
+      "command": "uv",
+      "args": ["run", "--no-project", "--with", "boto3", "--with", "mcp", "--python", "3.13", "/Users/hcherian/Documents/Claude-data-operations/mcp-servers/pii-detection-server/server.py"],
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "AWS_PROFILE": "default"
+      }
+    }
+  }
+}
