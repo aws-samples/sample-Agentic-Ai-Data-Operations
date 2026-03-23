@@ -10,12 +10,40 @@ Your data onboarding system now has reusable prompt patterns you can use for any
 
 | File | Purpose | When to Use |
 |------|---------|-------------|
+| **prompts/00-setup-environment.md** | 🏗️ First-time AWS setup | Run ONCE after cloning repo into new AWS account |
 | **prompts/** (01-route through 06-govern) | 📋 Copy-paste templates | Quick lookup for prompt structure |
 | **prompts/examples.md** | 📝 Filled-out examples | See real-world usage with details |
 | **prompts/regulation/** | 🔒 Regulation-specific controls | When GDPR, CCPA, HIPAA, SOX, or PCI DSS compliance is required |
 | **SKILLS.md** (bottom section) | 📖 Full documentation | Deep dive into each pattern |
 | **CLAUDE.md** | 🏗️ Architecture reference | Understand system design |
 | **deploy_to_aws.py** | 🚀 Deployment script | Deploy workload to AWS (Glue, MWAA, QuickSight) |
+
+---
+
+## 🏗️ First Time? Setup Your AWS Environment
+
+If this is a fresh clone into a new AWS account, run the setup prompt first:
+
+```
+Setup AWS environment for the Agentic Data Onboarding platform.
+
+Account details:
+- AWS Region: us-east-1
+- Project name: data-onboarding
+- Environment: dev
+
+What I need created:
+- [x] IAM roles
+- [x] S3 data lake bucket
+- [x] KMS encryption keys
+- [x] Glue databases
+- [x] Lake Formation LF-Tags
+- [x] Lake Formation TBAC grants
+
+Existing resources: none
+```
+
+This creates all AWS prerequisites (IAM roles, S3 bucket, KMS keys, Glue databases, LF-Tags) interactively. See `prompts/00-setup-environment.md` for full details.
 
 ---
 
