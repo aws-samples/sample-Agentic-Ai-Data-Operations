@@ -1615,6 +1615,66 @@ Step 5.8: Deploy DAG to MWAA (if MWAA configured)
   → Exclude: __pycache__/, *.pyc
   → Verify: DAG appears in Airflow UI (check DAG processing logs for import errors)
   → Note: MWAA bucket is DIFFERENT from data lake bucket — ask during discovery or use Airflow Variable
+
+Step 5.9: Post-Deployment Verification (MANDATORY — do NOT skip)
+  Run after ALL deployment steps complete. This is a comprehensive smoke test.
+  Present results as a summary table to the human.
+
+  5.9a: Glue Catalog — verify all Silver + Gold tables exist with correct schema
+    → CLI: `aws glue get-tables --database-name {DB}` — list all tables
+    → CLI: `aws glue get-table --database-name {DB} --name {TABLE}` — spot-check columns
+    → Expected: Column names/types match semantic.yaml
+
+  5.9b: Athena Queries — verify data is queryable with correct row counts
+    → CLI: `aws athena start-query-execution` — SELECT COUNT(*) on each Gold table
+    → CLI: Run a star schema join query (if applicable) to verify FKs work
+    → Expected: Row counts > 0, joins return data, no COLUMN_NOT_FOUND
+
+  5.9c: LF-Tags — verify every column is tagged (PII and non-PII)
+    → CLI: `aws lakeformation get-resource-lf-tags` per table
+    → Expected: Every column has PII_Classification + Data_Sensitivity
+
+  5.9d: TBAC Grants — verify each role's access level
+    → CLI: `aws lakeformation list-permissions` per principal
+    → Test: Assume restricted role, query table — HIGH/CRITICAL columns should return NULL
+    → Expected: Grants match sensitivity levels defined in regulation prompts
+
+  5.9e: KMS Encryption — verify keys exist and rotation enabled
+    → CLI: `aws kms describe-key`, `aws kms get-key-rotation-status`
+    → CLI: `aws s3api get-bucket-encryption` on data lake bucket
+    → Expected: SSE-KMS enabled, rotation active
+
+  5.9f: MWAA DAG — verify DAG loaded without import errors
+    → CLI: `aws s3 ls s3://{MWAA_BUCKET}/dags/{workload}_dag.py`
+    → CLI: MWAA CLI or Airflow REST API → `dags list` → grep for workload
+    → Expected: DAG listed, no import errors in processing logs
+
+  5.9g: QuickSight — verify datasets accessible and data source connected
+    → CLI: `aws quicksight list-data-sets`, `aws quicksight describe-data-source`
+    → Expected: Status = CREATION_SUCCESSFUL
+
+  5.9h: CloudTrail — verify audit events logged
+    → `mcp__cloudtrail__lookup_events` — check for CreateTable, AddLFTagsToResource, GrantPermissions
+    → Expected: Recent deployment events visible
+
+  5.9i: Present summary table to human:
+    ┌──────────────────────────────────────────────┐
+    │ POST-DEPLOYMENT VERIFICATION: {workload}     │
+    ├──────────────────────────────────────────────┤
+    │ Glue Catalog:   {N} tables         PASS/FAIL │
+    │ Athena Queries: {N} tables         PASS/FAIL │
+    │ LF-Tags:        {N} columns        PASS/FAIL │
+    │ TBAC Grants:    {N} roles          PASS/FAIL │
+    │ KMS Encryption: Key active         PASS/FAIL │
+    │ MWAA DAG:       Loaded             PASS/SKIP │
+    │ QuickSight:     {N} datasets       PASS/SKIP │
+    │ CloudTrail:     Events logged      PASS/FAIL │
+    ├──────────────────────────────────────────────┤
+    │ Overall: ALL PASS / {N} FAILURES             │
+    └──────────────────────────────────────────────┘
+
+  If ANY check fails: report details, ask human how to proceed.
+  Do NOT consider deployment complete until all checks pass.
 ```
 
 **Fallback logging**: If any step falls back to CLI, log the reason:
