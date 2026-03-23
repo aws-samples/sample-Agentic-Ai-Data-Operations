@@ -16,6 +16,7 @@ Each prompt is named with a **phase prefix** that indicates when it runs in the 
 | `ENRICH` | Post-build | **Enrich: Link Datasets via FK** | Add relationships + join semantics |
 | `CONSUME` | Post-build | **Consume: Create Dashboard** | QuickSight visualization on Gold |
 | `GOVERN` | Post-build | **Govern: Trace Data Lineage** | Compliance docs, impact analysis |
+| `prompts/regulation/` | Optional | **Regulation-Specific Controls** | GDPR, CCPA, HIPAA, SOX, PCI DSS — loaded only when regulation selected during discovery (referenced from SKILLS.md section 6a) |
 
 ---
 
@@ -341,10 +342,11 @@ This shows which prompts must run before others:
 │  │  - Dependencies (from human: wait for other DAGs)                      │   │  │
 │  │  - Shared operators (from shared/ folder)                              │   │  │
 │  │                                                                         │   │  │
-│  │  Produces → {workload}_dag.py, schedule.yaml                          │   │  │
+│  │  Produces → {workload}_dag.py, schedule.yaml, deploy_to_aws.py       │   │  │
 │  └────────────────────────────────────────────────────────────────────────┘   │  │
 │                                                                                │  │
 │  All sub-agents complete → present artifacts to human → approve               │  │
+│  Deployment includes MWAA step + mandatory post-deployment verification      │  │
 └──────────────────────────────────────────────────────────────────────────────┘  │
        │                                                                          │
        │ Workload created in workloads/{name}/                                   │
@@ -533,9 +535,16 @@ ONBOARD Prompt (Data Onboarding Agent — main conversation)
 │  │
 │  ▼ TEST GATE ── PASS
 │
-│  PHASE 5: Human Review (inline)
-│  ──────────────────────────────
-│  Present all artifacts + test results
+│  PHASE 5: Deploy to AWS (inline, via MCP)
+│  ─────────────────────────────────────────
+│  After human approval, orchestrator deploys:
+│  Step 5.1-5.7: S3 upload, Glue registration, IAM, LF, KMS, Query Verify, Audit
+│  Step 5.8: Deploy DAG to MWAA (upload DAG + shared utils + config + scripts to MWAA S3 bucket)
+│  Step 5.9: Post-Deployment Verification (mandatory smoke test:
+│             Glue Catalog tables exist, Athena queries work, LF-Tags applied,
+│             TBAC grants active, KMS encryption verified, MWAA DAG parse success,
+│             QuickSight datasets accessible, CloudTrail audit logs present)
+│  │
 │  Human approves → workload complete
 ```
 
@@ -636,15 +645,22 @@ SYSTEM DECOMPOSES INTO 5+ AGENT INTERACTIONS
 
   Interaction 6: DAG Agent (sub-agent, 5-10 min)
   ├── Input:  all scripts + schedule + dependencies
-  ├── Output: {workload}_dag.py
+  ├── Output: {workload}_dag.py, deploy_to_aws.py
   └── Gate:   51 tests must pass
 
   Interaction 7: Human review (inline, 2 min)
   ├── Input:  all artifacts + 196 test results
   └── Output: "approved" or "change X"
 
+  Interaction 8: Deploy to AWS (inline via MCP, 10-15 min)
+  ├── Input:  approved artifacts
+  ├── Steps:  S3 upload, Glue registration, IAM, LF, KMS, Query Verify, Audit
+  │           MWAA DAG deployment (Step 5.8: upload DAG + shared utils + config + scripts)
+  │           Post-deployment verification (Step 5.9: mandatory smoke test)
+  └── Output: Live workload in AWS, all tests passed
 
-TOTAL: 1 human prompt → 7 interactions → 196 tests → 20+ files created
+
+TOTAL: 1 human prompt → 8 interactions → 196 tests → 20+ files created → deployed to AWS
 ```
 
 ---

@@ -10,10 +10,12 @@ Your data onboarding system now has reusable prompt patterns you can use for any
 
 | File | Purpose | When to Use |
 |------|---------|-------------|
-| **PROMPTS_QUICK_REFERENCE.md** | 📋 Copy-paste templates | Quick lookup for prompt structure |
-| **PROMPTS_EXAMPLES.md** | 📝 Filled-out examples | See real-world usage with details |
+| **prompts/** (01-route through 06-govern) | 📋 Copy-paste templates | Quick lookup for prompt structure |
+| **prompts/examples.md** | 📝 Filled-out examples | See real-world usage with details |
+| **prompts/regulation/** | 🔒 Regulation-specific controls | When GDPR, CCPA, HIPAA, SOX, or PCI DSS compliance is required |
 | **SKILLS.md** (bottom section) | 📖 Full documentation | Deep dive into each pattern |
 | **CLAUDE.md** | 🏗️ Architecture reference | Understand system design |
+| **deploy_to_aws.py** | 🚀 Deployment script | Deploy workload to AWS (Glue, MWAA, QuickSight) |
 
 ---
 
@@ -196,6 +198,53 @@ Generate data_product_catalog.yaml and lineage diagram.
 
 ---
 
+### Scenario 5: Deploy to MWAA
+
+**Need**: Deploy the DAG and dependencies to Amazon Managed Workflows for Apache Airflow
+
+**Option 1: Using the deployment script**
+```bash
+# Deploy workload to MWAA S3 bucket
+python3 deploy_to_aws.py --mwaa-bucket=my-mwaa-bucket-name --workload=customer_master
+
+# The script will:
+# 1. Upload DAG file to s3://my-mwaa-bucket-name/dags/
+# 2. Sync shared utilities to s3://my-mwaa-bucket-name/plugins/
+# 3. Upload Glue scripts to configured S3 location
+# 4. Verify all files are in place
+```
+
+**Option 2: Manual deployment**
+```bash
+# Upload DAG
+aws s3 cp workloads/customer_master/dags/customer_master_dag.py \
+  s3://my-mwaa-bucket-name/dags/
+
+# Sync shared utilities
+aws s3 sync shared/ s3://my-mwaa-bucket-name/plugins/shared/ \
+  --exclude "*.pyc" --exclude "__pycache__/*"
+```
+
+**Set Airflow Variables** (in MWAA UI or via CLI):
+```json
+{
+  "glue_script_s3_path": "s3://my-glue-scripts-bucket/scripts/",
+  "glue_iam_role": "arn:aws:iam::123456789012:role/GlueJobRole",
+  "aws_account_id": "123456789012",
+  "kms_key_alias": "alias/data-pipeline-key"
+}
+```
+
+**Verify**:
+1. Open MWAA Airflow UI
+2. Check that `customer_master_dag` appears in the DAG list
+3. Unpause the DAG
+4. Trigger a manual run to test
+
+**What happens**: Your DAG is deployed to MWAA and ready to run on the configured schedule.
+
+---
+
 ## 🎯 The Six Core Patterns
 
 Use these in order for a complete data onboarding:
@@ -259,6 +308,38 @@ First onboarding doesn't need to be perfect:
 2. Run tests, see what fails
 3. Refine transformations/quality rules
 4. Re-run until all tests pass
+
+### 5. Load Regulation-Specific Prompts When Needed
+
+**Important**: Regulation-specific prompts are NOT loaded by default. Only use them when compliance is explicitly required.
+
+During discovery (Phase 1), if the user mentions compliance requirements:
+```
+Does this data require regulatory compliance? (GDPR, CCPA, HIPAA, SOX, PCI DSS)
+```
+
+If YES, load the appropriate prompt from `prompts/regulation/`:
+- `prompts/regulation/gdpr.md` — GDPR (EU data protection)
+- `prompts/regulation/ccpa.md` — CCPA (California privacy)
+- `prompts/regulation/hipaa.md` — HIPAA (healthcare data)
+- `prompts/regulation/sox.md` — SOX (financial reporting)
+- `prompts/regulation/pci_dss.md` — PCI DSS (payment card data)
+
+These prompts add:
+- Mandatory data residency controls
+- Enhanced encryption and access controls
+- Audit trail requirements
+- Data retention and deletion policies
+- Consent tracking (GDPR/CCPA)
+- Field-level encryption (HIPAA/PCI DSS)
+
+**Example**:
+```
+User: "We need to onboard patient records"
+Claude: "Does this data require HIPAA compliance?"
+User: "Yes"
+Claude: [loads prompts/regulation/hipaa.md] → adds PHI encryption, audit logging, access controls
+```
 
 ---
 
@@ -340,25 +421,27 @@ Claude will edit existing files instead of creating new ones.
 ## 📚 Next Steps
 
 **For your first onboarding:**
-1. Open `PROMPTS_EXAMPLES.md`
+1. Open `prompts/examples.md`
 2. Find an example similar to your data
 3. Copy the ROUTE prompt, fill in your details, send to Claude
 4. If not found, copy the ONBOARD prompt, fill in, send
 5. Wait for pipeline generation (~5-10 minutes)
 6. Run tests: `pytest workloads/[NAME]/tests/ -v`
-7. If tests pass, you're done! Deploy to AWS.
+7. If tests pass, you're done! Deploy to AWS with `deploy_to_aws.py`
 
 **For ongoing work:**
-- Keep `PROMPTS_QUICK_REFERENCE.md` open for copy-paste
+- Keep `prompts/` folder open for copy-paste templates
 - Use GENERATE to create demo data for testing
 - Use ENRICH to document relationships between datasets
 - Use CONSUME to create dashboards for stakeholders
 - Use GOVERN to generate lineage docs for governance
+- Load `prompts/regulation/` only when compliance is required
 
 **Need help?**
-- See detailed examples: `PROMPTS_EXAMPLES.md`
+- See detailed examples: `prompts/examples.md`
 - See full documentation: `SKILLS.md` → Modular Prompt Patterns
 - See architecture: `CLAUDE.md`
+- See deployment guide: `docs/aws-account-setup.md`
 
 ---
 

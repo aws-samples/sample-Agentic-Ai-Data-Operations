@@ -105,6 +105,30 @@ The Agentic Data Onboarding System now routes **ALL** AWS operations through Mod
 | **eventbridge** | (to build) EventBridge scheduling |
 | **lakeformation** | (to build) Lake Formation permissions |
 
+### MCP Server Status
+
+**LOADED (working, live tools available):**
+- `iam` - IAM roles, policies, permission management
+- `lambda` - Serverless functions, Lake Formation access grant Lambda
+- `redshift` - Query verification via Redshift Spectrum
+- `cloudtrail` - Audit log lookup and compliance tracking
+
+**NOT LOADED (CLI fallback required):**
+- `aws-dataprocessing` - Glue, EMR, Athena (use AWS CLI)
+- `s3-tables` - S3 Tables / Iceberg operations (use AWS CLI)
+- `sagemaker-catalog` - SageMaker Catalog operations (use AWS CLI)
+- `core` - S3, KMS core services (use AWS CLI)
+- `sns-sqs` - SNS/SQS alerting (use AWS CLI)
+- `cloudwatch` - CloudWatch metrics/logs (use AWS CLI)
+- `cost-explorer` - Cost tracking (use AWS CLI)
+- `eventbridge` - EventBridge scheduling (use AWS CLI)
+- `lakeformation` - Lake Formation grants (use `lambda` MCP for LF_access_grant Lambda)
+- `dynamodb` - DynamoDB operations (use AWS CLI)
+- `stepfunctions` - Step Functions orchestration (use AWS CLI)
+- `local-filesystem` - Local config files (use Python file I/O)
+
+**Default behavior in local mode:** MCP calls to loaded servers execute live; CLI fallback commands are dry-run unless `DEPLOY_MODE=live`.
+
 ## Example: Visual Step Logging
 
 ```
@@ -271,6 +295,37 @@ orch.call_mcp(
 | **Quality Agent** | `aws-dataprocessing`, `cloudwatch` |
 | **Analysis Agent** | `aws-dataprocessing` (Athena), `dynamodb` (SynoDB), `sagemaker-catalog` |
 | **Orchestration DAG Agent** | `stepfunctions`, `lambda`, `eventbridge`, `sns-sqs` |
+
+## Phase 5 Deployment via MCP
+
+After human approval of all artifacts and passing test gates, the Data Onboarding Agent executes deployment in the main conversation using MCP tools:
+
+### Deployment Steps
+
+| Step | Operation | MCP Tool (if loaded) | CLI Fallback |
+|------|-----------|----------------------|--------------|
+| 5.1 | S3 Upload | N/A (not loaded) | `aws s3 cp` |
+| 5.2 | Glue Registration | N/A (not loaded) | `aws glue create-database`, `aws glue create-table` |
+| 5.3 | IAM Roles & Policies | `mcp__iam__*` | `aws iam create-role`, `aws iam put-role-policy` |
+| 5.4 | Lake Formation Grants | `mcp__lambda__invoke` (via LF_access_grant Lambda) | `aws lakeformation grant-permissions` |
+| 5.5 | KMS Key Configuration | N/A (not loaded) | `aws kms create-key`, `aws kms create-alias` |
+| 5.6 | Query Verification | `mcp__redshift__execute_statement` (via Spectrum) | `aws athena start-query-execution` |
+| 5.7 | Audit Log Check | `mcp__cloudtrail__lookup_events` | `aws cloudtrail lookup-events` |
+| 5.8 | MWAA DAG Deployment | N/A (no MCP server for MWAA) | `aws s3 cp` to MWAA DAG bucket + `aws mwaa update-environment` |
+| 5.9 | Post-Deployment Verification | `mcp__cloudtrail__lookup_events` for audit check, CLI for rest | `aws glue get-table`, `aws athena get-query-execution` |
+
+**Full deployment automation:** `deploy_to_aws.py` handles all steps including MWAA DAG deployment and post-verification.
+
+### Regulation-Specific Compliance Controls
+
+The `prompts/regulation/` directory contains regulation-specific prompts that reference MCP tools for compliance verification:
+
+- **GDPR**, **CCPA**, **HIPAA**, **SOX**, **PCI DSS** prompts
+- Use `mcp__lakeformation__*` (when loaded) or `mcp__lambda__invoke` (LF_access_grant Lambda) for LF-Tag verification
+- Use `mcp__iam__*` for TBAC grant checks
+- Use `mcp__cloudtrail__lookup_events` for audit trail validation
+
+See `prompts/regulation/README.md` for usage instructions.
 
 ## Next Steps
 

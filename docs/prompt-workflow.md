@@ -127,14 +127,16 @@ Day 1: Onboard primary dataset
 ├─ ROUTE: Check existing
 ├─ ONBOARD: Build main dataset pipeline (e.g., customer_master)
 ├─ Validate: Run tests, check quality
-└─ Deploy: Airflow DAG to production
+├─ Deploy: Deploy to MWAA (deploy_to_aws.py --mwaa-bucket=BUCKET or manual S3 upload)
+└─ Verify: Post-Deployment Verification (8 smoke tests: Glue, Athena, LF-Tags, TBAC, KMS, MWAA, QuickSight, CloudTrail)
 
 Day 2: Onboard related dataset
 ├─ ROUTE: Check existing
 ├─ ONBOARD: Build related dataset pipeline (e.g., order_transactions)
 ├─ ENRICH: Link FK relationship to customer_master
 ├─ Validate: Test FK integrity, cross-workload DAG dependencies
-└─ Deploy: Airflow DAG with ExternalTaskSensor
+├─ Deploy: Deploy to MWAA (Airflow DAG with ExternalTaskSensor)
+└─ Verify: Post-Deployment Verification
 
 Day 3: Enable self-service analytics
 ├─ CONSUME: Create QuickSight dashboard (customer + order metrics)
@@ -216,6 +218,13 @@ Do stakeholders need dashboards?
 Does governance need documentation?
 ├─ YES → Generate lineage (GOVERN)
 └─ NO → Skip GOVERN (but you'll need it eventually)
+
+Does my data need regulatory compliance?
+├─ YES → Regulation prompts loaded during ONBOARD Phase 1 (GDPR, CCPA, HIPAA, SOX, PCI DSS)
+└─ NO → Skip regulation prompts (not loaded by default)
+
+Ready to deploy to AWS?
+└─ ONBOARD (03) → deploy_to_aws.py → MWAA deployment → verification (8 smoke tests)
 ```
 
 ---
@@ -268,3 +277,7 @@ Does governance need documentation?
 7. **Test locally first**: Run `pytest tests/ -v` before deploying to AWS. Faster feedback loop.
 
 8. **One pattern at a time**: Don't try to do ONBOARD+ENRICH+CONSUME in one prompt. Break it up, validate each step.
+
+9. **Regulation prompts are optional**: `prompts/regulation/` contains compliance controls for GDPR, CCPA, HIPAA, SOX, PCI DSS. These are loaded ONLY when you select a regulation during ONBOARD Phase 1 discovery—not default.
+
+10. **Deploy after build**: After ONBOARD completes and tests pass, deploy to MWAA using `deploy_to_aws.py` or manual S3 upload. Run 8 post-deployment smoke tests to verify Glue, Athena, LF-Tags, TBAC, KMS, MWAA, QuickSight, CloudTrail.
