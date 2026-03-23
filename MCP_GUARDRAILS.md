@@ -14,25 +14,25 @@
 |---|---|---|
 | **iam** | `mcp__iam__list_roles`, `mcp__iam__simulate_principal_policy`, `mcp__iam__list_role_policies`, `mcp__iam__get_role_policy`, `mcp__iam__put_role_policy`, `mcp__iam__create_role`, `mcp__iam__list_users`, `mcp__iam__get_user`, `mcp__iam__attach_user_policy`, `mcp__iam__attach_group_policy` | Role/policy lookup, permission simulation, least-privilege verification |
 | **lambda** | `mcp__lambda__AWS_LambdaFn_LF_access_grant_new`, `mcp__lambda__AWS_Lambda_LF_revoke_access_new`, `mcp__lambda__spark_on_aws_lambda`, `mcp__lambda__tagging_finder`, `mcp__lambda__LF_access_grant` | Lake Formation grants/revokes via Lambda, Spark execution, resource tagging |
-| **redshift** | `mcp__redshift__list_clusters`, `mcp__redshift__list_databases`, `mcp__redshift__list_schemas`, `mcp__redshift__list_tables`, `mcp__redshift__list_columns`, `mcp__redshift__execute_query` | Query verification on Gold data, schema discovery via Spectrum, data validation |
+| **s3-tables** | S3 Tables (Iceberg) operations | S3 Tables management, Iceberg table operations |
 | **cloudtrail** | `mcp__cloudtrail__lookup_events`, `mcp__cloudtrail__lake_query`, `mcp__cloudtrail__list_event_data_stores`, `mcp__cloudtrail__get_query_results`, `mcp__cloudtrail__get_query_status` | Audit trail verification, security investigation, compliance checks |
+| **redshift** | `mcp__redshift__list_clusters`, `mcp__redshift__list_databases`, `mcp__redshift__list_schemas`, `mcp__redshift__list_tables`, `mcp__redshift__list_columns`, `mcp__redshift__execute_query` | Query verification on Gold data, schema discovery via Spectrum, data validation |
+| **cloudwatch** | Logs, metrics, alarms, dashboards | Monitoring, log queries, metric alarms |
+| **cost-explorer** | Cost and usage data | Cost tracking, budget analysis |
+| **dynamodb** | Table CRUD, query, scan | SynoDB metrics store, DynamoDB operations |
+| **core** | S3, KMS, Secrets Manager | S3 operations, KMS key management, secrets. *Slow startup — may timeout on health check but works in conversation.* |
+| **pii-detection** | `detect_pii_in_table`, `scan_database_for_pii`, `create_lf_tags`, `get_pii_columns`, `apply_column_security`, `get_pii_report` | PII detection + LF-Tag application. Custom server. *Slow startup.* |
 
-### Configured but NOT Loaded (server connection failed — use CLI fallback)
+### Not Available (no PyPI package or dependency conflict — CLI fallback)
 
-| MCP Server | Intended Use | Fallback |
+| MCP Server | Reason | Fallback |
 |---|---|---|
-| `aws-dataprocessing` | Glue Crawlers, Glue ETL, Athena, Data Catalog | `aws glue` / `aws athena` CLI |
-| `s3-tables` | S3 Tables (Iceberg) management | `aws s3` CLI |
-| `sagemaker-catalog` | Business metadata columns | `aws glue` CLI with custom properties |
-| `core` | S3, KMS, Secrets Manager | `aws s3` / `aws kms` / `aws secretsmanager` CLI |
-| `sns-sqs` | Alerting, notifications | `aws sns` / `aws sqs` CLI |
-| `cloudwatch` | Monitoring, metrics, alarms | `aws cloudwatch` CLI |
-| `cost-explorer` | Cost tracking | `aws ce` CLI |
-| `eventbridge` | Workflow triggers | `aws events` CLI |
-| `lakeformation` | Column-level permissions | Lambda MCP (`LF_access_grant_new`) or `aws lakeformation` CLI |
-| `dynamodb` | SynoDB metrics store | `aws dynamodb` CLI |
-| `stepfunctions` | Workflow orchestration | `aws stepfunctions` CLI |
-| `local-filesystem` | Local file operations | Native file tools (Read/Write/Edit/Glob) |
+| `aws-dataprocessing` | No PyPI package exists | `aws glue` / `aws athena` CLI |
+| `sagemaker-catalog` | No PyPI package exists | `aws glue` CLI with custom properties |
+| `lakeformation` | Dependency conflict in uvx | Lambda MCP (`LF_access_grant_new`) or `aws lakeformation` CLI |
+| `sns-sqs` | Dependency conflict in uvx | `aws sns` / `aws sqs` CLI |
+| `eventbridge` | Dependency conflict in uvx | `aws events` CLI |
+| `stepfunctions` | Dependency conflict in uvx | `aws stepfunctions` CLI |
 
 ---
 
@@ -43,7 +43,7 @@
 | Step | MCP Tool (if available) | Fallback | Notes |
 |---|---|---|---|
 | Check existing Glue databases | `mcp__redshift__execute_query` (via Spectrum external schema) | `aws glue get-databases` CLI | Redshift Spectrum can see Glue catalog |
-| Check existing S3 data | — (core MCP not loaded) | `aws s3 ls` CLI | |
+| Check existing S3 data | `core` MCP (S3 operations) | `aws s3 ls` CLI | core MCP now loaded (slow startup) |
 | Verify IAM roles exist | `mcp__iam__list_roles` | `aws iam list-roles` CLI | Check Glue/LF roles before starting |
 | Check existing permissions | `mcp__iam__simulate_principal_policy` | `aws iam simulate-principal-policy` CLI | Verify role can access source |
 | Audit who accessed source data | `mcp__cloudtrail__lookup_events` | `aws cloudtrail lookup-events` CLI | Security check on source |
@@ -53,7 +53,7 @@
 1. **ALWAYS** check IAM role existence via `mcp__iam__list_roles` before asking discovery questions
 2. **ALWAYS** run `mcp__cloudtrail__lookup_events` on the source to check recent access patterns
 3. If checking whether data exists in Redshift, use `mcp__redshift__list_tables` — do NOT run CLI
-4. For S3 checks, CLI is acceptable (core MCP not loaded)
+4. For S3 checks, prefer `core` MCP (now loaded); CLI acceptable as fallback if timeout
 5. Local workload folder scans use native file tools (Read/Glob/Grep) — never MCP
 
 ---
@@ -65,7 +65,7 @@
 | Step | MCP Tool (if available) | Fallback | Notes |
 |---|---|---|---|
 | Scan existing workloads | Native file tools (Glob/Read) | — | Always local — scan `workloads/*/config/source.yaml` |
-| Validate S3 source exists | — (core MCP not loaded) | `aws s3 ls` CLI | |
+| Validate S3 source exists | `core` MCP (S3 operations) | `aws s3 ls` CLI | core MCP now loaded |
 | Validate IAM can read source | `mcp__iam__simulate_principal_policy` | `aws iam simulate-principal-policy` CLI | Test `s3:GetObject` on source path |
 | Validate Glue role permissions | `mcp__iam__list_role_policies` + `mcp__iam__get_role_policy` | `aws iam list-role-policies` CLI | Inspect attached policies |
 | Check for duplicate Glue tables | `mcp__redshift__execute_query` (query `information_schema`) | `aws glue get-tables` CLI | Via Spectrum if external schema exists |
@@ -130,10 +130,10 @@
 
 | Operation | MCP Tool | Fallback | Status |
 |---|---|---|---|
-| Upload Bronze data | — (core MCP not loaded) | `aws s3 cp` CLI | CLI required |
-| Upload Silver data | — (s3-tables MCP not loaded) | `aws s3 cp` CLI | CLI required |
-| Upload Gold data | — (s3-tables MCP not loaded) | `aws s3 cp` CLI | CLI required |
-| Upload quarantine | — (core MCP not loaded) | `aws s3 cp` CLI | CLI required |
+| Upload Bronze data | `core` MCP (S3 operations) | `aws s3 cp` CLI | **MCP** (core now loaded) |
+| Upload Silver data | `s3-tables` MCP | `aws s3 cp` CLI | **MCP** (s3-tables now loaded) |
+| Upload Gold data | `s3-tables` MCP | `aws s3 cp` CLI | **MCP** (s3-tables now loaded) |
+| Upload quarantine | `core` MCP (S3 operations) | `aws s3 cp` CLI | **MCP** (core now loaded) |
 | Verify upload | `mcp__cloudtrail__lookup_events` (EventName=PutObject) | `aws s3 ls` CLI | MCP preferred for audit |
 
 ### Step 5.2: Glue Catalog Registration
@@ -168,8 +168,8 @@
 
 | Operation | MCP Tool | Fallback | Status |
 |---|---|---|---|
-| Create/verify KMS keys | — (core MCP not loaded) | `aws kms create-key` / `aws kms describe-key` CLI | CLI required |
-| Create key aliases | — (core MCP not loaded) | `aws kms create-alias` CLI | CLI required |
+| Create/verify KMS keys | `core` MCP (KMS operations) | `aws kms create-key` / `aws kms describe-key` CLI | **MCP** (core now loaded) |
+| Create key aliases | `core` MCP (KMS operations) | `aws kms create-alias` CLI | **MCP** (core now loaded) |
 | Audit KMS operations | `mcp__cloudtrail__lookup_events` (EventName=CreateKey) | — | MCP preferred |
 
 ### Step 5.6: Query Verification
@@ -208,7 +208,7 @@
 When running locally (no AWS target), the deploy phase operates in **simulation mode**:
 
 1. Pipeline artifacts stay in `workloads/{name}/output/` (Silver, Gold, quarantine, quality reports)
-2. MCP calls that **are loaded** (IAM, Lambda, Redshift, CloudTrail) execute against the real AWS account
+2. MCP calls that **are loaded** (IAM, Lambda, S3-Tables, CloudTrail, Redshift, CloudWatch, Cost-Explorer, DynamoDB, Core, PII-Detection) execute against the real AWS account
 3. CLI fallback calls are **logged but not executed** — printed as `[DRY-RUN] aws glue create-table ...`
 4. Local `.iceberg_metadata` sidecar files simulate Iceberg table registration
 
@@ -229,15 +229,21 @@ Deploy Summary: {workload_name}
 ===============================
 
 MCP Calls (live):
-  iam:         {count} calls  (list_roles, simulate_principal_policy, ...)
-  lambda:      {count} calls  (LF_access_grant_new, ...)
-  redshift:    {count} calls  (execute_query, list_tables, ...)
-  cloudtrail:  {count} calls  (lookup_events, ...)
+  iam:            {count} calls  (list_roles, simulate_principal_policy, ...)
+  lambda:         {count} calls  (LF_access_grant_new, ...)
+  s3-tables:      {count} calls  (Iceberg table operations, ...)
+  cloudtrail:     {count} calls  (lookup_events, ...)
+  redshift:       {count} calls  (execute_query, list_tables, ...)
+  cloudwatch:     {count} calls  (log queries, metrics, ...)
+  cost-explorer:  {count} calls  (cost analysis, ...)
+  dynamodb:       {count} calls  (SynoDB queries, ...)
+  core:           {count} calls  (S3 ops, KMS, Secrets Manager, ...)
+  pii-detection:  {count} calls  (detect_pii, apply_tags, ...)
 
 CLI Fallback (dry-run in local mode):
-  aws s3:      {count} calls  (Reason: core MCP not loaded)
-  aws glue:    {count} calls  (Reason: aws-dataprocessing MCP not loaded)
-  aws kms:     {count} calls  (Reason: core MCP not loaded)
+  aws glue:    {count} calls  (Reason: aws-dataprocessing not on PyPI)
+  aws athena:  {count} calls  (Reason: aws-dataprocessing not on PyPI)
+  aws lf:      {count} calls  (Reason: lakeformation dependency conflict)
 
 Total: {mcp_count} MCP + {cli_count} CLI = {total} operations
 MCP Coverage: {mcp_pct}%
@@ -245,22 +251,51 @@ MCP Coverage: {mcp_pct}%
 
 ---
 
-## Reconnecting Failed MCP Servers
+## MCP Server Installation
 
-To increase MCP coverage, troubleshoot these servers in `.mcp.json`:
+All servers are configured in `.mcp.json` using `uvx` (uv tool runner) which auto-manages Python 3.12+ environments.
 
-| Server | Command | Likely Issue |
+### Currently Installed (10 servers)
+
+| Server | Package | Command |
 |---|---|---|
-| `aws-dataprocessing` | `uvx awslabs.aws-dataprocessing-mcp-server@latest` | Package not found or Python env issue |
-| `s3-tables` | `uvx awslabs.s3-tables-mcp-server@latest` | Package not found |
-| `core` | `uvx awslabs.core-mcp-server@latest` | Package not found |
-| `sagemaker-catalog` | `python3 shared/mcp/servers/sagemaker-catalog-mcp-server/server.py` | Custom server — check if file exists |
-| `lakeformation` | `python3 shared/mcp/servers/lakeformation-mcp-server/server.py` | Custom server — check if file exists |
-| `cloudwatch` | `uvx awslabs.cloudwatch-mcp-server@latest` | Package not found |
+| `iam` | `awslabs-iam-mcp-server` | `uvx --from awslabs-iam-mcp-server awslabs.iam-mcp-server` |
+| `lambda` | `awslabs-lambda-mcp-server` | `uvx --from awslabs-lambda-mcp-server awslabs.lambda-mcp-server` |
+| `s3-tables` | `awslabs-s3-tables-mcp-server` | `uvx --from awslabs-s3-tables-mcp-server awslabs.s3-tables-mcp-server` |
+| `cloudtrail` | `awslabs-cloudtrail-mcp-server` | `uvx --from awslabs-cloudtrail-mcp-server awslabs.cloudtrail-mcp-server` |
+| `redshift` | `awslabs-redshift-mcp-server` | `uvx --from awslabs-redshift-mcp-server awslabs.redshift-mcp-server` |
+| `cloudwatch` | `awslabs-cloudwatch-mcp-server` | `uvx --from awslabs-cloudwatch-mcp-server awslabs.cloudwatch-mcp-server` |
+| `cost-explorer` | `awslabs-cost-explorer-mcp-server` | `uvx --from awslabs-cost-explorer-mcp-server awslabs.cost-explorer-mcp-server` |
+| `dynamodb` | `awslabs-dynamodb-mcp-server` | `uvx --from awslabs-dynamodb-mcp-server awslabs.dynamodb-mcp-server` |
+| `core` | `awslabs-core-mcp-server` | `uvx --from awslabs-core-mcp-server awslabs.core-mcp-server` |
+| `pii-detection` | Custom server | `uv run --no-project --with boto3 --with mcp --python 3.13 mcp-servers/pii-detection-server/server.py` |
 
-Test connectivity:
+### Not Available on PyPI
+
+| Server | Reason | Workaround |
+|---|---|---|
+| `aws-dataprocessing` (Glue/Athena) | No PyPI package exists | `aws glue` / `aws athena` CLI |
+| `sagemaker-catalog` | No PyPI package exists | `aws glue` CLI with custom metadata properties |
+
+### Dependency Conflicts (uvx cannot resolve)
+
+| Server | Reason | Workaround |
+|---|---|---|
+| `lakeformation` | `awslabs-lakeformation-mcp-server` has dependency conflicts | `lambda` MCP (`LF_access_grant_new`) or `aws lakeformation` CLI |
+| `sns-sqs` | `awslabs-sns-sqs-mcp-server` has dependency conflicts | `aws sns` / `aws sqs` CLI |
+| `eventbridge` | `awslabs-eventbridge-mcp-server` has dependency conflicts | `aws events` CLI |
+| `stepfunctions` | `awslabs-stepfunctions-mcp-server` has dependency conflicts | `aws stepfunctions` CLI |
+
+### Test connectivity
+
 ```bash
-# Test a specific MCP server
-uvx awslabs.iam-mcp-server@latest --help  # Should show usage
-uvx awslabs.core-mcp-server@latest --help  # Check if installable
+# Health check all servers
+claude mcp list
+
+# Test a specific server
+uvx --from awslabs-iam-mcp-server awslabs.iam-mcp-server --help
+uvx --from awslabs-core-mcp-server awslabs.core-mcp-server --help
+
+# Note: core and pii-detection have slow startup (~5-10s)
+# Health check may timeout but they work fine in conversation
 ```
