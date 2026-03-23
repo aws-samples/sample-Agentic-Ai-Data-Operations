@@ -819,6 +819,16 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
    >   - **Audit logging** — all access logged to CloudTrail
    >   - **Encryption** — zone-specific KMS keys, re-encrypt at boundaries"
 
+   If the user selects a regulation, load the corresponding prompt from `prompts/regulation/`:
+   - **GDPR** → `prompts/regulation/gdpr.md`
+   - **CCPA** → `prompts/regulation/ccpa.md`
+   - **HIPAA** → `prompts/regulation/hipaa.md`
+   - **SOX** → `prompts/regulation/sox.md`
+   - **PCI DSS** → `prompts/regulation/pci-dss.md`
+
+   These prompts are **MANDATORY** when selected — apply ALL controls listed.
+   They are **NOT loaded by default** — only when explicitly requested.
+
    **6b. PII Detection & Tagging (AUTOMATIC for all workloads):**
 
    All workloads use the **shared PII detection framework** (`shared/utils/pii_detection_and_tagging.py`):

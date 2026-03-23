@@ -207,6 +207,7 @@ See [docs/aws-account-setup.md](docs/aws-account-setup.md) for AWS configuration
 - Lake Formation LF-Tags for column-level access control
 - 4 sensitivity levels: CRITICAL, HIGH, MEDIUM, LOW
 - Integrated into profiling phase — runs automatically on every dataset
+- **Regulation-specific prompts** for GDPR, CCPA, HIPAA, SOX, PCI DSS — see [prompts/regulation/](prompts/regulation/). Each prompt contains self-contained controls (retention, masking, LF-Tags, TBAC grants, audit, quality rules) applied only when a regulation is selected during discovery
 
 ### Quality Gates
 - 5 dimensions: Completeness, Accuracy, Consistency, Validity, Uniqueness
@@ -353,9 +354,24 @@ Each agent (Router, Onboarding, Metadata, Transformation, Quality, DAG, Analysis
 
 ---
 
-## Security
+## Data Security
 
-See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
+The platform enforces security at every layer:
+
+- **Encryption**: AES-256 at rest (zone-specific KMS keys), TLS 1.3 in transit, re-encryption at zone boundaries
+- **PII Detection**: Automatic AI-driven scanning of all columns (name-based + content-based patterns) — see `shared/utils/pii_detection_and_tagging.py`
+- **Column-Level Access**: Lake Formation LF-Tags (`PII_Classification`, `PII_Type`, `Data_Sensitivity`) enable tag-based access control (TBAC) — analysts see only what their role permits
+- **Regulatory Compliance**: Self-contained prompt per regulation in [prompts/regulation/](prompts/regulation/):
+  - **GDPR** — right to erasure, consent tracking, 365-day retention, data minimization
+  - **CCPA** — right to know/delete, opt-out tracking, 730-day retention, data lineage
+  - **HIPAA** — PHI encryption, minimum necessary access, BAA, 7-year audit trail
+  - **SOX** — financial integrity, 0.95+ quality gates, immutable Bronze, 7-year retention
+  - **PCI DSS** — cardholder data tokenization, CVV drop, restricted `pci_admin_role` access
+- **Cedar Policies**: 16 forbid policies + 7 agent authorization policies enforcing safety invariants (no Bronze mutation, no quality bypass, PII masking in logs)
+- **Audit Logging**: CloudTrail for all Lake Formation operations — who accessed what column, when tags changed, all permission grants
+- **Bronze Immutability**: Source data is never modified after ingestion
+
+See [SECURITY.md](SECURITY.md) and [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
 
 ## License
 
