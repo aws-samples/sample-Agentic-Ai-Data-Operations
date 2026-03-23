@@ -3084,6 +3084,15 @@ pytest workloads/order_transactions/tests/integration/test_fk_integrity.py -v
 
 **When to use**: After Gold tables exist and you want to provide visualization/reporting.
 
+**Prerequisites (MUST complete before creating any QuickSight resources)**:
+1. **Find actual QuickSight username**: `aws quicksight list-users --aws-account-id ACCOUNT --namespace default` — do NOT assume `Admin/{region}`
+2. **Grant QuickSight service role S3 access**: Default `AWSQuickSightS3Policy` is often a deny-all placeholder. Add inline policy with S3 read/write + Athena + Glue + `lakeformation:GetDataAccess` to `aws-quicksight-service-role-v0`
+3. **If LF-Tags applied**: Grant QuickSight service role TBAC permissions on all tag values, plus DESCRIBE on the database. Without this → "database generated SQL exception"
+4. **Creation order matters**: Data Source → Datasets → Analysis → Dashboard. Each depends on the previous. If you delete/recreate a data source, you must also delete/recreate all datasets, analysis, and dashboard (the full chain)
+5. **Use `--definition file://` for analysis/dashboard creation** (not `--source-entity` which requires a template ARN)
+
+See `prompts/05-consume-create-dashboard.md` for full deployment CLI with known issues table.
+
 **Prompt Template**:
 ```
 Create QuickSight dashboard on Gold zone data:
