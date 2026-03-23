@@ -122,31 +122,59 @@ This document maps every tool and operation in the Agentic Data Onboarding Syste
 
 ## MCP Servers Summary
 
+### Server Status Overview
+
+**LOADED (4 servers)** — Working tools available:
+- `iam` — Role and policy management
+- `lambda` — Serverless functions for ingestion/triggers
+- `redshift` — Large-scale Gold zone queries
+- `cloudtrail` — Audit logging
+
+**NOT LOADED (12 servers)** — Connection failed, use CLI fallback:
+- `aws-dataprocessing` — Glue, EMR, Athena
+- `s3-tables` — Iceberg table management
+- `sagemaker-catalog` — Custom metadata (planned)
+- `core` — S3, KMS, Secrets Manager
+- `sns-sqs` — Alerting and messaging
+- `cloudwatch` — Logs, metrics, alarms
+- `cost-explorer` — Cost tracking
+- `eventbridge` — Scheduling (planned)
+- `lakeformation` — Column-level access (planned)
+- `dynamodb` — SynoDB metrics store
+- `stepfunctions` — State machine orchestration
+- `local-filesystem` — Config file operations (planned)
+
+**No MCP Server** — Always use CLI:
+- **MWAA** — DAG deployment via `aws s3 cp/sync` to DAGs bucket
+
 ### AWS MCP Servers (Available from awslabs/mcp)
 
 | Server | Package Name | Status | Use Cases |
 |--------|--------------|--------|-----------|
-| **AWS DataProcessing** | `awslabs.aws-dataprocessing-mcp-server` | ✅ Available | Glue, EMR, Athena — all ETL and cataloging |
-| **S3 Tables** | `awslabs.s3-tables-mcp-server` | ✅ Available | Iceberg table management (Silver/Gold zones) |
-| **DynamoDB** | `awslabs.dynamodb-mcp-server` | ✅ Available | SynoDB (metrics & SQL store) |
-| **Lambda** | `awslabs.lambda-tool-mcp-server` | ✅ Available | Serverless functions for ingestion/triggers |
-| **Step Functions** | `awslabs.stepfunctions-tool-mcp-server` | ✅ Available | State machine orchestration |
-| **SNS/SQS** | `awslabs.amazon-sns-sqs-mcp-server` | ✅ Available | Alerting and messaging |
-| **IAM** | `awslabs.iam-mcp-server` | ✅ Available | Role and policy management |
-| **CloudWatch** | `awslabs.cloudwatch-mcp-server` | ✅ Available | Logs, metrics, alarms |
-| **CloudTrail** | `awslabs.cloudtrail-mcp-server` | ✅ Available | Audit logging |
-| **Cost Explorer** | `awslabs.cost-explorer-mcp-server` | ✅ Available | Cost tracking by workload |
-| **Redshift** | `awslabs.redshift-mcp-server` | ✅ Available | Large-scale Gold zone queries |
-| **Core (AWS SDK)** | `awslabs.core-mcp-server` | ✅ Available | S3, KMS, Secrets Manager (low-level APIs) |
+| **AWS DataProcessing** | `awslabs.aws-dataprocessing-mcp-server` | ❌ Not Loaded | Glue, EMR, Athena — all ETL and cataloging |
+| **S3 Tables** | `awslabs.s3-tables-mcp-server` | ❌ Not Loaded | Iceberg table management (Silver/Gold zones) |
+| **DynamoDB** | `awslabs.dynamodb-mcp-server` | ❌ Not Loaded | SynoDB (metrics & SQL store) |
+| **Lambda** | `awslabs.lambda-tool-mcp-server` | ✅ Loaded | Serverless functions for ingestion/triggers |
+| **Step Functions** | `awslabs.stepfunctions-tool-mcp-server` | ❌ Not Loaded | State machine orchestration |
+| **SNS/SQS** | `awslabs.amazon-sns-sqs-mcp-server` | ❌ Not Loaded | Alerting and messaging |
+| **IAM** | `awslabs.iam-mcp-server` | ✅ Loaded | Role and policy management |
+| **CloudWatch** | `awslabs.cloudwatch-mcp-server` | ❌ Not Loaded | Logs, metrics, alarms |
+| **CloudTrail** | `awslabs.cloudtrail-mcp-server` | ✅ Loaded | Audit logging |
+| **Cost Explorer** | `awslabs.cost-explorer-mcp-server` | ❌ Not Loaded | Cost tracking by workload |
+| **Redshift** | `awslabs.redshift-mcp-server` | ✅ Loaded | Large-scale Gold zone queries |
+| **Core (AWS SDK)** | `awslabs.core-mcp-server` | ❌ Not Loaded | S3, KMS, Secrets Manager (low-level APIs) |
 
-### Custom MCP Servers (To Be Built)
+### Custom MCP Servers (Planned)
 
-| Server | Purpose | Implementation | Priority |
-|--------|---------|----------------|----------|
-| **sagemaker-catalog-mcp-server** | SageMaker Catalog custom metadata operations (column roles, PII, hierarchies) | Python + FastMCP | HIGH |
-| **eventbridge-mcp-server** | EventBridge rules and targets for scheduling | Python + FastMCP | MEDIUM |
-| **lakeformation-mcp-server** | Lake Formation permissions (column-level access) | Python + FastMCP | MEDIUM |
-| **local-filesystem-mcp-server** | Read/write workload config files (YAML) | Python + FastMCP | HIGH |
+**Note**: Custom MCP servers (sagemaker-catalog, lakeformation, pii-detection) are planned but not yet fully operational. Use CLI fallback for these operations.
+
+| Server | Purpose | Implementation | Priority | Status |
+|--------|---------|----------------|----------|--------|
+| **sagemaker-catalog-mcp-server** | SageMaker Catalog custom metadata operations (column roles, PII, hierarchies) | Python + FastMCP | HIGH | ❌ Not Loaded |
+| **eventbridge-mcp-server** | EventBridge rules and targets for scheduling | Python + FastMCP | MEDIUM | ❌ Not Loaded |
+| **lakeformation-mcp-server** | Lake Formation permissions (column-level access) | Python + FastMCP | MEDIUM | ❌ Not Loaded |
+| **local-filesystem-mcp-server** | Read/write workload config files (YAML) | Python + FastMCP | HIGH | ❌ Not Loaded |
+| **pii-detection-mcp-server** | AI-driven PII detection and LF-Tag application | Python + FastMCP | HIGH | ❌ Not Loaded |
 
 ### External MCP Servers (Third-Party)
 

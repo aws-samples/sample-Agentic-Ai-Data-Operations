@@ -231,6 +231,8 @@ Which guardrails are checked at which pipeline step:
 | 10 | Publish encrypt and write | SEC-001, SEC-002, SEC-004, OPS-002, OPS-004 |
 | 11 | Publish quality gate | DQ-001, DQ-002 |
 | 12 | Pipeline summary and cleanup | OPS-003 |
+| 13 | MWAA DAG upload | SEC-001, OPS-003 |
+| 14 | Post-deployment verification | DQ-001, SEC-004, OPS-003, OPS-004 |
 
 ---
 
@@ -363,6 +365,58 @@ The summary table includes an Engine column:
   SEC-002      KMS key alias validated: alias/landing-d   PASS   local
   DQ-001       Staging quality gate: 0.72 >= 0.80         FAIL   local
 ```
+
+---
+
+## Phase 5 Deployment Guardrails
+
+Phase 5 introduces deployment-specific guardrails that ensure the pipeline is production-ready before going live.
+
+### DAG Syntax Valid
+
+| Attribute | Value |
+|---|---|
+| **Category** | Operational |
+| **Description** | DAG file must parse without Python syntax errors. All imports must resolve, no undefined variables. |
+| **Check Logic** | Run `python -m py_compile dags/{workload_name}_dag.py`. Check exit code. If non-zero, parse stderr for syntax error details. |
+| **When Checked** | Step 13 (before MWAA DAG upload) |
+| **PASS** | `[DEPLOYMENT] DAG syntax validated: dags/order_transactions_dag.py ... PASS` |
+| **FAIL** | `[DEPLOYMENT] DAG syntax error: line 42, undefined variable 'bucket_nme' ... FAIL` |
+
+### Airflow Variables Set
+
+| Attribute | Value |
+|---|---|
+| **Category** | Operational |
+| **Description** | All `Variable.get()` calls in the DAG must either have `default_var` argument OR the Variable must exist in MWAA. No missing variables at runtime. |
+| **Check Logic** | Parse the DAG file for `Variable.get('key')` patterns. Extract all keys. Check if each key exists in MWAA (via `airflow variables list`) or has a `default_var` parameter. |
+| **When Checked** | Step 13 (before MWAA DAG upload) |
+| **PASS** | `[DEPLOYMENT] Airflow variables validated: 5/5 variables exist or have defaults ... PASS` |
+| **FAIL** | `[DEPLOYMENT] Missing Airflow variable: 'staging_bucket' (no default_var) ... FAIL` |
+
+### Smoke Test Suite Passes
+
+| Attribute | Value |
+|---|---|
+| **Category** | Data Quality, Security, Operational |
+| **Description** | All 8 post-deployment verification checks must pass before deployment is considered complete: Glue tables registered, Athena query succeeds, Lake Formation LF-Tags applied, TBAC grants active, KMS encryption verified, MWAA DAG imported, QuickSight dashboard accessible, CloudTrail logging active. |
+| **Check Logic** | Run the verification suite in `run_pipeline.py` Step 14. Each check has pass/fail criteria. Overall deployment passes only if all 8 checks pass. |
+| **When Checked** | Step 14 (post-deployment verification) |
+| **PASS** | `[DEPLOYMENT] Smoke test suite: 8/8 checks passed ... PASS` |
+| **FAIL** | `[DEPLOYMENT] Smoke test suite: 6/8 checks passed (Athena query failed, QuickSight dashboard not found) ... FAIL` |
+
+### No Secrets in DAG
+
+| Attribute | Value |
+|---|---|
+| **Category** | Security |
+| **Description** | DAG file must not contain hardcoded credentials, AWS account IDs, S3 bucket names, or connection strings. All config must come from Airflow Variables or Connections. |
+| **Check Logic** | Scan DAG file with the same regex patterns as SEC-001. Additionally check for patterns: `\d{12}` (account ID), `s3://[a-z0-9\-]+` (bucket name), `arn:aws:` (ARN). |
+| **When Checked** | Step 13 (before MWAA DAG upload) |
+| **PASS** | `[DEPLOYMENT] No secrets in DAG: dags/order_transactions_dag.py ... PASS` |
+| **FAIL** | `[DEPLOYMENT] Hardcoded value in DAG line 28: s3://my-bucket-123456789012 ... FAIL` |
+
+**Note**: Regulation-specific controls in `prompts/regulation/` (GDPR, CCPA, HIPAA, SOX, PCI DSS) add additional guardrails when loaded. These augment the base 16 guardrails with compliance-specific checks such as data retention policies, consent tracking, breach notification procedures, and audit trail requirements.
 
 ---
 

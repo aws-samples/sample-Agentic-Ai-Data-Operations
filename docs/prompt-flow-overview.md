@@ -172,6 +172,10 @@ Human Input --> ONBOARD Phase 1 (Discovery)
 | Full Production | ROUTE -> ONBOARD -> ENRICH -> CONSUME -> GOVERN | Complete data product |
 | Demo Setup | GENERATE -> GENERATE -> ONBOARD -> ONBOARD -> ENRICH -> CONSUME | End-to-end demo with synthetic data |
 
+**Phase 5: Deployment & Verification**: After human approval in Phase 4, the ONBOARD prompt continues with deployment (Step 5.8 MWAA + Step 5.9 smoke tests). See SKILLS.md Phase 5 and prompts/03-onboard-build-pipeline.md Steps 9-10 for the 8 post-deployment smoke tests (S3 bucket verification, Glue catalog registration, IAM permissions, KMS key access, data quality baseline, Iceberg metadata validation, Airflow DAG validation, and end-to-end query test).
+
+**Regulation Prompts**: `prompts/regulation/` provides optional compliance add-ons (GDPR, CCPA, HIPAA, SOX, PCI DSS) that can be loaded during ONBOARD Phase 1 when regulatory requirements are identified. These prompts inject additional quality rules, audit requirements, and data retention policies.
+
 ---
 
 ## 4. Enterprise-Grade Patterns
@@ -429,3 +433,5 @@ GOVERN (trace lineage) -- optional
 | **Retry + Escalation** | Sub-agents retry twice on failure, then escalate to human with full context |
 | **MCP Governance** | Per-phase tool selection rules, sub-agent isolation from AWS operations |
 | **Compliance** | GOVERN prompt produces lineage docs, data product catalog, impact analysis |
+| **Post-Deployment Verification** | 8 mandatory smoke tests after deployment (S3, Glue catalog, IAM, KMS, DQ baseline, Iceberg metadata, DAG validation, end-to-end query) |
+| **Deployment Script Standard** | Every workload includes `deploy_to_aws.py` as a standard artifact for repeatable AWS deployment |
