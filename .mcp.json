@@ -1,5 +1,18 @@
 {
   "mcpServers": {
+    "aws.dp-mcp": {
+      "autoApprove": [],
+      "disabled": false,
+      "command": "uvx",
+      "args": [
+        "awslabs.aws-dataprocessing-mcp-server@latest",
+        "--allow-write"
+      ],
+      "env": {
+        "AWS_PROFILE": "default",
+        "AWS_REGION": "us-east-1"
+      }
+    },
     "core": {
       "command": "uvx",
       "args": ["--from", "awslabs-core-mcp-server", "awslabs.core-mcp-server"],
@@ -83,7 +96,7 @@
     },
     "pii-detection": {
       "command": "uv",
-      "args": ["run", "--no-project", "--with", "boto3", "--with", "mcp", "--python", "3.13", "/Users/hcherian/Documents/Claude-data-operations/mcp-servers/pii-detection-server/server.py"],
+      "args": ["run", "--no-project", "--with", "boto3", "--with", "mcp", "--python", "3.13", "mcp-servers/pii-detection-server/server.py"],
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default"
