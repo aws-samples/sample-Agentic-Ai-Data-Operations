@@ -235,3 +235,28 @@ workloads/{dataset_name}/
 ```
 
 Plus 50+ tests (unit + integration) that must all pass.
+
+## Phase 7: Deploy to AWS Glue
+
+After artifacts pass all tests and get human approval, deploy to AWS:
+
+### Deployment Checklist
+1. **Create Glue database** (if new workload)
+2. **Grant Lake Formation permissions** (CREATE_TABLE, ALTER, DROP on database; ALL on tables)
+3. **Create Glue jobs** (one per ETL script, Glue 4.0, `--datalake-formats: iceberg`)
+4. **⚠️ Upload scripts to CORRECT S3 path** — verify each job's `ScriptLocation`:
+   ```bash
+   aws glue get-job --job-name MY_JOB --query 'Job.Command.ScriptLocation' --output text
+   ```
+5. **Run Bronze→Silver jobs first**, then Silver→Gold after Silver succeeds
+6. **Verify all Iceberg tables** exist in Glue Data Catalog
+
+### Known Glue 4.0 + Iceberg Rules
+- Use `.saveAsTable("glue_catalog.db.table")` — NOT `.save(s3_path)`
+- Use `spark.table("glue_catalog.db.table")` — NOT `spark.read.parquet()`
+- Do NOT use `.partitionBy()` — causes `ClusteredWriter` errors
+- Point `bronze_path` to specific CSV files, not directories with mixed formats
+- Only require `JOB_NAME` in `getResolvedOptions` for catalog-based jobs
+- Use catalog table names in lineage sections, not `args['path']`
+
+See `prompts/07-fix-iceberg-glue.md` for the full troubleshooting guide.
