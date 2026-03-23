@@ -67,6 +67,15 @@ secrets.json
 
 # MCP Configuration — .mcp.json is now committed (portable, no local paths)
 # Override locally via .mcp.local.json if needed
+.mcp.json.example
+
+# One-off scripts and profiling output (should not be committed)
+profile_*.py
+*_profile.json
+onboard_*.log
+
+# Root output directory (runtime artifacts)
+/output/
 
 # Test Results & Outputs
 pii_detection_test_results_*.json

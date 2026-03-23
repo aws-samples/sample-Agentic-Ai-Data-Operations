@@ -84,15 +84,17 @@ iam_role: "arn:aws:iam::123456789012:role/YourRole"  # Replace
 
 ## Configuration Files
 
-### `.mcp.json` → `.mcp.json.example`
+### `.mcp.json`
 
-The real `.mcp.json` contains local paths and is **gitignored**.
+The `.mcp.json` is committed to the repo and is portable (no local paths, no secrets). It uses `uvx` to auto-install MCP server packages and references relative paths only.
 
-Use the template:
+To customize for your account, edit `AWS_REGION` and `AWS_PROFILE`:
 ```bash
-cp .mcp.json.example ~/.mcp.json
-# Edit with your actual paths
+sed -i 's/us-east-1/your-region/g' .mcp.json
+sed -i 's/"default"/"your-profile"/g' .mcp.json
 ```
+
+See `MCP_SETUP.md` for full setup guide.
 
 ### AWS Credentials
 
