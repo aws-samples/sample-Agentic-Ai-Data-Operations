@@ -1541,12 +1541,15 @@ If any REQUIRED server shows "Failed to connect", present the issue and ask how 
 
 ```
 Step 5.1: Upload data to S3
-  → CLI: `aws s3 cp` (core/s3-tables MCP not loaded)
+  → `core` MCP (S3 operations) or `aws s3 cp` CLI fallback
+  → `s3-tables` MCP for Iceberg table uploads
   → Verify: `mcp__cloudtrail__lookup_events` (EventName=PutObject)
 
 Step 5.2: Register tables in Glue Data Catalog
-  → CLI: `aws glue create-database`, `aws glue create-table` (aws-dataprocessing MCP not loaded)
-  → Verify: `mcp__redshift__list_tables` (via Spectrum) or `aws glue get-table` CLI
+  → `mcp__glue_athena__create_database` — create Glue database
+  → `mcp__glue_athena__create_table` — register tables in catalog
+  → `mcp__glue_athena__get_tables` — verify tables registered
+  → Verify: `mcp__redshift__list_tables` (via Spectrum) or `mcp__glue_athena__get_table`
   → Audit: `mcp__cloudtrail__lookup_events` (EventName=CreateTable)
 
 Step 5.3: IAM & Permissions (MCP available)
@@ -1555,9 +1558,11 @@ Step 5.3: IAM & Permissions (MCP available)
   → `mcp__iam__list_role_policies` + `mcp__iam__get_role_policy` — inspect policies
   → `mcp__iam__put_role_policy` — add inline policy if needed
 
-Step 5.4: Lake Formation Grants (MCP via Lambda)
-  → `mcp__lambda__AWS_LambdaFn_LF_access_grant_new` — grant table/database permissions
-  → `mcp__lambda__AWS_Lambda_LF_revoke_access_new` — revoke if needed
+Step 5.4: Lake Formation Grants (MCP — direct LF API)
+  → `mcp__lakeformation__grant_permissions` — grant table/database/LFTagPolicy permissions
+  → `mcp__lakeformation__revoke_permissions` — revoke if needed
+  → `mcp__lakeformation__batch_grant_permissions` — bulk grants for multi-table workloads
+  → Fallback: `mcp__lambda__AWS_LambdaFn_LF_access_grant_new` (Lambda wrapper) or `aws lakeformation` CLI
   → Audit: `mcp__cloudtrail__lookup_events` (EventName=GrantPermissions)
 
 Step 5.4.5: PII Detection + LF-Tag Application (MANDATORY)
@@ -1565,7 +1570,7 @@ Step 5.4.5: PII Detection + LF-Tag Application (MANDATORY)
   Uses: `shared/utils/pii_detection_and_tagging.py`
 
   5.4.5a: Create LF-Tags (if they don't exist)
-    → CLI: `aws lakeformation create-lf-tag` (lakeformation MCP not loaded)
+    → `mcp__lakeformation__create_lf_tag` (tag_key, tag_values) — returns "already_exists" if present
     → Creates 3 tags: PII_Classification, PII_Type, Data_Sensitivity
     → Idempotent — skips if tags already exist
 
@@ -1575,13 +1580,13 @@ Step 5.4.5: PII Detection + LF-Tag Application (MANDATORY)
     → Even if no PII found: tag ALL columns with PII_Classification=NONE, Data_Sensitivity=LOW
 
   5.4.5c: Apply LF-Tags to Glue Catalog columns
-    → CLI: `aws lakeformation add-lf-tags-to-resource` per column
+    → `mcp__lakeformation__add_lf_tags_to_resource` (database, table, lf_tags, column_names)
     → PII columns: PII_Classification={sensitivity}, PII_Type={type}, Data_Sensitivity={sensitivity}
     → Non-PII columns: PII_Classification=NONE, Data_Sensitivity=LOW
     → Audit: `mcp__cloudtrail__lookup_events` (EventName=AddLFTagsToResource)
 
   5.4.5d: Verify tags applied
-    → CLI: `aws lakeformation get-resource-lf-tags` per table
+    → `mcp__lakeformation__get_resource_lf_tags` (database, table) per table
     → Report: {table}.{column} → PII_Classification={value}, Data_Sensitivity={value}
 
   If PII detected in a column already in Gold zone:
@@ -1729,7 +1734,7 @@ Step 5.9: Post-Deployment Verification (MANDATORY — do NOT skip)
 Warning: MCP fallback — {mcp_server} not loaded for {operation}. Using CLI.
 ```
 
-**Local mode** (default): MCP calls to loaded servers (iam, lambda, redshift, cloudtrail) execute live. CLI fallback commands are dry-run (`[DRY-RUN] aws glue create-table ...`). Set `DEPLOY_MODE=live` to execute all.
+**Local mode** (default): MCP calls to loaded servers (glue-athena, lakeformation, iam, lambda, s3-tables, cloudtrail, redshift, cloudwatch, cost-explorer, dynamodb, core, pii-detection, sagemaker-catalog) execute live. CLI fallback commands are dry-run (`[DRY-RUN] aws ...`). Set `DEPLOY_MODE=live` to execute all.
 
 **If deployment fails**: Do NOT retry automatically. Report the failure to the human with full context (which step, which MCP server, error details) and ask how to proceed.
 
