@@ -1,11 +1,11 @@
 # 00 — SETUP: First-Time AWS Environment Setup
 
-> Run this prompt ONCE after cloning the repo into a new AWS account.
-> It creates all AWS resources needed before you can onboard data.
+> Run this prompt to set up AWS prerequisites. Safe to re-run — it auto-detects
+> existing resources and only creates what's missing.
 
 ## Purpose
 
-Interactive, guided setup of all AWS prerequisites using MCP tools and CLI. Run this before any other prompt (ROUTE, ONBOARD, etc.). Claude will create resources step-by-step, verify each one, and present a final checklist.
+Interactive, guided setup of all AWS prerequisites using MCP tools and CLI. Run this before any other prompt (ROUTE, ONBOARD, etc.). Claude auto-detects what already exists, skips completed steps, and only creates what's missing. Safe to re-run at any time.
 
 ## When to Use
 
@@ -13,6 +13,7 @@ Interactive, guided setup of all AWS prerequisites using MCP tools and CLI. Run 
 - Setting up a new region in an existing account
 - Recovering after infrastructure was deleted
 - Onboarding a new team member who needs their own dev environment
+- **Verifying** that an existing environment is still healthy (re-run is safe)
 
 ## Prerequisites
 
@@ -53,18 +54,113 @@ Existing resources (skip creation):
 
 ## What Claude Will Do
 
-Claude uses MCP tools where available, CLI fallback otherwise. Each step verifies success before proceeding.
+Claude uses MCP tools where available, CLI fallback otherwise. Each step verifies success before proceeding. **Steps 0 and 1 always run first** to detect existing state and skip what's already done.
 
-### Step 1: Verify Prerequisites
+### Step 0: Auto-Detect Existing Resources
 
 ```
-Action: Check AWS credentials, region, MCP server connectivity
+Action: Scan AWS account for all resources this prompt would create.
+        Build a resource inventory BEFORE asking the user what to create.
+MCP:    mcp__iam__list_roles → look for *-glue-service-role
+        mcp__iam__list_policies → look for project-specific policies
+CLI:    aws s3 ls → look for project data lake bucket
+        aws kms list-aliases → look for alias/{PROJECT}-*-key
+        aws glue get-databases → look for landing_db, staging_db, publish_db
+        aws lakeformation list-lf-tags → look for PII_Classification, PII_Type, Data_Sensitivity
+        aws lakeformation list-permissions → check TBAC grants
+        aws mwaa list-environments → check for MWAA
+
+Output:
+  EXISTING RESOURCE SCAN
+  ──────────────────────────────────────────
+  IAM Role:       {PROJECT}-glue-service-role     [FOUND / NOT FOUND]
+  S3 Bucket:      {BUCKET}                        [FOUND / NOT FOUND]
+  KMS Keys:       alias/{PROJECT}-*-key           [4/4 FOUND / N/4 FOUND]
+  Glue DBs:       landing_db, staging_db, publish [3/3 FOUND / N/3 FOUND]
+  LF-Tags:        3 tags                          [3/3 FOUND / N/3 FOUND]
+  TBAC Grants:    Glue role grants                [FOUND / NOT FOUND]
+  MWAA:           environment name                [FOUND / NOT FOUND]
+  Airflow Vars:   required variables              [FOUND / NOT FOUND / SKIPPED]
+  Cedar Policies: AVP policy store                [FOUND / NOT FOUND]
+  ──────────────────────────────────────────
+  Resources to create: {N} (skipping {M} already exist)
+
+Gate:   If ALL resources found → print "Environment fully set up. No action needed."
+        and jump to Step 10 (verification) to confirm health.
+        If SOME found → auto-uncheck those items, proceed with missing only.
+        If NONE found → proceed with full setup.
+```
+
+### Step 1: MCP Setup + Health Check
+
+MCP servers are the primary interface for all AWS operations. Set them up FIRST, before creating any AWS resources.
+
+```
+Action: Determine MCP hosting mode, verify connectivity, build endpoint inventory.
+
+── 1a. Choose MCP Hosting Mode ──────────────────────────────────────
+
+  Two options (ask the user):
+
+  LOCAL MODE (default):
+    - 13 servers run on your laptop via .mcp.json (stdio transport)
+    - No cloud setup needed, works immediately after clone
+    - Requires: uv, Python 3.12+, AWS credentials
+
+  GATEWAY MODE (team/production):
+    - 13 servers hosted on Agentcore Gateway (SSE transport)
+    - Team members connect via .mcp.gateway.json — zero local setup
+    - Requires: Agentcore Gateway deployed (prompts/09 + prompts/10)
+    - Run prompts/09-deploy-agentcore-gateway.md FIRST to deploy Gateway
+    - Run prompts/10-deploy-agentcore-runtime.md for cloud-hosted agent (optional)
+
+── 1b. Verify AWS Credentials ──────────────────────────────────────
+
+CLI:    aws sts get-caller-identity
+Output: Account ID, region confirmed
+Gate:   Must succeed before proceeding
+
+── 1c. MCP Health Check + Endpoint Inventory ────────────────────────
+
 MCP:    mcp__iam__list_roles (verify IAM access)
         mcp__cloudtrail__lookup_events (verify CloudTrail access)
-CLI:    aws sts get-caller-identity
-        claude mcp list
-Output: Account ID, region, MCP server status table
-Gate:   Must have valid credentials and at least iam + cloudtrail MCP connected
+CLI:    claude mcp list
+
+Output:
+  MCP HEALTH CHECK
+  ──────────────────────────────────────────────────────────────────
+  Mode: [LOCAL (.mcp.json) / GATEWAY (.mcp.gateway.json)]
+
+  Server              Status      Transport  Endpoint
+  ─────────────────── ─────────── ────────── ─────────────────────────
+  REQUIRED:
+  glue-athena         [CONNECTED] stdio/SSE  [local / https://gw:8001]
+  lakeformation       [CONNECTED] stdio/SSE  [local / https://gw:8002]
+  iam                 [CONNECTED] stdio      [local / https://gw:PORT]
+
+  WARN (CLI fallback):
+  cloudtrail          [CONNECTED] stdio      [local / https://gw:PORT]
+  redshift            [CONNECTED] stdio      [local / https://gw:PORT]
+  core                [CONNECTED] stdio      [local / https://gw:PORT]
+  s3-tables           [CONNECTED] stdio      [local / https://gw:PORT]
+  pii-detection       [CONNECTED] stdio/SSE  [local / https://gw:8004]
+
+  OPTIONAL:
+  sagemaker-catalog   [CONNECTED] stdio/SSE  [local / https://gw:8003]
+  lambda              [CONNECTED] stdio      [local / https://gw:PORT]
+  cloudwatch          [CONNECTED] stdio      [local / https://gw:PORT]
+  cost-explorer       [CONNECTED] stdio      [local / https://gw:PORT]
+  dynamodb            [CONNECTED] stdio      [local / https://gw:PORT]
+  aws.dp-mcp          [CONNECTED] stdio      [local / https://gw:PORT]
+  ──────────────────────────────────────────────────────────────────
+  Result: {N}/13 servers connected | Mode: {LOCAL/GATEWAY}
+
+Gate:   Must have valid credentials.
+        REQUIRED servers must be CONNECTED — block setup if any fail.
+        WARN servers use CLI fallback if failed.
+        OPTIONAL servers are informational only.
+        If GATEWAY mode selected but Gateway not deployed → prompt user to
+        run prompts/09 first, or fall back to LOCAL mode.
 ```
 
 ### Step 2: Create IAM Roles
@@ -263,9 +359,20 @@ Existing resources:
 - Existing KMS keys: none
 ```
 
+### Step 11: Deploy to Agentcore (Optional — for team/production use)
+
+If you want cloud-hosted MCP tools and/or a cloud-hosted agent instead of running everything locally:
+
+- **Gateway (all 13 servers in cloud)**: Run `prompts/09-deploy-agentcore-gateway.md` to host all 13 MCP servers (4 custom + 9 PyPI) on Agentcore Gateway. Team members connect by replacing `.mcp.json` with `.mcp.gateway.json` -- zero local setup needed.
+- **Runtime (agent in cloud)**: Run `prompts/10-deploy-agentcore-runtime.md` to host the Data Onboarding Agent on Agentcore Runtime, connected to all 13 Gateway tools, accessible via API.
+
+These are optional -- the platform works fully in local mode with `.mcp.json` and stdio transport.
+
+See `agentcore/README.md` for architecture details.
+
 ## After Setup Is Complete
 
-You're ready to onboard data. Next steps:
+MCP servers are connected, AWS resources are created. You're ready to onboard data:
 
 1. **Check for existing data**: Use `prompts/01-route-check-existing.md`
 2. **Generate test data**: Use `prompts/02-generate-synthetic-data.md`

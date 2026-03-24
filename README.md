@@ -33,6 +33,14 @@ Output: workloads/{dataset_name}/   (ready to deploy to MWAA)
 
 ## Architecture
 
+### System Overview
+
+![Architecture Diagram](docs/architecture.png)
+
+### Pipeline Flow (Phase 0 → Phase 5)
+
+![Pipeline Flow](docs/flow.png)
+
 ### Data Zones (Medallion Pattern)
 
 | Zone | Purpose | Format | Quality Gate |
@@ -101,7 +109,25 @@ Sub-agents do NOT execute AWS operations — they generate artifacts and tests o
 claude mcp list   # All 13 servers auto-connect
 ```
 
-**Health check before deployment**: 3 servers are REQUIRED (`glue-athena`, `lakeformation`, `iam`) — deployment blocks if any fail. See [MCP_SETUP.md](MCP_SETUP.md) for full setup guide.
+**Health check before deployment**: 3 servers are REQUIRED (`glue-athena`, `lakeformation`, `iam`) -- deployment blocks if any fail. See [MCP_SETUP.md](MCP_SETUP.md) for full setup guide.
+
+### Agentcore (Optional Cloud Deployment)
+
+All 13 MCP servers can be deployed to **Agentcore Gateway** for shared, cloud-hosted tool access -- no local Python, uv, or stdio transport needed per user. The **Data Onboarding Agent** can be deployed to **Agentcore Runtime** for API-accessible invocation, with all 13 tools connected from Gateway.
+
+```
+Local Mode (default)           Agentcore Mode
+────────────────────           ────────────────────────
+Claude Code → stdio → 13      Claude Code / API Client
+  local servers                    → Runtime (agent)
+                                       → Gateway (all 13 servers)
+```
+
+- Deploy Gateway (all 13 servers): `prompts/09-deploy-agentcore-gateway.md`
+- Deploy Runtime (agent + Gateway tools): `prompts/10-deploy-agentcore-runtime.md`
+- Config + 13 IAM policies: `agentcore/`
+
+See [agentcore/README.md](agentcore/README.md) for details.
 
 ---
 
@@ -131,7 +157,8 @@ claude mcp list   # All 13 servers auto-connect
 │   ├── orchestrator_examples/        # Multi-workload DAG examples
 │   └── workflows/                    # Demo governance workflows
 │
-├── mcp-servers/                      # Custom MCP servers (PII detection)
+├── agentcore/                        # Agentcore Gateway + Runtime config (optional cloud deploy)
+├── mcp-servers/                      # Custom MCP servers (4 FastMCP servers with SSE support)
 ├── sample_data/                      # Sample CSV files for sales_transactions
 ├── docs/                             # Setup guides and architecture docs
 ├── prompts/                          # Reusable prompt patterns (ROUTE → ONBOARD → ENRICH → CONSUME → GOVERN)
@@ -370,6 +397,7 @@ Each agent (Router, Onboarding, Metadata, Transformation, Quality, DAG, Analysis
 | [SECURITY.md](SECURITY.md) | Security practices |
 | [RUNNING_TESTS.md](RUNNING_TESTS.md) | Test execution guide |
 | [docs/aws-account-setup.md](docs/aws-account-setup.md) | AWS prerequisites |
+| [agentcore/README.md](agentcore/README.md) | Agentcore Gateway + Runtime (optional) |
 | [docs/getting-started.md](docs/getting-started.md) | Quick start guide |
 
 ---
