@@ -68,6 +68,41 @@ Sub-agents do NOT execute AWS operations — they generate artifacts and tests o
 | Amazon MWAA | Airflow orchestration |
 | SageMaker Catalog | Business metadata (custom columns) |
 
+### MCP Servers (Model Context Protocol)
+
+13 MCP servers provide Claude Code with direct AWS access — no CLI needed for most operations. Pre-configured in `.mcp.json`, auto-install via `uvx` on first use.
+
+**PyPI Servers (9)** — installed automatically via `uvx`:
+
+| Server | Package | Purpose |
+|--------|---------|---------|
+| `core` | awslabs-core-mcp-server | S3 operations, KMS key management, Secrets Manager |
+| `iam` | awslabs-iam-mcp-server | Role lookup, permission simulation, policy management |
+| `lambda` | awslabs-lambda-mcp-server | Lambda invocation, Lake Formation grants via Lambda |
+| `s3-tables` | awslabs-s3-tables-mcp-server | S3 Tables (Iceberg) management |
+| `cloudtrail` | awslabs-cloudtrail-mcp-server | Audit trail verification, compliance checks |
+| `redshift` | awslabs-redshift-mcp-server | Schema verification, Gold zone queries via Spectrum |
+| `cloudwatch` | awslabs-cloudwatch-mcp-server | Logs, metrics, alarms |
+| `cost-explorer` | awslabs-cost-explorer-mcp-server | Cost tracking, budget analysis |
+| `dynamodb` | awslabs-dynamodb-mcp-server | DynamoDB / SynoDB operations |
+
+**Custom Servers (4)** — built in-house using FastMCP, in `mcp-servers/`:
+
+| Server | Tools | Purpose |
+|--------|-------|---------|
+| `glue-athena` | 13 | Glue catalog CRUD, crawler management, ETL job execution, synchronous Athena queries |
+| `lakeformation` | 9 | LF-Tag create/apply/remove, TBAC grant/revoke, column-level security |
+| `sagemaker-catalog` | 5 | Business metadata (column roles, PII flags, hierarchies) on Glue tables |
+| `pii-detection` | 6 | AI-driven PII detection + automatic LF-Tag application |
+
+**Quick start** (after cloning):
+```bash
+# Prerequisites: uv installed, AWS credentials configured
+claude mcp list   # All 13 servers auto-connect
+```
+
+**Health check before deployment**: 3 servers are REQUIRED (`glue-athena`, `lakeformation`, `iam`) — deployment blocks if any fail. See [MCP_SETUP.md](MCP_SETUP.md) for full setup guide.
+
 ---
 
 ## Project Structure
