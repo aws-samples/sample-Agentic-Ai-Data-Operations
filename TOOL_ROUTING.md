@@ -37,9 +37,9 @@ These are the **actually loaded** MCP servers. Do not assume others work.
 | ✅ **LOADED** | `dynamodb` | Table CRUD, query, scan | SynoDB metrics store, DynamoDB operations |
 | ✅ **LOADED** | `core` | S3, KMS, Secrets Manager | S3 operations, KMS key management, secrets (slow startup — may timeout on health check but works in conversation) |
 | ✅ **LOADED** | `pii-detection` | `detect_pii_in_table`, `scan_database_for_pii`, `create_lf_tags`, `get_pii_columns`, `apply_column_security`, `get_pii_report` | PII detection + LF-Tag application (custom server, slow startup) |
-| ❌ **NOT ON PyPI** | `aws-dataprocessing` | — | → Fall back to `aws glue` / `aws athena` CLI (no package exists) |
-| ❌ **NOT ON PyPI** | `sagemaker-catalog` | — | → Fall back to `aws glue` CLI with custom properties (no package exists) |
-| ❌ **DEPENDENCY CONFLICT** | `lakeformation` | — | → Use `lambda` MCP (`LF_access_grant_new`) or `aws lakeformation` CLI |
+| ✅ **LOADED** | `glue-athena` | `create_database`, `get_table`, `get_tables`, `create_crawler`, `start_crawler`, `start_job_run`, `get_job_run`, `athena_query` | Glue catalog + Athena queries (custom FastMCP server, replaces aws-dataprocessing) |
+| ✅ **LOADED** | `lakeformation` | `create_lf_tag`, `add_lf_tags_to_resource`, `grant_permissions`, `revoke_permissions`, `batch_grant_permissions`, `get_resource_lf_tags` | LF-Tags, TBAC grants, column-level security (custom FastMCP server) |
+| ✅ **LOADED** | `sagemaker-catalog` | `put_custom_metadata`, `get_custom_metadata`, `list_tables_with_metadata`, `search_metadata`, `delete_custom_metadata` | Business metadata on Glue tables (custom FastMCP server) |
 | ❌ **DEPENDENCY CONFLICT** | `sns-sqs`, `eventbridge`, `stepfunctions` | — | → Fall back to respective `aws` CLI commands |
 
 ---
@@ -86,13 +86,13 @@ details: MCP_GUARDRAILS.md → Phase 1 / Phase 5.7
 ```yaml
 tool: glue-crawler
 intent: ["discover schema", "detect columns", "crawl source", "new dataset schema", "what columns does this have"]
-use: aws glue create-crawler + start-crawler CLI (aws-dataprocessing MCP not loaded)
+use: mcp__glue_athena__create_crawler + mcp__glue_athena__start_crawler
 not_when: >
   Source is a REST API → define schema manually from API docs |
   Source is a stream (Kafka/Kinesis) → use schema registry |
   Need results in under 1 minute → use Athena DDL instead
 fallback: Athena DDL (faster, no partition auto-detection)
-mcp_server: aws-dataprocessing ❌ → CLI fallback (no PyPI package)
+mcp_server: glue-athena ✅ LOADED (custom FastMCP)
 details: TOOLS.md → Phase 3: Step 3.1
 ```
 
@@ -112,11 +112,11 @@ details: MCP_GUARDRAILS.md → Phase 3
 ```yaml
 tool: athena-tablesample
 intent: ["profile the data", "sample the source", "check data quality before onboarding", "detect PII", "distribution of values", "null rates"]
-use: aws athena start-query-execution CLI with TABLESAMPLE BERNOULLI(5) query
+use: mcp__glue_athena__athena_query with TABLESAMPLE BERNOULLI(5) query (synchronous — handles polling internally)
 not_when: >
   Source is not in S3 yet → use Glue JDBC job instead |
-  Redshift Spectrum external schema exists → prefer mcp__redshift__execute_query (synchronous, no polling)
-mcp_server: aws-dataprocessing ❌ → CLI fallback (no PyPI package); OR redshift ✅ if Spectrum schema exists
+  Redshift Spectrum external schema exists → prefer mcp__redshift__execute_query
+mcp_server: glue-athena ✅ LOADED (custom FastMCP); OR redshift ✅ if Spectrum schema exists
 details: TOOLS.md → Phase 3: Step 3.2
 ```
 
@@ -138,7 +138,7 @@ tool: glue-jdbc-etl
 intent: ["ingest from database", "extract from RDS", "pull from Postgres", "copy from Redshift to Bronze"]
 use: aws glue create-job CLI with JDBC source → writes raw extract (no transforms) to S3 Bronze
 not_when: Source is already in S3 — use s3 sync instead
-mcp_server: aws-dataprocessing ❌ → CLI fallback (no PyPI package)
+mcp_server: glue-athena ✅ LOADED (custom FastMCP)
 details: TOOLS.md → Bronze Zone Tools
 ```
 
@@ -161,7 +161,7 @@ intent: ["transform Bronze to Silver", "clean the data", "apply schema", "dedupl
 use: aws glue create-job CLI (PySpark + Iceberg) — MUST include --enable-data-lineage true
 not_when: Simple file copy with no transforms — use s3 sync instead (cheaper)
 mandatory_flag: "--enable-data-lineage: true — NON-NEGOTIABLE on every Glue ETL job"
-mcp_server: aws-dataprocessing ❌ → CLI fallback (no PyPI package)
+mcp_server: glue-athena ✅ LOADED (custom FastMCP)
 details: TOOLS.md → Silver Zone Tools
 ```
 
@@ -170,7 +170,7 @@ tool: glue-data-quality
 intent: ["run quality rules", "check completeness", "validate Silver data", "quality gate", "DQDL rules"]
 use: aws glue start-data-quality-ruleset-evaluation-run CLI (DQDL syntax)
 not_when: Quick one-off check — Athena SQL is faster; Silver score threshold is 80%, Gold is 95%
-mcp_server: aws-dataprocessing ❌ → CLI fallback (no PyPI package)
+mcp_server: glue-athena ✅ LOADED (custom FastMCP)
 details: TOOLS.md → Silver Zone Tools → Glue Data Quality rule example
 ```
 
@@ -184,7 +184,7 @@ intent: ["transform Silver to Gold", "build star schema", "create fact table", "
 use: aws glue create-job CLI (PySpark + Iceberg) — MUST include --enable-data-lineage true
 not_when: Format decision not yet made — run Phase 1 discovery first (see Gold format decision tree in TOOLS.md)
 mandatory_flag: "--enable-data-lineage: true — NON-NEGOTIABLE"
-mcp_server: aws-dataprocessing ❌ → CLI fallback (no PyPI package)
+mcp_server: glue-athena ✅ LOADED (custom FastMCP)
 details: TOOLS.md → Gold Zone Tools
 ```
 
@@ -204,9 +204,9 @@ details: MCP_GUARDRAILS.md → Phase 5.6
 ```yaml
 tool: lake-formation-grant
 intent: ["grant column access", "restrict PII columns", "apply LF-Tags", "column-level security", "give role access to table"]
-use: mcp__lambda__AWS_LambdaFn_LF_access_grant_new (LF via Lambda MCP)
+use: mcp__lakeformation__grant_permissions or mcp__lakeformation__add_lf_tags_to_resource
 not_when: Row-level security needed — use Athena row filters instead
-mcp_server: lambda ✅ LOADED (lakeformation MCP ❌ not loaded — Lambda is the live path)
+mcp_server: lakeformation ✅ LOADED (custom FastMCP — direct LF API, no Lambda workaround needed)
 details: MCP_GUARDRAILS.md → Phase 5.4
 ```
 
@@ -236,16 +236,16 @@ tool: glue-data-catalog
 intent: ["register table schema", "update catalog", "add table to catalog", "schema registration"]
 use: aws glue create-table / update-table CLI (automatic for Iceberg via S3 Tables integration)
 not_when: Table is Iceberg on S3 Tables — registration is automatic, no manual step needed
-mcp_server: aws-dataprocessing ❌ → CLI fallback (no PyPI package)
+mcp_server: glue-athena ✅ LOADED (custom FastMCP)
 details: TOOLS.md → Metadata & Catalog Tools
 ```
 
 ```yaml
 tool: sagemaker-catalog-metadata
 intent: ["store business context", "add column descriptions", "flag PII column", "set column role", "business glossary"]
-use: aws glue update-table CLI with custom properties (sagemaker-catalog MCP not loaded)
+use: mcp__sagemaker_catalog__put_custom_metadata or mcp__sagemaker_catalog__get_custom_metadata
 not_when: High-read-volume operational data — use DynamoDB instead
-mcp_server: sagemaker-catalog ❌ → CLI fallback
+mcp_server: sagemaker-catalog ✅ LOADED (custom FastMCP)
 details: TOOLS.md → Metadata & Catalog Tools
 ```
 

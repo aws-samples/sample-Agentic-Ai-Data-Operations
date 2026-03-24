@@ -1,16 +1,27 @@
 {
   "mcpServers": {
-    "aws.dp-mcp": {
-      "autoApprove": [],
-      "disabled": false,
-      "command": "uvx",
-      "args": [
-        "awslabs.aws-dataprocessing-mcp-server@latest",
-        "--allow-write"
-      ],
+    "glue-athena": {
+      "command": "uv",
+      "args": ["run", "--no-project", "--with", "fastmcp", "--with", "boto3", "--python", "3.13", "mcp-servers/glue-athena-server/server.py"],
       "env": {
-        "AWS_PROFILE": "default",
-        "AWS_REGION": "us-east-1"
+        "AWS_REGION": "us-east-1",
+        "AWS_PROFILE": "default"
+      }
+    },
+    "lakeformation": {
+      "command": "uv",
+      "args": ["run", "--no-project", "--with", "fastmcp", "--with", "boto3", "--python", "3.13", "mcp-servers/lakeformation-server/server.py"],
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "AWS_PROFILE": "default"
+      }
+    },
+    "sagemaker-catalog": {
+      "command": "uv",
+      "args": ["run", "--no-project", "--with", "fastmcp", "--with", "boto3", "--python", "3.13", "mcp-servers/sagemaker-catalog-server/server.py"],
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "AWS_PROFILE": "default"
       }
     },
     "core": {

@@ -23,16 +23,22 @@
 | **core** | S3, KMS, Secrets Manager | S3 operations, KMS key management, secrets. *Slow startup — may timeout on health check but works in conversation.* |
 | **pii-detection** | `detect_pii_in_table`, `scan_database_for_pii`, `create_lf_tags`, `get_pii_columns`, `apply_column_security`, `get_pii_report` | PII detection + LF-Tag application. Custom server. *Slow startup.* |
 
-### Not Available (no PyPI package or dependency conflict — CLI fallback)
+### Custom Servers (FastMCP, in mcp-servers/)
+
+| MCP Server | Tools | Use For |
+|---|---|---|
+| **glue-athena** | `create_database`, `get_table`, `get_tables`, `create_crawler`, `start_crawler`, `start_job_run`, `get_job_run`, `athena_query` + 5 more | Glue catalog operations + synchronous Athena queries. Replaces aws-dataprocessing. |
+| **lakeformation** | `create_lf_tag`, `list_lf_tags`, `add_lf_tags_to_resource`, `remove_lf_tags_from_resource`, `get_resource_lf_tags`, `grant_permissions`, `revoke_permissions`, `batch_grant_permissions`, `get_lf_tag` | LF-Tags, TBAC grants, column-level security. Replaces Lambda workaround. |
+| **sagemaker-catalog** | `put_custom_metadata`, `get_custom_metadata`, `list_tables_with_metadata`, `search_metadata`, `delete_custom_metadata` | Business metadata on Glue tables (column roles, PII flags, hierarchies). |
+| **pii-detection** | `detect_pii_in_table`, `scan_database_for_pii`, `create_lf_tags`, `get_pii_columns`, `apply_column_security`, `get_pii_report` | PII detection + LF-Tag application. *Slow startup.* |
+
+### Not Used in Codebase (CLI fallback if ever needed)
 
 | MCP Server | Reason | Fallback |
 |---|---|---|
-| `aws-dataprocessing` | No PyPI package exists | `aws glue` / `aws athena` CLI |
-| `sagemaker-catalog` | No PyPI package exists | `aws glue` CLI with custom properties |
-| `lakeformation` | Dependency conflict in uvx | Lambda MCP (`LF_access_grant_new`) or `aws lakeformation` CLI |
-| `sns-sqs` | Dependency conflict in uvx | `aws sns` / `aws sqs` CLI |
-| `eventbridge` | Dependency conflict in uvx | `aws events` CLI |
-| `stepfunctions` | Dependency conflict in uvx | `aws stepfunctions` CLI |
+| `sns-sqs` | Not used in production code (comments only) | `aws sns` / `aws sqs` CLI |
+| `eventbridge` | Not used in production code | `aws events` CLI |
+| `stepfunctions` | Not used (Airflow handles orchestration) | `aws stepfunctions` CLI |
 
 ---
 
@@ -85,11 +91,11 @@
 
 | Step | MCP Tool (if available) | Fallback | Notes |
 |---|---|---|---|
-| Run Glue Crawler | — (aws-dataprocessing MCP not loaded) | `aws glue create-crawler` + `aws glue start-crawler` CLI | Schema discovery |
-| Profile via Athena | — (aws-dataprocessing MCP not loaded) | `aws athena start-query-execution` CLI | 5% sample profiling |
+| Run Glue Crawler | `glue-athena` MCP | `aws glue create-crawler` + `aws glue start-crawler` CLI | Schema discovery |
+| Profile via Athena | `glue-athena` MCP | `aws athena start-query-execution` CLI | 5% sample profiling |
 | Profile via Redshift Spectrum | `mcp__redshift__execute_query` | Athena CLI | If external schema exists, query via Spectrum |
 | Verify profiling results | `mcp__redshift__list_columns` | `aws glue get-table` CLI | Check discovered schema |
-| PII detection | — (aws-dataprocessing MCP not loaded) | Glue ETL `DetectPII` or local regex | |
+| PII detection | `glue-athena` MCP | Glue ETL `DetectPII` or local regex | |
 | Audit profiling operations | `mcp__cloudtrail__lookup_events` (EventName=StartCrawler) | `aws cloudtrail lookup-events` CLI | Verify crawler ran |
 
 ### Guardrail Rules — Phase 3
@@ -140,8 +146,8 @@
 
 | Operation | MCP Tool | Fallback | Status |
 |---|---|---|---|
-| Create database | — (aws-dataprocessing MCP not loaded) | `aws glue create-database` CLI | CLI required |
-| Create tables | — (aws-dataprocessing MCP not loaded) | `aws glue create-table` CLI | CLI required |
+| Create database | `glue-athena` MCP (`create_database`) | `aws glue create-database` CLI | **MCP** |
+| Create tables | `glue-athena` MCP (`create_table`) | `aws glue create-table` CLI | **MCP** |
 | Verify tables registered | `mcp__redshift__list_tables` (via Spectrum) | `aws glue get-table` CLI | MCP preferred |
 | Verify columns | `mcp__redshift__list_columns` (via Spectrum) | `aws glue get-table` CLI | MCP preferred |
 | Audit catalog ops | `mcp__cloudtrail__lookup_events` (EventName=CreateTable) | — | MCP required |
