@@ -359,25 +359,63 @@ Existing resources:
 - Existing KMS keys: none
 ```
 
-### Step 11: Deploy to Agentcore (Optional — for team/production use)
+## After Setup: Choose Your Path
 
-If you want cloud-hosted MCP tools and/or a cloud-hosted agent instead of running everything locally:
+Two ways to run the platform. Choose one during Step 1a (MCP Setup).
 
-- **Gateway (all 13 servers in cloud)**: Run `prompts/09-deploy-agentcore-gateway.md` to host all 13 MCP servers (4 custom + 9 PyPI) on Agentcore Gateway. Team members connect by replacing `.mcp.json` with `.mcp.gateway.json` -- zero local setup needed.
-- **Runtime (agent in cloud)**: Run `prompts/10-deploy-agentcore-runtime.md` to host the Data Onboarding Agent on Agentcore Runtime, connected to all 13 Gateway tools, accessible via API.
+### Path A: Local Mode (default — solo developer)
 
-These are optional -- the platform works fully in local mode with `.mcp.json` and stdio transport.
+```
+00-setup-environment        ← you are here (one-time)
+    │
+    │  MCP: 13 servers on laptop via .mcp.json (stdio)
+    │  No cloud MCP infrastructure needed
+    │
+    ▼
+01-route-check-existing     ← always run first (check if data exists)
+    ▼
+02-generate-synthetic-data  ← optional (create test data)
+    ▼
+03-onboard-build-pipeline   ← master prompt (Phase 0-5, spawns sub-agents)
+    ▼
+04-enrich-link-datasets     ← add FK relationships between datasets
+    ▼
+05-consume-create-dashboard ← QuickSight on Gold data
+    ▼
+06-govern-trace-lineage     ← compliance docs, impact analysis
 
-See `agentcore/README.md` for architecture details.
+Troubleshooting (use anytime):
+  07-fix-iceberg-glue       ← fix Glue/Iceberg deployment issues
+  08-deep-agent-logging     ← enable detailed agent tracing
+```
 
-## After Setup Is Complete
+### Path B: Gateway Mode (team / production)
 
-MCP servers are connected, AWS resources are created. You're ready to onboard data:
+```
+00-setup-environment        ← you are here (one-time)
+    │
+    ▼
+09-deploy-agentcore-gateway ← deploy 13 MCP servers to Agentcore Gateway
+    │                         (4 custom + 9 PyPI, SSE transport)
+    │                         team members connect via .mcp.gateway.json
+    ▼
+10-deploy-agentcore-runtime ← optional: deploy agent to Agentcore Runtime
+    │                         (API-accessible, all 13 Gateway tools)
+    │
+    │  MCP: 13 servers on Gateway (cloud-hosted, shared)
+    │  Zero local setup for team members
+    │
+    ▼
+01-route-check-existing     ← same sequence as Local from here
+    ▼
+02 → 03 → 04 → 05 → 06    ← identical workflow, same tool names
 
-1. **Check for existing data**: Use `prompts/01-route-check-existing.md`
-2. **Generate test data**: Use `prompts/02-generate-synthetic-data.md`
-3. **Build a pipeline**: Use `prompts/03-onboard-build-pipeline.md`
-4. **Deploy to AWS**: Use `deploy_to_aws.py --mwaa-bucket=BUCKET`
+Troubleshooting: 07, 08     ← same as Local
+```
+
+**Key difference**: Gateway mode runs prompts 09 (+ optionally 10) right after 00, before any pipeline work. Local mode skips them entirely. Once MCP servers are running (either way), the pipeline prompts (01-06) are identical.
+
+See `agentcore/README.md` for Gateway architecture details.
 
 ## Teardown (Remove All Resources)
 
