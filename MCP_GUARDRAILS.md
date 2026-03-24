@@ -132,6 +132,27 @@
 
 > Main conversation deploys artifacts to AWS. MCP first, CLI fallback.
 
+### Step 5.0: MCP Health Check (MANDATORY)
+
+Run `claude mcp list` before any deployment. All REQUIRED servers must show Connected.
+
+| Server | Category | If Failed |
+|--------|----------|-----------|
+| `glue-athena` | **REQUIRED** | BLOCK — cannot register tables or run jobs |
+| `lakeformation` | **REQUIRED** | BLOCK — cannot apply LF-Tags or TBAC grants |
+| `iam` | **REQUIRED** | BLOCK — cannot verify permissions |
+| `cloudtrail` | WARN | Proceed, defer audit verification |
+| `redshift` | WARN | Fall back to `athena_query` tool |
+| `core` | WARN | Fall back to `aws s3` / `aws kms` CLI |
+| `s3-tables` | WARN | Fall back to `aws s3` CLI |
+| `pii-detection` | WARN | Fall back to `shared/utils/pii_detection_and_tagging.py` |
+| `sagemaker-catalog` | OPTIONAL | Defer metadata enrichment |
+
+**Rules:**
+1. Do NOT proceed with deployment if any REQUIRED server fails
+2. Slow-startup servers (`core`, `pii-detection`, `sagemaker-catalog`) may timeout on health check — test with a simple call to confirm
+3. Present health check results to human before deploying
+
 ### Step 5.1: S3 Upload
 
 | Operation | MCP Tool | Fallback | Status |

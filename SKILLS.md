@@ -1490,6 +1490,53 @@ After human approves, execute ALL AWS operations from the main conversation wher
 > **Full guardrails for every phase (including deploy) are in `MCP_GUARDRAILS.md`.**
 > That file has the actual MCP tool names, per-step fallback rules, and live server status.
 
+**Step 5.0: MCP Health Check (MANDATORY — run before ANY deployment)**
+
+Before executing any MCP tool calls, verify all required servers are connected and responding:
+
+```bash
+claude mcp list
+```
+
+**Required servers for deployment** (all must show Connected):
+
+| Server | Required For | If Not Connected |
+|--------|-------------|-----------------|
+| `glue-athena` | Steps 5.1-5.2 (catalog, crawlers, jobs, queries) | BLOCK — cannot deploy without Glue/Athena |
+| `lakeformation` | Steps 5.4-5.4.5 (LF-Tags, TBAC grants) | BLOCK — cannot apply governance |
+| `iam` | Step 5.3 (role verification, policy management) | BLOCK — cannot verify permissions |
+| `cloudtrail` | Step 5.7 (audit trail verification) | WARN — deploy can proceed, audit deferred |
+| `redshift` | Step 5.6 (query verification via Spectrum) | WARN — fall back to athena_query tool |
+| `core` | Step 5.1, 5.5 (S3 upload, KMS keys) | WARN — fall back to CLI |
+| `s3-tables` | Step 5.1 (Iceberg table uploads) | WARN — fall back to CLI |
+| `pii-detection` | Step 5.4.5 (PII detection + tagging) | WARN — fall back to shared/utils/ script |
+| `sagemaker-catalog` | Post-deploy (business metadata) | OPTIONAL — can defer |
+
+**Health check rules:**
+1. If ANY server in the BLOCK category fails → stop and troubleshoot before deploying
+2. If a WARN server fails → log the fallback and proceed with CLI
+3. Slow-startup servers (`core`, `pii-detection`, `sagemaker-catalog`) may timeout on health check but work in conversation — test with a simple tool call (e.g., `mcp__iam__list_roles`) to confirm
+4. If a server was Connected in health check but fails during deployment → retry once, then fall back to CLI
+
+**Present health check results to human before proceeding:**
+```
+MCP HEALTH CHECK: Pre-Deployment
+────────────────────────────────
+glue-athena:       Connected     [REQUIRED]
+lakeformation:     Connected     [REQUIRED]
+iam:               Connected     [REQUIRED]
+cloudtrail:        Connected     [REQUIRED]
+redshift:          Connected     [OPTIONAL]
+core:              Connected     [OPTIONAL]
+s3-tables:         Connected     [OPTIONAL]
+pii-detection:     Slow startup  [OPTIONAL]
+sagemaker-catalog: Slow startup  [OPTIONAL]
+────────────────────────────────
+Status: READY TO DEPLOY (all required servers connected)
+```
+
+If any REQUIRED server shows "Failed to connect", present the issue and ask how to proceed.
+
 **Deployment order** (sequential — each step depends on the previous):
 
 ```
