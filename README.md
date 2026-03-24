@@ -35,11 +35,11 @@ Output: workloads/{dataset_name}/   (ready to deploy to MWAA)
 
 ### System Overview
 
-![Architecture Diagram](docs/architecture.png)
+![Architecture Diagram](docs/Architecture-Diagram.png)
 
 ### Pipeline Flow (Phase 0 → Phase 5)
 
-![Pipeline Flow](docs/flow.png)
+![Pipeline Flow](docs/Prompt-flow.png)
 
 ### Data Zones (Medallion Pattern)
 
