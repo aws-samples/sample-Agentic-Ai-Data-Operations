@@ -247,9 +247,34 @@ The `deploy_to_aws.py` script MUST include:
 - `--dry-run` mode for safe testing
 - `--mwaa-bucket=BUCKET` parameter for MWAA deployment
 
-## Phase 7: Deploy to AWS Glue
+## Phase 7: Deploy to AWS
 
-After artifacts pass all tests and get human approval, deploy to AWS:
+After artifacts pass all tests and get human approval, deploy to AWS.
+
+### Step 0: MCP Health Check (MANDATORY)
+
+Before any deployment, verify MCP servers are connected:
+
+```bash
+claude mcp list
+```
+
+**Required servers** (must be Connected — BLOCK deployment if not):
+- `glue-athena` — Glue catalog, crawlers, jobs, Athena queries
+- `lakeformation` — LF-Tags, TBAC grants, column-level security
+- `iam` — Role verification, policy management
+
+**Optional servers** (fall back to CLI if not connected):
+- `cloudtrail` — Audit trail verification
+- `redshift` — Query verification via Spectrum
+- `core` — S3 uploads, KMS keys
+- `s3-tables` — Iceberg table management
+- `pii-detection` — PII detection + LF-Tag application
+- `sagemaker-catalog` — Business metadata
+
+**Slow-startup servers** (`core`, `pii-detection`, `sagemaker-catalog`) may show "Failed to connect" on health check but work during conversation. Test with a simple call to confirm.
+
+Present results to human. Do NOT proceed if any REQUIRED server fails.
 
 ### Deployment Checklist
 1. **Create Glue database** (if new workload)
