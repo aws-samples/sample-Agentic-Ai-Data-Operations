@@ -25,67 +25,51 @@ Read `design.md` before making architectural decisions. Read `SKILLS.md` before 
 ## Architecture Overview
 
 ```
-MAIN CONVERSATION (local mode — default)
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  MCP SERVERS (set up FIRST — before any phase)                              │
+│                                                                             │
+│  Local mode (.mcp.json, stdio)     OR    Gateway mode (.mcp.gateway.json)   │
+│  13 servers on laptop                    13 servers on Agentcore Gateway     │
+│                                          (deploy via prompts/09 + 10 first) │
+│                                                                             │
+│  REQUIRED: glue-athena, lakeformation, iam  (block if down)                 │
+│  WARN:     cloudtrail, redshift, core, s3-tables, pii-detection             │
+│  OPTIONAL: sagemaker-catalog, lambda, cloudwatch, cost-explorer,            │
+│            dynamodb, aws.dp-mcp                                             │
+└────────────────────────────────┬────────────────────────────────────────────┘
+                                 │ all phases use MCP tools
+                                 ▼
+MAIN CONVERSATION
 ├── Router (inline) — check workloads/, found or not found
 └── Data Onboarding Agent (orchestrator, human-facing)
     │
     │  Phase 0: Health Check & Auto-Detect (read-only, always first)
     │  ├── Step 0.1: Scan AWS — IAM roles, S3, KMS, Glue DBs, LF-Tags, MWAA
-    │  ├── Step 0.2: MCP Health Check — 13 servers, status/transport/endpoint
-    │  │   ├── REQUIRED: glue-athena, lakeformation, iam → BLOCK if down
-    │  │   ├── WARN: cloudtrail, redshift, core, s3-tables, pii-detection → CLI fallback
-    │  │   └── OPTIONAL: sagemaker-catalog, lambda, cloudwatch, cost-explorer, dynamodb, aws.dp-mcp
-    │  └── Gate: all critical resources + required MCP → pass or block
+    │  ├── Step 0.2: MCP Health Check — verify 13 servers connected
+    │  │   status, transport (stdio/SSE), endpoint (local/gateway URL)
+    │  └── Gate: critical resources + required MCP → pass or block
     │
     │  Phase 1-2: inline (questions, dedup, validation)
+    │  │  Uses: iam, cloudtrail, redshift, core (discovery checks)
+    │  │
     │  Phase 3-4: spawns sub-agents via Agent tool
+    │  │  Sub-agents have NO MCP access — generate artifacts + tests only
+    │  │  spawn → Metadata Agent ──→ TEST GATE ──→ proceed
+    │  │  spawn → Transformation Agent ──→ TEST GATE ──→ proceed
+    │  │  spawn → Quality Agent ──→ TEST GATE ──→ proceed
+    │  │  spawn → Orchestration DAG Agent ──→ TEST GATE ──→ proceed
+    │  │
+    │  └── Present all artifacts + test results → human approves
     │
-    │  spawn → Metadata Agent ──→ TEST GATE ──→ proceed
-    │  spawn → Transformation Agent ──→ TEST GATE ──→ proceed
-    │  spawn → Quality Agent ──→ TEST GATE ──→ proceed
-    │  spawn → Orchestration DAG Agent ──→ TEST GATE ──→ proceed
-    │
-    └── Present all artifacts + test results → human approves
-    │
-    │  Phase 5: Deploy (main conversation — see MCP_GUARDRAILS.md)
+    │  Phase 5: Deploy artifacts to AWS (uses MCP tools)
     │  Step 5.0: Reuse Phase 0 health check or re-run
-    │  Glue/Athena → `glue-athena` MCP (custom)
-    │  LF-Tags/TBAC → `lakeformation` MCP (custom)
-    │  IAM/Permissions → `iam` MCP (loaded)
-    │  LF Grants → `lambda` MCP (loaded, via LF_access_grant Lambda)
-    │  Query Verify → `redshift` MCP (loaded, via Spectrum)
-    │  Audit → `cloudtrail` MCP (loaded)
-    │  S3/KMS → `core` MCP (loaded, slow startup) or CLI fallback
-
-AGENTCORE MODE (optional — prompts/09 + prompts/10)
-│
-├── Gateway: all 13 MCP servers (cloud-hosted, always deployed)
-│   ├── glue-athena (:8001)     — Glue catalog, crawlers, Athena queries
-│   ├── lakeformation (:8002)   — LF-Tags, TBAC grants
-│   ├── sagemaker-catalog (:8003) — business metadata
-│   ├── pii-detection (:8004)   — PII detection + LF-Tags
-│   ├── iam                     — role/policy management
-│   ├── lambda                  — Lambda invocation, LF grants
-│   ├── core                    — S3, KMS, Secrets Manager
-│   ├── s3-tables               — S3 Tables / Iceberg
-│   ├── cloudtrail              — audit trail
-│   ├── redshift                — schema verification, Spectrum
-│   ├── cloudwatch              — logs, metrics, alarms
-│   ├── cost-explorer           — cost tracking
-│   └── dynamodb                — SynoDB operations
-│
-├── Local Demo Mode (Gateway + local agent)
-│   ├── agent: Claude Code CLI on laptop
-│   ├── tools: all 13 Gateway servers via .mcp.gateway.json
-│   ├── sub-agents: spawned via Agent tool (local)
-│   └── human-in-the-loop: yes
-│
-└── Production Mode (Gateway + Runtime agent)
-    ├── agent: Agentcore Runtime (API-accessible)
-    ├── model: Claude Sonnet
-    ├── tools: all 13 Gateway servers (same Gateway)
-    ├── sub-agents: managed internally by Runtime
-    └── memory: persistent, namespaced
+    │  S3 upload       → core, s3-tables MCP
+    │  Glue catalog    → glue-athena MCP
+    │  IAM/Permissions → iam MCP
+    │  LF-Tags/TBAC   → lakeformation MCP
+    │  PII detection   → pii-detection MCP
+    │  Query verify    → redshift MCP
+    │  Audit trail     → cloudtrail MCP
 ```
 
 **MCP-First Rule**: All AWS operations use MCP server tools first. Sub-agents do NOT have MCP access — they generate scripts/configs only. Deployment runs in the main conversation via MCP. See `MCP_GUARDRAILS.md` for actual tool names, per-phase rules, and fallback decisions. See `TOOLS.md` for the full AWS service mapping.
