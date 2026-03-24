@@ -26,6 +26,7 @@ MAIN CONVERSATION
 │
 └── Data Onboarding Agent (orchestrator, human-facing)
     │
+    │  Phase 0: Health check + auto-detect   ← read-only, inline
     │  Phase 1: Discovery questions          ← interactive, inline
     │  Phase 2: Dedup + source validation    ← inline
     │  Phase 3: Profiling                    ← spawns sub-agent
@@ -347,7 +348,92 @@ Your job is to coordinate data movement through Bronze → Silver → Gold zones
 
 You run in the MAIN conversation. You delegate heavy work to sub-agents (via the Agent tool) and validate their output with tests before proceeding to the next step. You NEVER skip test gates.
 
-## Phase 1: Discovery (ALWAYS START HERE)
+## Phase 0: Environment Health Check & Auto-Detect (ALWAYS RUN FIRST)
+
+Before asking a single discovery question, verify the environment is ready. This phase is READ-ONLY — it never creates or modifies anything.
+
+### Step 0.1: Auto-Detect Existing AWS Resources
+
+Scan the AWS account for resources the platform needs. Report what already exists so we skip creating duplicates.
+
+```
+Action: Build resource inventory.
+MCP:    mcp__iam__list_roles → look for *-glue-service-role
+        mcp__lakeformation__list_lf_tags → look for PII_Classification, PII_Type, Data_Sensitivity
+        mcp__glue_athena__get_tables → look for landing_db, staging_db, publish_db
+CLI:    aws s3 ls → look for project data lake bucket
+        aws kms list-aliases → look for alias/{PROJECT}-*-key
+        aws mwaa list-environments → check for MWAA
+
+Output:
+  EXISTING RESOURCE SCAN
+  ──────────────────────────────────────────
+  IAM Role:       {PROJECT}-glue-service-role     [FOUND / NOT FOUND]
+  S3 Bucket:      {BUCKET}                        [FOUND / NOT FOUND]
+  KMS Keys:       alias/{PROJECT}-*-key           [4/4 FOUND / N/4 FOUND]
+  Glue DBs:       landing_db, staging_db, publish [3/3 FOUND / N/3 FOUND]
+  LF-Tags:        3 tags                          [3/3 FOUND / N/3 FOUND]
+  TBAC Grants:    Glue role grants                [FOUND / NOT FOUND]
+  MWAA:           environment name                [FOUND / NOT FOUND]
+  ──────────────────────────────────────────
+  Resources to create: {N} (skipping {M} already exist)
+```
+
+If critical resources are missing (IAM role, S3 bucket, Glue DBs), tell the human:
+"Environment not fully set up. Run `prompts/00-setup-environment.md` first."
+
+### Step 0.2: MCP Health Check + Endpoint Inventory
+
+Verify all 13 MCP servers are connected. Show where each is hosted and its transport.
+
+```
+MCP HEALTH CHECK
+──────────────────────────────────────────────────────────────────
+Mode: [LOCAL (.mcp.json) / GATEWAY (.mcp.gateway.json)]
+
+Server              Status      Transport  Endpoint
+─────────────────── ─────────── ────────── ─────────────────────────
+REQUIRED:
+glue-athena         [CONNECTED] stdio/SSE  [local / https://gw:8001]
+lakeformation       [CONNECTED] stdio/SSE  [local / https://gw:8002]
+iam                 [CONNECTED] stdio      [local / https://gw:PORT]
+
+WARN (CLI fallback):
+cloudtrail          [CONNECTED] stdio      [local / https://gw:PORT]
+redshift            [CONNECTED] stdio      [local / https://gw:PORT]
+core                [CONNECTED] stdio      [local / https://gw:PORT]
+s3-tables           [CONNECTED] stdio      [local / https://gw:PORT]
+pii-detection       [CONNECTED] stdio/SSE  [local / https://gw:8004]
+
+OPTIONAL:
+sagemaker-catalog   [CONNECTED] stdio/SSE  [local / https://gw:8003]
+lambda              [CONNECTED] stdio      [local / https://gw:PORT]
+cloudwatch          [CONNECTED] stdio      [local / https://gw:PORT]
+cost-explorer       [CONNECTED] stdio      [local / https://gw:PORT]
+dynamodb            [CONNECTED] stdio      [local / https://gw:PORT]
+aws.dp-mcp          [CONNECTED] stdio      [local / https://gw:PORT]
+──────────────────────────────────────────────────────────────────
+Result: {N}/13 servers connected | Mode: {LOCAL/GATEWAY}
+```
+
+**Rules:**
+- REQUIRED servers (`glue-athena`, `lakeformation`, `iam`) must be CONNECTED → BLOCK if any fail
+- WARN servers → proceed with CLI fallback, log: `Warning: MCP fallback — {server} not loaded. Using CLI.`
+- OPTIONAL servers → proceed silently, features deferred
+- Slow-startup servers (`core`, `pii-detection`, `sagemaker-catalog`) may timeout on `claude mcp list` — test with a simple call to confirm
+- If Gateway mode selected but Gateway not deployed → prompt user to run `prompts/09` first, or fall back to Local mode
+- Store health check results for the session — Phase 5 can reuse them instead of re-running
+
+### Phase 0 Gate
+
+Both Step 0.1 and Step 0.2 must complete before proceeding:
+- If critical AWS resources missing → direct to `prompts/00-setup-environment.md`
+- If REQUIRED MCP servers down → troubleshoot or switch modes before continuing
+- If all checks pass → proceed to Phase 1
+
+---
+
+## Phase 1: Discovery (ALWAYS START HERE — after Phase 0 passes)
 
 Before doing ANYTHING, gather information by asking the human these questions. Do not proceed until you have answers. Adapt the questions based on the DATA DOMAIN the user describes.
 
@@ -1490,52 +1576,22 @@ After human approves, execute ALL AWS operations from the main conversation wher
 > **Full guardrails for every phase (including deploy) are in `MCP_GUARDRAILS.md`.**
 > That file has the actual MCP tool names, per-step fallback rules, and live server status.
 
-**Step 5.0: MCP Health Check (MANDATORY — run before ANY deployment)**
+**Step 5.0: MCP Health Check (MANDATORY — reuse or re-run Phase 0)**
 
-Before executing any MCP tool calls, verify all required servers are connected and responding:
+Re-run the Phase 0 Step 0.2 health check before deployment. If Phase 0 was already run in this session and all REQUIRED servers passed, you may reuse those results — confirm with the human:
 
-```bash
-claude mcp list
+```
+MCP health check: reusing Phase 0 results ({N}/13 connected). Re-run? [y/N]
 ```
 
-**Required servers for deployment** (all must show Connected):
-
-| Server | Required For | If Not Connected |
-|--------|-------------|-----------------|
-| `glue-athena` | Steps 5.1-5.2 (catalog, crawlers, jobs, queries) | BLOCK — cannot deploy without Glue/Athena |
-| `lakeformation` | Steps 5.4-5.4.5 (LF-Tags, TBAC grants) | BLOCK — cannot apply governance |
-| `iam` | Step 5.3 (role verification, policy management) | BLOCK — cannot verify permissions |
-| `cloudtrail` | Step 5.7 (audit trail verification) | WARN — deploy can proceed, audit deferred |
-| `redshift` | Step 5.6 (query verification via Spectrum) | WARN — fall back to athena_query tool |
-| `core` | Step 5.1, 5.5 (S3 upload, KMS keys) | WARN — fall back to CLI |
-| `s3-tables` | Step 5.1 (Iceberg table uploads) | WARN — fall back to CLI |
-| `pii-detection` | Step 5.4.5 (PII detection + tagging) | WARN — fall back to shared/utils/ script |
-| `sagemaker-catalog` | Post-deploy (business metadata) | OPTIONAL — can defer |
+If re-running or first time, execute the full health check (see Phase 0 Step 0.2 for the complete server table with status, transport, and endpoint columns).
 
 **Health check rules:**
-1. If ANY server in the BLOCK category fails → stop and troubleshoot before deploying
+1. REQUIRED servers (`glue-athena`, `lakeformation`, `iam`) must be CONNECTED → BLOCK deployment if any fail
 2. If a WARN server fails → log the fallback and proceed with CLI
-3. Slow-startup servers (`core`, `pii-detection`, `sagemaker-catalog`) may timeout on health check but work in conversation — test with a simple tool call (e.g., `mcp__iam__list_roles`) to confirm
-4. If a server was Connected in health check but fails during deployment → retry once, then fall back to CLI
-
-**Present health check results to human before proceeding:**
-```
-MCP HEALTH CHECK: Pre-Deployment
-────────────────────────────────
-glue-athena:       Connected     [REQUIRED]
-lakeformation:     Connected     [REQUIRED]
-iam:               Connected     [REQUIRED]
-cloudtrail:        Connected     [REQUIRED]
-redshift:          Connected     [OPTIONAL]
-core:              Connected     [OPTIONAL]
-s3-tables:         Connected     [OPTIONAL]
-pii-detection:     Slow startup  [OPTIONAL]
-sagemaker-catalog: Slow startup  [OPTIONAL]
-────────────────────────────────
-Status: READY TO DEPLOY (all required servers connected)
-```
-
-If any REQUIRED server shows "Failed to connect", present the issue and ask how to proceed.
+3. Slow-startup servers (`core`, `pii-detection`, `sagemaker-catalog`) may timeout on `claude mcp list` but work in conversation — test with a simple tool call to confirm
+4. If a server was Connected in Phase 0 but fails during deployment → retry once, then fall back to CLI
+5. Present results to human before proceeding — do NOT auto-deploy
 
 **Deployment order** (sequential — each step depends on the previous):
 
@@ -2478,6 +2534,11 @@ The Data Onboarding Agent (main conversation) spawns sub-agents using the Claude
 
 ```
 Data_Onboarding_Agent (main conversation)
+│
+├── Phase 0: Health check + auto-detect (inline, read-only)
+│   ├── Step 0.1: Auto-detect existing AWS resources
+│   ├── Step 0.2: MCP health check + endpoint inventory
+│   └── GATE: critical resources + required MCP servers → pass or block
 │
 ├── Phase 1-2: Interactive (inline)
 │

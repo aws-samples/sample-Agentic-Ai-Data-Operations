@@ -42,6 +42,126 @@
 
 ---
 
+## Phase 0: Environment Health Check & Auto-Detect
+
+> Run before any other phase. Auto-detects existing AWS resources and verifies MCP connectivity.
+> This is what `prompts/00-setup-environment.md` Step 0 and Step 1 execute.
+> Safe to re-run — never creates or modifies anything.
+
+### Step 0.1: Auto-Detect Existing Resources
+
+Before asking the user what to create, scan the AWS account for all resources the platform needs.
+
+| Resource | Detection Method | MCP Tool | CLI Fallback |
+|---|---|---|---|
+| IAM Glue role | Look for `*-glue-service-role` | `mcp__iam__list_roles` | `aws iam list-roles` |
+| S3 data lake bucket | Look for project bucket with zone folders | `core` MCP | `aws s3 ls` |
+| KMS keys | Look for `alias/{PROJECT}-*-key` | `core` MCP | `aws kms list-aliases` |
+| Glue databases | Look for `landing_db`, `staging_db`, `publish_db` | `glue-athena` MCP | `aws glue get-databases` |
+| LF-Tags | Look for `PII_Classification`, `PII_Type`, `Data_Sensitivity` | `lakeformation` MCP | `aws lakeformation list-lf-tags` |
+| TBAC grants | Check Glue role has LF grants | `lakeformation` MCP | `aws lakeformation list-permissions` |
+| MWAA environment | Check for active environment | — | `aws mwaa list-environments` |
+| Airflow Variables | Check required vars exist | — | `aws mwaa create-cli-token` + curl |
+| Cedar policies | Check AVP policy store | — | `python3 shared/scripts/setup_avp.py --dry-run` |
+
+**Output:**
+```
+EXISTING RESOURCE SCAN
+──────────────────────────────────────────
+IAM Role:       {PROJECT}-glue-service-role     [FOUND / NOT FOUND]
+S3 Bucket:      {BUCKET}                        [FOUND / NOT FOUND]
+KMS Keys:       alias/{PROJECT}-*-key           [4/4 FOUND / N/4 FOUND]
+Glue DBs:       landing_db, staging_db, publish [3/3 FOUND / N/3 FOUND]
+LF-Tags:        3 tags                          [3/3 FOUND / N/3 FOUND]
+TBAC Grants:    Glue role grants                [FOUND / NOT FOUND]
+MWAA:           environment name                [FOUND / NOT FOUND]
+Airflow Vars:   required variables              [FOUND / NOT FOUND / SKIPPED]
+Cedar Policies: AVP policy store                [FOUND / NOT FOUND]
+──────────────────────────────────────────
+Resources to create: {N} (skipping {M} already exist)
+```
+
+**Rules:**
+- If ALL resources found → environment is fully set up, skip to verification
+- If SOME found → only create what's missing
+- If NONE found → full setup required
+
+### Step 0.2: MCP Health Check + Endpoint Inventory
+
+MCP setup is part of initial environment setup (`prompts/00-setup-environment.md` Step 1). The health check verifies all 13 servers, shows where each is hosted, and determines tool selection for the session.
+
+**Hosting modes:**
+- **Local mode** (`.mcp.json`): 13 servers on laptop via stdio transport
+- **Gateway mode** (`.mcp.gateway.json`): 13 servers on Agentcore Gateway via SSE transport
+
+If using Gateway mode, deploy the Gateway FIRST via `prompts/09-deploy-agentcore-gateway.md` before running health check.
+
+**3-tier classification:**
+
+| Server | Category | If Failed |
+|--------|----------|-----------|
+| `glue-athena` | **REQUIRED** | BLOCK — cannot register tables, run crawlers, or query Athena |
+| `lakeformation` | **REQUIRED** | BLOCK — cannot apply LF-Tags or TBAC grants |
+| `iam` | **REQUIRED** | BLOCK — cannot verify or create permissions |
+| `cloudtrail` | WARN | Proceed, defer audit verification |
+| `redshift` | WARN | Fall back to `athena_query` tool |
+| `core` | WARN | Fall back to `aws s3` / `aws kms` CLI. *Slow startup — may timeout but works in conversation.* |
+| `s3-tables` | WARN | Fall back to `aws s3` CLI |
+| `pii-detection` | WARN | Fall back to `shared/utils/pii_detection_and_tagging.py`. *Slow startup.* |
+| `sagemaker-catalog` | OPTIONAL | Defer metadata enrichment. *Slow startup.* |
+| `lambda` | OPTIONAL | Fall back to `aws lambda invoke` CLI |
+| `cloudwatch` | OPTIONAL | Defer monitoring setup |
+| `cost-explorer` | OPTIONAL | Defer cost tracking |
+| `dynamodb` | OPTIONAL | Defer SynoDB operations |
+| `aws.dp-mcp` | OPTIONAL | Glue-athena custom server is primary; this is supplemental |
+
+**Output:**
+```
+MCP HEALTH CHECK
+──────────────────────────────────────────────────────────────────
+Mode: [LOCAL (.mcp.json) / GATEWAY (.mcp.gateway.json)]
+
+Server              Status      Transport  Endpoint
+─────────────────── ─────────── ────────── ─────────────────────────
+REQUIRED:
+glue-athena         [CONNECTED] stdio/SSE  [local / https://gw:8001]
+lakeformation       [CONNECTED] stdio/SSE  [local / https://gw:8002]
+iam                 [CONNECTED] stdio      [local / https://gw:PORT]
+
+WARN (CLI fallback):
+cloudtrail          [CONNECTED] stdio      [local / https://gw:PORT]
+redshift            [CONNECTED] stdio      [local / https://gw:PORT]
+core                [CONNECTED] stdio      [local / https://gw:PORT]
+s3-tables           [CONNECTED] stdio      [local / https://gw:PORT]
+pii-detection       [CONNECTED] stdio/SSE  [local / https://gw:8004]
+
+OPTIONAL:
+sagemaker-catalog   [CONNECTED] stdio/SSE  [local / https://gw:8003]
+lambda              [CONNECTED] stdio      [local / https://gw:PORT]
+cloudwatch          [CONNECTED] stdio      [local / https://gw:PORT]
+cost-explorer       [CONNECTED] stdio      [local / https://gw:PORT]
+dynamodb            [CONNECTED] stdio      [local / https://gw:PORT]
+aws.dp-mcp          [CONNECTED] stdio      [local / https://gw:PORT]
+──────────────────────────────────────────────────────────────────
+Result: {N}/13 servers connected | Mode: {LOCAL/GATEWAY}
+```
+
+**Rules:**
+1. **ALWAYS** run health check before Phase 1 (discovery) and Phase 5 (deploy)
+2. If any REQUIRED server fails → BLOCK and report error. Do not proceed.
+3. WARN servers → proceed with CLI fallback, log: `Warning: MCP fallback — {server} not loaded. Using CLI.`
+4. OPTIONAL servers → proceed silently, features deferred
+5. Slow-startup servers (`core`, `pii-detection`, `sagemaker-catalog`) may timeout on `claude mcp list` — test with a simple call to confirm
+6. If Gateway mode selected but Gateway not deployed → prompt user to run `prompts/09` first, or fall back to Local mode
+
+### Guardrail Rules — Phase 0
+1. Phase 0 is **read-only** — it never creates, modifies, or deletes resources
+2. Auto-detect results feed into ALL subsequent phases — no phase should re-check what Phase 0 already found
+3. Health check results determine tool selection for the rest of the session
+4. Store health check results in memory so they don't need to be re-run mid-session (unless a server comes online)
+
+---
+
 ## Phase 1: Discovery (Interactive)
 
 > Mostly human interaction. MCP used for checking existing infrastructure.
@@ -134,24 +254,15 @@
 
 ### Step 5.0: MCP Health Check (MANDATORY)
 
-Run `claude mcp list` before any deployment. All REQUIRED servers must show Connected.
+Re-run the **Phase 0 Step 0.2 health check** before any deployment. If Phase 0 was run earlier in the same session and all REQUIRED servers passed, you may skip re-running — but confirm with the user.
 
-| Server | Category | If Failed |
-|--------|----------|-----------|
-| `glue-athena` | **REQUIRED** | BLOCK — cannot register tables or run jobs |
-| `lakeformation` | **REQUIRED** | BLOCK — cannot apply LF-Tags or TBAC grants |
-| `iam` | **REQUIRED** | BLOCK — cannot verify permissions |
-| `cloudtrail` | WARN | Proceed, defer audit verification |
-| `redshift` | WARN | Fall back to `athena_query` tool |
-| `core` | WARN | Fall back to `aws s3` / `aws kms` CLI |
-| `s3-tables` | WARN | Fall back to `aws s3` CLI |
-| `pii-detection` | WARN | Fall back to `shared/utils/pii_detection_and_tagging.py` |
-| `sagemaker-catalog` | OPTIONAL | Defer metadata enrichment |
+See [Phase 0 Step 0.2](#step-02-mcp-health-check) for the full 3-tier server table (REQUIRED / WARN / OPTIONAL).
 
 **Rules:**
-1. Do NOT proceed with deployment if any REQUIRED server fails
+1. Do NOT proceed with deployment if any REQUIRED server (`glue-athena`, `lakeformation`, `iam`) fails
 2. Slow-startup servers (`core`, `pii-detection`, `sagemaker-catalog`) may timeout on health check — test with a simple call to confirm
 3. Present health check results to human before deploying
+4. If health check was already run in Phase 0, report: `"MCP health check: reusing Phase 0 results ({N}/13 connected). Re-run? [y/N]"`
 
 ### Step 5.1: S3 Upload
 
@@ -230,6 +341,46 @@ Run `claude mcp list` before any deployment. All REQUIRED servers must show Conn
 
 ---
 
+## Gateway Mode (Agentcore)
+
+Gateway mode is chosen during initial setup (`prompts/00-setup-environment.md` Step 1a). If selected, deploy the Gateway via `prompts/09-deploy-agentcore-gateway.md` BEFORE proceeding with AWS resource creation. Gateway is a one-time setup — once deployed, all team members connect via `.mcp.gateway.json`.
+
+### Two Execution Modes (Same Gateway)
+
+| Mode | Agent Location | Tools | Human-in-the-loop | Setup |
+|------|---------------|-------|-------------------|-------|
+| **Local Demo** | Claude Code (laptop) | All 13 Gateway servers via `.mcp.gateway.json` | Yes | Gateway only (prompt 09) |
+| **Production** | Agentcore Runtime (cloud) | All 13 Gateway servers (auto-connected) | Optional | Gateway + Runtime (prompts 09 + 10) |
+
+Gateway is deployed **once** and shared by both modes. See `agentcore/README.md` for full details.
+
+### Transport
+- All 13 servers are hosted on Gateway (4 custom via SSE, 9 PyPI as managed packages)
+- **Local demo**: `.mcp.gateway.json` contains all 13 server endpoint URLs. Replace `.mcp.json` with `.mcp.gateway.json`.
+- **Production**: Runtime agent connects to Gateway automatically -- no `.mcp.gateway.json` needed.
+
+### Tool Names
+- Tool names are IDENTICAL across all three modes (local stdio, Gateway demo, Gateway production)
+- All guardrail rules in Phases 1-5 apply unchanged regardless of execution mode
+- No code changes needed when switching between modes
+
+### IAM Policies
+- Each of the 13 Gateway servers runs with its own least-privilege IAM policy (from `agentcore/gateway/iam/`)
+- Gateway policies are MORE restrictive than local credentials (scoped to specific resources)
+- If a tool call fails with AccessDenied in Gateway mode, check the server's IAM policy in `agentcore/gateway/iam/`
+
+### Agent Behavior (Both Modes)
+- Same agent behavior regardless of where it runs -- sub-agents still generate artifacts only, no MCP access
+- Phase 5 deploy operations use Gateway tools in both modes
+- In production mode, the Runtime agent uses the same CLAUDE.md + SKILLS.md instructions
+
+### Health Check
+- **Local demo**: `claude mcp list` (same as local mode)
+- **Production**: `aws bedrock-agent get-agent --agent-id {GATEWAY_ID}` + health check per server
+- If Gateway is down, fall back to local stdio mode (`git checkout .mcp.json`)
+
+---
+
 ## Local Mode (Current Default)
 
 When running locally (no AWS target), the deploy phase operates in **simulation mode**:
@@ -256,21 +407,23 @@ Deploy Summary: {workload_name}
 ===============================
 
 MCP Calls (live):
-  iam:            {count} calls  (list_roles, simulate_principal_policy, ...)
-  lambda:         {count} calls  (LF_access_grant_new, ...)
-  s3-tables:      {count} calls  (Iceberg table operations, ...)
-  cloudtrail:     {count} calls  (lookup_events, ...)
-  redshift:       {count} calls  (execute_query, list_tables, ...)
-  cloudwatch:     {count} calls  (log queries, metrics, ...)
-  cost-explorer:  {count} calls  (cost analysis, ...)
-  dynamodb:       {count} calls  (SynoDB queries, ...)
-  core:           {count} calls  (S3 ops, KMS, Secrets Manager, ...)
-  pii-detection:  {count} calls  (detect_pii, apply_tags, ...)
+  glue-athena:       {count} calls  (create_database, create_table, athena_query, ...)
+  lakeformation:     {count} calls  (create_lf_tag, grant_permissions, ...)
+  iam:               {count} calls  (list_roles, simulate_principal_policy, ...)
+  lambda:            {count} calls  (LF_access_grant_new, spark_on_aws_lambda, ...)
+  s3-tables:         {count} calls  (Iceberg table operations, ...)
+  cloudtrail:        {count} calls  (lookup_events, ...)
+  redshift:          {count} calls  (execute_query, list_tables, ...)
+  cloudwatch:        {count} calls  (log queries, metrics, ...)
+  cost-explorer:     {count} calls  (cost analysis, ...)
+  dynamodb:          {count} calls  (SynoDB queries, ...)
+  core:              {count} calls  (S3 ops, KMS, Secrets Manager, ...)
+  pii-detection:     {count} calls  (detect_pii, apply_tags, ...)
+  sagemaker-catalog: {count} calls  (put_custom_metadata, search_metadata, ...)
 
 CLI Fallback (dry-run in local mode):
-  aws glue:    {count} calls  (Reason: aws-dataprocessing not on PyPI)
-  aws athena:  {count} calls  (Reason: aws-dataprocessing not on PyPI)
-  aws lf:      {count} calls  (Reason: lakeformation dependency conflict)
+  aws mwaa:    {count} calls  (Reason: no MWAA MCP server)
+  aws s3:      {count} calls  (Reason: core MCP timeout — CLI fallback)
 
 Total: {mcp_count} MCP + {cli_count} CLI = {total} operations
 MCP Coverage: {mcp_pct}%
@@ -280,9 +433,9 @@ MCP Coverage: {mcp_pct}%
 
 ## MCP Server Installation
 
-All servers are configured in `.mcp.json` using `uvx` (uv tool runner) which auto-manages Python 3.12+ environments.
+All 13 servers are configured in `.mcp.json`. PyPI servers use `uvx` (uv tool runner). Custom servers use `uv run` with FastMCP.
 
-### Currently Installed (10 servers)
+### PyPI Servers (9 — via uvx)
 
 | Server | Package | Command |
 |---|---|---|
@@ -295,34 +448,42 @@ All servers are configured in `.mcp.json` using `uvx` (uv tool runner) which aut
 | `cost-explorer` | `awslabs-cost-explorer-mcp-server` | `uvx --from awslabs-cost-explorer-mcp-server awslabs.cost-explorer-mcp-server` |
 | `dynamodb` | `awslabs-dynamodb-mcp-server` | `uvx --from awslabs-dynamodb-mcp-server awslabs.dynamodb-mcp-server` |
 | `core` | `awslabs-core-mcp-server` | `uvx --from awslabs-core-mcp-server awslabs.core-mcp-server` |
-| `pii-detection` | Custom server | `uv run --no-project --with boto3 --with mcp --python 3.13 mcp-servers/pii-detection-server/server.py` |
 
-### Not Available on PyPI
+### Custom Servers (4 — FastMCP in mcp-servers/)
 
-| Server | Reason | Workaround |
+| Server | Location | Command |
 |---|---|---|
-| `aws-dataprocessing` (Glue/Athena) | No PyPI package exists | `aws glue` / `aws athena` CLI |
-| `sagemaker-catalog` | No PyPI package exists | `aws glue` CLI with custom metadata properties |
+| `glue-athena` | `mcp-servers/glue-athena-server/server.py` | `uv run --no-project --with fastmcp --with boto3 --python 3.13 ...` |
+| `lakeformation` | `mcp-servers/lakeformation-server/server.py` | `uv run --no-project --with fastmcp --with boto3 --python 3.13 ...` |
+| `sagemaker-catalog` | `mcp-servers/sagemaker-catalog-server/server.py` | `uv run --no-project --with fastmcp --with boto3 --python 3.13 ...` |
+| `pii-detection` | `mcp-servers/pii-detection-server/server.py` | `uv run --no-project --with fastmcp --with boto3 --python 3.13 ...` |
 
-### Dependency Conflicts (uvx cannot resolve)
+### Supplemental Server (1 — via uvx)
 
-| Server | Reason | Workaround |
+| Server | Package | Notes |
 |---|---|---|
-| `lakeformation` | `awslabs-lakeformation-mcp-server` has dependency conflicts | `lambda` MCP (`LF_access_grant_new`) or `aws lakeformation` CLI |
-| `sns-sqs` | `awslabs-sns-sqs-mcp-server` has dependency conflicts | `aws sns` / `aws sqs` CLI |
-| `eventbridge` | `awslabs-eventbridge-mcp-server` has dependency conflicts | `aws events` CLI |
-| `stepfunctions` | `awslabs-stepfunctions-mcp-server` has dependency conflicts | `aws stepfunctions` CLI |
+| `aws.dp-mcp` | `awslabs.aws-dataprocessing-mcp-server@latest` | Glue/Athena operations. Supplemental to `glue-athena` custom server. |
 
-### Test connectivity
+### Not Used in Codebase (CLI fallback if ever needed)
+
+| Server | Reason | Fallback |
+|---|---|---|
+| `sns-sqs` | Not used in production code | `aws sns` / `aws sqs` CLI |
+| `eventbridge` | Not used in production code | `aws events` CLI |
+| `stepfunctions` | Not used (Airflow handles orchestration) | `aws stepfunctions` CLI |
+
+### Test Connectivity
 
 ```bash
-# Health check all servers
+# Health check all servers (Phase 0 Step 0.2)
 claude mcp list
 
-# Test a specific server
+# Test a specific PyPI server
 uvx --from awslabs-iam-mcp-server awslabs.iam-mcp-server --help
-uvx --from awslabs-core-mcp-server awslabs.core-mcp-server --help
 
-# Note: core and pii-detection have slow startup (~5-10s)
+# Test a custom server
+uv run --no-project --with fastmcp --with boto3 --python 3.13 mcp-servers/glue-athena-server/server.py --help
+
+# Note: core, pii-detection, sagemaker-catalog have slow startup (~5-10s)
 # Health check may timeout but they work fine in conversation
 ```

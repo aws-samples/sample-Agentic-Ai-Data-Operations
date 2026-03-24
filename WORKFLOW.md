@@ -23,6 +23,18 @@ flowchart TD
 
     subgraph MAIN["DATA ONBOARDING AGENT (main conversation)"]
 
+        subgraph P0["PHASE 0: Health Check & Auto-Detect (read-only)"]
+            PHASE0[Auto-Detect Existing Resources]
+            PHASE0 --> SCAN["Scan AWS Account<br/>IAM roles, S3 bucket, KMS keys,<br/>Glue DBs, LF-Tags, MWAA"]
+            SCAN --> INVENTORY["Resource Inventory<br/>FOUND / NOT FOUND per resource"]
+            INVENTORY --> HEALTH["MCP Health Check<br/>+ Endpoint Inventory"]
+            HEALTH --> HC_TABLE["13 servers: status, transport, endpoint<br/>Mode: LOCAL (.mcp.json) / GATEWAY (.mcp.gateway.json)"]
+            HC_TABLE --> P0_GATE{Phase 0 Gate}
+            P0_GATE -->|"Critical resources missing"| SETUP_REDIRECT["Direct to<br/>prompts/00-setup-environment.md"]
+            P0_GATE -->|"REQUIRED MCP servers down"| MCP_FIX["Troubleshoot MCP<br/>or switch modes"]
+            P0_GATE -->|"All checks pass"| PHASE1
+        end
+
         subgraph P1["PHASE 1: Discovery (interactive)"]
             PHASE1[Ask clarifying questions]
             PHASE1 --> SRC[Data Source<br/>location, format, credentials]
@@ -106,6 +118,7 @@ flowchart TD
 
     style ROUTER_BLOCK fill:#f0f4ff,stroke:#4a6fa5
     style MAIN fill:#fafafa,stroke:#333
+    style P0 fill:#f3e5f5,stroke:#9c27b0
     style P1 fill:#e8f5e9,stroke:#4caf50
     style P2 fill:#fff3e0,stroke:#ff9800
     style P3 fill:#e3f2fd,stroke:#2196f3
@@ -123,6 +136,19 @@ sequenceDiagram
     participant Q as Quality Agent<br/>(sub-agent)
     participant D as DAG Agent<br/>(sub-agent)
     participant FS as File System<br/>(workloads/)
+
+    Note over O: Phase 0: Health Check & Auto-Detect (read-only)
+    O->>O: Auto-detect existing AWS resources
+    O->>O: Scan IAM roles, S3 buckets, KMS, Glue DBs, LF-Tags, MWAA
+    O->>O: MCP Health Check (13 servers)
+    O->>H: Resource inventory + MCP status table<br/>(mode, status, transport, endpoint per server)
+    alt Critical resources missing
+        O->>H: "Run prompts/00-setup-environment.md first"
+    else REQUIRED MCP servers down
+        O->>H: "Troubleshoot MCP or switch to Gateway/Local mode"
+    else All checks pass
+        O->>H: "Environment ready. {N}/13 MCP servers connected."
+    end
 
     Note over H,O: Phase 1: Discovery (interactive)
     H->>O: "Onboard sales data from S3"
