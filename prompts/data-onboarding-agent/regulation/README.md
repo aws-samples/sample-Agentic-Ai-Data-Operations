@@ -45,6 +45,26 @@ All regulation prompts build on the same shared utilities:
 - **LF-Tags**: `PII_Classification`, `PII_Type`, `Data_Sensitivity`
 - **Audit**: CloudTrail for all Lake Formation operations
 
+## Prerequisites (Run Before Applying Controls)
+
+**All 5 regulation prompts now include a Prerequisites section** that verifies required AWS resources exist before applying controls:
+
+| What's Checked | Why It Matters |
+|----------------|----------------|
+| **KMS encryption keys** | Regulation-specific keys (e.g., `alias/hipaa-phi-key`, `alias/pci-cardholder-key`) must exist before encrypting data |
+| **IAM roles** | Access control roles (e.g., `DPORole`, `AuditorRole`, `pci_admin_role`) must exist before granting Lake Formation permissions |
+| **LF-Tags** | 3 tags (`PII_Classification`, `PII_Type`, `Data_Sensitivity`) must exist before tagging columns |
+| **CloudTrail** | Must be enabled to meet audit trail requirements |
+| **S3 audit bucket** | Immutable audit log storage (with Object Lock) required for compliance |
+
+**What to do if prerequisites are missing:**
+
+1. Run the environment setup: `prompts/environment-setup-agent/01-setup-aws-infrastructure.md`
+2. Or create resources manually using the commands in each regulation prompt's Prerequisites section
+3. **Do NOT proceed with onboarding until all prerequisites pass** — deployments will fail at Phase 5 without them
+
+Each regulation prompt includes a "Quick check" bash script to verify all prerequisites in ~10 seconds.
+
 ## Related Documentation
 
 - `docs/governance-framework.md` — Full governance architecture and control matrices

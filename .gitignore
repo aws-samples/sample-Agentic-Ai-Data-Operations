@@ -248,3 +248,26 @@ grant_access_*.sh
 # Demo folder (synthetic data generation - optional, comment out to include in repo)
 # demo/
 
+
+# Mac system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Cleanup backups
+.cleanup_backup_*
+
+# Neptune generated config
+shared/semantic_layer/neptune_config.sh
+
+# Lambda deployment artifacts
+/tmp/neptune-loader-deploy/
+/tmp/neptune-loader.zip
+
+# Cleanup artifacts
+cleanup_*.sh

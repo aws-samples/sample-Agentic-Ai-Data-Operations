@@ -17,12 +17,17 @@ if command -v excalidraw-cli &> /dev/null; then
       --background-color white
 
     excalidraw-cli export flow.excalidraw \
-      --output prompt-flow.png \
+      --output Prompt-flow.png \
+      --scale 2 \
+      --background-color white
+
+    excalidraw-cli export semantic-layer-architecture.excalidraw \
+      --output semantic-layer.png \
       --scale 2 \
       --background-color white
 
     echo "✓ Diagrams exported successfully"
-    ls -lh Architecture-Diagram.png prompt-flow.png
+    ls -lh Architecture-Diagram.png Prompt-flow.png semantic-layer.png
 
 elif command -v npx &> /dev/null; then
     echo "Using: npx @excalidraw/cli"
@@ -32,12 +37,17 @@ elif command -v npx &> /dev/null; then
       --background-color white
 
     npx @excalidraw/cli export flow.excalidraw \
-      --output prompt-flow.png \
+      --output Prompt-flow.png \
+      --scale 2 \
+      --background-color white
+
+    npx @excalidraw/cli export semantic-layer-architecture.excalidraw \
+      --output semantic-layer.png \
       --scale 2 \
       --background-color white
 
     echo "✓ Diagrams exported successfully"
-    ls -lh Architecture-Diagram.png prompt-flow.png
+    ls -lh Architecture-Diagram.png Prompt-flow.png semantic-layer.png
 
 else
     echo "⚠️  No excalidraw-cli found"
@@ -56,7 +66,8 @@ else
     echo "  2. Load docs/architecture.excalidraw"
     echo "  3. Click export → PNG"
     echo "  4. Save as docs/Architecture-Diagram.png"
-    echo "  5. Repeat for docs/flow.excalidraw → docs/prompt-flow.png"
+    echo "  5. Repeat for docs/flow.excalidraw → docs/Prompt-flow.png"
+    echo "  6. Repeat for docs/semantic-layer-architecture.excalidraw → docs/semantic-layer.png"
     echo
     echo "See docs/UPDATE_DIAGRAMS.md for full instructions"
     echo

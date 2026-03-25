@@ -10,6 +10,47 @@
 - Workload config has `compliance: [PCI_DSS]` in quality_rules.yaml
 - Data contains cardholder data (card numbers, CVV, expiry dates)
 
+## Prerequisites
+
+Before applying PCI DSS controls, verify these AWS resources exist:
+
+| Resource | Check Command | What If Missing? |
+|----------|---------------|------------------|
+| **KMS key** `alias/pci-cardholder-key` | `aws kms describe-key --key-id alias/pci-cardholder-key --region us-east-1` | Run `prompts/environment-setup-agent/01-setup-aws-infrastructure.md` Step 4, or create manually: `aws kms create-key --description "PCI DSS cardholder data encryption key"` then `aws kms create-alias --alias-name alias/pci-cardholder-key --target-key-id {KEY_ID}`. **This key MUST be dedicated to cardholder data only (PCI DSS Req 3.5).** |
+| **IAM role** `pci_admin_role` | `aws iam get-role --role-name pci_admin_role` | Create with trust policy for Lake Formation and Glue: `aws iam create-role --role-name pci_admin_role --assume-role-policy-document file://trust-policy.json`. **This role is the ONLY role with access to CRITICAL cardholder data.** |
+| **IAM role** `PaymentProcessingRole` | `aws iam get-role --role-name PaymentProcessingRole` | Create with trust policy for Lake Formation (access to HIGH/MEDIUM/LOW, NOT CRITICAL) |
+| **IAM role** `AuditRole` | `aws iam get-role --role-name AuditRole` | Create with trust policy for Lake Formation (read-only audit access) |
+| **IAM role** `AnalystRole` | `aws iam get-role --role-name AnalystRole` | Create with trust policy for Lake Formation (LOW sensitivity only, no cardholder data) |
+| **IAM role** `DashboardUserRole` | `aws iam get-role --role-name DashboardUserRole` | Create with trust policy for QuickSight and Athena (LOW sensitivity only) |
+| **LF-Tag** `PII_Classification` | `aws lakeformation list-lf-tags --region us-east-1 \| grep PII_Classification` | Run `prompts/environment-setup-agent/01-setup-aws-infrastructure.md` Step 6, or create manually: `aws lakeformation create-lf-tag --tag-key PII_Classification --tag-values CRITICAL,HIGH,MEDIUM,LOW,NONE` |
+| **LF-Tag** `PII_Type` | `aws lakeformation list-lf-tags --region us-east-1 \| grep PII_Type` | Create: `aws lakeformation create-lf-tag --tag-key PII_Type --tag-values SSN,EMAIL,PHONE,ADDRESS,DOB,NATIONAL_ID,NAME,FINANCIAL_ACCOUNT,CREDIT_CARD` |
+| **LF-Tag** `Data_Sensitivity` | `aws lakeformation list-lf-tags --region us-east-1 \| grep Data_Sensitivity` | Create: `aws lakeformation create-lf-tag --tag-key Data_Sensitivity --tag-values CRITICAL,HIGH,MEDIUM,LOW` |
+| **CloudTrail** enabled | `aws cloudtrail get-trail-status --name {TRAIL} --region us-east-1` | Enable CloudTrail in AWS Console or via CLI. PCI DSS Req 10 mandates audit trail for ALL cardholder data access. |
+| **S3 audit bucket** with Object Lock | `aws s3api get-object-lock-configuration --bucket {AUDIT_BUCKET}` | Create immutable audit bucket: `aws s3api create-bucket --bucket {AUDIT_BUCKET} --object-lock-enabled-for-bucket --region us-east-1`. PCI DSS requires 365-day minimum retention. |
+| **Network segmentation** (VPC Endpoints) | `aws ec2 describe-vpc-endpoints --filters Name=service-name,Values=com.amazonaws.us-east-1.s3` | Configure VPC endpoint for S3 to isolate Cardholder Data Environment (CDE). See [PCI DSS Req 1.2](https://www.pcisecuritystandards.org/document_library). |
+
+**Quick check** (run this before applying PCI DSS controls):
+```bash
+# Check if dedicated PCI key exists
+aws kms describe-key --key-id alias/pci-cardholder-key --region us-east-1 && echo "✓ PCI KMS key exists" || echo "✗ PCI KMS key missing"
+
+# Verify key is NOT shared with other workloads (check description)
+aws kms describe-key --key-id alias/pci-cardholder-key --query 'KeyMetadata.Description' --output text
+
+# Check if roles exist
+for ROLE in pci_admin_role PaymentProcessingRole AuditRole AnalystRole DashboardUserRole; do
+  aws iam get-role --role-name $ROLE >/dev/null 2>&1 && echo "✓ $ROLE exists" || echo "✗ $ROLE missing"
+done
+
+# Check if LF-Tags exist
+aws lakeformation list-lf-tags --region us-east-1 --query 'LFTags[].TagKey' --output text | grep -E 'PII_Classification|PII_Type|Data_Sensitivity' && echo "✓ LF-Tags exist" || echo "✗ LF-Tags missing"
+
+# Verify VPC endpoint for S3 (optional but recommended)
+aws ec2 describe-vpc-endpoints --filters Name=service-name,Values=com.amazonaws.us-east-1.s3 --query 'VpcEndpoints[0].VpcEndpointId' --output text || echo "⚠️  No VPC endpoint for S3 (recommended for CDE isolation)"
+```
+
+**If prerequisites are missing**: Run the environment setup first (`prompts/environment-setup-agent/01-setup-aws-infrastructure.md`) or create resources manually using the commands above. **Do NOT proceed with PCI DSS onboarding until all prerequisites pass.** PCI DSS violations can result in fines and loss of card processing privileges.
+
 ## Controls Applied
 
 ### 1. PII Detection (Cardholder Data)

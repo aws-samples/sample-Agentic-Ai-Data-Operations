@@ -82,10 +82,10 @@ MAIN CONVERSATION
 ## Tech Stack
 
 - **Language**: TypeScript (implementation), Python (Airflow DAGs, scripts)
-- **Cloud**: AWS — S3 + S3 Tables (data zones), Glue (catalog), SageMaker Catalog (business metadata), Apache Iceberg (table format), Athena (queries), Step Functions (workflows), Lambda (agents), OpenSearch (knowledge graph), KMS (encryption)
+- **Cloud**: AWS — S3 + S3 Tables (data zones), Glue (catalog), SageMaker Catalog (business metadata), Apache Iceberg (table format), Athena (queries), Step Functions (workflows), Lambda (agents), Neptune (knowledge graph), KMS (encryption)
 - **Orchestration**: Apache Airflow
 - **Testing**: Jest + fast-check (property-based)
-- **Vector DB**: OpenSearch (knowledge graph / semantic search)
+- **Graph DB**: Amazon Neptune with Titan embeddings (knowledge graph / semantic search via Gremlin)
 - **Auth**: API Key, OAuth 2.0, SAML, JWT
 
 ## Agent Behavior Model
@@ -351,7 +351,7 @@ Every pipeline run produces a structured trace across three layers, linked by `r
 | S3 Tables | Amazon S3 bucket type optimized for Apache Iceberg tables — automatic compaction and catalog integration |
 | SageMaker Catalog | Extends Glue Data Catalog with custom metadata columns — stores column roles, business context, PII flags, relationships |
 | SynoDB | Metrics & SQL Store — seed SQL examples + queries the Analysis Agent learns over time |
-| Knowledge Graph | Vector embeddings for semantic search (OpenSearch) |
+| Knowledge Graph | Graph database with Titan embeddings for semantic search (Neptune) |
 | MCP Layer | Model Context Protocol — standard interface for AI model interaction with the platform |
 | Quality Gate | Threshold check that blocks data from advancing to the next zone |
 | Lineage | Record of data provenance — which source produced which target via which transformation |

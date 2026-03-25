@@ -1,0 +1,164 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                 SEMANTIC LAYER - QUICK REFERENCE CARD                      ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+┌─ LOAD METADATA TO NEPTUNE ──────────────────────────────────────────────────┐
+│                                                                             │
+│  python shared/semantic_layer/load_to_neptune.py \                         │
+│    --workload financial_portfolios \                                       │
+│    --database financial_portfolios_db \                                    │
+│    --neptune-endpoint YOUR-NEPTUNE-ENDPOINT.amazonaws.com \                │
+│    --region us-east-1                                                      │
+│                                                                             │
+│  Options:                                                                  │
+│    --dry-run          Preview without writing                             │
+│    --clear-graph      Clear existing graph (DANGEROUS!)                   │
+│                                                                             │
+│  Expected time: ~40 seconds                                                │
+│  Expected cost: ~$0.10 (embeddings)                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ VERIFY SETUP ──────────────────────────────────────────────────────────────┐
+│                                                                             │
+│  python shared/semantic_layer/verify_setup.py \                            │
+│    --workload financial_portfolios \                                       │
+│    --database financial_portfolios_db \                                    │
+│    --neptune-endpoint YOUR-NEPTUNE-ENDPOINT \                              │
+│    --verbose                                                               │
+│                                                                             │
+│  Expected: ✓ 8/8 checks passed                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ QUERY WITH PYTHON ─────────────────────────────────────────────────────────┐
+│                                                                             │
+│  from shared.semantic_layer import execute_nl_query                        │
+│                                                                             │
+│  gen_result, exec_result = execute_nl_query(                               │
+│      nl_query="What is the total portfolio value by region?",             │
+│      workload="financial_portfolios",                                      │
+│      database="financial_portfolios_db",                                   │
+│      neptune_endpoint="YOUR-NEPTUNE-ENDPOINT",                             │
+│      athena_database="financial_portfolios_db",                            │
+│      s3_output_location="s3://bucket/results/"                             │
+│  )                                                                          │
+│                                                                             │
+│  print(gen_result.sql)        # Generated SQL                              │
+│  print(exec_result.rows)      # Query results                              │
+│  print(gen_result.confidence) # 0.0 - 1.0                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ THE 7 STEPS ───────────────────────────────────────────────────────────────┐
+│                                                                             │
+│  1. Read semantic.yaml              ← YAML configuration                   │
+│  2. Fetch Glue Catalog metadata     ← Technical schemas                    │
+│  3. Fetch Lake Formation LF-Tags    ← PII/sensitivity                      │
+│  4. Combine & generate embeddings   ← Merge + Titan (1024-dim)             │
+│  5. Load graph into Neptune         ← Create vertices/edges                │
+│  6. Create DynamoDB table           ← Query store (synodb_queries)         │
+│  7. Load seed queries               ← Initial patterns                     │
+│                                                                             │
+│  Result: Knowledge graph ready for NL queries                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ WHAT GETS CREATED ─────────────────────────────────────────────────────────┐
+│                                                                             │
+│  NEPTUNE GRAPH:                                                            │
+│    • 1 database vertex                                                     │
+│    • 3 table vertices (with embeddings)                                    │
+│    • 23 column vertices (with embeddings, PII tags)                        │
+│    • 8 business term vertices (with embeddings)                            │
+│    • 35 edges (contains, has_column, references, described_by)             │
+│                                                                             │
+│  DYNAMODB (synodb_queries):                                                │
+│    • 8 seed query items (with embeddings)                                  │
+│    • GSI: workload-index, success_count-index                              │
+│                                                                             │
+│  EMBEDDINGS:                                                               │
+│    • 50 total vectors (1024 dimensions each)                               │
+│    • Via AWS Bedrock Titan (amazon.titan-embed-text-v1)                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ EXAMPLE QUERIES ───────────────────────────────────────────────────────────┐
+│                                                                             │
+│  "What is the total portfolio value?"                                      │
+│  → SELECT SUM(market_value) FROM positions                                 │
+│                                                                             │
+│  "Show me revenue by region"                                               │
+│  → SELECT region, SUM(revenue) FROM sales GROUP BY region                  │
+│                                                                             │
+│  "Which customers have the highest orders?"                                │
+│  → SELECT c.name, SUM(o.total) FROM orders o                               │
+│     JOIN customers c ON o.customer_id = c.customer_id                      │
+│     GROUP BY c.name ORDER BY SUM(o.total) DESC                             │
+│                                                                             │
+│  "What is the monthly trend in AUM?"                                       │
+│  → SELECT DATE_TRUNC('month', date), SUM(market_value)                     │
+│     FROM positions GROUP BY DATE_TRUNC('month', date)                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ DOCUMENTATION FILES ───────────────────────────────────────────────────────┐
+│                                                                             │
+│  START_HERE.md                  Quick navigation & overview                │
+│  LOADING_GUIDE.md               Detailed loading instructions             │
+│  KNOWLEDGE_GRAPH_EXPLAINED.md   How YAML becomes graph                    │
+│  QUICKSTART.md                  Complete setup guide                      │
+│  README.md                      Full API reference                        │
+│  SUMMARY.md                     Project stats & overview                  │
+│  IMPLEMENTATION_STATUS.md       Phase tracking                            │
+│                                                                             │
+│  All in: shared/semantic_layer/                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ TROUBLESHOOTING ───────────────────────────────────────────────────────────┐
+│                                                                             │
+│  Error: "Neptune connection refused"                                       │
+│    → Check VPC, security groups, port 8182 access                          │
+│    → Test: telnet YOUR-NEPTUNE-ENDPOINT 8182                               │
+│                                                                             │
+│  Error: "Bedrock access denied"                                            │
+│    → Enable model access in Bedrock console                                │
+│    → Model: amazon.titan-embed-text-v1                                     │
+│                                                                             │
+│  Error: "semantic.yaml not found"                                          │
+│    → Check: workloads/NAME/config/semantic.yaml exists                     │
+│                                                                             │
+│  Error: "Glue database not found"                                          │
+│    → Create: aws glue create-database --database-input '{"Name":"..."}'    │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ PREREQUISITES ─────────────────────────────────────────────────────────────┐
+│                                                                             │
+│  [ ] Neptune cluster created (endpoint ready)                              │
+│  [ ] Bedrock Titan access enabled (amazon.titan-embed-text-v1)             │
+│  [ ] Glue database exists with tables                                      │
+│  [ ] S3 bucket for Athena results                                          │
+│  [ ] AWS credentials configured                                            │
+│  [ ] VPC access to Neptune                                                 │
+│  [ ] Security group allows port 8182                                       │
+│  [ ] semantic.yaml exists: workloads/NAME/config/semantic.yaml             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─ QUICK COMMANDS ────────────────────────────────────────────────────────────┐
+│                                                                             │
+│  # Count Neptune vertices                                                  │
+│  aws neptune execute-gremlin-query \                                       │
+│    --endpoint YOUR-NEPTUNE-ENDPOINT \                                      │
+│    --query "g.V().count()"                                                 │
+│                                                                             │
+│  # List tables in graph                                                    │
+│  aws neptune execute-gremlin-query \                                       │
+│    --endpoint YOUR-NEPTUNE-ENDPOINT \                                      │
+│    --query "g.V().hasLabel('table').values('name')"                        │
+│                                                                             │
+│  # Check DynamoDB table                                                    │
+│  aws dynamodb describe-table --table-name synodb_queries                   │
+│                                                                             │
+│  # Test Bedrock Titan                                                      │
+│  aws bedrock-runtime invoke-model \                                        │
+│    --model-id amazon.titan-embed-text-v1 \                                 │
+│    --body '{"inputText":"test"}' /tmp/output.json                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║  Need help? See shared/semantic_layer/START_HERE.md                       ║
+╚════════════════════════════════════════════════════════════════════════════╝
