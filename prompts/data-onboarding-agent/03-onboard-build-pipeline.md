@@ -11,7 +11,69 @@ The primary prompt for onboarding a new dataset through the full Landing -> Stag
 - For each dataset you want to bring into the platform
 - After GENERATE (02) if using synthetic data
 
-## Prompt Template
+## Quick Start (Simple CSV Ingestion)
+
+For simple workloads, you can skip most details and use defaults:
+
+```
+Onboard new dataset: [DATASET_NAME]
+
+Source: CSV at [S3_PATH or LOCAL_PATH]
+Schema: (paste first 5-10 columns, rest will be auto-detected)
+- [col1]: [type]
+- [col2]: [type]
+- [col3]: [type]
+...
+
+Regulation: [None/HIPAA/GDPR/CCPA/SOX/PCI DSS]
+
+Use all defaults for encryption, retention, quality, and scheduling.
+```
+
+**That's it!** The system will:
+- Auto-detect remaining columns via profiling (Phase 3)
+- Apply default transformations (dedup on PK, null handling, type casting)
+- Generate standard quality rules (completeness 90%, uniqueness 100%)
+- Schedule daily at 2 AM UTC with 2-hour SLA
+- Create basic Bronze→Silver→Gold DAG
+- Apply regulation-specific controls automatically (if regulation selected)
+
+**When to use the full template below?**
+- Custom transformations (complex dedup logic, derived columns, hierarchies)
+- Regulatory compliance with custom controls beyond defaults
+- Advanced semantic layer (time intelligence, seed questions, business terms)
+- Non-standard scheduling (hourly, real-time, custom dependencies)
+- Specific encryption keys or retention periods
+
+---
+
+## Default Values (Optional — Skip if Using Defaults)
+
+The following values have sensible defaults. Only specify if you need custom values:
+
+| Field | Default | When to Override |
+|-------|---------|------------------|
+| **KMS key (Landing)** | `alias/landing-data-key` | HIPAA/PCI DSS: use `alias/hipaa-phi-key` or `alias/pci-cardholder-key` |
+| **KMS key (Staging)** | `alias/staging-data-key` | HIPAA/PCI DSS: use same key as Landing (all zones contain PHI/PCI data) |
+| **KMS key (Publish)** | `alias/publish-data-key` | HIPAA/PCI DSS: use same key as Landing |
+| **Schedule** | Daily at 2 AM UTC (`0 2 * * *`) | Hourly, real-time, or custom schedule |
+| **SLA** | 2 hours | Mission-critical pipelines need tighter SLAs |
+| **Retries** | 3 with exponential backoff | Flaky sources need more retries |
+| **Landing Retention** | 90 days | Regulatory requirements (HIPAA: 90 days, GDPR: depends on consent) |
+| **Staging Retention** | 365 days | Regulatory requirements (HIPAA: 2555 days / 7 years) |
+| **Publish Retention** | 365 days | Regulatory requirements (HIPAA: 2555 days / 7 years) |
+| **Quality Threshold (Silver)** | 80% | Lower for exploratory pipelines, higher for critical data |
+| **Quality Threshold (Gold)** | 95% | Always high for business-ready data |
+| **Deduplication** | Auto-detect PK from schema | Specify if composite key or custom logic |
+| **Null handling** | DROP rows with null PKs, FILL non-critical columns | Specify if different strategy needed |
+
+**Quick Start users**: If you don't specify these, the defaults above are automatically applied.
+
+**Full Template users**: Specify values inline (overrides defaults).
+
+---
+
+## Prompt Template (Comprehensive Onboarding)
 
 ```
 Onboard new dataset: [DATASET_NAME]
@@ -31,22 +93,33 @@ Schema:
 
 Semantic Layer (for AI Analysis Agent):
 
+**REQUIRED (minimum for AI to answer questions):**
+
   Fact table grain: [What does one row represent? e.g., one order / one line item / one event]
 
   Measures (with aggregation semantics):
   - [col]: [SUM/AVG/COUNT DISTINCT/MIN/MAX] - [description] - unit: [USD/count/pct]
     (e.g., revenue: SUM - "Net revenue after discount" - unit: USD)
     (e.g., unit_price: AVG - "Price per unit, SUM is meaningless" - unit: USD)
+  *Provide top 3-5 measures — most important business metrics*
 
   Dimensions (with allowed values):
   - [col]: [description] - values: [list or "free text"]
     (e.g., region: "Sales territory" - values: [East, West, Central, South])
+  *Provide top 5-10 dimensions — how users slice/filter the data*
 
   Temporal:
   - [col]: [description] - grain: [day/hour] - primary: [YES/NO]
+  *At least one temporal column for time-based analysis*
 
   Identifiers:
   - [col]: [description] - role: [PK/FK] - references: [TABLE.COL if FK]
+  *Primary key and any foreign keys for joins*
+
+**OPTIONAL (advanced semantic features — skip for simple workloads):**
+
+<details>
+<summary>Click to expand advanced semantic layer options</summary>
 
   Derived columns:
   - [col] = [FORMULA] - [description]
@@ -76,25 +149,87 @@ Semantic Layer (for AI Analysis Agent):
   - Latest available: [T-0/T-1 day/T-1 week]
 
   Seed questions (top 5-10 business user questions):
-  1. "[question]" -> [expected SQL pattern]
-  2. "[question]" -> [expected SQL pattern]
-  ...
+  Provide 3-5 examples with full SQL to help the AI understand your data:
+
+  1. "What was our total revenue last month?"
+     ```sql
+     SELECT SUM(revenue) AS total_revenue
+     FROM gold_orders
+     WHERE order_date >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
+       AND order_date < DATE_TRUNC('month', CURRENT_DATE)
+       AND status = 'Completed'
+     ```
+
+  2. "Which region had the highest average order value in Q4?"
+     ```sql
+     SELECT region, AVG(revenue) AS avg_order_value
+     FROM gold_orders
+     WHERE QUARTER(order_date) = 4
+       AND YEAR(order_date) = YEAR(CURRENT_DATE - INTERVAL '1 year')
+       AND status = 'Completed'
+     GROUP BY region
+     ORDER BY avg_order_value DESC
+     LIMIT 1
+     ```
+
+  3. "Show me the top 10 customers by lifetime value"
+     ```sql
+     SELECT customer_id, customer_name, SUM(revenue) AS lifetime_value
+     FROM gold_orders
+     WHERE status = 'Completed'
+     GROUP BY customer_id, customer_name
+     ORDER BY lifetime_value DESC
+     LIMIT 10
+     ```
+
+  (Add more questions specific to your use case)
 
   Data steward:
   - Owner: [team/person]
   - Domain: [Sales/Marketing/Finance/Ops]
   - Sensitivity: [Public/Internal/Confidential/Restricted]
 
+</details>
+
 Encryption (at rest):
-- Landing zone: [KMS key alias, e.g., alias/landing-data-key] — SSE-KMS on S3
-- Staging zone: [KMS key alias, e.g., alias/staging-data-key] — Iceberg tables encrypted via S3 SSE-KMS
-- Publish zone: [KMS key alias, e.g., alias/publish-data-key] — Iceberg tables encrypted via S3 SSE-KMS
+
+**KMS Key Strategy Decision Tree:**
+
+```
+┌─ HIPAA or PCI DSS selected?
+│  └─ YES → Use SAME dedicated key for all zones
+│     - HIPAA: alias/hipaa-phi-key (all zones contain PHI)
+│     - PCI DSS: alias/pci-cardholder-key (all zones contain cardholder data)
+│     - Rationale: Sensitive data exists in all zones (Bronze=raw, Silver=masked, Gold=aggregated)
+│     - Re-encrypt at zone boundaries WITH THE SAME KEY (log the operation)
+│
+└─ NO (GDPR/CCPA/SOX/None) → Use DIFFERENT keys per zone
+   - Landing: alias/landing-data-key OR alias/{workload}-landing-key
+   - Staging: alias/staging-data-key OR alias/{workload}-staging-key
+   - Publish: alias/publish-data-key OR alias/{workload}-publish-key
+   - Glue Catalog: alias/catalog-metadata-key (shared across workloads)
+   - Rationale: Data sensitivity decreases from Bronze→Silver→Gold (masking applied in Silver)
+   - Re-encrypt at each zone boundary (Landing key → Staging key → Publish key)
+```
+
+**Specify keys for each zone:**
+- Landing zone: [KMS key alias, e.g., alias/landing-data-key OR alias/hipaa-phi-key] — SSE-KMS on S3
+- Staging zone: [KMS key alias, e.g., alias/staging-data-key OR alias/hipaa-phi-key] — Iceberg tables encrypted via S3 SSE-KMS
+- Publish zone: [KMS key alias, e.g., alias/publish-data-key OR alias/hipaa-phi-key] — Iceberg tables encrypted via S3 SSE-KMS
 - Glue Catalog: [KMS key alias, e.g., alias/catalog-metadata-key] — catalog metadata encryption
 - Log every encrypt/decrypt operation: "Encrypting with KMS key: [alias]"
-- Re-encrypt at each zone boundary (Landing key != Staging key != Publish key)
 
 Compliance & Governance:
 - Regulatory requirements: [GDPR/CCPA/HIPAA/SOX/PCI DSS/None]
+
+**How regulation loading works**:
+If you select a regulation (e.g., HIPAA), the system automatically loads controls from `prompts/data-onboarding-agent/regulation/hipaa.md`. These controls include default encryption keys, retention periods, LF-Tag requirements, access roles, and masking methods. You don't need to specify these manually — they're auto-applied during Phase 1 discovery. See `prompts/data-onboarding-agent/regulation/README.md` for what each regulation provides.
+
+**What you MUST still specify** (even with regulation selected):
+- Data steward owner and domain
+- Failure notification email
+- Business context (semantic layer, seed questions if needed)
+
 - PII detection: [Automatic via shared/utils/pii_detection_and_tagging.py]
   - Name-based: Scan column names for PII patterns
   - Content-based: Regex on sample data (100 rows)
@@ -114,7 +249,20 @@ Landing (raw ingestion):
 Staging (cleaned, validated):
 - Cleaning: Dedupe on [KEY], handle nulls [DROP/FILL], cast [COL->TYPE]
 - PII detection: [Run after profiling — automatic]
-- PII masking: [COLUMNS to hash/mask based on detection results]
+- PII masking: [Automatic based on sensitivity — specify overrides if needed]
+
+**Default PII masking methods** (auto-applied after detection):
+| Sensitivity | Method | Example | Reversible |
+|-------------|--------|---------|------------|
+| CRITICAL (SSN, MRN, Credit Card) | SHA-256 hash | `123-45-6789` → `a1b2c3d4...` | No |
+| HIGH (Name, Email, DOB) | SHA-256 hash OR mask_email | `john@email.com` → `j***@email.com` | No |
+| MEDIUM (Phone, Address) | mask_partial | `555-123-4567` → `555-***-4567` | No |
+| LOW | No masking (keep original) | `92101` (zip) → `92101` | N/A |
+
+**Override masking** (optional — only if defaults don't fit):
+- [COLUMN]: [method] - [reason]
+  Example: `ssn: keep - "Needed for fraud detection in Staging, will be dropped in Gold"`
+
 - LF-Tags: [Applied to all PII columns for column-level security]
 - Validate: [enum constraints, date ranges, FK references]
 - Format: Apache Iceberg on S3 Tables
@@ -146,12 +294,30 @@ Schedule:
 - SLA: [minutes]
 - MWAA bucket: [S3 bucket for Airflow DAG deployment, e.g., s3://my-mwaa-environment-bucket]
 
-Testing:
+Testing (choose tier based on use case):
+
+**Minimum (Test Gate Pass)** — for exploratory pipelines or prototypes:
+- 5 unit tests: schema validation, transformation logic, quality check basics, deduplication, null handling
+- 1 integration test: Bronze→Silver pipeline run with fixture data
+- Allows deployment but flagged as "prototype" in workload README
 - Use [FIXTURE_PATH] as data source for integration tests
+
+**Standard (Recommended)** — for production pipelines:
+- 20+ unit tests: metadata, transformations (per-column), quality (all 5 dimensions), DAG structure, lineage
+- 5+ integration tests: Bronze→Silver→Gold flow, quality gates, error handling, idempotency, PII detection
 - Use [SIMULATED_S3_PATH] for local pipeline runs (e.g., /tmp/data-lake/)
-- Import scripts using importlib.util.spec_from_file_location to avoid
-  cross-workload module collisions when running pytest across all workloads
-- Target: 50+ tests (unit: metadata, transformations, quality, DAG; integration: pipeline)
+- Import scripts using importlib.util.spec_from_file_location to avoid cross-workload module collisions when running pytest across all workloads
+
+**Comprehensive (Production-Ready)** — for critical/regulated data:
+- 50+ unit tests: all Standard tests + edge cases + column-level transformation tests
+- 10+ integration tests: all Standard tests + failure scenarios + rollback tests + compliance verification
+- Property-based tests (fast-check): transformation idempotency, lineage completeness, quality monotonicity, schema preservation, Bronze immutability
+- Required for HIPAA/SOX/PCI DSS workloads
+
+**Skip tests for prototype** (NOT RECOMMENDED):
+- Add `--skip-tests` flag in Phase 4
+- Pipeline will be flagged as "UNTESTED - DO NOT USE IN PRODUCTION" in README
+- Must add tests before promoting to production use
 
 Build complete pipeline with tests.
 ```
@@ -257,6 +423,49 @@ The `deploy_to_aws.py` script MUST include:
 - **MWAA DAG deployment** (Step 13): uploads DAG file, shared utils, workload config, and workload scripts to MWAA S3 bucket
 - `--dry-run` mode for safe testing
 - `--mwaa-bucket=BUCKET` parameter for MWAA deployment
+
+## Prompt Validation (Pre-Flight Check)
+
+Before starting the onboarding process, validate the prompt template inputs to catch errors early:
+
+**Mandatory validation checks** (fail-fast on first error):
+
+1. **Dataset name valid**:
+   - Format: lowercase, alphanumeric + underscores only, no spaces
+   - Length: 3-64 characters
+   - Not already in use: check `workloads/` folder
+   - Example valid: `healthcare_patients`, `order_transactions`
+   - Example invalid: `Healthcare-Patients!`, `my workload`
+
+2. **Source accessible**:
+   - If S3: verify path format `s3://bucket/path/` and bucket exists (if not simulated)
+   - If local: verify path exists and is readable
+   - If fixture: verify CSV file exists at specified path
+   - Format specified: CSV, JSON, or Parquet
+
+3. **Schema has ≥1 column**:
+   - At least one column defined with name and type
+   - Column names valid (no special chars except underscore)
+   - At least one column has a role (measure/dimension/identifier/temporal)
+
+4. **Regulation fields complete** (if regulation selected):
+   - Regulation is one of: HIPAA, GDPR, CCPA, SOX, PCI DSS, None
+   - If regulation selected, data steward owner is specified
+   - If regulation selected, failure notification email is specified
+
+5. **Required fields not empty**:
+   - Dataset name provided
+   - Source location provided
+   - Source format provided
+   - Frequency provided (Daily/Hourly)
+   - At least one measure OR dimension defined (semantic layer minimum)
+
+**Remediation** (if any check fails):
+- Report which check failed with specific reason
+- Provide corrected example
+- Ask user to fix and re-submit prompt
+
+**Pass criteria**: All 5 checks pass → proceed to Phase 0 (Health Check & Auto-Detect from SKILLS.md).
 
 ## Phase 7: Deploy to AWS
 

@@ -66,7 +66,7 @@
 | Secrets | AWS Secrets Manager | Airflow Connections | `core` (Secrets Manager) |
 | Monitoring | Amazon CloudWatch | Airflow UI metrics | `cloudwatch` |
 | Alerting | Amazon SNS → Slack/Email | Airflow on_failure_callback | `sns-sqs` |
-| Vector search | Amazon OpenSearch (k-NN) | Pinecone / Weaviate | External: `opensearch` |
+| Knowledge graph / Vector search | Amazon Neptune (Property Graph + Titan embeddings) | Neo4j / Pinecone | AWS: `neptune` / Bedrock Titan |
 | Serverless compute | AWS Lambda | — | `lambda` |
 | Query engine (Gold) | Amazon Athena | Redshift Spectrum | `aws-dataprocessing` or `redshift` |
 

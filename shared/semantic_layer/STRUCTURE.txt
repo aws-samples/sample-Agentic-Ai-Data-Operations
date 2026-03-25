@@ -1,0 +1,45 @@
+shared/
+├── semantic_layer/                    # Main semantic layer package
+│   ├── README.md                      # Comprehensive API documentation (625 lines)
+│   ├── QUICKSTART.md                  # Step-by-step setup guide (412 lines)
+│   ├── IMPLEMENTATION_STATUS.md       # Implementation status & stats
+│   ├── STRUCTURE.txt                  # This file
+│   ├── __init__.py                    # Clean API exports
+│   ├── setup_workload.py              # CLI tool for one-time setup
+│   ├── example_usage.py               # Example code for all features
+│   └── verify_setup.py                # Verification script (8 checks)
+│
+├── schemas/                           # Data structures
+│   ├── neptune_schema.py              # Graph schema (vertices, edges, IDs)
+│   └── unified_metadata.py            # UnifiedColumn, UnifiedTable, UnifiedMetadataGraph
+│
+├── metadata/                          # Metadata fetchers & combiner
+│   ├── __init__.py
+│   ├── glue_fetcher.py                # Fetch from Glue Data Catalog
+│   ├── semantic_reader.py             # Read semantic.yaml files
+│   ├── lakeformation_fetcher.py       # Fetch LF-Tags from Lake Formation
+│   └── combiner.py                    # Merge all three sources
+│
+├── embeddings/                        # Titan embeddings
+│   ├── __init__.py
+│   ├── titan_client.py                # AWS Bedrock Titan client (1024-dim)
+│   └── metadata_embedder.py           # Add embeddings to all entities
+│
+├── neptune/                           # Neptune graph loading
+│   ├── __init__.py
+│   └── loader.py                      # Load metadata graph via Gremlin
+│
+├── synodb/                            # Query store (DynamoDB)
+│   ├── __init__.py
+│   ├── setup.py                       # DynamoDB table creation
+│   ├── loader.py                      # Load seed queries with embeddings
+│   └── search.py                      # Find similar queries via vector search
+│
+└── analysis_agent/                    # NL → SQL query generation
+    ├── __init__.py
+    ├── nl_parser.py                   # Parse NL into QueryIntent (Claude)
+    ├── neptune_search.py              # Semantic search on Neptune graph
+    ├── sql_generator.py               # Generate SQL (metadata + LLM)
+    └── executor.py                    # Execute SQL via Athena + cache
+
+TOTAL: 27 files, ~6,034 lines of Python + documentation

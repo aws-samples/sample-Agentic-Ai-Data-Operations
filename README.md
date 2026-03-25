@@ -38,11 +38,11 @@ Output: workloads/{dataset_name}/   (ready to deploy to MWAA)
 
 ### System Overview
 
-![Architecture Diagram](docs/Architecture-Diagram.png)
+![Architecture Diagram](docs/diagrams/Architecture-Diagram.png)
 
 ### Pipeline Flow (Phase 0 → Phase 5)
 
-![Pipeline Flow](docs/Prompt-flow.png)
+![Pipeline Flow](docs/diagrams/Prompt-flow.png)
 
 ### Data Zones (Medallion Pattern)
 
@@ -81,6 +81,25 @@ Sub-agents generate code/config only. AWS execution happens via MCP tools in mai
 | Lake Formation | Column-level security via LF-Tags |
 | Amazon MWAA | Airflow orchestration |
 | SageMaker Catalog | Business metadata (custom columns) |
+| Amazon Neptune | Knowledge graph with Titan embeddings for semantic search |
+
+### Semantic Layer
+
+The semantic layer enables natural language to SQL query generation by combining business context (semantic.yaml) with technical metadata (Glue Catalog, Lake Formation) in a queryable graph database.
+
+![Semantic Layer Architecture](docs/semantic-layer.png)
+
+**How it works:**
+1. **Input**: Define business context in `semantic.yaml` (column roles, aggregations, relationships, business terms)
+2. **Transform**: Merge with Glue schemas and LF-Tags, generate 1024-dim Titan embeddings for tables/columns/terms/queries
+3. **Storage**: Load into **Amazon Neptune** (graph with embeddings) + **SynoDB** (DynamoDB query patterns with embeddings)
+4. **Query**: AI agent uses semantic search + graph traversal to auto-generate SQL with JOINs
+
+**Why two stores?**
+- **Neptune**: Graph relationships let AI discover JOINs via FK edges, semantic search finds similar tables/columns
+- **SynoDB**: Fast key-value lookup for past query patterns, learns from successful queries over time
+
+See [shared/semantic_layer/README.md](shared/semantic_layer/README.md) for detailed implementation.
 
 ### MCP Servers (Model Context Protocol)
 
