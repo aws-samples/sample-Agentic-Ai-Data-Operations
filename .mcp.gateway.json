@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "agentcore-gateway": {
+      "url": "https://data-onboarding-mcp-gateway-zqqrahrcm2.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp",
+      "transport": "sse",
+      "auth": {
+        "type": "aws-sigv4",
+        "service": "bedrock-agentcore",
+        "region": "us-east-1"
+      }
+    }
+  }
+}

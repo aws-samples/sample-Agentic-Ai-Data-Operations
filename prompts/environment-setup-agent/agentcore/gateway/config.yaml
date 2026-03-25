@@ -1,0 +1,138 @@
+# Agentcore Gateway Configuration
+# Deploys ALL 13 MCP servers to Agentcore Gateway.
+# Custom servers (FastMCP) run from source. PyPI servers run from packages.
+# Each server gets its own least-privilege IAM policy.
+
+gateway:
+  name: data-onboarding-gateway
+  description: All MCP servers for the Agentic Data Onboarding platform
+
+# --- Custom Servers (FastMCP, from mcp-servers/) ---
+
+servers:
+  - name: glue-athena
+    type: custom
+    source: mcp-servers/glue-athena-server/server.py
+    transport: sse
+    port: 8001
+    iam_policy: iam/glue-athena-policy.json
+    dependencies: [fastmcp, boto3]
+    description: Glue catalog CRUD, crawler management, ETL jobs, synchronous Athena queries
+    health_check: get_databases
+    required: true
+
+  - name: lakeformation
+    type: custom
+    source: mcp-servers/lakeformation-server/server.py
+    transport: sse
+    port: 8002
+    iam_policy: iam/lakeformation-policy.json
+    dependencies: [fastmcp, boto3]
+    description: LF-Tag CRUD, TBAC grant/revoke, column-level security
+    health_check: list_lf_tags
+    required: true
+
+  - name: sagemaker-catalog
+    type: custom
+    source: mcp-servers/sagemaker-catalog-server/server.py
+    transport: sse
+    port: 8003
+    iam_policy: iam/sagemaker-catalog-policy.json
+    dependencies: [fastmcp, boto3]
+    description: Business metadata (column roles, PII flags, hierarchies) on Glue tables
+    health_check: get_custom_metadata
+    required: false
+
+  - name: pii-detection
+    type: custom
+    source: mcp-servers/pii-detection-server/server.py
+    transport: sse
+    port: 8004
+    iam_policy: iam/pii-detection-policy.json
+    dependencies: [fastmcp, boto3]
+    description: AI-driven PII detection + automatic LF-Tag application
+    health_check: create_lf_tags
+    required: false
+
+# --- PyPI Servers (installed via uvx) ---
+
+  - name: iam
+    type: pypi
+    package: awslabs-iam-mcp-server
+    entrypoint: awslabs.iam-mcp-server
+    iam_policy: iam/iam-policy.json
+    description: IAM role/policy management, permission simulation
+    health_check: list_roles
+    required: true
+
+  - name: lambda
+    type: pypi
+    package: awslabs-lambda-mcp-server
+    entrypoint: awslabs.lambda-mcp-server
+    iam_policy: iam/lambda-policy.json
+    description: Lambda invocation, Lake Formation grants via Lambda
+    health_check: list_functions
+    required: false
+
+  - name: core
+    type: pypi
+    package: awslabs-core-mcp-server
+    entrypoint: awslabs.core-mcp-server
+    iam_policy: iam/core-policy.json
+    description: S3 operations, KMS key management, Secrets Manager
+    health_check: list_buckets
+    required: false
+
+  - name: s3-tables
+    type: pypi
+    package: awslabs-s3-tables-mcp-server
+    entrypoint: awslabs.s3-tables-mcp-server
+    iam_policy: iam/s3-tables-policy.json
+    description: S3 Tables (Iceberg) management
+    health_check: list_table_buckets
+    required: false
+
+  - name: cloudtrail
+    type: pypi
+    package: awslabs-cloudtrail-mcp-server
+    entrypoint: awslabs.cloudtrail-mcp-server
+    iam_policy: iam/cloudtrail-policy.json
+    description: Audit trail verification, security investigation, compliance
+    health_check: lookup_events
+    required: false
+
+  - name: redshift
+    type: pypi
+    package: awslabs-redshift-mcp-server
+    entrypoint: awslabs.redshift-mcp-server
+    iam_policy: iam/redshift-policy.json
+    description: Schema verification, Gold zone queries via Spectrum
+    health_check: list_clusters
+    required: false
+
+  - name: cloudwatch
+    type: pypi
+    package: awslabs-cloudwatch-mcp-server
+    entrypoint: awslabs.cloudwatch-mcp-server
+    iam_policy: iam/cloudwatch-policy.json
+    description: Logs, metrics, alarms, dashboards
+    health_check: describe_alarms
+    required: false
+
+  - name: cost-explorer
+    type: pypi
+    package: awslabs-cost-explorer-mcp-server
+    entrypoint: awslabs.cost-explorer-mcp-server
+    iam_policy: iam/cost-explorer-policy.json
+    description: Cost tracking, budget analysis
+    health_check: get_cost_and_usage
+    required: false
+
+  - name: dynamodb
+    type: pypi
+    package: awslabs-dynamodb-mcp-server
+    entrypoint: awslabs.dynamodb-mcp-server
+    iam_policy: iam/dynamodb-policy.json
+    description: DynamoDB / SynoDB operations
+    health_check: list_tables
+    required: false

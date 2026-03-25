@@ -14,9 +14,15 @@ from typing import Any
 
 import boto3
 from botocore.exceptions import ClientError
-from fastmcp import FastMCP
 
-mcp = FastMCP("glue-athena")
+# FastMCP is only needed for SSE/stdio modes, not Lambda
+try:
+    from fastmcp import FastMCP
+    mcp = FastMCP("glue-athena")
+    HAS_FASTMCP = True
+except ImportError:
+    mcp = None
+    HAS_FASTMCP = False
 
 session = boto3.Session(
     region_name=os.getenv('AWS_REGION', 'us-east-1'),
@@ -370,4 +376,109 @@ def athena_query(
 
 
 if __name__ == "__main__":
-    mcp.run()
+    transport = os.getenv("MCP_TRANSPORT", "stdio")
+    if transport == "sse":
+        mcp.run(transport="sse", host="0.0.0.0", port=int(os.getenv("MCP_PORT", "8001")))
+    else:
+        mcp.run()
+
+
+# Lambda handler (used when deployed to AWS Lambda)
+def handler(event, context):
+    """AWS Lambda handler - converts Lambda events to MCP tool invocations."""
+    import json
+
+    try:
+        # Parse request
+        if isinstance(event.get('body'), str):
+            body = json.loads(event['body'])
+        else:
+            body = event.get('body', {})
+
+        tool_name = body.get('tool')
+        arguments = body.get('arguments', {})
+
+        # Health check
+        if tool_name == 'health_check':
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({
+                    'status': 'healthy',
+                    'server': 'glue-athena',
+                    'function': os.getenv('AWS_LAMBDA_FUNCTION_NAME', 'unknown')
+                })
+            }
+
+        # List tools
+        if tool_name == 'list_tools':
+            tools = [
+                'create_database', 'get_database', 'get_databases',
+                'create_table', 'get_table', 'get_tables', 'update_table',
+                'create_crawler', 'get_crawler', 'start_crawler',
+                'get_job_run', 'start_job_run',
+                'athena_query'
+            ]
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({
+                    'status': 'success',
+                    'tools': tools,
+                    'count': len(tools)
+                })
+            }
+
+        # Map tool names to functions
+        tool_map = {
+            'create_database': create_database,
+            'get_database': get_database,
+            'get_databases': get_databases,
+            'create_table': create_table,
+            'get_table': get_table,
+            'get_tables': get_tables,
+            'update_table': update_table,
+            'create_crawler': create_crawler,
+            'get_crawler': get_crawler,
+            'start_crawler': start_crawler,
+            'get_job_run': get_job_run,
+            'start_job_run': start_job_run,
+            'athena_query': athena_query
+        }
+
+        if tool_name not in tool_map:
+            return {
+                'statusCode': 404,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({
+                    'status': 'error',
+                    'error': f'Unknown tool: {tool_name}'
+                })
+            }
+
+        # Call the tool
+        result = tool_map[tool_name](**arguments)
+
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps({
+                'status': 'success',
+                'tool': tool_name,
+                'result': result
+            })
+        }
+
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({
+                'status': 'error',
+                'error': str(e),
+                'type': type(e).__name__
+            })
+        }

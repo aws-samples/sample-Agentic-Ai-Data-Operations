@@ -1,0 +1,54 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "GlueCatalogRead",
+      "Effect": "Allow",
+      "Action": [
+        "glue:GetTable",
+        "glue:GetTables",
+        "glue:GetDatabase"
+      ],
+      "Resource": [
+        "arn:aws:glue:*:*:catalog",
+        "arn:aws:glue:*:*:database/*",
+        "arn:aws:glue:*:*:table/*/*"
+      ]
+    },
+    {
+      "Sid": "LFTagManagement",
+      "Effect": "Allow",
+      "Action": [
+        "lakeformation:CreateLFTag",
+        "lakeformation:GetLFTag",
+        "lakeformation:AddLFTagsToResource",
+        "lakeformation:RemoveLFTagsFromResource",
+        "lakeformation:GetResourceLFTags",
+        "lakeformation:GrantPermissions"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AthenaForContentDetection",
+      "Effect": "Allow",
+      "Action": [
+        "athena:StartQueryExecution",
+        "athena:GetQueryExecution",
+        "athena:GetQueryResults"
+      ],
+      "Resource": "arn:aws:athena:*:*:workgroup/*"
+    },
+    {
+      "Sid": "AthenaResultsBucket",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::*-athena-results*",
+        "arn:aws:s3:::*-athena-results*/*"
+      ]
+    }
+  ]
+}

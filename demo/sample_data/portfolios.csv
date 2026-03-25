@@ -1,0 +1,16 @@
+portfolio_id,portfolio_name,manager_name,strategy,risk_level,benchmark,inception_date,total_value,cash_balance,num_positions,avg_position_size,largest_position_pct,status,rebalance_frequency,last_rebalance_date
+P001,Growth Momentum Fund,Sarah Chen,Growth,High,S&P 500,2020-01-15,12547893.45,234567.89,28,448138.98,8.7,Active,Quarterly,2026-01-15
+P002,Dividend Income Portfolio,Michael Roberts,Income,Low,Dividend Aristocrats,2018-06-20,8934521.78,145632.12,45,198544.93,4.2,Active,Semi-Annual,2025-12-01
+P003,Tech Innovation Fund,Jennifer Wu,Sector Focus,High,NASDAQ 100,2021-03-10,15678234.56,567890.23,22,712647.03,12.3,Active,Monthly,2026-03-01
+P004,Balanced Allocation,David Thompson,Balanced,Medium,60/40 Blend,2019-09-05,18923456.89,823456.78,62,305216.40,3.8,Active,Quarterly,2026-02-15
+P005,Value Opportunity Fund,Lisa Martinez,Value,Medium,Russell 1000 Value,2017-11-30,9876543.21,198765.43,38,259906.93,5.9,Active,Quarterly,2025-12-20
+P006,Small Cap Growth,Robert Kim,Growth,Very High,Russell 2000,2022-02-14,6543210.98,321098.76,33,198279.12,7.1,Active,Monthly,2026-02-28
+P007,ESG Leaders Portfolio,Amanda Foster,ESG,Medium,MSCI USA ESG,2020-07-22,11234567.89,456789.12,41,274038.24,4.6,Active,Quarterly,2026-01-10
+P008,Global Equity Fund,James Park,Global,Medium,MSCI World,2016-04-18,21345678.90,1234567.89,73,292544.24,3.2,Active,Quarterly,2025-12-30
+P009,Quality Growth Portfolio,Emily Zhang,Quality,Medium,S&P 500 Quality,2021-08-25,7654321.09,234561.09,31,246913.58,6.8,Active,Quarterly,2026-02-01
+P010,Conservative Income,Thomas Anderson,Income,Very Low,Agg Bond + Dividend,2015-12-01,13456789.23,987654.32,55,244668.90,3.1,Active,Semi-Annual,2025-11-15
+P011,Healthcare Sector Fund,Rachel Green,Sector Focus,High,Healthcare Select,2019-05-12,5432109.87,123450.98,18,301783.88,9.4,Active,Quarterly,2026-01-20
+P012,Energy & Materials,Kevin Brown,Sector Focus,Very High,Energy + Materials,2020-10-08,4321098.76,98765.43,15,288073.25,11.2,Active,Monthly,2026-02-25
+P013,Mega Cap Leaders,Sophia Lee,Large Cap,Low,S&P 100,2018-03-14,19876543.21,1098765.43,25,795461.75,7.9,Active,Quarterly,2025-12-15
+P014,All Weather Portfolio,Daniel Garcia,Risk Parity,Low,Custom Benchmark,2017-09-20,16789012.34,2345678.90,68,247191.36,2.8,Active,Annual,2026-01-01
+P015,Momentum Trading,Olivia Taylor,Momentum,Very High,Custom Momentum,2022-06-01,3210987.65,567890.12,12,267582.30,15.6,Active,Weekly,2026-03-15

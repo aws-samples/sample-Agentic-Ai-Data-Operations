@@ -1,0 +1,39 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "IAMReadOnly",
+      "Effect": "Allow",
+      "Action": [
+        "iam:ListRoles",
+        "iam:ListUsers",
+        "iam:GetRole",
+        "iam:GetUser",
+        "iam:ListRolePolicies",
+        "iam:GetRolePolicy",
+        "iam:ListAttachedRolePolicies",
+        "iam:ListGroupsForUser",
+        "iam:ListUserPolicies"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "IAMRoleManagement",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "iam:PutRolePolicy",
+        "iam:AttachRolePolicy",
+        "iam:AttachUserPolicy",
+        "iam:AttachGroupPolicy"
+      ],
+      "Resource": "arn:aws:iam::*:role/*"
+    },
+    {
+      "Sid": "IAMSimulation",
+      "Effect": "Allow",
+      "Action": "iam:SimulatePrincipalPolicy",
+      "Resource": "*"
+    }
+  ]
+}

@@ -1,0 +1,149 @@
+# Healthcare Patients Orchestration Schedule
+# HIPAA-Compliant DAG Configuration
+
+dataset_name: healthcare_patients
+version: "1.0.0"
+compliance: HIPAA
+
+schedule:
+  cron: "0 2 * * *"  # Daily at 2:00 AM UTC
+  timezone: UTC
+  description: "Daily patient visit data ingestion and processing"
+  catchup: false
+  max_active_runs: 1
+
+sla:
+  duration_minutes: 120  # 2 hours
+  action: alert
+  recipients: [healthcare-ops-team@hospital.com]
+
+retries:
+  max_attempts: 3
+  backoff_strategy: exponential
+  base_delay_seconds: 60
+  max_delay_seconds: 600
+
+dependencies:
+  upstream: []  # Independent pipeline, no upstream dependencies
+  downstream: []  # No downstream dependencies yet
+
+failure_handling:
+  on_failure:
+    action: email_and_slack
+    recipients: [healthcare-ops-team@hospital.com]
+    slack_channel: "#healthcare-data-alerts"
+    include_logs: true
+    include_stack_trace: true
+
+  on_retry:
+    action: log
+    max_retries_before_alert: 2
+
+  on_success:
+    action: email
+    recipients: [healthcare-ops-team@hospital.com]
+    include_summary: true
+
+dag_configuration:
+  dag_id: healthcare_patients_pipeline
+  default_args:
+    owner: Healthcare Operations Team
+    depends_on_past: false
+    email: [healthcare-ops-team@hospital.com]
+    email_on_failure: true
+    email_on_retry: false
+    retries: 3
+    retry_delay_seconds: 60
+    execution_timeout_minutes: 120
+
+  tags: [healthcare, hipaa, production]
+
+  task_groups:
+    - name: extract
+      description: "Bronze zone extraction"
+      tasks:
+        - landing_to_s3
+      sla_minutes: 20
+
+    - name: transform
+      description: "Silver zone transformation with PII masking"
+      tasks:
+        - staging_clean
+        - staging_validate
+        - staging_pii_masking
+      sla_minutes: 40
+
+    - name: quality
+      description: "HIPAA compliance checks"
+      tasks:
+        - run_quality_checks
+        - verify_phi_encryption
+        - verify_lf_tags
+      sla_minutes: 20
+
+    - name: publish
+      description: "Gold zone publication"
+      tasks:
+        - publish_star_schema
+        - publish_aggregations
+      sla_minutes: 30
+
+    - name: audit
+      description: "HIPAA audit trail"
+      tasks:
+        - log_phi_access
+        - verify_audit_logging
+      sla_minutes: 10
+
+mwaa:
+  environment_name: DataZoneMWAAEnv-dzd_3r8vjvw09xh5yf-4rosjy6nd9pgdj-dev
+  s3_bucket: amazon-sagemaker-133661573128-us-east-1-e8cea5855b8a
+  dags_prefix: dzd_3r8vjvw09xh5yf/4rosjy6nd9pgdj/dev/workflows/project-files/workflows/dags
+  airflow_version: "2.10.1"
+
+  required_variables:
+    - name: glue_script_s3_path
+      default: s3://amazon-sagemaker-133661573128-us-east-1-e8cea5855b8a/scripts/healthcare_patients/
+      description: "S3 path for Glue scripts"
+
+    - name: glue_iam_role
+      default: arn:aws:iam::133661573128:role/GlueServiceRole
+      description: "IAM role for Glue jobs"
+
+    - name: aws_account_id
+      default: "133661573128"
+      description: "AWS account ID"
+
+    - name: kms_key_alias
+      default: alias/hipaa-phi-key
+      description: "KMS key alias for HIPAA encryption"
+
+    - name: audit_trail_enabled
+      default: "true"
+      description: "Enable HIPAA audit trail logging"
+
+monitoring:
+  cloudwatch_logs:
+    enabled: true
+    log_group: /aws/mwaa/healthcare-patients
+    retention_days: 2555  # 7 years for HIPAA
+
+  metrics:
+    - name: dag_run_duration
+      statistic: average
+      threshold_minutes: 120
+      alarm_action: email
+
+    - name: task_failures
+      statistic: sum
+      threshold: 3
+      alarm_action: email_and_slack
+
+    - name: quality_score
+      statistic: average
+      threshold: 0.95
+      alarm_action: email
+
+  xray_tracing:
+    enabled: true
+    sampling_rate: 1.0  # 100% for HIPAA audit requirements

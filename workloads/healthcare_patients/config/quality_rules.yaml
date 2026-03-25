@@ -1,0 +1,257 @@
+# Healthcare Patients Quality Rules
+# HIPAA-Compliant Data Quality and Compliance Checks
+
+dataset_name: healthcare_patients
+version: "1.0.0"
+compliance: HIPAA
+
+# Standard Quality Dimensions
+
+completeness:
+  - columns: [patient_id, medical_record_number, ssn, visit_date]
+    threshold: 1.0  # 100%
+    severity: critical
+    description: "Critical identifiers must be non-null"
+
+  - columns: [diagnosis, insurance_provider, treatment_cost]
+    threshold: 0.95  # 95%
+    severity: high
+    description: "Core business columns should be mostly complete"
+
+uniqueness:
+  - columns: [patient_id, visit_date]
+    threshold: 1.0  # 100%
+    severity: critical
+    description: "Patient ID + visit date must be unique"
+
+  - column: medical_record_number
+    threshold: 1.0  # 100%
+    severity: critical
+    description: "Medical record number must be unique"
+
+validity:
+  - column: blood_type
+    values: ["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"]
+    threshold: 0.95  # 95%
+    severity: high
+    description: "Blood type must be valid"
+
+  - column: state
+    validation: valid_us_state_abbreviation
+    threshold: 1.0  # 100%
+    severity: high
+    description: "State must be valid US state abbreviation"
+
+  - column: treatment_cost
+    range: [0, 1000000]
+    threshold: 1.0  # 100%
+    severity: critical
+    description: "Treatment cost must be non-negative and reasonable"
+
+  - column: visit_date
+    range: ["1900-01-01", CURRENT_DATE]
+    threshold: 1.0  # 100%
+    severity: critical
+    description: "Visit date must not be in the future"
+
+  - column: dob
+    range: ["1900-01-01", CURRENT_DATE]
+    threshold: 1.0  # 100%
+    severity: critical
+    description: "Date of birth must not be in the future"
+
+accuracy:
+  - rule: phi_columns_encrypted
+    check: encryption_enabled
+    columns: [patient_name, dob, ssn, email, phone, address, city, state, zip, medical_record_number, visit_date]
+    threshold: 1.0  # 100%
+    severity: critical
+    description: "HIPAA requires all PHI encrypted at rest"
+
+consistency:
+  - rule: age_consistency
+    check: |
+      SELECT COUNT(*) FROM staging.patient_visits
+      WHERE (YEAR(CURRENT_DATE) - YEAR(dob)) < 0 OR (YEAR(CURRENT_DATE) - YEAR(dob)) > 120
+    threshold: 0  # No rows should fail
+    severity: high
+    description: "Age must be reasonable (0-120 years)"
+
+# HIPAA-Specific Compliance Rules
+
+hipaa_compliance:
+  regulation: HIPAA
+  phi_columns: [patient_name, dob, ssn, email, phone, address, city, state, zip, medical_record_number, visit_date]
+  audit_retention_days: 2555  # 7 years
+  encryption_required: true
+  kms_key_alias: alias/hipaa-phi-key
+  access_logging: all_columns
+  minimum_necessary: true
+  baa_required: true
+  breach_notification_days: 60
+
+  rules:
+    - rule: phi_columns_encrypted
+      check: encryption_enabled_at_rest
+      columns: [patient_name, dob, ssn, email, phone, address, city, state, zip, medical_record_number, visit_date]
+      threshold: 1.0  # 100%
+      severity: critical
+      description: "HIPAA requires all PHI to be encrypted at rest"
+      validation_method: |
+        aws s3api get-bucket-encryption --bucket ${BUCKET}
+        # Verify SSE-KMS with alias/hipaa-phi-key
+
+    - rule: phi_columns_tagged
+      check: lf_tags_applied
+      columns: [patient_name, dob, ssn, email, phone, address, city, state, zip, medical_record_number, visit_date]
+      threshold: 1.0  # 100%
+      severity: critical
+      description: "All PHI columns must have LF-Tags for access control"
+      required_tags:
+        - PII_Classification
+        - PII_Type
+        - Data_Sensitivity
+      validation_method: |
+        aws lakeformation get-resource-lf-tags \
+          --resource '{"TableWithColumns": {"DatabaseName": "${DATABASE}", "Name": "${TABLE}", "ColumnNames": ["ssn", "patient_name"]}}'
+
+    - rule: audit_logging_active
+      check: cloudtrail_enabled
+      threshold: 1.0  # 100%
+      severity: critical
+      description: "HIPAA requires audit trail for all PHI access"
+      tracked_events: [GetDataAccess, AddLFTagsToResource, GrantPermissions, RevokePermissions]
+      validation_method: |
+        aws cloudtrail get-trail-status --name ${TRAIL_NAME}
+        aws cloudtrail lookup-events --lookup-attributes AttributeKey=ResourceType,AttributeValue=AWS::Glue::Table
+
+    - rule: phi_not_in_logs
+      check: no_pii_in_logs
+      threshold: 1.0  # 100%
+      severity: critical
+      description: "PHI must never appear in application logs or error messages"
+      scan_locations:
+        - /var/log/airflow/
+        - s3://prod-data-lake/logs/
+      validation_method: |
+        # Scan logs for SSN pattern: XXX-XX-XXXX
+        grep -r "\d{3}-\d{2}-\d{4}" /var/log/airflow/ && exit 1 || exit 0
+
+    - rule: minimum_necessary_access
+      check: provider_role_cannot_access_critical_phi
+      threshold: 1.0  # 100%
+      severity: critical
+      description: "Provider role must not access CRITICAL PHI (SSN, MRN)"
+      validation_method: |
+        # Test query as Provider role - should return AccessDenied or NULL
+        aws athena start-query-execution \
+          --query-string "SELECT ssn FROM healthcare_patients_silver.patient_visits LIMIT 5" \
+          --query-execution-context Database=healthcare_patients_silver \
+          --result-configuration OutputLocation=s3://${BUCKET}/query-results/
+
+    - rule: kms_key_rotation_enabled
+      check: key_rotation_enabled
+      threshold: 1.0  # 100%
+      severity: critical
+      description: "HIPAA KMS key must have automatic rotation enabled"
+      validation_method: |
+        aws kms get-key-rotation-status --key-id alias/hipaa-phi-key
+
+    - rule: audit_log_immutability
+      check: s3_object_lock_enabled
+      threshold: 1.0  # 100%
+      severity: critical
+      description: "Audit logs must be immutable (S3 Object Lock)"
+      retention_days: 2555  # 7 years
+      validation_method: |
+        aws s3api get-object-lock-configuration --bucket ${AUDIT_BUCKET}
+
+# Anomaly Detection
+
+anomaly_detection:
+  enabled: true
+  methods:
+    - type: outlier_detection
+      columns: [treatment_cost]
+      threshold: 3_std_dev
+      action: flag
+
+    - type: distribution_shift
+      columns: [diagnosis, insurance_provider, state]
+      window: 30_days
+      threshold: 0.20  # 20% change in distribution
+      action: alert
+
+    - type: volume_anomaly
+      metric: row_count
+      window: 7_days
+      threshold: 0.20  # 20% deviation
+      action: alert
+
+    - type: null_spike
+      columns: [email, phone]
+      window: 7_days
+      threshold: 0.15  # 15% increase in nulls
+      action: alert
+
+# Historical Comparison
+
+historical_baseline:
+  enabled: true
+  window: 90_days
+  metrics:
+    - completeness_score
+    - uniqueness_violations
+    - validity_failures
+    - treatment_cost_avg
+    - patient_count
+
+  alert_on:
+    - metric: completeness_score
+      change: decrease
+      threshold: 0.05  # 5% drop
+
+    - metric: validity_failures
+      change: increase
+      threshold: 0.10  # 10% increase
+
+# Quality Gates
+
+quality_gates:
+  landing_to_staging:
+    overall_score: 0.80  # 80%
+    critical_failures: 0
+    action_on_failure: block
+
+  staging_to_publish:
+    overall_score: 0.95  # 95%
+    critical_failures: 0
+    hipaa_checks: all_pass
+    action_on_failure: block
+
+  publish_to_dashboard:
+    overall_score: 0.98  # 98%
+    critical_failures: 0
+    action_on_failure: warn
+
+# Notifications
+
+notifications:
+  on_failure:
+    - severity: critical
+      action: email_and_slack
+      recipients: [healthcare-ops-team@hospital.com]
+      slack_channel: "#healthcare-data-alerts"
+
+    - severity: high
+      action: email
+      recipients: [healthcare-ops-team@hospital.com]
+
+  on_success:
+    action: log_only
+
+  hipaa_breach_detection:
+    action: immediate_escalation
+    recipients: [healthcare-ops-team@hospital.com, compliance-team@hospital.com]
+    notification_deadline_hours: 24
+    description: "Potential PHI breach - requires investigation within 24 hours"

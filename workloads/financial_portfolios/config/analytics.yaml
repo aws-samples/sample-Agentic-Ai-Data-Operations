@@ -1,0 +1,110 @@
+workload: financial_portfolios
+platform: amazon_quicksight
+
+dashboards:
+  - dashboard_id: "portfolio_performance"
+    name: "Portfolio Performance Dashboard"
+    description: "Financial portfolio analytics and performance metrics"
+
+    datasets:
+      - dataset_id: "fact_positions"
+        source: "gold.fact_positions"
+        data_source: "financial_portfolios_athena"
+
+      - dataset_id: "dim_stocks"
+        source: "gold.dim_stocks"
+        data_source: "financial_portfolios_athena"
+
+      - dataset_id: "dim_portfolios"
+        source: "gold.dim_portfolios"
+        data_source: "financial_portfolios_athena"
+
+      - dataset_id: "portfolio_summary"
+        source: "gold.portfolio_summary"
+        data_source: "financial_portfolios_athena"
+
+    visuals:
+      - visual_id: "top_positions_by_gain"
+        title: "Top 5 Positions by Unrealized Gain"
+        type: "bar_chart"
+        dataset: "fact_positions"
+        query:
+          select:
+            - "position_id"
+            - "ticker"
+            - "unrealized_gain_loss"
+          order_by: "unrealized_gain_loss DESC"
+          limit: 5
+        x_axis: "ticker"
+        y_axis: "unrealized_gain_loss"
+        color_by: "sector"
+
+      - visual_id: "recent_trades"
+        title: "Top 5 Recent Trades"
+        type: "table"
+        dataset: "fact_positions"
+        query:
+          select:
+            - "entry_date"
+            - "ticker"
+            - "shares"
+            - "purchase_price"
+            - "market_value"
+            - "unrealized_gain_loss_pct"
+          order_by: "entry_date DESC"
+          limit: 5
+        columns:
+          - {field: "entry_date", label: "Trade Date"}
+          - {field: "ticker", label: "Symbol"}
+          - {field: "shares", label: "Shares", format: "#,##0"}
+          - {field: "purchase_price", label: "Purchase Price", format: "$#,##0.00"}
+          - {field: "market_value", label: "Market Value", format: "$#,##0.00"}
+          - {field: "unrealized_gain_loss_pct", label: "Gain/Loss %", format: "0.00%"}
+
+      - visual_id: "portfolio_performance_by_manager"
+        title: "Portfolio Performance by Manager"
+        type: "bar_chart"
+        dataset: "portfolio_summary"
+        joins:
+          - {left: "portfolio_summary.portfolio_id", right: "dim_portfolios.portfolio_id"}
+        query:
+          select:
+            - "dim_portfolios.manager_name"
+            - "SUM(total_market_value) as total_value"
+            - "SUM(total_unrealized_gain_loss) as total_gain_loss"
+          group_by: "dim_portfolios.manager_name"
+        x_axis: "manager_name"
+        y_axis: "total_gain_loss"
+        tooltip: ["total_value", "total_gain_loss"]
+
+      - visual_id: "sector_allocation"
+        title: "Sector Allocation Breakdown"
+        type: "pie_chart"
+        dataset: "fact_positions"
+        joins:
+          - {left: "fact_positions.ticker", right: "dim_stocks.ticker"}
+        query:
+          select:
+            - "dim_stocks.sector"
+            - "SUM(market_value) as sector_value"
+          group_by: "dim_stocks.sector"
+        dimension: "sector"
+        measure: "sector_value"
+        labels: true
+        percentages: true
+
+    filters:
+      - filter_id: "date_range"
+        type: "date_range"
+        field: "entry_date"
+        default: "last_30_days"
+
+      - filter_id: "portfolio_filter"
+        type: "multi_select"
+        field: "portfolio_id"
+        default: "all"
+
+    refresh_schedule:
+      frequency: "daily"
+      time: "15:00"  # 15 minutes after DAG completion
+      timezone: "US/Eastern"

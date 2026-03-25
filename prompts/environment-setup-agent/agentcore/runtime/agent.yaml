@@ -1,0 +1,69 @@
+# Agentcore Runtime Agent Definition
+# Deploys the Data Onboarding Agent to Agentcore Runtime.
+# ALL tools come from Gateway -- no local servers needed.
+
+agent:
+  name: data-onboarding-agent
+  description: >
+    Autonomous data pipeline orchestration agent. Onboards datasets through
+    Bronze -> Silver -> Gold zones using sub-agents for metadata, transformation,
+    quality, and DAG generation.
+
+  model:
+    provider: anthropic
+    model_id: claude-sonnet-4-20250514
+    max_tokens: 8192
+
+  system_prompt_files:
+    - CLAUDE.md
+    - SKILLS.md
+    - MCP_GUARDRAILS.md
+
+  tools:
+    # All 13 servers are hosted on Gateway -- agent connects to all of them
+    gateway_servers:
+      # Custom servers (FastMCP)
+      - glue-athena
+      - lakeformation
+      - sagemaker-catalog
+      - pii-detection
+      # PyPI servers
+      - iam
+      - lambda
+      - core
+      - s3-tables
+      - cloudtrail
+      - redshift
+      - cloudwatch
+      - cost-explorer
+      - dynamodb
+
+  memory:
+    enabled: true
+    namespace: data-onboarding
+    session_ttl_hours: 24
+
+  sub_agents:
+    - name: metadata-agent
+      description: Profiles data, generates config files, catalogs schema
+      tools: []  # Local file tools only -- no MCP access
+
+    - name: transformation-agent
+      description: Generates PySpark scripts for Bronze->Silver->Gold
+      tools: []
+
+    - name: quality-agent
+      description: Defines quality rules, implements gates
+      tools: []
+
+    - name: dag-agent
+      description: Generates Airflow DAG with scheduling
+      tools: []
+
+  guardrails:
+    cedar_policy_store: shared/policies/
+    max_retries_per_agent: 2
+    test_gate_required: true
+    bronze_immutable: true
+    quality_gate_silver: 0.80
+    quality_gate_gold: 0.95

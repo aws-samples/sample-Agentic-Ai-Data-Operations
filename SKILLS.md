@@ -905,12 +905,12 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
    >   - **Audit logging** — all access logged to CloudTrail
    >   - **Encryption** — zone-specific KMS keys, re-encrypt at boundaries"
 
-   If the user selects a regulation, load the corresponding prompt from `prompts/regulation/`:
-   - **GDPR** → `prompts/regulation/gdpr.md`
-   - **CCPA** → `prompts/regulation/ccpa.md`
-   - **HIPAA** → `prompts/regulation/hipaa.md`
-   - **SOX** → `prompts/regulation/sox.md`
-   - **PCI DSS** → `prompts/regulation/pci-dss.md`
+   If the user selects a regulation, load the corresponding prompt from `prompts/data-onboarding-agent/regulation/`:
+   - **GDPR** → `prompts/data-onboarding-agent/regulation/gdpr.md`
+   - **CCPA** → `prompts/data-onboarding-agent/regulation/ccpa.md`
+   - **HIPAA** → `prompts/data-onboarding-agent/regulation/hipaa.md`
+   - **SOX** → `prompts/data-onboarding-agent/regulation/sox.md`
+   - **PCI DSS** → `prompts/data-onboarding-agent/regulation/pci-dss.md`
 
    These prompts are **MANDATORY** when selected — apply ALL controls listed.
    They are **NOT loaded by default** — only when explicitly requested.
@@ -1540,6 +1540,92 @@ After sub-agent returns, run:
 → All sub-agents complete. Presenting results to human.
 ```
 
+### Step 4.5.1: Code Error Checking (inline)
+
+**MANDATORY after every code generation step** — verify all generated code is syntactically correct and follows best practices.
+
+**Purpose**: Catch syntax errors, import errors, and common anti-patterns BEFORE deployment. Saves 30+ minutes vs debugging in MWAA.
+
+**Checks to run** (fail-fast on first error):
+
+1. **Python syntax check** (all Python files):
+   ```bash
+   python3 -m py_compile workloads/{workload_name}/scripts/**/*.py
+   python3 -m py_compile workloads/{workload_name}/dags/*.py
+   ```
+
+2. **DAG parsing check** (Airflow-specific):
+   ```bash
+   cd workloads/{workload_name}/dags
+   python3 -c "from {workload_name}_pipeline import *"
+   ```
+   
+   **Common errors**:
+   - `TaskGroup can only be used inside a dag` → must use `with DAG(...) as dag:` context manager
+   - `Task X doesn't have a DAG` → ensure DAG context manager wraps all TaskGroups/operators
+   - `Missing required argument` in operators → check all required parameters are set
+
+3. **Import resolution check** (verify all imports exist):
+   ```bash
+   python3 -c "
+   import sys
+   sys.path.insert(0, 'workloads/{workload_name}')
+   from scripts.transform.staging_clean import *
+   from scripts.quality.run_checks import *
+   "
+   ```
+
+4. **Airflow DAG best practices** (automated checks):
+   ```python
+   # Check these patterns in DAG file:
+   - Uses `with DAG(...) as dag:` context manager (NOT `dag = DAG(...)`)
+   - All Variable.get() have default_var parameter
+   - catchup=False is set
+   - max_active_runs=1 is set (for data pipelines)
+   - retries >= 3 with exponential backoff
+   - No hardcoded credentials, S3 paths, account IDs
+   - TaskGroup used (not SubDagOperator - deprecated)
+   ```
+
+5. **YAML syntax check** (config files):
+   ```bash
+   python3 -c "
+   import yaml
+   with open('workloads/{workload_name}/config/source.yaml') as f:
+       yaml.safe_load(f)
+   # repeat for transformations, quality_rules, schedule
+   "
+   ```
+
+**If ANY check fails**:
+1. Log the full error message (do NOT hide stack traces)
+2. Fix the code inline (do NOT ask human)
+3. Re-run all checks from the beginning
+4. Maximum 2 fix attempts — after that, escalate to human with details
+
+**Expected output**:
+```
+Code Error Checking: {workload_name}
+✓ Python syntax: 7 files (0 errors)
+✓ DAG parsing: healthcare_patients_pipeline.py (0 import errors)
+✓ Import resolution: 4 scripts (all imports found)
+✓ Airflow best practices: 8/8 checks passed
+✓ YAML syntax: 4 config files (0 errors)
+
+All code validation passed. Ready for final review.
+```
+
+**Why this matters**:
+- MWAA takes 1-2 minutes to refresh DAGs after S3 upload
+- A parsing error blocks ALL DAGs in MWAA from loading
+- Error messages in CloudWatch are truncated and hard to debug
+- This step catches 95% of deployment issues before they reach MWAA
+
+**Integration with Phase 5 deployment**:
+- If this step passes, deployment is safe to proceed
+- If this step is skipped, deployment MUST include a post-upload DAG parsing check
+
+
 ### Step 4.6: Final Review (inline)
 
 Present ALL artifacts and test results to the human:
@@ -2088,7 +2174,7 @@ job.commit()
 }
 ```
 
-SQL DDL goes in (tables under shared zone databases — see `shared/sql/common/create_zone_databases.sql`):
+SQL DDL goes in (tables under shared zone databases — see `prompts/environment-setup-agent/sql/create_zone_databases.sql`):
 - `workloads/{name}/sql/landing/` — tables under `landing_db`
 - `workloads/{name}/sql/staging/` — tables under `staging_db`
 - `workloads/{name}/sql/publish/` — tables under `publish_db`
@@ -2713,8 +2799,8 @@ Relationships (optional):
 - Referential integrity: [X]% valid FKs, [Y]% orphans
 
 Output:
-- Python generator script: shared/fixtures/[dataset_name]_generator.py
-- Generated CSV: shared/fixtures/[dataset_name].csv
+- Python generator script: demo/sample_data/[dataset_name]_generator.py
+- Generated CSV: demo/sample_data/[dataset_name].csv
 - Documentation in docstring
 - Unit tests for FK integrity, distributions, reproducibility
 ```
@@ -2742,31 +2828,32 @@ Quality characteristics:
 - 3 intentional data quality issues: future join_dates, negative annual_value, invalid country codes
 
 Output:
-- Python generator script: shared/fixtures/customer_master_generator.py
-- Generated CSV: shared/fixtures/customer_master.csv
+- Python generator script: demo/sample_data/customer_master_generator.py
+- Generated CSV: demo/sample_data/customer_master.csv
 - Seed: 42 for reproducibility
 - Unit tests for distributions, nulls, duplicates
 ```
 
 **Expected Output**:
-- `shared/fixtures/customer_master_generator.py` created
-- `shared/fixtures/customer_master.csv` created (100 rows + header)
-- Tests pass: `pytest shared/tests/unit/test_customer_master_generator.py`
+- `demo/sample_data/customer_master_generator.py` created
+- `demo/sample_data/customer_master.csv` created (100 rows + header)
+- Tests (optional): Embed validation in generator script or create test_customer_master_generator.py in demo/sample_data/
 - Data summary report: "Generated 100 customers: 20 Enterprise, 50 SMB, 30 Individual. 10 null emails. 5 duplicates. 3 quality issues."
 
 **Validation**:
 ```bash
 # Verify file created
-wc -l shared/fixtures/customer_master.csv  # Should be 101 (header + 100)
+wc -l demo/sample_data/customer_master.csv  # Should be 101 (header + 100)
 
 # Verify reproducibility
-python3 shared/fixtures/customer_master_generator.py --rows 100 --seed 42
-python3 shared/fixtures/customer_master_generator.py --rows 100 --seed 42
-diff shared/fixtures/customer_master.csv shared/fixtures/customer_master_2.csv  # Should be identical
+python3 demo/sample_data/customer_master_generator.py --rows 100 --seed 42
+mv demo/sample_data/customer_master.csv demo/sample_data/customer_master_1.csv
+python3 demo/sample_data/customer_master_generator.py --rows 100 --seed 42
+mv demo/sample_data/customer_master.csv demo/sample_data/customer_master_2.csv
+diff demo/sample_data/customer_master_1.csv demo/sample_data/customer_master_2.csv  # Should be identical
 
-# Run tests
-pytest shared/tests/unit/test_customer_master_generator.py -v
-# All tests should pass
+# Run tests (if created)
+pytest demo/sample_data/test_customer_master_generator.py -v  # Optional
 ```
 
 ---

@@ -1,0 +1,6 @@
+# Ignore per-run logs (ephemeral)
+run_*/
+*.log
+
+# Keep cumulative trace history
+!trace_events.jsonl

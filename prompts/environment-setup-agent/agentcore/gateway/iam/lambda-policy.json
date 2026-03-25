@@ -1,0 +1,15 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "LambdaInvoke",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:InvokeFunction",
+        "lambda:ListFunctions",
+        "lambda:GetFunction"
+      ],
+      "Resource": "arn:aws:lambda:*:*:function:*"
+    }
+  ]
+}

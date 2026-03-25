@@ -150,7 +150,7 @@ Columns:
 - segment: ENUM, Enterprise 20%, SMB 50%, Individual 30%
 - country: STRING, US 60%, UK 20%, CA 10%, DE 10%
 
-Output: shared/fixtures/customer_demo.csv with generator script
+Output: demo/sample_data/customer_demo.csv with generator script
 ```
 
 Then onboard it with ONBOARD prompt above.
@@ -226,7 +226,54 @@ Generate data_product_catalog.yaml and lineage diagram.
 
 ---
 
-### Scenario 5: Deploy to MWAA
+### Scenario 5a: Demo with Gateway (Cloud-Hosted Tools, Local Agent)
+
+**Need**: Team wants cloud-hosted MCP tools without local Python/uv setup, but agent stays on laptop
+
+```
+1. Deploy all 13 MCP servers to Agentcore Gateway:
+   → Run prompts/09-deploy-agentcore-gateway.md
+
+2. Switch to Gateway tools:
+   → Replace .mcp.json with .mcp.gateway.json
+
+3. Onboard data as usual:
+   → Run prompts/03-onboard-build-pipeline.md
+```
+
+**What happens**:
+- Gateway: All 13 MCP servers (4 custom FastMCP + 9 PyPI) hosted in cloud, each with least-privilege IAM
+- Agent: Runs in Claude Code on your laptop (human-in-the-loop)
+- Sub-agents: Spawned locally via Claude Code `Agent` tool
+- Same onboarding workflow as before -- only the tool transport changes (stdio to SSE)
+
+To revert to fully local: `git checkout .mcp.json`
+
+### Scenario 5b: Production with Runtime (Cloud-Hosted Tools + Cloud Agent)
+
+**Need**: Agent accessible via API for production pipelines, integrations, or multi-user access
+
+```
+1. Deploy all 13 MCP servers to Agentcore Gateway:
+   → Run prompts/09-deploy-agentcore-gateway.md (if not already deployed)
+
+2. Deploy agent to Agentcore Runtime:
+   → Run prompts/10-deploy-agentcore-runtime.md
+
+3. Invoke agent via API:
+   → aws bedrock-agent-runtime invoke-agent --agent-id {ID} --input-text "Onboard..."
+```
+
+**What happens**:
+- Gateway: Same Gateway as Scenario 5a (deployed once, shared by both modes)
+- Runtime: Data Onboarding Agent accessible via API, connected to all 13 Gateway tools, with persistent memory
+- Human-in-the-loop: Optional -- agent can run autonomously or pause for approval via API
+
+See `prompts/environment-setup-agent/agentcore/README.md` for architecture details.
+
+---
+
+### Scenario 6: Deploy to MWAA
 
 **Need**: Deploy the DAG and dependencies to Amazon Managed Workflows for Apache Airflow
 

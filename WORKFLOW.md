@@ -30,7 +30,7 @@ flowchart TD
             INVENTORY --> HEALTH["MCP Health Check<br/>+ Endpoint Inventory"]
             HEALTH --> HC_TABLE["13 servers: status, transport, endpoint<br/>Mode: LOCAL (.mcp.json) / GATEWAY (.mcp.gateway.json)"]
             HC_TABLE --> P0_GATE{Phase 0 Gate}
-            P0_GATE -->|"Critical resources missing"| SETUP_REDIRECT["Direct to<br/>prompts/00-setup-environment.md"]
+            P0_GATE -->|"Critical resources missing"| SETUP_REDIRECT["Direct to<br/>prompts/environment-setup-agent/setup-aws-infrastructure.md"]
             P0_GATE -->|"REQUIRED MCP servers down"| MCP_FIX["Troubleshoot MCP<br/>or switch modes"]
             P0_GATE -->|"All checks pass"| PHASE1
         end
@@ -143,7 +143,7 @@ sequenceDiagram
     O->>O: MCP Health Check (13 servers)
     O->>H: Resource inventory + MCP status table<br/>(mode, status, transport, endpoint per server)
     alt Critical resources missing
-        O->>H: "Run prompts/00-setup-environment.md first"
+        O->>H: "Run prompts/environment-setup-agent/setup-aws-infrastructure.md first"
     else REQUIRED MCP servers down
         O->>H: "Troubleshoot MCP or switch to Gateway/Local mode"
     else All checks pass
