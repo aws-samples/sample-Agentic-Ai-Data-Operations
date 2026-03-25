@@ -45,7 +45,7 @@
 ## Phase 0: Environment Health Check & Auto-Detect
 
 > Run before any other phase. Auto-detects existing AWS resources and verifies MCP connectivity.
-> This is what `prompts/00-setup-environment.md` Step 0 and Step 1 execute.
+> This is what `prompts/environment-setup-agent/setup-aws-infrastructure-setup-environment.md` Step 0 and Step 1 execute.
 > Safe to re-run — never creates or modifies anything.
 
 ### Step 0.1: Auto-Detect Existing Resources
@@ -62,7 +62,7 @@ Before asking the user what to create, scan the AWS account for all resources th
 | TBAC grants | Check Glue role has LF grants | `lakeformation` MCP | `aws lakeformation list-permissions` |
 | MWAA environment | Check for active environment | — | `aws mwaa list-environments` |
 | Airflow Variables | Check required vars exist | — | `aws mwaa create-cli-token` + curl |
-| Cedar policies | Check AVP policy store | — | `python3 shared/scripts/setup_avp.py --dry-run` |
+| Cedar policies | Check AVP policy store | — | `python3 prompts/environment-setup-agent/scripts/setup_avp.py --dry-run` |
 
 **Output:**
 ```
@@ -88,7 +88,7 @@ Resources to create: {N} (skipping {M} already exist)
 
 ### Step 0.2: MCP Health Check + Endpoint Inventory
 
-MCP setup is part of initial environment setup (`prompts/00-setup-environment.md` Step 1). The health check verifies all 13 servers, shows where each is hosted, and determines tool selection for the session.
+MCP setup is part of initial environment setup (`prompts/environment-setup-agent/setup-aws-infrastructure-setup-environment.md` Step 1). The health check verifies all 13 servers, shows where each is hosted, and determines tool selection for the session.
 
 **Hosting modes:**
 - **Local mode** (`.mcp.json`): 13 servers on laptop via stdio transport
@@ -343,7 +343,7 @@ See [Phase 0 Step 0.2](#step-02-mcp-health-check) for the full 3-tier server tab
 
 ## Gateway Mode (Agentcore)
 
-Gateway mode is chosen during initial setup (`prompts/00-setup-environment.md` Step 1a). If selected, deploy the Gateway via `prompts/09-deploy-agentcore-gateway.md` BEFORE proceeding with AWS resource creation. Gateway is a one-time setup — once deployed, all team members connect via `.mcp.gateway.json`.
+Gateway mode is chosen during initial setup (`prompts/environment-setup-agent/setup-aws-infrastructure-setup-environment.md` Step 1a). If selected, deploy the Gateway via `prompts/09-deploy-agentcore-gateway.md` BEFORE proceeding with AWS resource creation. Gateway is a one-time setup — once deployed, all team members connect via `.mcp.gateway.json`.
 
 ### Two Execution Modes (Same Gateway)
 
@@ -352,7 +352,7 @@ Gateway mode is chosen during initial setup (`prompts/00-setup-environment.md` S
 | **Local Demo** | Claude Code (laptop) | All 13 Gateway servers via `.mcp.gateway.json` | Yes | Gateway only (prompt 09) |
 | **Production** | Agentcore Runtime (cloud) | All 13 Gateway servers (auto-connected) | Optional | Gateway + Runtime (prompts 09 + 10) |
 
-Gateway is deployed **once** and shared by both modes. See `agentcore/README.md` for full details.
+Gateway is deployed **once** and shared by both modes. See `prompts/environment-setup-agent/agentcore/README.md` for full details.
 
 ### Transport
 - All 13 servers are hosted on Gateway (4 custom via SSE, 9 PyPI as managed packages)
@@ -365,9 +365,9 @@ Gateway is deployed **once** and shared by both modes. See `agentcore/README.md`
 - No code changes needed when switching between modes
 
 ### IAM Policies
-- Each of the 13 Gateway servers runs with its own least-privilege IAM policy (from `agentcore/gateway/iam/`)
+- Each of the 13 Gateway servers runs with its own least-privilege IAM policy (from `prompts/environment-setup-agent/agentcore/gateway/iam/`)
 - Gateway policies are MORE restrictive than local credentials (scoped to specific resources)
-- If a tool call fails with AccessDenied in Gateway mode, check the server's IAM policy in `agentcore/gateway/iam/`
+- If a tool call fails with AccessDenied in Gateway mode, check the server's IAM policy in `prompts/environment-setup-agent/agentcore/gateway/iam/`
 
 ### Agent Behavior (Both Modes)
 - Same agent behavior regardless of where it runs -- sub-agents still generate artifacts only, no MCP access

@@ -1,0 +1,17 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CloudTrailRead",
+      "Effect": "Allow",
+      "Action": [
+        "cloudtrail:LookupEvents",
+        "cloudtrail:GetQueryResults",
+        "cloudtrail:StartQuery",
+        "cloudtrail:GetEventDataStore",
+        "cloudtrail:ListEventDataStores"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

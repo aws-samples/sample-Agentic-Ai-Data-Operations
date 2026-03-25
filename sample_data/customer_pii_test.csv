@@ -1,6 +1,0 @@
-customer_id,first_name,last_name,email,phone,ssn,dob,credit_card,street_address,city,state,zip_code,ip_address,account_number
-C001,Alice,Smith,alice.smith@gmail.com,(555) 123-4567,123-45-6789,03/15/1985,4532-1234-5678-9010,123 Main St,Boston,MA,02101,192.168.1.100,ACC-9876543210
-C002,Bob,Johnson,bob.j@outlook.com,(555) 234-5678,234-56-7890,07/22/1990,5425-9876-5432-1098,456 Oak Ave,Chicago,IL,60601,10.0.0.50,ACC-8765432109
-C003,Carol,Williams,carol.w@company.com,(555) 345-6789,345-67-8901,11/08/1982,3782-123456-78901,789 Pine Rd,Seattle,WA,98101,172.16.0.25,ACC-7654321098
-C004,David,Brown,david.brown@yahoo.com,(555) 456-7890,456-78-9012,02/28/1995,6011-1234-5678-9012,321 Elm Blvd,Austin,TX,73301,192.168.100.5,ACC-6543210987
-C005,Eve,Davis,eve.d@email.com,(555) 567-8901,567-89-0123,09/14/1988,3566-1234-5678-9012,654 Maple Dr,Portland,OR,97201,10.10.10.10,ACC-5432109876

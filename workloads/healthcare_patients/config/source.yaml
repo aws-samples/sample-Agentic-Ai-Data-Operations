@@ -1,0 +1,194 @@
+# Healthcare Patients Data Source Configuration
+# HIPAA-Compliant Data Pipeline
+
+dataset_name: healthcare_patients
+version: "1.0.0"
+created_date: "2026-03-24"
+compliance: HIPAA
+
+source:
+  type: csv
+  location:
+    production: s3://prod-data-lake/raw/healthcare/patients/
+    local_simulation: /tmp/data-lake/landing/healthcare_patients/
+    fixture: workloads/healthcare_patients/sample_data/patients.csv
+  format: csv
+  frequency: daily
+  credentials:
+    type: airflow_connection
+    connection_id: healthcare_s3_conn
+  estimated_size:
+    rows: 1000
+    size_gb: 0.001
+    test_rows: 20
+
+schema:
+  columns:
+    - name: patient_id
+      type: STRING
+      description: Unique patient identifier
+      role: identifier
+      primary_key: true
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: patient_name
+      type: STRING
+      description: Patient full name (PHI)
+      role: dimension
+      nullable: false
+      phi: true
+      phi_type: NAME
+      sensitivity: HIGH
+
+    - name: dob
+      type: DATE
+      description: Date of birth (PHI)
+      role: temporal
+      nullable: false
+      phi: true
+      phi_type: DOB
+      sensitivity: HIGH
+
+    - name: ssn
+      type: STRING
+      description: Social Security Number (PHI - CRITICAL)
+      role: identifier
+      nullable: false
+      phi: true
+      phi_type: SSN
+      sensitivity: CRITICAL
+
+    - name: email
+      type: STRING
+      description: Patient email address (PHI)
+      role: dimension
+      nullable: true
+      phi: true
+      phi_type: EMAIL
+      sensitivity: HIGH
+
+    - name: phone
+      type: STRING
+      description: Patient phone number (PHI)
+      role: dimension
+      nullable: true
+      phi: true
+      phi_type: PHONE
+      sensitivity: MEDIUM
+
+    - name: address
+      type: STRING
+      description: Street address (PHI)
+      role: dimension
+      nullable: true
+      phi: true
+      phi_type: ADDRESS
+      sensitivity: MEDIUM
+
+    - name: city
+      type: STRING
+      description: City (PHI)
+      role: dimension
+      nullable: true
+      phi: true
+      phi_type: ADDRESS
+      sensitivity: MEDIUM
+
+    - name: state
+      type: STRING
+      description: State abbreviation (PHI)
+      role: dimension
+      nullable: true
+      phi: true
+      phi_type: ADDRESS
+      sensitivity: MEDIUM
+
+    - name: zip
+      type: STRING
+      description: ZIP code (PHI)
+      role: dimension
+      nullable: true
+      phi: true
+      phi_type: ADDRESS
+      sensitivity: MEDIUM
+
+    - name: blood_type
+      type: STRING
+      description: Patient blood type (non-PHI)
+      role: dimension
+      nullable: true
+      phi: false
+      sensitivity: LOW
+      valid_values: ["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"]
+
+    - name: diagnosis
+      type: STRING
+      description: Primary diagnosis (sensitive)
+      role: dimension
+      nullable: true
+      phi: false
+      sensitivity: LOW
+
+    - name: visit_date
+      type: DATE
+      description: Date of visit
+      role: temporal
+      primary_temporal: true
+      nullable: false
+      phi: true
+      phi_type: DOB
+      sensitivity: HIGH
+
+    - name: treatment_cost
+      type: DECIMAL
+      description: Cost of treatment in USD
+      role: measure
+      nullable: false
+      phi: false
+      sensitivity: LOW
+      decimal_precision: 10
+      decimal_scale: 2
+
+    - name: insurance_provider
+      type: STRING
+      description: Insurance company name
+      role: dimension
+      nullable: true
+      phi: false
+      sensitivity: LOW
+
+    - name: medical_record_number
+      type: STRING
+      description: Hospital MRN (PHI - CRITICAL)
+      role: identifier
+      nullable: false
+      phi: true
+      phi_type: NATIONAL_ID
+      sensitivity: CRITICAL
+
+data_steward:
+  owner: Healthcare Operations Team
+  domain: Healthcare
+  sensitivity: Restricted
+  contact: healthcare-ops-team@hospital.com
+
+encryption:
+  landing:
+    kms_key_alias: alias/hipaa-phi-key
+    algorithm: AES-256
+    transport: TLS_1_3
+  staging:
+    kms_key_alias: alias/hipaa-phi-key
+    algorithm: AES-256
+    transport: TLS_1_3
+  publish:
+    kms_key_alias: alias/hipaa-phi-key
+    algorithm: AES-256
+    transport: TLS_1_3
+  glue_catalog:
+    kms_key_alias: alias/catalog-metadata-key
+  key_rotation:
+    enabled: true
+    frequency: annual

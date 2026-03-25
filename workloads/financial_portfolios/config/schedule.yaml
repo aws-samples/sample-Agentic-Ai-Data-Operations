@@ -1,0 +1,79 @@
+workload: financial_portfolios
+version: "1.0"
+
+schedule:
+  cron: "0 14 * * *"  # Daily at 9:00 AM EST (14:00 UTC)
+  timezone: "US/Eastern"
+  start_date: "2026-03-20"
+  catchup: false
+  max_active_runs: 1
+
+dag_config:
+  dag_id: "financial_portfolios_pipeline"
+  description: "Daily financial portfolio data pipeline: Bronze → Silver → Gold"
+  tags: ["finance", "portfolios", "sox-compliant"]
+  default_args:
+    owner: "data-team"
+    depends_on_past: false
+    email_on_failure: true
+    email_on_retry: false
+    email: ["data-team@company.com"]
+    retries: 3
+    retry_delay_minutes: 5
+    retry_exponential_backoff: true
+    max_retry_delay_minutes: 30
+    sla_minutes: 30
+
+failure_callbacks:
+  on_failure:
+    notification_channels: ["email", "slack"]
+    recipients: ["data-team@company.com"]
+    slack_webhook: "${SLACK_WEBHOOK_URL}"
+  on_sox_compliance_failure:
+    notification_channels: ["email"]
+    recipients: ["compliance@company.com"]
+
+task_groups:
+  - name: "bronze_ingestion"
+    description: "Ingest CSV files from S3 landing zone to Bronze"
+    tasks:
+      - ingest_stocks
+      - ingest_portfolios
+      - ingest_positions
+
+  - name: "silver_transformation"
+    description: "Clean and validate data: Bronze → Silver (Iceberg)"
+    tasks:
+      - transform_stocks_to_silver
+      - transform_portfolios_to_silver
+      - transform_positions_to_silver
+    dependencies: ["bronze_ingestion"]
+
+  - name: "silver_quality_gate"
+    description: "Run quality checks on Silver data"
+    tasks:
+      - quality_check_silver
+    dependencies: ["silver_transformation"]
+    gate: true  # Must pass before proceeding
+
+  - name: "gold_transformation"
+    description: "Build star schema: Silver → Gold"
+    tasks:
+      - transform_dim_stocks
+      - transform_dim_portfolios
+      - transform_fact_positions
+      - transform_portfolio_summary
+    dependencies: ["silver_quality_gate"]
+
+  - name: "gold_quality_gate"
+    description: "Run quality checks on Gold data"
+    tasks:
+      - quality_check_gold
+    dependencies: ["gold_transformation"]
+    gate: true
+
+  - name: "dashboard_refresh"
+    description: "Refresh QuickSight dashboards"
+    tasks:
+      - refresh_quicksight_datasets
+    dependencies: ["gold_quality_gate"]

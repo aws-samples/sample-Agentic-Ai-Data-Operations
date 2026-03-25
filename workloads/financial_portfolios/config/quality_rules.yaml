@@ -1,0 +1,273 @@
+workload: financial_portfolios
+version: "1.0"
+compliance:
+  - SOX  # Sarbanes-Oxley Act
+retention_years: 7
+
+# Quality thresholds (overall)
+quality_thresholds:
+  completeness: 0.95  # 95% non-null
+  uniqueness: 1.0     # 100% unique PKs
+  validity: 0.98      # 98% valid values
+  consistency: 1.0    # 100% consistent references
+  overall_score: 0.80 # Min score to pass Bronze→Silver
+  critical_score: 0.95 # Min score to pass Silver→Gold
+
+tables:
+  stocks:
+    primary_key: ticker
+    completeness_rules:
+      - columns: [ticker, company_name, sector, industry, exchange]
+        threshold: 1.0
+        severity: critical
+        action: reject
+        reason: "Core identifiers must be complete"
+      - columns: [current_price, market_cap_billions]
+        threshold: 1.0
+        severity: critical
+        action: reject
+        reason: "Financial metrics must be complete"
+
+    uniqueness_rules:
+      - column: ticker
+        threshold: 1.0
+        severity: critical
+        action: reject
+        reason: "Duplicate tickers violate PK constraint"
+
+    validity_rules:
+      - column: current_price
+        rule: greater_than
+        value: 0
+        severity: critical
+        action: reject
+        reason: "Stock price must be positive"
+      - column: market_cap_billions
+        rule: greater_than_or_equal
+        value: 0
+        severity: warning
+        reason: "Market cap cannot be negative"
+      - column: listing_date
+        rule: date_not_future
+        severity: critical
+        action: reject
+        reason: "Listing date cannot be in the future"
+      - column: pe_ratio
+        rule: between
+        min: -100
+        max: 1000
+        severity: warning
+        reason: "P/E ratio outside reasonable range"
+
+    anomaly_detection:
+      - column: current_price
+        method: z_score
+        threshold: 3.0
+        severity: info
+        description: "Detect unusually high/low stock prices"
+      - column: avg_volume_millions
+        method: interquartile_range
+        threshold: 1.5
+        severity: info
+        description: "Detect unusual trading volume"
+
+  portfolios:
+    primary_key: portfolio_id
+    completeness_rules:
+      - columns: [portfolio_id, portfolio_name, manager_name, strategy, risk_level]
+        threshold: 1.0
+        severity: critical
+        action: reject
+        reason: "Core portfolio identifiers must be complete"
+      - columns: [total_value, cash_balance]
+        threshold: 1.0
+        severity: critical
+        action: reject
+        reason: "Financial metrics must be complete"
+
+    uniqueness_rules:
+      - column: portfolio_id
+        threshold: 1.0
+        severity: critical
+        action: reject
+        reason: "Duplicate portfolio IDs violate PK constraint"
+
+    validity_rules:
+      - column: total_value
+        rule: greater_than
+        value: 0
+        severity: critical
+        action: reject
+        reason: "Portfolio value must be positive"
+      - column: cash_balance
+        rule: greater_than_or_equal
+        value: 0
+        severity: critical
+        action: reject
+        reason: "Cash balance cannot be negative"
+      - column: num_positions
+        rule: greater_than
+        value: 0
+        severity: warning
+        reason: "Portfolio should have at least one position"
+      - column: inception_date
+        rule: date_not_future
+        severity: critical
+        action: reject
+        reason: "Inception date cannot be in the future"
+
+    consistency_rules:
+      - rule: cash_balance_less_than_total_value
+        expression: "cash_balance <= total_value"
+        severity: warning
+        reason: "Cash balance should not exceed total portfolio value"
+      - rule: avg_position_size_calculation
+        expression: "abs(total_value / num_positions - avg_position_size) < 10000"
+        severity: warning
+        reason: "Average position size calculation sanity check"
+
+    anomaly_detection:
+      - column: total_value
+        method: z_score
+        threshold: 3.0
+        severity: info
+        description: "Detect unusually large/small portfolios"
+      - column: ytd_return_pct
+        method: z_score
+        threshold: 3.0
+        severity: info
+        description: "Detect unusual portfolio performance"
+
+  positions:
+    primary_key: position_id
+    foreign_keys:
+      - column: portfolio_id
+        reference_table: portfolios
+        reference_column: portfolio_id
+        severity: critical
+        action: quarantine
+        reason: "Position references non-existent portfolio"
+      - column: ticker
+        reference_table: stocks
+        reference_column: ticker
+        severity: critical
+        action: quarantine
+        reason: "Position references non-existent stock"
+
+    completeness_rules:
+      - columns: [position_id, portfolio_id, ticker, shares]
+        threshold: 1.0
+        severity: critical
+        action: quarantine
+        reason: "Cannot process positions without core identifiers"
+      - columns: [cost_basis, purchase_price, current_price, market_value]
+        threshold: 1.0
+        severity: critical
+        action: quarantine
+        reason: "Financial metrics must be complete for valuation"
+
+    uniqueness_rules:
+      - column: position_id
+        threshold: 1.0
+        severity: critical
+        action: reject
+        reason: "Duplicate position IDs violate PK constraint"
+
+    validity_rules:
+      - column: shares
+        rule: greater_than
+        value: 0
+        severity: critical
+        action: quarantine
+        reason: "Negative or zero shares are invalid"
+      - column: cost_basis
+        rule: greater_than
+        value: 0
+        severity: critical
+        action: quarantine
+        reason: "Cost basis must be positive"
+      - column: market_value
+        rule: greater_than
+        value: 0
+        severity: critical
+        action: quarantine
+        reason: "Market value must be positive"
+      - column: entry_date
+        rule: date_not_future
+        severity: critical
+        action: quarantine
+        reason: "Entry date cannot be in the future"
+      - column: unrealized_gain_loss_pct
+        rule: between
+        min: -100
+        max: 10000
+        severity: warning
+        reason: "Gain/loss percentage outside reasonable range"
+
+    consistency_rules:
+      - rule: market_value_calculation
+        expression: "abs(shares * current_price - market_value) < 1.0"
+        severity: warning
+        reason: "Market value = shares × current_price (within $1)"
+      - rule: unrealized_gain_loss_calculation
+        expression: "abs((market_value - cost_basis) - unrealized_gain_loss) < 1.0"
+        severity: warning
+        reason: "Unrealized gain/loss = market_value - cost_basis"
+      - rule: weight_pct_sum_by_portfolio
+        expression: "sum(weight_pct) group by portfolio_id should be ~100"
+        severity: warning
+        reason: "Position weights should sum to 100% per portfolio"
+
+    anomaly_detection:
+      - column: market_value
+        method: z_score
+        threshold: 3.0
+        severity: info
+        description: "Detect unusually large/small positions"
+      - column: holding_period_days
+        method: z_score
+        threshold: 3.0
+        severity: info
+        description: "Detect unusually long/short holding periods"
+      - column: unrealized_gain_loss_pct
+        method: z_score
+        threshold: 3.0
+        severity: info
+        description: "Detect unusual gains/losses"
+
+# Historical baseline tracking
+baseline:
+  enabled: true
+  lookback_days: 30
+  metrics:
+    - row_count
+    - null_percentage
+    - distinct_count
+    - mean
+    - stddev
+  deviation_thresholds:
+    row_count: 0.20  # Alert if >20% change
+    null_percentage: 0.10  # Alert if >10% change
+
+# Alerts
+alerts:
+  critical_failure:
+    channels: [email, slack]
+    recipients: [data-team@company.com]
+    message_template: "CRITICAL: Quality check failed for {workload} {zone} zone"
+  warning:
+    channels: [slack]
+    recipients: [data-team@company.com]
+    message_template: "WARNING: Quality issues detected in {workload} {zone} zone"
+  sox_audit:
+    channels: [email]
+    recipients: [compliance@company.com, audit@company.com]
+    message_template: "SOX Audit: Quality report for {workload} {zone} zone"
+    include_full_report: true
+
+# Quarantine settings
+quarantine:
+  enabled: true
+  location: s3://financial-portfolios-bucket/quarantine/{zone}/{date}/
+  retention_days: 90
+  notification_required: true

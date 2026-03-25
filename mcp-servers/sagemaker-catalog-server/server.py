@@ -293,5 +293,8 @@ def list_dimensions(
 
 
 if __name__ == "__main__":
-    # Run MCP server
-    mcp.run()
+    transport = os.getenv("MCP_TRANSPORT", "stdio")
+    if transport == "sse":
+        mcp.run(transport="sse", host="0.0.0.0", port=int(os.getenv("MCP_PORT", "8003")))
+    else:
+        mcp.run()

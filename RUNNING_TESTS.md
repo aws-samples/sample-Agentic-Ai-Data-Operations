@@ -374,9 +374,7 @@ For AWS integration tests, see `docs/aws-account-setup.md`.
 ## 📖 Further Reading
 
 - `CLAUDE.md` - Testing strategy section
-- `docs/testing-strategy.md` - Detailed testing approach
-- `shared/tests/README.md` - Shared test utilities
-- `conftest.py` - Pytest fixtures
+- `docs/aws-account-setup.md` - AWS integration test setup
 
 ---
 

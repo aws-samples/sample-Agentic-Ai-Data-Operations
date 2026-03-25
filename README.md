@@ -14,6 +14,7 @@ User: "Onboard customer data from PostgreSQL, daily refresh, PII masking require
    ┌─────────────────────────────────────────────────────────┐
    │  Data Onboarding Agent (orchestrator)                   │
    │                                                         │
+   │  Phase 0: Health Check ─ verify AWS + MCP servers       │
    │  Phase 1: Discovery ─── asks source, schema, rules      │
    │  Phase 2: Dedup ─────── checks existing workloads       │
    │  Phase 3: Profile ───── samples data, detects PII       │
@@ -21,9 +22,11 @@ User: "Onboard customer data from PostgreSQL, daily refresh, PII masking require
    │     ├── Metadata Agent ──────→ config/ + catalog         │
    │     ├── Transformation Agent → scripts/ + sql/           │
    │     ├── Quality Agent ───────→ quality rules + gates     │
-   │     └── DAG Agent ───────────→ dags/ + schedule          │
+   │     ├── DAG Agent ───────────→ dags/ + schedule          │
+   │     └── Code Validator ──────→ syntax + best practices   │
    │                                                         │
    │  Each sub-agent writes tests → must pass before next     │
+   │  Code validation blocks deployment if errors found       │
    └─────────────────────────────────────────────────────────┘
 
 Output: workloads/{dataset_name}/   (ready to deploy to MWAA)
@@ -49,19 +52,22 @@ Output: workloads/{dataset_name}/   (ready to deploy to MWAA)
 | **Silver** | Cleaned, validated, schema-enforced | Apache Iceberg on S3 Tables | Score >= 80% |
 | **Gold** | Curated, business-ready | Iceberg (star schema or flat) | Score >= 95% |
 
-### Agent Architecture
+### Agent Architecture (4 Main Agents)
 
-| Agent | Role | Runs In |
-|-------|------|---------|
-| **Router** | Checks if data already onboarded | Main conversation (inline) |
-| **Data Onboarding** | Orchestrates all phases, human-facing | Main conversation |
-| **Metadata** | Profiles data, generates config, catalogs schema | Sub-agent |
-| **Transformation** | Generates PySpark scripts for Bronze→Silver→Gold | Sub-agent |
-| **Quality** | Defines quality rules, implements gates | Sub-agent |
-| **DAG** | Generates Airflow DAG with scheduling | Sub-agent |
-| **Analysis** | Derives SQL from natural language using semantic layer | Sub-agent |
+| Agent | Purpose | When to Run | Folder |
+|-------|---------|-------------|--------|
+| **Environment Setup** | Set up AWS infra (IAM, S3, KMS, Glue, Gateway) | Once per AWS account | [`prompts/environment-setup-agent/`](prompts/environment-setup-agent/) |
+| **Data Onboarding** | Orchestrate Bronze→Silver→Gold pipeline creation | Per data source (repeatable) | [`prompts/data-onboarding-agent/`](prompts/data-onboarding-agent/) |
+| **Data Analysis** | Query semantic layer, create dashboards | On-demand after onboarding | [`prompts/data-analysis-agent/`](prompts/data-analysis-agent/) |
+| **DevOps** | CI/CD, monitoring, cost optimization | Continuous (coming Q2-Q3 2026) | [`prompts/devops-agent/`](prompts/devops-agent/) |
 
-Sub-agents do NOT execute AWS operations — they generate artifacts and tests only. AWS execution happens via MCP servers in the main conversation during deployment.
+**Sub-agents** (spawned by Data Onboarding Agent):
+- **Metadata Agent**: Profile data schema, detect PII, generate semantic metadata
+- **Transformation Agent**: Generate PySpark ETL scripts (Bronze→Silver→Gold)
+- **Quality Agent**: Define quality rules, implement validation gates
+- **Orchestration Agent**: Generate Airflow DAG with task dependencies
+
+Sub-agents generate code/config only. AWS execution happens via MCP tools in main conversation.
 
 ### AWS Services
 
@@ -123,11 +129,11 @@ Claude Code → stdio → 13      Claude Code / API Client
                                        → Gateway (all 13 servers)
 ```
 
-- Deploy Gateway (all 13 servers): `prompts/09-deploy-agentcore-gateway.md`
-- Deploy Runtime (agent + Gateway tools): `prompts/10-deploy-agentcore-runtime.md`
-- Config + 13 IAM policies: `agentcore/`
+- Deploy Gateway (all 13 servers): `prompts/environment-setup-agent/deploy-agentcore-gateway.md`
+- Deploy Runtime (agent + Gateway tools): `prompts/environment-setup-agent/deploy-agentcore-runtime.md`
+- Config + 13 IAM policies: `prompts/environment-setup-agent/agentcore/`
 
-See [agentcore/README.md](agentcore/README.md) for details.
+See [prompts/environment-setup-agent/agentcore/README.md](prompts/environment-setup-agent/agentcore/README.md) for details.
 
 ---
 
@@ -141,7 +147,8 @@ See [agentcore/README.md](agentcore/README.md) for details.
 │   ├── order_transactions/           # Example: orders with star schema + FK
 │   ├── product_inventory/            # Example: inventory with quality checks
 │   ├── us_mutual_funds_etf/          # Example: mutual funds (most complete)
-│   └── healthcare_patients/          # Example: HIPAA governance demo
+│   ├── healthcare_patients/          # Example: HIPAA compliance (deployed to MWAA)
+│   └── financial_portfolios/         # Example: SOX compliance (deployed to MWAA)
 │
 ├── shared/                           # Reusable code across workloads
 │   ├── reic/                         # REIC intent classification (vector search + agent selection)
@@ -157,12 +164,16 @@ See [agentcore/README.md](agentcore/README.md) for details.
 │   ├── orchestrator_examples/        # Multi-workload DAG examples
 │   └── workflows/                    # Demo governance workflows
 │
-├── agentcore/                        # Agentcore Gateway + Runtime config (optional cloud deploy)
 ├── mcp-servers/                      # Custom MCP servers (4 FastMCP servers with SSE support)
 ├── sample_data/                      # Sample CSV files for sales_transactions
 ├── docs/                             # Setup guides and architecture docs
-├── prompts/                          # Reusable prompt patterns (ROUTE → ONBOARD → ENRICH → CONSUME → GOVERN)
+├── prompts/                          # Agent-based prompt organization
 │
+│   ├── environment-setup-agent/      # One-time AWS infrastructure setup (includes agentcore/ config)
+│   ├── data-onboarding-agent/        # Bronze→Silver→Gold pipeline creation (main workflow)
+│   ├── data-analysis-agent/          # Dashboards, queries via semantic layer
+│   ├── devops-agent/                 # CI/CD, monitoring (coming soon)
+│   └── examples/                     # Demo data generation helpers
 ├── CLAUDE.md                         # Agent configuration and conventions
 ├── SKILLS.md                         # Agent skill definitions and prompts
 ├── TOOL_ROUTING.md                   # Which tool to pick (read first)
@@ -269,7 +280,7 @@ See [docs/aws-account-setup.md](docs/aws-account-setup.md) for AWS configuration
 - Lake Formation LF-Tags for column-level access control
 - 4 sensitivity levels: CRITICAL, HIGH, MEDIUM, LOW
 - Integrated into profiling phase — runs automatically on every dataset
-- **Regulation-specific prompts** for GDPR, CCPA, HIPAA, SOX, PCI DSS — see [prompts/regulation/](prompts/regulation/). Each prompt contains self-contained controls (retention, masking, LF-Tags, TBAC grants, audit, quality rules) applied only when a regulation is selected during discovery
+- **Regulation-specific prompts** for GDPR, CCPA, HIPAA, SOX, PCI DSS — see [prompts/data-onboarding-agent/regulation/](prompts/data-onboarding-agent/regulation/). Each prompt contains self-contained controls (retention, masking, LF-Tags, TBAC grants, audit, quality rules) applied only when a regulation is selected during discovery
 
 ### Quality Gates
 - 5 dimensions: Completeness, Accuracy, Consistency, Validity, Uniqueness
@@ -359,25 +370,40 @@ Uses **Amazon Cedar** (the policy language behind Amazon Verified Permissions) t
 **7 Agent Authorization Policies** (who can do what):
 Each agent (Router, Onboarding, Metadata, Transformation, Quality, DAG, Analysis) has a Cedar permit policy defining exactly which actions it can perform on which resources — enforcing least-privilege at the agent level.
 
-**Dual-mode evaluation**: `shared/utils/cedar_client.py` evaluates policies locally (cedarpy) for testing or via AWS Verified Permissions (boto3) for production. Setup script at `shared/scripts/setup_avp.py` syncs all policies to AVP.
+**Dual-mode evaluation**: `shared/utils/cedar_client.py` evaluates policies locally (cedarpy) for testing or via AWS Verified Permissions (boto3) for production. Setup script at `prompts/environment-setup-agent/scripts/setup_avp.py` syncs all policies to AVP.
 
 ### Test-Driven Pipeline Generation
 - Every sub-agent writes unit + integration tests alongside artifacts
 - Tests must pass before the orchestrator proceeds (max 2 retries)
-- 728 passing tests across 6 workloads, all runnable locally without AWS
+- 728+ passing tests across 7 workloads, all runnable locally without AWS
+
+### Pre-Deployment Code Validation (Step 4.5.1)
+Automatically validates all generated code BEFORE deployment to catch 95% of issues in seconds vs. minutes of MWAA debugging:
+
+**5 validation checks** (fail-fast):
+1. **Python syntax**: All scripts compile without errors (`py_compile`)
+2. **DAG parsing**: Airflow can import the DAG file without exceptions
+3. **Import resolution**: All `from X import Y` statements resolve
+4. **Airflow best practices**: 8 patterns enforced (context manager, retries, no hardcoded paths, etc.)
+5. **YAML syntax**: All config files parse correctly
+
+**Auto-fix policy**: Errors are fixed inline (max 2 attempts), no human intervention for syntax errors
+
+**Why it matters**: MWAA takes 1-2 minutes to refresh DAGs after S3 upload. A parsing error blocks ALL DAGs from loading. This step prevents wasted deployment cycles.
 
 ---
 
 ## Example Workloads
 
-| Workload | Tests | Key Features |
-|----------|-------|-------------|
-| `sales_transactions` | 196 | Basic Bronze→Silver→Gold, quality checks |
-| `customer_master` | 118 | KMS encryption, PII masking, Iceberg tables |
-| `order_transactions` | 70 | FK validation, star schema, aggregate calculations |
-| `product_inventory` | 23 + 18* | Advanced quality rules, quarantine handling |
-| `us_mutual_funds_etf` | 321 + 44* | PII detection, QuickSight dashboards, complete DAG |
-| `healthcare_patients` | — | HIPAA compliance, Cedar policy enforcement |
+| Workload | Tests | Status | Key Features |
+|----------|-------|--------|-------------|
+| `sales_transactions` | 196 | Local | Basic Bronze→Silver→Gold, quality checks |
+| `customer_master` | 118 | Local | KMS encryption, PII masking, Iceberg tables |
+| `order_transactions` | 70 | Local | FK validation, star schema, aggregate calculations |
+| `product_inventory` | 23 + 18* | Local | Advanced quality rules, quarantine handling |
+| `us_mutual_funds_etf` | 321 + 44* | Deployed | PII detection, QuickSight dashboards, MWAA DAG |
+| `financial_portfolios` | 200+ | Deployed | SOX compliance, 7 Iceberg tables, MWAA DAG |
+| `healthcare_patients` | Generated | Deployed | HIPAA compliance, PHI masking, TBAC, MWAA DAG |
 
 *Some tests require PySpark (Java) or pipeline output to be generated first. See [RUNNING_TESTS.md](RUNNING_TESTS.md).
 
@@ -397,7 +423,7 @@ Each agent (Router, Onboarding, Metadata, Transformation, Quality, DAG, Analysis
 | [SECURITY.md](SECURITY.md) | Security practices |
 | [RUNNING_TESTS.md](RUNNING_TESTS.md) | Test execution guide |
 | [docs/aws-account-setup.md](docs/aws-account-setup.md) | AWS prerequisites |
-| [agentcore/README.md](agentcore/README.md) | Agentcore Gateway + Runtime (optional) |
+| [prompts/environment-setup-agent/agentcore/README.md](prompts/environment-setup-agent/agentcore/README.md) | Agentcore Gateway + Runtime (optional) |
 | [docs/getting-started.md](docs/getting-started.md) | Quick start guide |
 
 ---
@@ -424,7 +450,7 @@ The platform enforces security at every layer:
 - **Encryption**: AES-256 at rest (zone-specific KMS keys), TLS 1.3 in transit, re-encryption at zone boundaries
 - **PII Detection**: Automatic AI-driven scanning of all columns (name-based + content-based patterns) — see `shared/utils/pii_detection_and_tagging.py`
 - **Column-Level Access**: Lake Formation LF-Tags (`PII_Classification`, `PII_Type`, `Data_Sensitivity`) enable tag-based access control (TBAC) — analysts see only what their role permits
-- **Regulatory Compliance**: Self-contained prompt per regulation in [prompts/regulation/](prompts/regulation/):
+- **Regulatory Compliance**: Self-contained prompt per regulation in [prompts/data-onboarding-agent/regulation/](prompts/data-onboarding-agent/regulation/):
   - **GDPR** — right to erasure, consent tracking, 365-day retention, data minimization
   - **CCPA** — right to know/delete, opt-out tracking, 730-day retention, data lineage
   - **HIPAA** — PHI encryption, minimum necessary access, BAA, 7-year audit trail

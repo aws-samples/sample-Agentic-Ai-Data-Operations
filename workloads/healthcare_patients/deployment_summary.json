@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-03-25T01:58:51.715267",
+  "project": "healthcare_patients",
+  "region": "us-east-1",
+  "account_id": "133661573128",
+  "s3_bucket": "amazon-sagemaker-133661573128-us-east-1-e8cea5855b8a",
+  "scripts_uploaded": true,
+  "databases_created": [
+    "healthcare_patients_bronze",
+    "healthcare_patients_silver",
+    "healthcare_patients_gold"
+  ],
+  "dag_deployed": true,
+  "kms_key": "alias/hipaa-phi-key",
+  "lf_tags_verified": true,
+  "phi_columns_count": 11,
+  "tbac_roles_count": 5,
+  "status": "SUCCESS"
+}

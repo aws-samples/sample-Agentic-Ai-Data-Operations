@@ -1,0 +1,245 @@
+# Healthcare Patients Transformation Rules
+# HIPAA-Compliant Data Transformations with PII Masking
+
+dataset_name: healthcare_patients
+version: "1.0.0"
+compliance: HIPAA
+
+# Bronze → Silver Transformations
+
+deduplication:
+  enabled: true
+  key_columns: [patient_id, visit_date]
+  strategy: keep_latest
+  order_by: ingestion_timestamp
+  description: "Keep latest record per patient visit"
+
+null_handling:
+  strategy: drop_rows
+  critical_columns: [patient_id, ssn, medical_record_number, visit_date]
+  description: "Drop rows with null critical identifiers"
+  non_critical_columns:
+    - column: email
+      action: keep_null
+      reason: "Email may not be collected for all patients"
+    - column: phone
+      action: keep_null
+      reason: "Phone may not be available"
+
+type_casting:
+  - column: treatment_cost
+    from_type: STRING
+    to_type: DECIMAL(10,2)
+    validation: value >= 0
+    on_error: quarantine
+
+  - column: dob
+    from_type: STRING
+    to_type: DATE
+    format: "YYYY-MM-DD"
+    validation: value >= '1900-01-01' AND value <= CURRENT_DATE
+    on_error: quarantine
+
+  - column: visit_date
+    from_type: STRING
+    to_type: DATE
+    format: "YYYY-MM-DD"
+    validation: value <= CURRENT_DATE
+    on_error: quarantine
+
+validation_rules:
+  - column: blood_type
+    rule: value IN ('O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-')
+    severity: warning
+    on_violation: keep_with_flag
+
+  - column: state
+    rule: valid_us_state_abbreviation
+    severity: critical
+    on_violation: quarantine
+
+  - column: treatment_cost
+    rule: value >= 0 AND value < 1000000
+    severity: critical
+    on_violation: quarantine
+
+  - column: visit_date
+    rule: value <= CURRENT_DATE
+    severity: critical
+    on_violation: quarantine
+    description: "No future visit dates allowed"
+
+  - column: dob
+    rule: value >= '1900-01-01' AND value <= CURRENT_DATE
+    severity: critical
+    on_violation: quarantine
+
+# HIPAA PII Masking Rules
+
+pii_masking:
+  staging:
+    - column: ssn
+      method: hash
+      algorithm: SHA-256
+      example: "'123-45-6789' → 'a1b2c3d4e5f6...'"
+      description: "HIPAA requires SSN to be hashed in Staging"
+      reversible: false
+
+    - column: patient_name
+      method: hash
+      algorithm: SHA-256
+      example: "'John Smith' → 'd4e5f6a7b8c9...'"
+      description: "Hash patient name for de-identification"
+      reversible: false
+
+    - column: email
+      method: mask_email
+      example: "'john.smith@email.com' → 'j***@email.com'"
+      description: "Mask email while preserving domain for analysis"
+      reversible: false
+
+    - column: phone
+      method: mask_partial
+      example: "'555-123-4567' → '555-***-4567'"
+      description: "Mask middle digits of phone number"
+      reversible: false
+
+    - column: medical_record_number
+      method: tokenize
+      example: "'MRN-2025-001' → 'MRN-TOKEN-001'"
+      description: "Tokenize MRN for cross-referencing"
+      reversible: true
+      token_map_location: s3://prod-data-lake/tokens/mrn_tokens.parquet
+
+    - column: address
+      method: keep
+      reason: "Needed for geography analysis (MEDIUM sensitivity)"
+      lf_tag_enforcement: true
+
+    - column: city
+      method: keep
+      reason: "Needed for geography analysis"
+      lf_tag_enforcement: true
+
+    - column: state
+      method: keep
+      reason: "Needed for geography analysis"
+      lf_tag_enforcement: true
+
+    - column: zip
+      method: keep
+      reason: "Needed for geography analysis"
+      lf_tag_enforcement: true
+
+  publish:
+    - method: aggregation_only
+      description: "Publish zone contains only aggregated data, no individual PHI"
+      tables:
+        - fact_patient_visits_agg
+        - dim_geography
+      individual_records: false
+
+derived_columns:
+  - name: age
+    formula: "YEAR(CURRENT_DATE) - YEAR(dob)"
+    description: "Patient age in years"
+    data_type: INTEGER
+    phi: false
+
+  - name: age_group
+    formula: |
+      CASE
+        WHEN age < 18 THEN 'Under 18'
+        WHEN age BETWEEN 18 AND 34 THEN '18-34'
+        WHEN age BETWEEN 35 AND 49 THEN '35-49'
+        WHEN age BETWEEN 50 AND 64 THEN '50-64'
+        WHEN age >= 65 THEN '65+'
+      END
+    description: "Age group buckets for analysis"
+    data_type: STRING
+    phi: false
+
+  - name: cost_category
+    formula: |
+      CASE
+        WHEN treatment_cost < 200 THEN 'Low'
+        WHEN treatment_cost BETWEEN 200 AND 500 THEN 'Medium'
+        WHEN treatment_cost > 500 THEN 'High'
+      END
+    description: "Treatment cost category"
+    data_type: STRING
+    phi: false
+
+quarantine_rules:
+  enabled: true
+  location: s3://prod-data-lake/quarantine/healthcare_patients/
+  retention_days: 90
+  reasons:
+    - invalid_type_cast
+    - validation_failure
+    - null_critical_column
+  notification:
+    on_quarantine: true
+    email: healthcare-ops-team@hospital.com
+
+# Silver → Gold Transformations
+
+star_schema:
+  fact_table:
+    name: fact_patient_visits
+    grain: one_row_per_visit
+    columns:
+      - patient_id
+      - visit_date
+      - diagnosis_key
+      - insurance_key
+      - treatment_cost
+      - age
+      - age_group
+      - cost_category
+    aggregations:
+      - name: fact_patient_visits_agg
+        group_by: [visit_date, state, diagnosis, insurance_provider]
+        measures:
+          - SUM(treatment_cost) as total_revenue
+          - COUNT(DISTINCT patient_id) as patient_count
+          - COUNT(*) as visit_count
+          - AVG(treatment_cost) as avg_cost
+
+  dimensions:
+    - name: dim_geography
+      type: SCD_TYPE_1
+      columns: [state, city, zip]
+      surrogate_key: geography_key
+      business_key: [state, city, zip]
+      phi: true
+      sensitivity: MEDIUM
+
+    - name: dim_diagnosis
+      type: SCD_TYPE_1
+      columns: [diagnosis]
+      surrogate_key: diagnosis_key
+      business_key: [diagnosis]
+      phi: false
+
+    - name: dim_insurance
+      type: SCD_TYPE_1
+      columns: [insurance_provider]
+      surrogate_key: insurance_key
+      business_key: [insurance_provider]
+      phi: false
+
+idempotency:
+  enabled: true
+  strategy: upsert
+  merge_key: [patient_id, visit_date]
+  description: "Running transformation twice produces identical output"
+
+lineage:
+  enabled: true
+  record_level: true
+  metadata:
+    - source_file
+    - ingestion_timestamp
+    - transformation_version
+    - processing_timestamp

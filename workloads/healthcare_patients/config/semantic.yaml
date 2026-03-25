@@ -1,0 +1,237 @@
+# Healthcare Patients Semantic Layer Configuration
+# For AI Analysis Agent - Business Context and Query Patterns
+
+dataset_name: healthcare_patients
+version: "1.0.0"
+compliance: HIPAA
+
+fact_table:
+  name: patient_visits
+  grain: "One row = one patient visit"
+  description: "Patient visit records with treatment costs and diagnoses"
+
+measures:
+  - name: treatment_cost
+    aggregation: SUM
+    source_column: treatment_cost
+    description: "Total treatment cost across visits"
+    unit: USD
+    format: "$#,##0.00"
+    data_type: DECIMAL
+
+  - name: patient_count
+    aggregation: COUNT_DISTINCT
+    source_column: patient_id
+    description: "Unique patient count"
+    unit: count
+    format: "#,##0"
+    data_type: INTEGER
+
+  - name: visit_count
+    aggregation: COUNT
+    source_column: "*"
+    description: "Total number of visits"
+    unit: count
+    format: "#,##0"
+    data_type: INTEGER
+
+  - name: avg_treatment_cost
+    aggregation: AVG
+    source_column: treatment_cost
+    description: "Average cost per visit"
+    unit: USD
+    format: "$#,##0.00"
+    data_type: DECIMAL
+
+dimensions:
+  - name: blood_type
+    source_column: blood_type
+    description: "Patient blood type"
+    values: ["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"]
+    phi: false
+    data_type: STRING
+
+  - name: diagnosis
+    source_column: diagnosis
+    description: "Primary diagnosis"
+    values: free_text
+    phi: false
+    data_type: STRING
+    examples: ["Hypertension", "Diabetes Type 2", "Asthma"]
+
+  - name: insurance_provider
+    source_column: insurance_provider
+    description: "Insurance company"
+    values: ["Blue Cross", "Aetna", "UnitedHealth", "Cigna", "Humana", "Kaiser"]
+    phi: false
+    data_type: STRING
+
+  - name: state
+    source_column: state
+    description: "Patient state"
+    values: US_STATES
+    phi: true
+    sensitivity: MEDIUM
+    data_type: STRING
+
+  - name: city
+    source_column: city
+    description: "Patient city"
+    values: free_text
+    phi: true
+    sensitivity: MEDIUM
+    data_type: STRING
+
+temporal:
+  - name: visit_date
+    source_column: visit_date
+    description: "Date of patient visit"
+    grain: day
+    primary: true
+    phi: true
+    sensitivity: HIGH
+    data_type: DATE
+
+  - name: dob
+    source_column: dob
+    description: "Patient date of birth (for age calculations)"
+    grain: day
+    primary: false
+    phi: true
+    sensitivity: HIGH
+    data_type: DATE
+    usage: age_calculations_only
+
+identifiers:
+  - name: patient_id
+    source_column: patient_id
+    description: "Primary key"
+    role: PK
+    phi: false
+
+  - name: ssn
+    source_column: ssn
+    description: "Social Security Number (CRITICAL PHI)"
+    role: identifier
+    phi: true
+    sensitivity: CRITICAL
+
+  - name: medical_record_number
+    source_column: medical_record_number
+    description: "Hospital medical record number (CRITICAL PHI)"
+    role: identifier
+    phi: true
+    sensitivity: CRITICAL
+
+derived_columns:
+  - name: age
+    formula: "YEAR(CURRENT_DATE) - YEAR(dob)"
+    description: "Patient age in years"
+    data_type: INTEGER
+
+  - name: cost_per_patient
+    formula: "SUM(treatment_cost) / COUNT(DISTINCT patient_id)"
+    description: "Average spend per patient"
+    data_type: DECIMAL
+
+hierarchies:
+  - name: geography
+    levels: [state, city, zip]
+    description: "Geographic hierarchy for regional analysis"
+
+  - name: diagnosis_category
+    levels: [diagnosis]
+    description: "Diagnosis categories (to be mapped to ICD-10 in future)"
+    future_enhancement: true
+
+default_filters:
+  - context: "Revenue queries"
+    condition: "WHERE treatment_cost > 0"
+    description: "Exclude zero-cost visits from revenue analysis"
+
+  - context: "Active patients"
+    condition: "WHERE visit_date >= CURRENT_DATE - INTERVAL 365 DAY"
+    description: "Filter to patients seen in last year"
+
+business_terms:
+  - term: "revenue"
+    synonyms: ["income", "charges"]
+    sql_expression: "SUM(treatment_cost)"
+    definition: "Total treatment charges"
+
+  - term: "patient load"
+    synonyms: ["patient volume"]
+    sql_expression: "COUNT(DISTINCT patient_id)"
+    definition: "Number of unique patients"
+
+  - term: "average visit cost"
+    synonyms: ["avg charge"]
+    sql_expression: "AVG(treatment_cost)"
+    definition: "Mean cost per visit"
+
+time_intelligence:
+  fiscal_year_start: January
+  week_starts: Sunday
+  comparisons: [MoM, QoQ, YoY, MTD, YTD]
+  timezone: UTC
+
+data_freshness:
+  refresh: daily
+  latest_available: "T-1 day"
+  description: "Previous day's visits"
+
+seed_questions:
+  - question: "What was total revenue last month?"
+    sql_pattern: "SELECT SUM(treatment_cost) FROM visits WHERE visit_date >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL 1 MONTH) AND visit_date < DATE_TRUNC('month', CURRENT_DATE)"
+    complexity: simple
+
+  - question: "How many patients visited in Q1?"
+    sql_pattern: "SELECT COUNT(DISTINCT patient_id) FROM visits WHERE QUARTER(visit_date) = 1 AND YEAR(visit_date) = YEAR(CURRENT_DATE)"
+    complexity: simple
+
+  - question: "What's the average treatment cost by diagnosis?"
+    sql_pattern: "SELECT diagnosis, AVG(treatment_cost) as avg_cost FROM visits GROUP BY diagnosis ORDER BY avg_cost DESC"
+    complexity: medium
+
+  - question: "Which insurance provider has the most patients?"
+    sql_pattern: "SELECT insurance_provider, COUNT(DISTINCT patient_id) as patient_count FROM visits GROUP BY insurance_provider ORDER BY patient_count DESC LIMIT 10"
+    complexity: medium
+
+  - question: "Show me patient visits by state"
+    sql_pattern: "SELECT state, COUNT(*) as visit_count FROM visits GROUP BY state ORDER BY visit_count DESC"
+    complexity: simple
+
+  - question: "What's our month-over-month revenue growth?"
+    sql_pattern: "WITH monthly AS (SELECT DATE_TRUNC('month', visit_date) as month, SUM(treatment_cost) as revenue FROM visits GROUP BY 1) SELECT month, revenue, LAG(revenue) OVER (ORDER BY month) as prev_month, ((revenue - LAG(revenue) OVER (ORDER BY month)) / LAG(revenue) OVER (ORDER BY month)) * 100 as growth_pct FROM monthly"
+    complexity: advanced
+
+  - question: "Which blood type has highest treatment costs?"
+    sql_pattern: "SELECT blood_type, AVG(treatment_cost) as avg_cost FROM visits GROUP BY blood_type ORDER BY avg_cost DESC"
+    complexity: medium
+
+  - question: "How many patients are over 65?"
+    sql_pattern: "SELECT COUNT(DISTINCT patient_id) as senior_patients FROM visits WHERE (YEAR(CURRENT_DATE) - YEAR(dob)) >= 65"
+    complexity: medium
+
+  - question: "What's the revenue breakdown by month?"
+    sql_pattern: "SELECT DATE_TRUNC('month', visit_date) as month, SUM(treatment_cost) as revenue FROM visits GROUP BY 1 ORDER BY 1"
+    complexity: simple
+
+  - question: "Which diagnoses generate the most revenue?"
+    sql_pattern: "SELECT diagnosis, SUM(treatment_cost) as total_revenue, COUNT(*) as visit_count FROM visits GROUP BY diagnosis ORDER BY total_revenue DESC LIMIT 10"
+    complexity: medium
+
+phi_de_identification:
+  publish_zone:
+    method: aggregation_only
+    description: "Only aggregated metrics, no individual PHI"
+    tables:
+      - name: dim_geography
+        includes_phi: true
+        aggregation_level: state_city
+        description: "Geography dimension (state, city) - no individual addresses"
+
+      - name: fact_patient_visits_agg
+        includes_phi: false
+        aggregation_level: daily
+        description: "Daily aggregated metrics, no individual patient data"

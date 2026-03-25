@@ -4,229 +4,377 @@
   "source": "claude-code",
   "elements": [
     {
-      "id": "ft_title", "type": "text", "x": 140, "y": 20, "width": 960, "height": 35,
-      "text": "Agentic Data Onboarding — End-to-End Pipeline Flow",
-      "fontSize": 28, "fontFamily": 2, "textAlign": "center", "verticalAlign": "top", "containerId": null, "originalText": "Agentic Data Onboarding — End-to-End Pipeline Flow", "lineHeight": 1.25,
-      "strokeColor": "#1e1e1e", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": null, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 1, "isDeleted": false, "seed": 2000001
+      "id": "title",
+      "type": "text",
+      "x": 200,
+      "y": 20,
+      "width": 800,
+      "height": 35,
+      "text": "4-Agent Workflow — Environment Setup → Onboarding → Analysis → DevOps",
+      "fontSize": 24,
+      "fontFamily": 2,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "containerId": null,
+      "originalText": "4-Agent Workflow — Environment Setup → Onboarding → Analysis → DevOps",
+      "lineHeight": 1.25,
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "angle": 0,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false
     },
 
     {
-      "id": "r_setup", "type": "rectangle", "x": 480, "y": 80, "width": 300, "height": 50,
-      "strokeColor": "#424242", "backgroundColor": "#fafafa", "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 3},
-      "boundElements": [{"id": "t_setup", "type": "text"}, {"id": "a_setup_mode", "type": "arrow"}], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 2, "isDeleted": false, "seed": 2000002
+      "id": "r_env",
+      "type": "rectangle",
+      "x": 100,
+      "y": 100,
+      "width": 200,
+      "height": 500,
+      "strokeColor": "#7b1fa2",
+      "backgroundColor": "#f3e5f5",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "angle": 0,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {"type": 3},
+      "boundElements": [{"id": "t_env", "type": "text"}, {"id": "a1", "type": "arrow"}],
+      "updated": 1,
+      "link": null,
+      "locked": false
     },
     {
-      "id": "t_setup", "type": "text", "x": 490, "y": 88, "width": 280, "height": 35, "text": "00 — Setup Environment\n(AWS resources, one-time)",
-      "fontSize": 14, "fontFamily": 2, "textAlign": "center", "verticalAlign": "middle", "containerId": "r_setup", "originalText": "00 — Setup Environment\n(AWS resources, one-time)", "lineHeight": 1.25,
-      "strokeColor": "#424242", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": null, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 3, "isDeleted": false, "seed": 2000003
-    },
-
-    {
-      "id": "a_setup_mode", "type": "arrow", "x": 630, "y": 130, "width": 0, "height": 35,
-      "strokeColor": "#1e1e1e", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 2}, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 4, "isDeleted": false, "seed": 2000004,
-      "points": [[0, 0], [0, 35]], "startBinding": {"elementId": "r_setup", "focus": 0, "gap": 5}, "endBinding": {"elementId": "d_mode", "focus": 0, "gap": 5}, "lastCommittedPoint": null, "startArrowhead": null, "endArrowhead": "arrow"
-    },
-
-    {
-      "id": "d_mode", "type": "diamond", "x": 545, "y": 170, "width": 170, "height": 80,
-      "strokeColor": "#424242", "backgroundColor": "#fff8e1", "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 2},
-      "boundElements": [{"id": "t_mode", "type": "text"}, {"id": "a_setup_mode", "type": "arrow"}, {"id": "a_mode_local", "type": "arrow"}, {"id": "a_mode_gw", "type": "arrow"}], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 5, "isDeleted": false, "seed": 2000005
-    },
-    {
-      "id": "t_mode", "type": "text", "x": 578, "y": 195, "width": 105, "height": 30, "text": "MCP Mode?\n(Step 1a)",
-      "fontSize": 13, "fontFamily": 2, "textAlign": "center", "verticalAlign": "middle", "containerId": "d_mode", "originalText": "MCP Mode?\n(Step 1a)", "lineHeight": 1.25,
-      "strokeColor": "#424242", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": null, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 6, "isDeleted": false, "seed": 2000006
-    },
-
-    {
-      "id": "a_mode_local", "type": "arrow", "x": 545, "y": 210, "width": 200, "height": 0,
-      "strokeColor": "#1565c0", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 2}, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 7, "isDeleted": false, "seed": 2000007,
-      "points": [[0, 0], [-200, 0]], "startBinding": {"elementId": "d_mode", "focus": 0, "gap": 5}, "endBinding": {"elementId": "r_local", "focus": 0, "gap": 5}, "lastCommittedPoint": null, "startArrowhead": null, "endArrowhead": "arrow"
-    },
-    {
-      "id": "ft_local_label", "type": "text", "x": 400, "y": 192, "width": 60, "height": 18, "text": "LOCAL",
-      "fontSize": 12, "fontFamily": 2, "textAlign": "center", "verticalAlign": "top", "containerId": null, "originalText": "LOCAL", "lineHeight": 1.25,
-      "strokeColor": "#1565c0", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": null, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 8, "isDeleted": false, "seed": 2000008
-    },
-
-    {
-      "id": "r_local", "type": "rectangle", "x": 160, "y": 190, "width": 180, "height": 42,
-      "strokeColor": "#1565c0", "backgroundColor": "#e3f2fd", "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 3},
-      "boundElements": [{"id": "t_local", "type": "text"}, {"id": "a_mode_local", "type": "arrow"}, {"id": "a_local_p0", "type": "arrow"}], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 9, "isDeleted": false, "seed": 2000009
-    },
-    {
-      "id": "t_local", "type": "text", "x": 170, "y": 198, "width": 160, "height": 25, "text": ".mcp.json (stdio)",
-      "fontSize": 14, "fontFamily": 2, "textAlign": "center", "verticalAlign": "middle", "containerId": "r_local", "originalText": ".mcp.json (stdio)", "lineHeight": 1.25,
-      "strokeColor": "#1565c0", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": null, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 10, "isDeleted": false, "seed": 2000010
-    },
-
-    {
-      "id": "a_mode_gw", "type": "arrow", "x": 715, "y": 210, "width": 200, "height": 0,
-      "strokeColor": "#00695c", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 2}, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 11, "isDeleted": false, "seed": 2000011,
-      "points": [[0, 0], [200, 0]], "startBinding": {"elementId": "d_mode", "focus": 0, "gap": 5}, "endBinding": {"elementId": "r_gw09", "focus": 0, "gap": 5}, "lastCommittedPoint": null, "startArrowhead": null, "endArrowhead": "arrow"
-    },
-    {
-      "id": "ft_gw_label", "type": "text", "x": 790, "y": 192, "width": 80, "height": 18, "text": "GATEWAY",
-      "fontSize": 12, "fontFamily": 2, "textAlign": "center", "verticalAlign": "top", "containerId": null, "originalText": "GATEWAY", "lineHeight": 1.25,
-      "strokeColor": "#00695c", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": null, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 12, "isDeleted": false, "seed": 2000012
+      "id": "t_env",
+      "type": "text",
+      "x": 110,
+      "y": 110,
+      "width": 180,
+      "height": 480,
+      "text": "🏗️\nEnvironment\nSetup Agent\n\nRun: Once\n\nPrompts:\n• setup-aws-\n  infrastructure\n• deploy-\n  agentcore-\n  gateway\n• deploy-\n  agentcore-\n  runtime\n\nCreates:\n• IAM roles\n• S3 buckets\n• KMS keys\n• Glue DBs\n• LF-Tags\n• MWAA\n• Gateway\n• Runtime",
+      "fontSize": 14,
+      "fontFamily": 2,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": "r_env",
+      "originalText": "🏗️\nEnvironment\nSetup Agent\n\nRun: Once\n\nPrompts:\n• setup-aws-\n  infrastructure\n• deploy-\n  agentcore-\n  gateway\n• deploy-\n  agentcore-\n  runtime\n\nCreates:\n• IAM roles\n• S3 buckets\n• KMS keys\n• Glue DBs\n• LF-Tags\n• MWAA\n• Gateway\n• Runtime",
+      "lineHeight": 1.25,
+      "strokeColor": "#7b1fa2",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "angle": 0,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false
     },
 
     {
-      "id": "r_gw09", "type": "rectangle", "x": 920, "y": 185, "width": 240, "height": 50,
-      "strokeColor": "#00695c", "backgroundColor": "#e0f2f1", "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 3},
-      "boundElements": [{"id": "t_gw09", "type": "text"}, {"id": "a_mode_gw", "type": "arrow"}, {"id": "a_09_10", "type": "arrow"}], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 13, "isDeleted": false, "seed": 2000013
-    },
-    {
-      "id": "t_gw09", "type": "text", "x": 930, "y": 193, "width": 220, "height": 35, "text": "09 — Deploy Gateway\n(13 MCP servers, SSE)",
-      "fontSize": 13, "fontFamily": 2, "textAlign": "center", "verticalAlign": "middle", "containerId": "r_gw09", "originalText": "09 — Deploy Gateway\n(13 MCP servers, SSE)", "lineHeight": 1.25,
-      "strokeColor": "#00695c", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": null, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 14, "isDeleted": false, "seed": 2000014
-    },
-
-    {
-      "id": "a_09_10", "type": "arrow", "x": 1040, "y": 235, "width": 0, "height": 25,
-      "strokeColor": "#00695c", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 2}, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 15, "isDeleted": false, "seed": 2000015,
-      "points": [[0, 0], [0, 25]], "startBinding": {"elementId": "r_gw09", "focus": 0, "gap": 5}, "endBinding": {"elementId": "r_gw10", "focus": 0, "gap": 5}, "lastCommittedPoint": null, "startArrowhead": null, "endArrowhead": "arrow"
-    },
-
-    {
-      "id": "r_gw10", "type": "rectangle", "x": 920, "y": 265, "width": 240, "height": 50,
-      "strokeColor": "#00695c", "backgroundColor": "#e0f2f1", "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "dashed", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 3},
-      "boundElements": [{"id": "t_gw10", "type": "text"}, {"id": "a_09_10", "type": "arrow"}, {"id": "a_gw_p0", "type": "arrow"}], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 16, "isDeleted": false, "seed": 2000016
-    },
-    {
-      "id": "t_gw10", "type": "text", "x": 930, "y": 273, "width": 220, "height": 35, "text": "10 — Deploy Runtime (optional)\n(agent + Gateway tools, API)",
-      "fontSize": 13, "fontFamily": 2, "textAlign": "center", "verticalAlign": "middle", "containerId": "r_gw10", "originalText": "10 — Deploy Runtime (optional)\n(agent + Gateway tools, API)", "lineHeight": 1.25,
-      "strokeColor": "#00695c", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": null, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 17, "isDeleted": false, "seed": 2000017
-    },
-
-    {
-      "id": "a_local_p0", "type": "arrow", "x": 250, "y": 232, "width": 380, "height": 148,
-      "strokeColor": "#1565c0", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 2}, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 18, "isDeleted": false, "seed": 2000018,
-      "points": [[0, 0], [0, 148], [380, 148]], "startBinding": {"elementId": "r_local", "focus": 0, "gap": 5}, "endBinding": {"elementId": "r_p0", "focus": -0.5, "gap": 5}, "lastCommittedPoint": null, "startArrowhead": null, "endArrowhead": "arrow"
-    },
-    {
-      "id": "a_gw_p0", "type": "arrow", "x": 1040, "y": 315, "width": 410, "height": 65,
-      "strokeColor": "#00695c", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 2}, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 19, "isDeleted": false, "seed": 2000019,
-      "points": [[0, 0], [0, 65], [-410, 65]], "startBinding": {"elementId": "r_gw10", "focus": 0, "gap": 5}, "endBinding": {"elementId": "r_p0", "focus": 0.5, "gap": 5}, "lastCommittedPoint": null, "startArrowhead": null, "endArrowhead": "arrow"
+      "id": "a1",
+      "type": "arrow",
+      "x": 300,
+      "y": 350,
+      "width": 50,
+      "height": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 3,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "angle": 0,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {"type": 2},
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "points": [[0, 0], [50, 0]],
+      "startBinding": {"elementId": "r_env", "focus": 0, "gap": 5},
+      "endBinding": {"elementId": "r_onboarding", "focus": 0, "gap": 5},
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow"
     },
 
     {
-      "id": "ft_both_paths", "type": "text", "x": 450, "y": 350, "width": 360, "height": 18, "text": "Both paths converge here (identical from Phase 0 on)",
-      "fontSize": 12, "fontFamily": 2, "textAlign": "center", "verticalAlign": "top", "containerId": null, "originalText": "Both paths converge here (identical from Phase 0 on)", "lineHeight": 1.25,
-      "strokeColor": "#616161", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": null, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 20, "isDeleted": false, "seed": 2000020
+      "id": "r_onboarding",
+      "type": "rectangle",
+      "x": 355,
+      "y": 100,
+      "width": 200,
+      "height": 500,
+      "strokeColor": "#1565c0",
+      "backgroundColor": "#e3f2fd",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "angle": 0,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {"type": 3},
+      "boundElements": [{"id": "t_onboarding", "type": "text"}, {"id": "a1", "type": "arrow"}, {"id": "a2", "type": "arrow"}],
+      "updated": 1,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "t_onboarding",
+      "type": "text",
+      "x": 365,
+      "y": 110,
+      "width": 180,
+      "height": 480,
+      "text": "📊\nData\nOnboarding\nAgent\n\nRun: Per source\n\nPhases:\n0. Health Check\n1. Discovery\n2. Validation\n3. Profiling\n4. Artifacts\n   (spawns 4\n    sub-agents)\n5. Deployment\n\nCreates:\n• Bronze→\n  Silver→Gold\n• Glue jobs\n• Airflow DAG\n• Quality checks\n• LF-Tags",
+      "fontSize": 14,
+      "fontFamily": 2,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": "r_onboarding",
+      "originalText": "📊\nData\nOnboarding\nAgent\n\nRun: Per source\n\nPhases:\n0. Health Check\n1. Discovery\n2. Validation\n3. Profiling\n4. Artifacts\n   (spawns 4\n    sub-agents)\n5. Deployment\n\nCreates:\n• Bronze→\n  Silver→Gold\n• Glue jobs\n• Airflow DAG\n• Quality checks\n• LF-Tags",
+      "lineHeight": 1.25,
+      "strokeColor": "#1565c0",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "angle": 0,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false
     },
 
     {
-      "id": "r_p0", "type": "rectangle", "x": 480, "y": 380, "width": 300, "height": 80,
-      "strokeColor": "#7b1fa2", "backgroundColor": "#f3e5f5", "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 3},
-      "boundElements": [{"id": "t_p0", "type": "text"}, {"id": "a_local_p0", "type": "arrow"}, {"id": "a_gw_p0", "type": "arrow"}, {"id": "a_p0_01", "type": "arrow"}], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 21, "isDeleted": false, "seed": 2000021
-    },
-    {
-      "id": "t_p0", "type": "text", "x": 490, "y": 388, "width": 280, "height": 65, "text": "Phase 0: Health Check\n0.1 Scan AWS resources\n0.2 MCP health check (13 servers)\nGate: pass or block",
-      "fontSize": 13, "fontFamily": 2, "textAlign": "center", "verticalAlign": "top", "containerId": "r_p0", "originalText": "Phase 0: Health Check\n0.1 Scan AWS resources\n0.2 MCP health check (13 servers)\nGate: pass or block", "lineHeight": 1.25,
-      "strokeColor": "#7b1fa2", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": null, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 22, "isDeleted": false, "seed": 2000022
-    },
-
-    {
-      "id": "a_p0_01", "type": "arrow", "x": 630, "y": 460, "width": 0, "height": 30,
-      "strokeColor": "#1e1e1e", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 2}, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 23, "isDeleted": false, "seed": 2000023,
-      "points": [[0, 0], [0, 30]], "startBinding": {"elementId": "r_p0", "focus": 0, "gap": 5}, "endBinding": {"elementId": "r_01", "focus": 0, "gap": 5}, "lastCommittedPoint": null, "startArrowhead": null, "endArrowhead": "arrow"
-    },
-
-    {
-      "id": "r_01", "type": "rectangle", "x": 480, "y": 495, "width": 300, "height": 45,
-      "strokeColor": "#283593", "backgroundColor": "#e8eaf6", "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 3},
-      "boundElements": [{"id": "t_01", "type": "text"}, {"id": "a_p0_01", "type": "arrow"}, {"id": "a_01_03", "type": "arrow"}], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 24, "isDeleted": false, "seed": 2000024
-    },
-    {
-      "id": "t_01", "type": "text", "x": 490, "y": 505, "width": 280, "height": 25, "text": "01 — Route (check existing data)",
-      "fontSize": 15, "fontFamily": 2, "textAlign": "center", "verticalAlign": "middle", "containerId": "r_01", "originalText": "01 — Route (check existing data)", "lineHeight": 1.25,
-      "strokeColor": "#283593", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": null, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 25, "isDeleted": false, "seed": 2000025
-    },
-
-    {
-      "id": "a_01_03", "type": "arrow", "x": 630, "y": 540, "width": 0, "height": 25,
-      "strokeColor": "#1e1e1e", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 2}, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 26, "isDeleted": false, "seed": 2000026,
-      "points": [[0, 0], [0, 25]], "startBinding": {"elementId": "r_01", "focus": 0, "gap": 5}, "endBinding": {"elementId": "r_03", "focus": 0, "gap": 5}, "lastCommittedPoint": null, "startArrowhead": null, "endArrowhead": "arrow"
+      "id": "a2",
+      "type": "arrow",
+      "x": 555,
+      "y": 350,
+      "width": 50,
+      "height": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 3,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "angle": 0,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {"type": 2},
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "points": [[0, 0], [50, 0]],
+      "startBinding": {"elementId": "r_onboarding", "focus": 0, "gap": 5},
+      "endBinding": {"elementId": "r_analysis", "focus": 0, "gap": 5},
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow"
     },
 
     {
-      "id": "r_03", "type": "rectangle", "x": 430, "y": 570, "width": 400, "height": 130,
-      "strokeColor": "#388e3c", "backgroundColor": "#e8f5e9", "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 3},
-      "boundElements": [{"id": "t_03", "type": "text"}, {"id": "a_01_03", "type": "arrow"}, {"id": "a_03_04", "type": "arrow"}], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 27, "isDeleted": false, "seed": 2000027
+      "id": "r_analysis",
+      "type": "rectangle",
+      "x": 610,
+      "y": 100,
+      "width": 200,
+      "height": 500,
+      "strokeColor": "#388e3c",
+      "backgroundColor": "#e8f5e9",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "angle": 0,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {"type": 3},
+      "boundElements": [{"id": "t_analysis", "type": "text"}, {"id": "a2", "type": "arrow"}, {"id": "a3", "type": "arrow"}],
+      "updated": 1,
+      "link": null,
+      "locked": false
     },
     {
-      "id": "t_03", "type": "text", "x": 440, "y": 578, "width": 380, "height": 115, "text": "03 — ONBOARD (master prompt)\n\nPhase 1: Discovery (questions)\nPhase 2: Dedup & Validation\nPhase 3: Profiling (sub-agent)\nPhase 4: Build Pipeline (4 sub-agents + test gates)\nPhase 5: Deploy artifacts to AWS via MCP",
-      "fontSize": 13, "fontFamily": 2, "textAlign": "center", "verticalAlign": "top", "containerId": "r_03", "originalText": "03 — ONBOARD (master prompt)\n\nPhase 1: Discovery (questions)\nPhase 2: Dedup & Validation\nPhase 3: Profiling (sub-agent)\nPhase 4: Build Pipeline (4 sub-agents + test gates)\nPhase 5: Deploy artifacts to AWS via MCP", "lineHeight": 1.25,
-      "strokeColor": "#388e3c", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": null, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 28, "isDeleted": false, "seed": 2000028
-    },
-
-    {
-      "id": "a_03_04", "type": "arrow", "x": 630, "y": 700, "width": 0, "height": 25,
-      "strokeColor": "#1e1e1e", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 2}, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 29, "isDeleted": false, "seed": 2000029,
-      "points": [[0, 0], [0, 25]], "startBinding": {"elementId": "r_03", "focus": 0, "gap": 5}, "endBinding": {"elementId": "r_04", "focus": 0, "gap": 5}, "lastCommittedPoint": null, "startArrowhead": null, "endArrowhead": "arrow"
-    },
-
-    {
-      "id": "r_04", "type": "rectangle", "x": 480, "y": 730, "width": 300, "height": 45,
-      "strokeColor": "#1565c0", "backgroundColor": "#e3f2fd", "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 3},
-      "boundElements": [{"id": "t_04", "type": "text"}, {"id": "a_03_04", "type": "arrow"}, {"id": "a_04_05", "type": "arrow"}], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 30, "isDeleted": false, "seed": 2000030
-    },
-    {
-      "id": "t_04", "type": "text", "x": 490, "y": 740, "width": 280, "height": 25, "text": "04 — Enrich (link datasets via FK)",
-      "fontSize": 15, "fontFamily": 2, "textAlign": "center", "verticalAlign": "middle", "containerId": "r_04", "originalText": "04 — Enrich (link datasets via FK)", "lineHeight": 1.25,
-      "strokeColor": "#1565c0", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": null, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 31, "isDeleted": false, "seed": 2000031
-    },
-
-    {
-      "id": "a_04_05", "type": "arrow", "x": 630, "y": 775, "width": 0, "height": 25,
-      "strokeColor": "#1e1e1e", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 2}, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 32, "isDeleted": false, "seed": 2000032,
-      "points": [[0, 0], [0, 25]], "startBinding": {"elementId": "r_04", "focus": 0, "gap": 5}, "endBinding": {"elementId": "r_05", "focus": 0, "gap": 5}, "lastCommittedPoint": null, "startArrowhead": null, "endArrowhead": "arrow"
-    },
-
-    {
-      "id": "r_05", "type": "rectangle", "x": 480, "y": 805, "width": 300, "height": 45,
-      "strokeColor": "#ad1457", "backgroundColor": "#fce4ec", "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 3},
-      "boundElements": [{"id": "t_05", "type": "text"}, {"id": "a_04_05", "type": "arrow"}, {"id": "a_05_06", "type": "arrow"}], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 33, "isDeleted": false, "seed": 2000033
-    },
-    {
-      "id": "t_05", "type": "text", "x": 490, "y": 815, "width": 280, "height": 25, "text": "05 — Consume (QuickSight dashboard)",
-      "fontSize": 15, "fontFamily": 2, "textAlign": "center", "verticalAlign": "middle", "containerId": "r_05", "originalText": "05 — Consume (QuickSight dashboard)", "lineHeight": 1.25,
-      "strokeColor": "#ad1457", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": null, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 34, "isDeleted": false, "seed": 2000034
-    },
-
-    {
-      "id": "a_05_06", "type": "arrow", "x": 630, "y": 850, "width": 0, "height": 25,
-      "strokeColor": "#1e1e1e", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 2}, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 35, "isDeleted": false, "seed": 2000035,
-      "points": [[0, 0], [0, 25]], "startBinding": {"elementId": "r_05", "focus": 0, "gap": 5}, "endBinding": {"elementId": "r_06", "focus": 0, "gap": 5}, "lastCommittedPoint": null, "startArrowhead": null, "endArrowhead": "arrow"
-    },
-
-    {
-      "id": "r_06", "type": "rectangle", "x": 480, "y": 880, "width": 300, "height": 45,
-      "strokeColor": "#00695c", "backgroundColor": "#e0f2f1", "fillStyle": "solid", "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 3},
-      "boundElements": [{"id": "t_06", "type": "text"}, {"id": "a_05_06", "type": "arrow"}], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 36, "isDeleted": false, "seed": 2000036
-    },
-    {
-      "id": "t_06", "type": "text", "x": 490, "y": 890, "width": 280, "height": 25, "text": "06 — Govern (lineage & compliance)",
-      "fontSize": 15, "fontFamily": 2, "textAlign": "center", "verticalAlign": "middle", "containerId": "r_06", "originalText": "06 — Govern (lineage & compliance)", "lineHeight": 1.25,
-      "strokeColor": "#00695c", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": null, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 37, "isDeleted": false, "seed": 2000037
+      "id": "t_analysis",
+      "type": "text",
+      "x": 620,
+      "y": 110,
+      "width": 180,
+      "height": 480,
+      "text": "📈\nData Analysis\nAgent\n\nRun: On-demand\n\nPrompts:\n• create-\n  dashboard\n• query-\n  semantic-layer\n  (future)\n• design-\n  visualizations\n  (future)\n\nReads:\n• SageMaker\n  Catalog\n• SynoDB\n• Gold zone\n\nCreates:\n• QuickSight\n  dashboards\n• SQL queries\n• Saves to\n  SynoDB",
+      "fontSize": 14,
+      "fontFamily": 2,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": "r_analysis",
+      "originalText": "📈\nData Analysis\nAgent\n\nRun: On-demand\n\nPrompts:\n• create-\n  dashboard\n• query-\n  semantic-layer\n  (future)\n• design-\n  visualizations\n  (future)\n\nReads:\n• SageMaker\n  Catalog\n• SynoDB\n• Gold zone\n\nCreates:\n• QuickSight\n  dashboards\n• SQL queries\n• Saves to\n  SynoDB",
+      "lineHeight": 1.25,
+      "strokeColor": "#388e3c",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "angle": 0,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false
     },
 
     {
-      "id": "r_trouble", "type": "rectangle", "x": 160, "y": 730, "width": 240, "height": 90,
-      "strokeColor": "#616161", "backgroundColor": "#f5f5f5", "fillStyle": "solid", "strokeWidth": 1, "strokeStyle": "dashed", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": {"type": 3},
-      "boundElements": [{"id": "t_trouble", "type": "text"}], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 38, "isDeleted": false, "seed": 2000038
-    },
-    {
-      "id": "t_trouble", "type": "text", "x": 170, "y": 738, "width": 220, "height": 75, "text": "Troubleshooting (anytime)\n\n07 — Fix Iceberg/Glue\n08 — Deep Agent Logging",
-      "fontSize": 13, "fontFamily": 2, "textAlign": "center", "verticalAlign": "top", "containerId": "r_trouble", "originalText": "Troubleshooting (anytime)\n\n07 — Fix Iceberg/Glue\n08 — Deep Agent Logging", "lineHeight": 1.25,
-      "strokeColor": "#616161", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": null, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 39, "isDeleted": false, "seed": 2000039
+      "id": "a3",
+      "type": "arrow",
+      "x": 810,
+      "y": 350,
+      "width": 50,
+      "height": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 3,
+      "strokeStyle": "dashed",
+      "roughness": 0,
+      "opacity": 100,
+      "angle": 0,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {"type": 2},
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false,
+      "points": [[0, 0], [50, 0]],
+      "startBinding": {"elementId": "r_analysis", "focus": 0, "gap": 5},
+      "endBinding": {"elementId": "r_devops", "focus": 0, "gap": 5},
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow"
     },
 
     {
-      "id": "ft_02_note", "type": "text", "x": 860, "y": 500, "width": 260, "height": 35, "text": "02 — Generate Synthetic Data\n(optional, before 03 if needed)",
-      "fontSize": 13, "fontFamily": 2, "textAlign": "left", "verticalAlign": "top", "containerId": null, "originalText": "02 — Generate Synthetic Data\n(optional, before 03 if needed)", "lineHeight": 1.25,
-      "strokeColor": "#616161", "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0, "groupIds": [], "frameId": null, "roundness": null, "boundElements": [], "updated": 1, "link": null, "locked": false, "version": 2, "versionNonce": 40, "isDeleted": false, "seed": 2000040
+      "id": "r_devops",
+      "type": "rectangle",
+      "x": 865,
+      "y": 100,
+      "width": 200,
+      "height": 500,
+      "strokeColor": "#e65100",
+      "backgroundColor": "#fff3e0",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "dashed",
+      "roughness": 0,
+      "opacity": 100,
+      "angle": 0,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": {"type": 3},
+      "boundElements": [{"id": "t_devops", "type": "text"}, {"id": "a3", "type": "arrow"}],
+      "updated": 1,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "t_devops",
+      "type": "text",
+      "x": 875,
+      "y": 110,
+      "width": 180,
+      "height": 480,
+      "text": "🚀\nDevOps\nAgent\n\nRun: Continuous\n\nStatus:\nComing Q2 2026\n\nPlanned:\n• CI/CD\n  pipelines\n• Git push →\n  auto-deploy\n• Monitoring\n• Alerts (Slack)\n• Cost\n  optimization\n• Self-healing\n  (auto-retry)\n• Quality\n  drift\n  detection\n• Resource\n  scaling",
+      "fontSize": 14,
+      "fontFamily": 2,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": "r_devops",
+      "originalText": "🚀\nDevOps\nAgent\n\nRun: Continuous\n\nStatus:\nComing Q2 2026\n\nPlanned:\n• CI/CD\n  pipelines\n• Git push →\n  auto-deploy\n• Monitoring\n• Alerts (Slack)\n• Cost\n  optimization\n• Self-healing\n  (auto-retry)\n• Quality\n  drift\n  detection\n• Resource\n  scaling",
+      "lineHeight": 1.25,
+      "strokeColor": "#e65100",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "angle": 0,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false
+    },
+
+    {
+      "id": "ft_note",
+      "type": "text",
+      "x": 100,
+      "y": 640,
+      "width": 965,
+      "height": 60,
+      "text": "Each agent has its own folder:  prompts/environment-setup-agent/  |  prompts/data-onboarding-agent/  |  prompts/data-analysis-agent/  |  prompts/devops-agent/\n\nAll agents use MCP tools (13 servers) set up by Environment Setup Agent FIRST",
+      "fontSize": 14,
+      "fontFamily": 2,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "originalText": "Each agent has its own folder:  prompts/environment-setup-agent/  |  prompts/data-onboarding-agent/  |  prompts/data-analysis-agent/  |  prompts/devops-agent/\n\nAll agents use MCP tools (13 servers) set up by Environment Setup Agent FIRST",
+      "lineHeight": 1.25,
+      "strokeColor": "#424242",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "angle": 0,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "boundElements": [],
+      "updated": 1,
+      "link": null,
+      "locked": false
     }
   ],
   "appState": {

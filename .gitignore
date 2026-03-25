@@ -26,7 +26,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-workloads/
+
 # Virtual Environments
 venv/
 ENV/
@@ -83,8 +83,8 @@ test_results_*.json
 test_output_*.json
 *_test_results_*.json
 
-# Logs & Agent Runs
-logs/
+# Logs & Agent Runs (but NOT workload logs/ folders - those are tracked selectively)
+/logs/
 agent_run_logs/
 *.log
 *.log.*
@@ -182,8 +182,9 @@ demo_real_data_*.csv
 # All workload output directories (generated at runtime)
 workloads/*/output/
 
-# Agent trace logs (generated per-run, timestamped)
-workloads/*/logs/
+# Agent trace logs (per-run folders are ignored, but README/trace_events.jsonl are tracked)
+workloads/*/logs/run_*/
+workloads/*/logs/*.log
 workloads/*/data/bronze/
 workloads/*/data/silver/
 workloads/*/data/gold/

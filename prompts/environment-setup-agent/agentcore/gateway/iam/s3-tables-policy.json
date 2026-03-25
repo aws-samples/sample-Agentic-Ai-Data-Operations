@@ -1,0 +1,36 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "S3TablesOperations",
+      "Effect": "Allow",
+      "Action": [
+        "s3tables:CreateTable",
+        "s3tables:GetTable",
+        "s3tables:ListTables",
+        "s3tables:UpdateTableMetadataLocation",
+        "s3tables:DeleteTable",
+        "s3tables:CreateNamespace",
+        "s3tables:GetNamespace",
+        "s3tables:ListNamespaces",
+        "s3tables:CreateTableBucket",
+        "s3tables:GetTableBucket",
+        "s3tables:ListTableBuckets"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "S3DataAccess",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::*",
+        "arn:aws:s3:::*/*"
+      ]
+    }
+  ]
+}

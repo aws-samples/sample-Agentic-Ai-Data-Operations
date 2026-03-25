@@ -30,7 +30,7 @@ Read `design.md` before making architectural decisions. Read `SKILLS.md` before 
 │                                                                             │
 │  Local mode (.mcp.json, stdio)     OR    Gateway mode (.mcp.gateway.json)   │
 │  13 servers on laptop                    13 servers on Agentcore Gateway     │
-│                                          (deploy via prompts/09 + 10 first) │
+│                                          (deploy via prompts/environment-setup-agent/ first) │
 │                                                                             │
 │  REQUIRED: glue-athena, lakeformation, iam  (block if down)                 │
 │  WARN:     cloudtrail, redshift, core, s3-tables, pii-detection             │
@@ -148,6 +148,8 @@ workloads/{workload_name}/
 ├── dags/            # {workload_name}_dag.py
 ├── sql/             # bronze/, silver/, gold/
 ├── tests/           # unit/, integration/
+├── logs/            # Pipeline execution traces and logs
+│   └── .gitignore  # Ignore run_*/ folders (keep trace_events.jsonl)
 └── README.md
 ```
 
@@ -218,7 +220,7 @@ These apply to ALL code generated in this project:
 2. **No infrastructure details in code** — Never include AWS account IDs, VPC IDs, subnet IDs, or S3 bucket names in code or comments. Use variables.
 3. **Encryption everywhere** — AES-256 at rest (KMS), TLS 1.3 in transit. Reference KMS keys by alias, never raw key material.
 4. **PII/PHI/PCI detection & masking** — ALL workloads MUST run PII detection (automatic via `shared/utils/pii_detection_and_tagging.py`). Classified fields must be masked in logs, error messages, query results, and debug output. Never log actual values of sensitive fields. Lake Formation LF-Tags applied for column-level access control.
-5. **Regulatory compliance** — Ask about GDPR, CCPA, HIPAA, SOX, PCI DSS requirements during discovery. Apply appropriate controls: tag-based access control (TBAC), data retention policies, audit trails, encryption at rest and in transit. See `prompts/regulation/` for regulation-specific controls — these prompts are loaded ONLY when a regulation is selected during discovery, not by default.
+5. **Regulatory compliance** — Ask about GDPR, CCPA, HIPAA, SOX, PCI DSS requirements during discovery. Apply appropriate controls: tag-based access control (TBAC), data retention policies, audit trails, encryption at rest and in transit. See `prompts/data-onboarding-agent/regulation/` for regulation-specific controls — these prompts are loaded ONLY when a regulation is selected during discovery, not by default.
 6. **Audit logging** — All data access, transformations, quality checks, and PII tag changes log: who (user/agent ID), what (operation), when (timestamp), where (dataset). CloudTrail enabled for all Lake Formation operations.
 7. **Least privilege** — Each agent/task uses minimum required IAM permissions. No wildcard (`*`) actions or resources.
 8. **Input validation** — Validate all user inputs before use in SQL, file paths, shell commands, or API calls. Prevent injection attacks.

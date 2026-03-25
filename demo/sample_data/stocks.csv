@@ -1,0 +1,51 @@
+ticker,company_name,sector,industry,exchange,market_cap_billions,current_price,price_52w_high,price_52w_low,pe_ratio,dividend_yield,beta,avg_volume_millions,listing_date
+AAPL,Apple Inc.,Technology,Consumer Electronics,NASDAQ,2847.5,185.25,198.45,124.17,29.8,0.52,1.21,58.4,1980-12-12
+MSFT,Microsoft Corporation,Technology,Software,NASDAQ,2789.3,374.58,384.30,213.43,34.2,0.83,0.93,24.6,1986-03-13
+GOOGL,Alphabet Inc.,Technology,Internet Services,NASDAQ,1654.8,131.85,142.58,88.12,24.5,0.00,1.05,26.8,2004-08-19
+AMZN,Amazon.com Inc.,Consumer Cyclical,E-Commerce,NASDAQ,1478.9,142.87,156.89,81.43,71.2,0.00,1.18,51.3,1997-05-15
+NVDA,NVIDIA Corporation,Technology,Semiconductors,NASDAQ,1198.4,485.92,502.66,108.13,88.7,0.04,1.67,44.2,1999-01-22
+TSLA,Tesla Inc.,Consumer Cyclical,Auto Manufacturers,NASDAQ,678.3,213.45,299.29,101.81,47.8,0.00,2.03,128.7,2010-06-29
+META,Meta Platforms Inc.,Technology,Internet Services,NASDAQ,876.5,345.67,384.33,88.09,28.9,0.00,1.24,19.8,2012-05-18
+BRK.B,Berkshire Hathaway Inc.,Financial,Insurance,NYSE,765.8,368.92,382.45,285.07,7.8,0.00,0.88,3.4,1996-05-09
+V,Visa Inc.,Financial,Credit Services,NYSE,487.6,234.56,252.58,195.27,32.4,0.76,0.98,7.2,2008-03-19
+JPM,JPMorgan Chase & Co.,Financial,Banking,NYSE,456.9,158.73,175.12,118.27,10.2,2.47,1.15,12.8,1980-03-05
+WMT,Walmart Inc.,Consumer Defensive,Discount Stores,NYSE,423.7,162.34,169.94,117.27,27.6,1.52,0.51,8.3,1972-08-25
+JNJ,Johnson & Johnson,Healthcare,Drug Manufacturers,NYSE,389.4,158.92,180.09,143.38,24.1,2.89,0.63,6.7,1944-09-25
+UNH,UnitedHealth Group Inc.,Healthcare,Healthcare Plans,NYSE,478.3,512.67,542.28,431.36,24.8,1.41,0.72,3.1,1984-10-18
+XOM,Exxon Mobil Corporation,Energy,Oil & Gas Integrated,NYSE,412.8,98.73,120.19,85.19,11.4,3.48,0.91,21.4,1920-03-01
+PG,Procter & Gamble Co.,Consumer Defensive,Household Products,NYSE,367.9,154.89,165.35,132.75,25.3,2.46,0.42,7.8,1891-01-01
+MA,Mastercard Inc.,Financial,Credit Services,NYSE,389.2,398.45,426.39,319.08,35.7,0.59,1.03,3.6,2006-05-25
+HD,Home Depot Inc.,Consumer Cyclical,Home Improvement,NYSE,334.6,328.92,354.87,245.61,22.4,2.38,1.08,4.2,1981-09-22
+CVX,Chevron Corporation,Energy,Oil & Gas Integrated,NYSE,289.4,151.23,182.40,135.37,10.8,3.72,0.94,8.9,1921-01-01
+ABBV,AbbVie Inc.,Healthcare,Drug Manufacturers,NYSE,298.7,168.92,182.34,137.08,32.9,3.71,0.58,6.4,2013-01-02
+COST,Costco Wholesale Corporation,Consumer Defensive,Discount Stores,NASDAQ,287.3,648.92,697.98,466.38,38.2,0.73,0.67,2.4,1985-12-11
+PEP,PepsiCo Inc.,Consumer Defensive,Beverages,NASDAQ,234.8,169.85,186.48,149.37,26.4,2.76,0.61,5.1,1919-01-01
+KO,The Coca-Cola Company,Consumer Defensive,Beverages,NYSE,256.9,59.67,63.52,51.55,25.8,3.07,0.59,15.8,1919-09-05
+TMO,Thermo Fisher Scientific Inc.,Healthcare,Diagnostics & Research,NYSE,209.4,534.78,596.88,445.61,29.1,0.29,0.85,1.5,1980-10-03
+MRK,Merck & Co. Inc.,Healthcare,Drug Manufacturers,NYSE,267.3,105.34,120.78,88.47,28.7,2.71,0.49,10.2,1946-01-01
+BAC,Bank of America Corp.,Financial,Banking,NYSE,298.4,37.89,42.56,24.96,11.3,2.58,1.24,51.7,1980-01-01
+CSCO,Cisco Systems Inc.,Technology,Communication Equipment,NASDAQ,189.7,47.92,57.59,38.93,16.2,3.25,1.01,20.1,1990-02-16
+DIS,The Walt Disney Company,Communication,Entertainment,NYSE,178.9,97.85,118.18,78.73,85.4,0.00,1.23,10.8,1957-11-12
+ADBE,Adobe Inc.,Technology,Software,NASDAQ,234.7,512.34,575.29,433.97,42.3,0.00,1.14,2.9,1986-08-20
+NFLX,Netflix Inc.,Communication,Entertainment,NASDAQ,189.3,432.18,485.73,271.56,38.9,0.00,1.31,7.3,2002-05-23
+CRM,Salesforce Inc.,Technology,Software,NYSE,256.8,267.89,304.98,187.45,92.3,0.00,1.09,6.8,2004-06-23
+ORCL,Oracle Corporation,Technology,Software,NYSE,287.9,104.56,115.38,85.07,32.1,1.42,0.88,9.2,1986-03-12
+NKE,Nike Inc.,Consumer Cyclical,Apparel,NYSE,178.4,116.73,136.84,82.22,31.7,1.28,0.96,7.4,1980-12-02
+INTC,Intel Corporation,Technology,Semiconductors,NASDAQ,198.6,47.34,68.49,41.63,-14.2,1.48,0.72,53.1,1971-10-13
+LLY,Eli Lilly and Company,Healthcare,Drug Manufacturers,NYSE,634.8,678.92,714.29,489.33,89.7,0.71,0.44,2.8,1952-07-01
+AMD,Advanced Micro Devices,Technology,Semiconductors,NASDAQ,198.3,121.87,164.46,54.57,241.8,0.00,1.89,87.4,1979-09-01
+AVGO,Broadcom Inc.,Technology,Semiconductors,NASDAQ,534.7,1287.65,1398.11,789.45,98.3,1.89,1.24,2.1,2009-08-06
+TXN,Texas Instruments Inc.,Technology,Semiconductors,NASDAQ,156.9,170.92,199.27,144.46,20.8,3.12,0.93,5.4,1953-10-01
+QCOM,QUALCOMM Inc.,Technology,Semiconductors,NASDAQ,178.4,158.73,185.86,101.93,18.9,2.08,1.12,9.7,1991-12-16
+PM,Philip Morris International,Consumer Defensive,Tobacco,NYSE,147.8,95.23,106.51,83.45,17.2,5.13,0.67,4.6,2008-03-17
+HON,Honeywell International Inc.,Industrials,Conglomerates,NASDAQ,134.9,198.45,220.97,165.14,24.7,2.14,1.11,2.8,1985-09-19
+UNP,Union Pacific Corporation,Industrials,Railroads,NYSE,145.7,228.92,256.84,195.68,21.3,2.38,1.06,3.1,1969-12-31
+UPS,United Parcel Service Inc.,Industrials,Integrated Freight,NYSE,123.8,142.67,158.92,123.45,16.8,3.89,0.89,3.4,1999-11-10
+RTX,Raytheon Technologies Corp.,Industrials,Aerospace & Defense,NYSE,134.2,94.56,105.83,78.40,31.2,2.31,1.02,5.8,2020-04-03
+LMT,Lockheed Martin Corporation,Industrials,Aerospace & Defense,NYSE,112.4,445.67,493.97,372.28,16.3,2.79,0.74,1.2,1995-03-16
+BA,The Boeing Company,Industrials,Aerospace & Defense,NYSE,123.9,203.45,267.54,159.27,-8.7,0.00,1.56,8.4,1962-01-02
+CAT,Caterpillar Inc.,Industrials,Farm & Construction,NYSE,134.8,256.78,293.88,200.17,15.4,2.18,1.23,3.7,1929-12-02
+DE,Deere & Company,Industrials,Farm & Construction,NYSE,109.3,374.23,446.76,299.55,11.9,1.42,1.28,2.1,1972-07-01
+MMM,3M Company,Industrials,Conglomerates,NYSE,67.8,118.92,145.67,98.53,14.2,5.92,0.98,2.9,1976-01-01
+GE,General Electric Company,Industrials,Conglomerates,NYSE,134.6,122.34,142.58,89.47,23.8,0.41,1.34,54.2,1962-01-02
+T,AT&T Inc.,Communication,Telecom Services,NYSE,123.7,17.23,22.03,13.43,8.1,6.98,0.68,42.7,1983-11-21
