@@ -410,6 +410,64 @@ Automatically validates all generated code BEFORE deployment to catch 95% of iss
 
 **Why it matters**: MWAA takes 1-2 minutes to refresh DAGs after S3 upload. A parsing error blocks ALL DAGs from loading. This step prevents wasted deployment cycles.
 
+### Self-Healing Prompt Architecture (Prompt Intelligence)
+
+The system **learns from mistakes** by analyzing trace logs from failed and successful pipeline runs across all workloads, then generates actionable recommendations to prevent recurring failures.
+
+**What it does:**
+1. **Pattern Detection**: Scans `trace_events.jsonl` across all workloads to find recurring errors
+2. **Cross-Workload Learning**: Groups identical failures (e.g., "KeyError: 'primary_key'" in 3+ workloads)
+3. **Root Cause Analysis**: Explains why the pattern occurs (e.g., "CSV sources lack explicit PK column")
+4. **Actionable Recommendations**: Generates ready-to-paste prompt patches to prevent recurrence
+5. **Best Practice Extraction**: Identifies high-confidence decisions from successful runs
+
+**When it runs:**
+- **On-demand** (not automatic) — triggered manually after onboardings complete
+- **Typical schedule**: Weekly, after major failures, or before deployments
+- **Can be integrated** into CI/CD pipelines for continuous learning
+
+```bash
+# Run analysis across all workloads
+python3 -m shared.prompt_intelligence.cli analyze --all
+
+# View the report (includes BLOCKING/DEGRADED/MINOR patterns)
+cat docs/prompt_intelligence/$(date +%Y-%m-%d)_report.md
+```
+
+**Example output:**
+```
+✓ Found 2 cross-workload failure patterns
+
+Top Failure Patterns:
+  1. KeyError: 'primary_key'
+     Frequency: 3, Workloads: 3, Confidence: 0.78
+     Impact: BLOCKING
+
+Recommendation: For CSV sources, ALWAYS ask 'What is the primary key?'
+                before profiling. Add to discovery checklist.
+
+Estimated Time Saved: 10-15 hours across future onboardings
+```
+
+**Report includes:**
+- **Executive Summary**: Impact distribution (BLOCKING/DEGRADED/MINOR), top blockers, estimated time savings
+- **Failure Patterns**: Grouped by impact with root cause analysis and prompt patches (ready to copy-paste into prompt files)
+- **Best Practices**: High-confidence successful decisions to adopt across workloads
+- **Implementation Guide**: Step-by-step instructions for applying fixes
+
+**How to test:**
+```bash
+# Quick demo (generates test failures, runs analysis)
+./shared/prompt_intelligence/demo.sh
+
+# Or manually create test scenarios
+./shared/prompt_intelligence/create_test_data.sh
+python3 -m shared.prompt_intelligence.cli analyze --all
+rm -rf workloads/test_*  # cleanup
+```
+
+See [shared/prompt_intelligence/QUICKSTART.md](shared/prompt_intelligence/QUICKSTART.md) for 3-minute start guide, or [shared/prompt_intelligence/TESTING.md](shared/prompt_intelligence/TESTING.md) for comprehensive test scenarios.
+
 ---
 
 ## Example Workloads
