@@ -1,10 +1,43 @@
 # Agentic Data Onboarding Platform
 
-A multi-agent data pipeline platform that autonomously onboards datasets through **Bronze → Silver → Gold** zones using AI-driven orchestration and AWS services.
+**Automate your entire data operations pipeline** — ETL, data quality, semantic layer population, and data analysis — **reducing development time from weeks to hours.** Built-in compliance with **GDPR, CCPA, HIPAA, SOX, and PCI DSS** through regulation-specific prompts that automatically apply required controls.
+
+---
+
+## Why Agentify Data Operations?
+
+Traditional data pipeline development is slow, manual, and error-prone:
+- **Weeks of manual coding** for ETL scripts, quality checks, and orchestration DAGs
+- **Repetitive boilerplate** across similar data sources (CSV ingestion patterns, PII detection, quality rules)
+- **Knowledge scattered** across Confluence docs, Slack threads, and tribal knowledge
+- **Quality issues discovered in production** instead of during development
+
+**This platform agentifies the entire data operations workflow:**
+
+| Traditional Approach | Agentic Approach | Time Saved |
+|---------------------|------------------|------------|
+| Data engineer writes PySpark ETL (2-3 days) | **Data Onboarding Agent** generates Bronze→Silver→Gold scripts from natural language (15 minutes) | **95%** |
+| Manually create quality rules per column (1-2 days) | **Data Quality Agent** auto-generates column-level checks from profiling (10 minutes) | **90%** |
+| Write Airflow DAG with task dependencies (1 day) | **Orchestration Agent** generates tested DAG from schedule config (15 minutes) | **95%** |
+| Build QuickSight dashboards manually (2-4 days) | **Data Analysis Agent** creates dashboards from natural language query (30 minutes) | **90%** |
+| Debug recurring pipeline failures (ongoing) | **Prompt Intelligence Agent** learns from failures, prevents recurrence (automated) | **Hours per week** |
+
+**Result: Data pipeline development goes from 2-3 weeks → 2-3 hours.**
 
 ---
 
 ## How It Works
+
+**All agents run in the Development environment only.** Generated scripts and configurations are version-controlled and promoted to higher environments (QA, Staging, Production) through standard CI/CD pipelines. Agents do not run in production — only the artifacts they generate.
+
+---
+
+## 1. Data Onboarding Agent
+
+**Purpose:** Automates the entire Bronze→Silver→Gold pipeline creation process from a natural language description.
+
+**Runs in:** Development environment only
+**Output:** Version-controlled scripts, configs, DAGs, and tests → promoted to higher environments via CI/CD
 
 A user describes their data source in natural language. The **Data Onboarding Agent** coordinates specialized sub-agents to generate a complete, tested pipeline — config files, transformation scripts, quality checks, and an Airflow DAG — without writing any code manually.
 
@@ -35,11 +68,20 @@ Phase 5: Deploy ────── uploads to S3, creates Glue catalog, applies 
 Output: workloads/{dataset_name}/ with config/, scripts/, dags/, sql/, tests/
 ```
 
-### Data Analysis Agent Workflow
+---
+
+## 2. Data Analysis Agent
+
+**Purpose:** Enables natural language querying and dashboard creation on onboarded data.
+
+**Runs in:** Development environment (for dashboard prototyping) OR Production (for end-user queries via QuickSight)
+**Output:** QuickSight dashboards, SQL queries, saved query patterns (SynoDB)
+
+### Agent Workflow
 
 ![Data Analysis Agent Workflow](docs/diagrams/data-analysis-agent-workflow.png)
 
-**The Data Analysis Agent enables natural language querying and dashboard creation on onboarded data:**
+**How it works:**
 
 1. **QuickSight Integration** — User requests are authorized through **Amazon QuickSight** and routed via **Enterprise MCP Registry**
 2. **Data Analysis Agent** — Receives user query (e.g., "Show me top 10 customers by revenue"), checks **Cached Queries** for similar past queries
@@ -48,6 +90,109 @@ Output: workloads/{dataset_name}/ with config/, scripts/, dags/, sql/, tests/
 5. **Publish** — Results delivered via **Snowflake** (data sharing), **Databricks** (notebooks), **Redshift** (queries), or back to **QuickSight** (dashboards)
 
 **Key Features:** The agent learns from successful queries by saving them to SynoDB (cached queries), enabling faster responses over time. All queries are validated against Cedar policies before execution, ensuring data governance and access control.
+
+---
+
+## 3. Prompt Intelligence Agent (Self-Healing)
+
+**Purpose:** Learns from pipeline failures across all workloads and generates recommendations to prevent recurring issues.
+
+**Runs in:** Development environment only
+**Output:** Analysis reports with prompt patches, best practices, estimated time savings
+
+The system **learns from mistakes** by analyzing trace logs from failed and successful pipeline runs across all workloads, then generates actionable recommendations to prevent recurring failures.
+
+### What It Does
+
+1. **Pattern Detection**: Scans `trace_events.jsonl` across all workloads to find recurring errors
+2. **Cross-Workload Learning**: Groups identical failures (e.g., "KeyError: 'primary_key'" in 3+ workloads)
+3. **Root Cause Analysis**: Explains why the pattern occurs (e.g., "CSV sources lack explicit PK column")
+4. **Actionable Recommendations**: Generates ready-to-paste prompt patches to prevent recurrence
+5. **Best Practice Extraction**: Identifies high-confidence decisions from successful runs
+
+### When It Runs
+
+- **On-demand** (not automatic) — triggered manually after onboardings complete
+- **Typical schedule**: Weekly, after major failures, or before deployments
+- **Can be integrated** into CI/CD pipelines for continuous learning
+
+```bash
+# Run analysis across all workloads
+python3 -m shared.prompt_intelligence.cli analyze --all
+
+# View the report (includes BLOCKING/DEGRADED/MINOR patterns)
+cat docs/prompt_intelligence/$(date +%Y-%m-%d)_report.md
+```
+
+**Example output:**
+```
+✓ Found 2 cross-workload failure patterns
+
+Top Failure Patterns:
+  1. KeyError: 'primary_key'
+     Frequency: 3, Workloads: 3, Confidence: 0.78
+     Impact: BLOCKING
+
+Recommendation: For CSV sources, ALWAYS ask 'What is the primary key?'
+                before profiling. Add to discovery checklist.
+
+Estimated Time Saved: 10-15 hours across future onboardings
+```
+
+**Report includes:**
+- **Executive Summary**: Impact distribution (BLOCKING/DEGRADED/MINOR), top blockers, estimated time savings
+- **Failure Patterns**: Grouped by impact with root cause analysis and prompt patches (ready to copy-paste into prompt files)
+- **Best Practices**: High-confidence successful decisions to adopt across workloads
+- **Implementation Guide**: Step-by-step instructions for applying fixes
+
+See [shared/prompt_intelligence/QUICKSTART.md](shared/prompt_intelligence/QUICKSTART.md) for 3-minute start guide.
+
+---
+
+## 4. DevOps Agent (Coming Q2 2026)
+
+**Purpose:** Automates CI/CD, monitoring, cost optimization, and self-healing for deployed pipelines.
+
+**Runs in:** Development environment (for CI/CD setup) AND Production (for monitoring/alerts)
+**Output:** CI/CD pipelines, CloudWatch alarms, cost optimization recommendations, auto-remediation scripts
+
+### Planned Features
+
+- **CI/CD Pipelines** — Git push → auto-deploy to QA/Staging/Prod
+- **Monitoring & Alerts** — Slack/email notifications for pipeline failures, quality degradation
+- **Cost Optimization** — Identifies unused Glue crawlers, over-provisioned clusters, suggests S3 lifecycle policies
+- **Self-Healing** — Auto-retries transient failures, scales resources based on data volume
+- **Quality Drift Detection** — Alerts when data quality scores drop below historical baseline
+- **Resource Scaling** — Right-sizes Glue jobs, Athena query concurrency based on usage patterns
+
+**Status:** Design phase — implementation targeted for Q2 2026
+
+---
+
+## Environment Model: Dev-Only Agent Execution
+
+**Critical principle:** All agents run **only in the Development environment**. Higher environments (QA, Staging, Production) execute only the generated scripts and configurations.
+
+| Environment | What Runs | How |
+|-------------|-----------|-----|
+| **Development** | All 4 agents (Onboarding, Analysis, Prompt Intelligence, DevOps setup) | Interactive via Claude Code CLI |
+| **QA/Staging** | Generated scripts/DAGs/configs only | Deployed via CI/CD (GitHub Actions, MWAA) |
+| **Production** | Generated scripts/DAGs/configs only | Promoted via CI/CD after QA approval |
+
+**Artifact Promotion Flow:**
+```
+Dev Agent → Generate scripts/tests → Commit to Git → CI/CD pipeline → QA → Staging → Prod
+          ↓
+      Run tests locally
+      Validate syntax/best practices
+      Human approval
+```
+
+**Why this matters:**
+- **Security**: Agents don't need production AWS credentials
+- **Auditability**: All changes are version-controlled, peer-reviewed
+- **Reproducibility**: Same scripts run identically across all environments
+- **Rollback**: Git history enables instant rollback to previous working version
 
 ---
 
@@ -68,23 +213,6 @@ Output: workloads/{dataset_name}/ with config/, scripts/, dags/, sql/, tests/
 | **Bronze** | Raw, immutable ingestion | Source format (CSV, JSON, Parquet) | None |
 | **Silver** | Cleaned, validated, schema-enforced | Apache Iceberg on S3 Tables | Score >= 80% |
 | **Gold** | Curated, business-ready | Iceberg (star schema or flat) | Score >= 95% |
-
-### Agent Architecture (4 Main Agents)
-
-| Agent | Purpose | When to Run | Folder |
-|-------|---------|-------------|--------|
-| **Environment Setup** | Set up AWS infra (IAM, S3, KMS, Glue, Gateway) | Once per AWS account | [`prompts/environment-setup-agent/`](prompts/environment-setup-agent/) |
-| **Data Onboarding** | Orchestrate Bronze→Silver→Gold pipeline creation | Per data source (repeatable) | [`prompts/data-onboarding-agent/`](prompts/data-onboarding-agent/) |
-| **Data Analysis** | Query semantic layer, create dashboards | On-demand after onboarding | [`prompts/data-analysis-agent/`](prompts/data-analysis-agent/) |
-| **DevOps** | CI/CD, monitoring, cost optimization | Continuous (coming Q2-Q3 2026) | [`prompts/devops-agent/`](prompts/devops-agent/) |
-
-**Sub-agents** (spawned by Data Onboarding Agent):
-- **Metadata Agent**: Profile data schema, detect PII, generate semantic metadata
-- **Transformation Agent**: Generate PySpark ETL scripts (Bronze→Silver→Gold)
-- **Quality Agent**: Define quality rules, implement validation gates
-- **Orchestration Agent**: Generate Airflow DAG with task dependencies
-
-Sub-agents generate code/config only. AWS execution happens via MCP tools in main conversation.
 
 ### AWS Services
 
@@ -427,65 +555,6 @@ Automatically validates all generated code BEFORE deployment to catch 95% of iss
 
 **Why it matters**: MWAA takes 1-2 minutes to refresh DAGs after S3 upload. A parsing error blocks ALL DAGs from loading. This step prevents wasted deployment cycles.
 
-### Self-Healing Prompt Architecture (Prompt Intelligence)
-
-The system **learns from mistakes** by analyzing trace logs from failed and successful pipeline runs across all workloads, then generates actionable recommendations to prevent recurring failures.
-
-**What it does:**
-1. **Pattern Detection**: Scans `trace_events.jsonl` across all workloads to find recurring errors
-2. **Cross-Workload Learning**: Groups identical failures (e.g., "KeyError: 'primary_key'" in 3+ workloads)
-3. **Root Cause Analysis**: Explains why the pattern occurs (e.g., "CSV sources lack explicit PK column")
-4. **Actionable Recommendations**: Generates ready-to-paste prompt patches to prevent recurrence
-5. **Best Practice Extraction**: Identifies high-confidence decisions from successful runs
-
-**When it runs:**
-- **On-demand** (not automatic) — triggered manually after onboardings complete
-- **Typical schedule**: Weekly, after major failures, or before deployments
-- **Can be integrated** into CI/CD pipelines for continuous learning
-
-```bash
-# Run analysis across all workloads
-python3 -m shared.prompt_intelligence.cli analyze --all
-
-# View the report (includes BLOCKING/DEGRADED/MINOR patterns)
-cat docs/prompt_intelligence/$(date +%Y-%m-%d)_report.md
-```
-
-**Example output:**
-```
-✓ Found 2 cross-workload failure patterns
-
-Top Failure Patterns:
-  1. KeyError: 'primary_key'
-     Frequency: 3, Workloads: 3, Confidence: 0.78
-     Impact: BLOCKING
-
-Recommendation: For CSV sources, ALWAYS ask 'What is the primary key?'
-                before profiling. Add to discovery checklist.
-
-Estimated Time Saved: 10-15 hours across future onboardings
-```
-
-**Report includes:**
-- **Executive Summary**: Impact distribution (BLOCKING/DEGRADED/MINOR), top blockers, estimated time savings
-- **Failure Patterns**: Grouped by impact with root cause analysis and prompt patches (ready to copy-paste into prompt files)
-- **Best Practices**: High-confidence successful decisions to adopt across workloads
-- **Implementation Guide**: Step-by-step instructions for applying fixes
-
-**How to test:**
-```bash
-# Quick demo (generates test failures, runs analysis)
-./shared/prompt_intelligence/demo.sh
-
-# Or manually create test scenarios
-./shared/prompt_intelligence/create_test_data.sh
-python3 -m shared.prompt_intelligence.cli analyze --all
-rm -rf workloads/test_*  # cleanup
-```
-
-See [shared/prompt_intelligence/QUICKSTART.md](shared/prompt_intelligence/QUICKSTART.md) for 3-minute start guide, or [shared/prompt_intelligence/TESTING.md](shared/prompt_intelligence/TESTING.md) for comprehensive test scenarios.
-
----
 
 ## Example Workloads
 
