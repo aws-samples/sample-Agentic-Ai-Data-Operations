@@ -8,29 +8,46 @@ A multi-agent data pipeline platform that autonomously onboards datasets through
 
 A user describes their data source in natural language. The **Data Onboarding Agent** coordinates specialized sub-agents to generate a complete, tested pipeline — config files, transformation scripts, quality checks, and an Airflow DAG — without writing any code manually.
 
+### Agent Coordination Workflow
+
+![Data Onboarding Agent Workflow](docs/diagrams/data-onboarding-workflow.png)
+
+**The Data Onboarding Agent (center, green) orchestrates 4 specialized sub-agents:**
+
+1. **Router Agent** — Checks if the data or workload already exists in `workloads/`
+2. **Metadata Agent** — Analyzes raw dataset, extracts metadata (data types, column datatypes, distinct values, quality issues), stores business context in **Semantic Layer**
+3. **Data Quality Agent** — Creates quality scripts for each column based on metadata agent inputs (column-level checks, parent-child relationships, quality thresholds, pass/fail gates)
+4. **Data Transformation Agent** — Creates AWS Glue scripts to run transformations (Bronze→Silver→Gold) based on user input and metadata agent analysis
+5. **Orchestration/Scheduling DAG Agent** — Creates the end-to-end orchestration DAG in Airflow or Step Functions
+
+**Workflow:**
 ```
 User: "Onboard customer data from PostgreSQL, daily refresh, PII masking required"
 
-   ┌─────────────────────────────────────────────────────────┐
-   │  Data Onboarding Agent (orchestrator)                   │
-   │                                                         │
-   │  Phase 0: Health Check ─ verify AWS + MCP servers       │
-   │  Phase 1: Discovery ─── asks source, schema, rules      │
-   │  Phase 2: Dedup ─────── checks existing workloads       │
-   │  Phase 3: Profile ───── samples data, detects PII       │
-   │  Phase 4: Build ─────── spawns sub-agents:               │
-   │     ├── Metadata Agent ──────→ config/ + catalog         │
-   │     ├── Transformation Agent → scripts/ + sql/           │
-   │     ├── Quality Agent ───────→ quality rules + gates     │
-   │     ├── DAG Agent ───────────→ dags/ + schedule          │
-   │     └── Code Validator ──────→ syntax + best practices   │
-   │                                                         │
-   │  Each sub-agent writes tests → must pass before next     │
-   │  Code validation blocks deployment if errors found       │
-   └─────────────────────────────────────────────────────────┘
+Phase 0: Health Check ─ verify AWS resources + 13 MCP servers (REQUIRED/WARN/OPTIONAL)
+Phase 1: Discovery ─── asks source, schema, cleaning rules, quality thresholds, schedule
+Phase 2: Dedup ─────── checks existing workloads for overlaps, reuses shared assets
+Phase 3: Profile ───── samples 5% of data, detects PII, presents metadata for approval
+Phase 4: Build ─────── spawns 4 sub-agents → each writes artifacts + tests → TEST GATE
+Phase 4.5: Validate ── checks Python syntax, DAG parsing, imports, Airflow best practices
+Phase 5: Deploy ────── uploads to S3, creates Glue catalog, applies LF-Tags, verifies
 
-Output: workloads/{dataset_name}/   (ready to deploy to MWAA)
+Output: workloads/{dataset_name}/ with config/, scripts/, dags/, sql/, tests/
 ```
+
+### Data Analysis Agent Workflow
+
+![Data Analysis Agent Workflow](docs/diagrams/data-analysis-agent-workflow.png)
+
+**The Data Analysis Agent enables natural language querying and dashboard creation on onboarded data:**
+
+1. **QuickSight Integration** — User requests are authorized through **Amazon QuickSight** and routed via **Enterprise MCP Registry**
+2. **Data Analysis Agent** — Receives user query (e.g., "Show me top 10 customers by revenue"), checks **Cached Queries** for similar past queries
+3. **Validation Agent** — Validates user query against Cedar policies (**Amazon Verified Permissions**) and checks access permissions via **Policy/Access** layer
+4. **Query Execution** — Accesses **Semantic Layer** (business metadata) and **Data MCPs** (Athena, Redshift Spectrum) to generate and execute SQL
+5. **Publish** — Results delivered via **Snowflake** (data sharing), **Databricks** (notebooks), **Redshift** (queries), or back to **QuickSight** (dashboards)
+
+**Key Features:** The agent learns from successful queries by saving them to SynoDB (cached queries), enabling faster responses over time. All queries are validated against Cedar policies before execution, ensuring data governance and access control.
 
 ---
 
