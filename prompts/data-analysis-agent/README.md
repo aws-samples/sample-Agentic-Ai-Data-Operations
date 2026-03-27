@@ -58,9 +58,9 @@ Data Analysis Agent
 
 | Prompt | Purpose | Status |
 |--------|---------|--------|
-| `create-dashboard.md` | Generate QuickSight dashboards from Gold zone data | ✅ Available |
-| `query-semantic-layer.md` | Natural language → SQL via SageMaker Catalog + SynoDB | 📝 Placeholder |
-| `design-visualizations.md` | Recommend viz types based on data characteristics | 📝 Placeholder |
+| `01-create-dashboard.md` | Generate QuickSight dashboards from Gold zone data | ✅ Available |
+| `02-query-semantic-layer.md` | Natural language → SQL via Neptune + SynoDB + Athena | ✅ Available |
+| `03-design-visualizations.md` | Recommend viz types based on data characteristics | 📝 Placeholder |
 
 ## Current Capabilities
 
@@ -86,17 +86,18 @@ Agent:
      - Customer segments (pie chart)
 ```
 
-### 📝 Coming Soon
+### ✅ Now Available
 
-**Natural Language Queries**:
+**Natural Language Queries** (`query-semantic-layer.md`):
 - "What were the top 5 products last quarter?"
 - "Compare revenue this month vs last month"
 - "Which customers have churned?"
+- Converts NL → SQL using Neptune semantic layer (graph + embeddings)
+- Caches successful queries in SynoDB (DynamoDB)
+- Executes via Athena MCP tool
+- Learns from each query to improve future results
 
-**SynoDB Integration**:
-- Store all successful queries
-- Reuse query patterns
-- Learn from user corrections
+### 📝 Coming Soon
 
 **Advanced Analytics**:
 - Anomaly detection (revenue spikes/drops)
