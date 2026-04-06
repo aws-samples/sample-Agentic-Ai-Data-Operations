@@ -12,6 +12,7 @@ from .schemas import (
     BestPractice,
     Correlation
 )
+from .patch_registry import PromptEvolver
 
 __all__ = [
     'FailurePattern',
@@ -19,4 +20,5 @@ __all__ = [
     'CrossWorkloadPattern',
     'BestPractice',
     'Correlation',
+    'PromptEvolver',
 ]

@@ -2,6 +2,29 @@
 
 The Prompt Intelligence system is **on-demand**, not automatic. Here's when and how to run it.
 
+## Automated Self-Healing (Recommended)
+
+The prompt intelligence system now closes the loop automatically via the `evolve` command:
+
+### Nightly (automated)
+```bash
+python3 -m shared.prompt_intelligence.cli evolve --auto-graft --min-confidence 0.80
+```
+
+What happens:
+1. Reads trace_events.jsonl from all workloads/*/logs/
+2. Extracts failure patterns and cross-workload signatures
+3. Patches with confidence >= 0.80 -> auto-grafted to SKILLS.md
+4. Patches with confidence 0.60-0.79 -> stored as "pending" for human review
+5. Patches below 0.60 -> not stored
+
+### Weekly (human review)
+```bash
+python3 -m shared.prompt_intelligence.cli patches --status pending
+python3 -m shared.prompt_intelligence.cli evolve --patch-id <id>  # apply specific
+python3 -m shared.prompt_intelligence.cli prune --patch-id <id>   # revert if bad
+```
+
 ## Execution Timeline
 
 ```

@@ -197,8 +197,8 @@ This folder contains all prompts organized by agent responsibility. Each agent h
 | `../CLAUDE.md` | Project-level configuration |
 | `../SKILLS.md` | Detailed agent skill definitions |
 | `../MCP_GUARDRAILS.md` | MCP tool selection rules per phase |
-| `../WORKFLOW.md` | Visual workflow diagrams |
-| `../MCP_SETUP.md` | MCP server configuration |
+| `../docs/workflow-diagrams.md` | Visual workflow diagrams |
+| `../docs/mcp-setup.md` | MCP server configuration |
 | `../README.md` | Project overview |
 
 ---

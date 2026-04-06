@@ -648,5 +648,5 @@ After successful deployment, you have:
 
 - **AWS Documentation**: [Amazon Bedrock AgentCore Gateway](https://docs.aws.amazon.com/bedrock/latest/userguide/agentcore-gateway.html)
 - **MCP Specification**: [Model Context Protocol](https://modelcontextprotocol.io/)
-- **Local Setup**: See `MCP_SETUP.md` for local stdio mode
+- **Local Setup**: See `docs/mcp-setup.md` for local stdio mode
 - **Runtime Agent**: See `prompts/10-deploy-agentcore-runtime.md`

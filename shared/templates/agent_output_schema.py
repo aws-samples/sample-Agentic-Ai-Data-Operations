@@ -30,13 +30,54 @@ Usage:
 
 import hashlib
 import json
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field, fields, asdict
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 
 VALID_AGENT_TYPES = {"metadata", "transformation", "quality", "dag", "analysis"}
 VALID_STATUSES = {"success", "failed", "partial"}
+
+
+# Bedrock tool schema that forces sub-agents to return structured JSON output.
+# Used with tool_choice={"tool": {"name": "submit_agent_output"}} in converse() calls.
+SUBMIT_OUTPUT_TOOL = {
+    "toolSpec": {
+        "name": "submit_agent_output",
+        "description": (
+            "Submit your completed work. You MUST call this tool to finish. "
+            "Do not respond in plain text — call this tool with a JSON payload."
+        ),
+        "inputSchema": {
+            "json": {
+                "type": "object",
+                "properties": {
+                    "agent_name":      {"type": "string", "description": "Your agent name"},
+                    "agent_type":      {"type": "string", "enum": ["metadata", "transformation", "quality", "dag", "analysis"]},
+                    "workload_name":   {"type": "string", "description": "Workload being processed"},
+                    "run_id":          {"type": "string", "description": "UUID for tracing"},
+                    "started_at":      {"type": "string", "description": "ISO 8601 timestamp"},
+                    "completed_at":    {"type": "string", "description": "ISO 8601 timestamp"},
+                    "status":          {"type": "string", "enum": ["success", "failed", "partial"]},
+                    "artifacts":       {"type": "array", "items": {"type": "object"}, "description": "List of {path, type, checksum}"},
+                    "tests":           {"type": "object", "description": "{unit: {passed, failed, total}, integration: {...}}"},
+                    "blocking_issues": {"type": "array", "items": {"type": "string"}, "description": "Issues that must be fixed"},
+                    "warnings":        {"type": "array", "items": {"type": "string"}},
+                    "next_steps":      {"type": "array", "items": {"type": "string"}},
+                    "decisions":       {"type": "array", "items": {"type": "object"}, "description": "Cognitive trace decisions"},
+                    "memory_hints":    {"type": "array", "items": {"type": "object"}, "description": "Durable facts to remember"},
+                    "input_hash":      {"type": "string"},
+                    "output_hash":     {"type": "string"},
+                },
+                "required": [
+                    "agent_name", "agent_type", "workload_name", "run_id",
+                    "started_at", "completed_at", "status", "artifacts",
+                    "blocking_issues", "tests",
+                ],
+            }
+        },
+    }
+}
 
 
 @dataclass
@@ -69,6 +110,10 @@ class AgentOutput:
     #             alternatives_considered, rejection_reasons, confidence, context}
     decisions: List[Dict[str, Any]] = field(default_factory=list)
 
+    # Memory hints — agent flags what is worth remembering for future runs
+    memory_hints: List[Dict[str, str]] = field(default_factory=list)
+    # Each hint: {"type": "user|feedback|project|reference", "content": "..."}
+
     # Determinism
     input_hash: str = ""  # SHA-256 of inputs
     output_hash: str = ""  # SHA-256 of all artifacts
@@ -95,11 +140,32 @@ class AgentOutput:
 
     @classmethod
     def from_dict(cls, data: dict) -> "AgentOutput":
-        return cls(**data)
+        """Deserialize from dict, filtering unknown keys for forward compatibility."""
+        known = {f.name for f in fields(cls)}
+        filtered = {k: v for k, v in data.items() if k in known}
+        return cls(**filtered)
 
     @classmethod
     def from_json(cls, raw: str) -> "AgentOutput":
         return cls.from_dict(json.loads(raw))
+
+    @classmethod
+    def from_bedrock_tool_call(cls, tool_use_block: dict) -> "AgentOutput":
+        """
+        Parse AgentOutput from a Bedrock converse() toolUse response block.
+        Args:
+            tool_use_block: The 'toolUse' dict from a Bedrock converse() response
+                            e.g. response['output']['message']['content'][0]['toolUse']
+
+        Raises:
+            ValueError: if tool name is not 'submit_agent_output'
+            KeyError: if required fields are missing
+        """
+        if tool_use_block.get("name") != "submit_agent_output":
+            raise ValueError(
+                f"Expected tool 'submit_agent_output', got '{tool_use_block.get('name')}'"
+            )
+        return cls.from_dict(tool_use_block["input"])
 
     # ------------------------------------------------------------------
     # Orchestrator decision helpers

@@ -114,16 +114,22 @@ The system **learns from mistakes** by analyzing trace logs from failed and succ
 
 ### When It Runs
 
-- **On-demand** (not automatic) — triggered manually after onboardings complete
-- **Typical schedule**: Weekly, after major failures, or before deployments
-- **Can be integrated** into CI/CD pipelines for continuous learning
+- **Nightly (automated)**: `evolve` command analyzes traces, generates patches, and auto-grafts high-confidence fixes to SKILLS.md
+- **Weekly (human review)**: Review pending patches (confidence 0.60-0.79) and approve or reject
+- **On-demand**: After major failures or before deployments
 
 ```bash
-# Run analysis across all workloads
-python3 -m shared.prompt_intelligence.cli analyze --all
+# Self-healing loop: analyze → generate patches → auto-apply to SKILLS.md
+python3 -m shared.prompt_intelligence.cli evolve --auto-graft --min-confidence 0.80
 
-# View the report (includes BLOCKING/DEGRADED/MINOR patterns)
-cat docs/prompt_intelligence/$(date +%Y-%m-%d)_report.md
+# Review pending patches
+python3 -m shared.prompt_intelligence.cli patches --status pending
+
+# Revert a bad patch
+python3 -m shared.prompt_intelligence.cli prune --patch-id abc123
+
+# Legacy: analysis-only (generates report, does not apply patches)
+python3 -m shared.prompt_intelligence.cli analyze --all
 ```
 
 **Example output:**
@@ -281,7 +287,7 @@ See [shared/semantic_layer/README.md](shared/semantic_layer/README.md) for detai
 claude mcp list   # All 13 servers auto-connect
 ```
 
-**Health check before deployment**: 3 servers are REQUIRED (`glue-athena`, `lakeformation`, `iam`) -- deployment blocks if any fail. See [MCP_SETUP.md](MCP_SETUP.md) for full setup guide.
+**Health check before deployment**: 3 servers are REQUIRED (`glue-athena`, `lakeformation`, `iam`) -- deployment blocks if any fail. See [MCP Setup Guide](docs/mcp-setup.md) for full setup guide.
 
 ### Agentcore (Optional Cloud Deployment)
 
@@ -317,9 +323,11 @@ See [prompts/environment-setup-agent/agentcore/README.md](prompts/environment-se
 │   └── financial_portfolios/         # Example: SOX compliance (deployed to MWAA)
 │
 ├── shared/                           # Reusable code across workloads
+│   ├── memory/                       # Per-workload persistent memory system
 │   ├── reic/                         # REIC intent classification (vector search + agent selection)
 │   ├── utils/                        # pii_detection, quality_checks, encryption
 │   ├── policies/                     # Cedar policies (guardrails + authorization)
+│   ├── prompt_intelligence/          # Self-healing: failure analysis + adaptive patch registry
 │   ├── mcp/                          # MCP orchestrator + custom servers
 │   ├── fixtures/                     # Shared test fixtures (CSV stubs)
 │   └── templates/                    # Templates for new workloads
@@ -331,24 +339,28 @@ See [prompts/environment-setup-agent/agentcore/README.md](prompts/environment-se
 │   └── workflows/                    # Demo governance workflows
 │
 ├── mcp-servers/                      # Custom MCP servers (4 FastMCP servers with SSE support)
-├── sample_data/                      # Sample CSV files for sales_transactions
-├── docs/                             # Setup guides and architecture docs
-├── prompts/                          # Agent-based prompt organization
+├── docs/                             # Reference documentation
+│   ├── neptune/                      # Neptune semantic layer tests and guides
+│   ├── prompt_intelligence/          # Generated analysis reports
+│   ├── mcp-setup.md                  # MCP server configuration guide
+│   ├── workflow-diagrams.md          # Visual workflow diagrams (Mermaid)
+│   ├── running-tests.md             # Test execution guide
+│   ├── security.md                   # Security practices and sanitization
+│   ├── aws-account-setup.md          # AWS account prerequisites
+│   └── getting-started.md            # Quickstart guide
 │
-│   ├── environment-setup-agent/      # One-time AWS infrastructure setup (includes agentcore/ config)
+├── prompts/                          # Agent-based prompt organization
+│   ├── environment-setup-agent/      # One-time AWS infrastructure setup (includes agentcore/)
 │   ├── data-onboarding-agent/        # Bronze→Silver→Gold pipeline creation (main workflow)
 │   ├── data-analysis-agent/          # Dashboards, queries via semantic layer
 │   ├── devops-agent/                 # CI/CD, monitoring (coming soon)
 │   └── examples/                     # Demo data generation helpers
+│
 ├── CLAUDE.md                         # Agent configuration and conventions
 ├── SKILLS.md                         # Agent skill definitions and prompts
-├── TOOL_ROUTING.md                   # Which tool to pick (read first)
 ├── TOOLS.md                          # AWS service mapping per agent phase
-├── MCP_GUARDRAILS.md                 # MCP tool selection rules
-├── WORKFLOW.md                       # Visual workflow diagrams
-├── MCP_SETUP.md                      # MCP server configuration guide
-├── SECURITY.md                       # Security practices and sanitization
-├── RUNNING_TESTS.md                  # Test execution guide
+├── MCP_GUARDRAILS.md                 # MCP tool selection rules (agent prompt)
+├── TOOL_ROUTING.md                   # Which tool to pick (agent prompt)
 ├── conftest.py                       # Pytest configuration
 └── pyproject.toml                    # Python project config
 ```
@@ -374,6 +386,9 @@ workloads/{dataset_name}/
 │   ├── bronze/                       # DDL for raw tables
 │   ├── silver/                       # DDL for cleaned tables
 │   └── gold/                         # DDL for curated tables
+├── memory/                           # Persistent workload memory (accumulated learnings)
+│   ├── MEMORY.md                     # Ledger index (auto-rebuilt, 200-line cap)
+│   └── *.md                          # Memory files with YAML frontmatter
 ├── tests/
 │   ├── unit/                         # Self-contained tests (no dependencies)
 │   └── integration/                  # Tests requiring pipeline output
@@ -406,7 +421,7 @@ pytest workloads/sales_transactions/tests/ -v
 pytest workloads/*/tests/unit/ -v
 ```
 
-See [RUNNING_TESTS.md](RUNNING_TESTS.md) for complete test guide including data generation.
+See [Running Tests](docs/running-tests.md) for complete test guide including data generation.
 
 ### Onboard a New Dataset
 
@@ -511,6 +526,41 @@ python3 -m shared.logging.trace_viewer trace_events.jsonl --decisions
       Confidence: high
 ```
 
+### Typed Sub-Agent Outputs (Structured Tool Calls)
+Sub-agents no longer return free-form markdown that requires brittle regex parsing. Instead, every sub-agent is forced to return structured JSON via Bedrock's `tool_choice` mechanism.
+
+- **`SUBMIT_OUTPUT_TOOL`**: A Bedrock `toolSpec` schema in `shared/templates/agent_output_schema.py` that defines every `AgentOutput` field. Sub-agents must call this tool to finish — plain text responses are treated as failures.
+- **`from_bedrock_tool_call()`**: Parses a Bedrock `toolUse` response block directly into a typed `AgentOutput` dataclass. No regex, no markdown splitting.
+- **Forward-compatible `from_dict()`**: Filters unknown keys, so old serialized data works with new fields and new data works with old code.
+- **`memory_hints`**: New optional field where sub-agents flag durable facts worth remembering (e.g., "pe_ratio has expected 5% nulls — do not quarantine"). These feed directly into the workload memory system.
+
+### Workload Memory (Per-Dataset Persistent Learning)
+Each workload accumulates knowledge across pipeline runs — schema quirks, quality thresholds, operator preferences — stored as structured `.md` files with YAML frontmatter in a `memory/` directory. Future runs start with context instead of cold.
+
+- **Storage**: `workloads/{name}/memory/` directory with a `MEMORY.md` ledger (200-line cap, 25KB cap) and individual memory files
+- **Four memory types**: `user` (operator preferences), `feedback` (corrections), `project` (schema facts), `reference` (S3 paths, Glue DB names)
+- **Memory-aware discovery**: Phase 1 loads the workload ledger before asking questions. Known answers are pre-filled and confirmed, not re-asked.
+- **Memory selection**: A cheap Haiku side-call (`find_relevant_memories()`) selects up to 5 relevant memory files from the manifest before each phase — keeps sub-agent context lean.
+- **Post-run extraction**: After each test gate passes, `extract_memories_from_run()` harvests durable learnings from the agent's decisions and memory hints. Runs asynchronously — never blocks the pipeline.
+
+```
+Run 1: Pipeline fails on pe_ratio nulls → agent learns "pe_ratio has expected 5% nulls"
+Run 2: Memory loaded → Quality Agent reads the hint → test gate passes without human intervention
+```
+
+### Adaptive Prompt Evolution (Self-Healing Loop)
+Closes the gap in prompt intelligence: patches were generated in reports but **never applied**. The new `PromptEvolver` stores, tracks, and auto-applies learned prompt patches to SKILLS.md.
+
+- **Patch registry**: `shared/prompt_intelligence/patches/` stores `.patch` files with YAML frontmatter (confidence, status, section). `PATCH_INDEX.md` tracks all patches.
+- **Confidence gate**: Patches with confidence >= 0.80 are auto-grafted to SKILLS.md. Below 0.80, they're stored as "pending" for human review.
+- **Reversible**: Every grafted patch is wrapped in `<!-- GRAFT: {id} -->` markers. `prune_patch()` removes it cleanly.
+- **CLI**: `evolve` (full self-healing cycle), `patches` (list registry), `prune` (revert a bad patch)
+
+```
+Before: Pipeline fails → report suggests fix → human reads report (never) → same failure repeats
+After:  Pipeline fails → nightly evolve runs → patch auto-grafted → next run succeeds
+```
+
 ### Deterministic Agent Output
 Inspired by the **GCC (Guardrails, Cognitive traces, Checksums)** pattern for making LLM-based multi-agent systems reproducible and auditable:
 
@@ -570,7 +620,7 @@ Automatically validates all generated code BEFORE deployment to catch 95% of iss
 | `financial_portfolios` | 200+ | Deployed | SOX compliance, 7 Iceberg tables, MWAA DAG |
 | `healthcare_patients` | Generated | Deployed | HIPAA compliance, PHI masking, TBAC, MWAA DAG |
 
-*Some tests require PySpark (Java) or pipeline output to be generated first. See [RUNNING_TESTS.md](RUNNING_TESTS.md).
+*Some tests require PySpark (Java) or pipeline output to be generated first. See [Running Tests](docs/running-tests.md).
 
 ---
 
@@ -583,10 +633,10 @@ Automatically validates all generated code BEFORE deployment to catch 95% of iss
 | [TOOL_ROUTING.md](TOOL_ROUTING.md) | **Read first** — which tool to pick and why (intent-based) |
 | [TOOLS.md](TOOLS.md) | AWS service mapping per pipeline phase (how to use each tool) |
 | [MCP_GUARDRAILS.md](MCP_GUARDRAILS.md) | MCP tool selection rules per phase (actual tool names) |
-| [WORKFLOW.md](WORKFLOW.md) | Visual workflow and data flow diagrams |
-| [MCP_SETUP.md](MCP_SETUP.md) | MCP server configuration |
-| [SECURITY.md](SECURITY.md) | Security practices |
-| [RUNNING_TESTS.md](RUNNING_TESTS.md) | Test execution guide |
+| [Workflow Diagrams](docs/workflow-diagrams.md) | Visual workflow and data flow diagrams |
+| [MCP Setup](docs/mcp-setup.md) | MCP server configuration |
+| [Security](docs/security.md) | Security practices |
+| [Running Tests](docs/running-tests.md) | Test execution guide |
 | [docs/aws-account-setup.md](docs/aws-account-setup.md) | AWS prerequisites |
 | [prompts/environment-setup-agent/agentcore/README.md](prompts/environment-setup-agent/agentcore/README.md) | Agentcore Gateway + Runtime (optional) |
 | [docs/getting-started.md](docs/getting-started.md) | Quick start guide |
@@ -625,7 +675,7 @@ The platform enforces security at every layer:
 - **Audit Logging**: CloudTrail for all Lake Formation operations — who accessed what column, when tags changed, all permission grants
 - **Bronze Immutability**: Source data is never modified after ingestion
 
-See [SECURITY.md](SECURITY.md) and [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
+See [Security](docs/security.md) and [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
 
 ## License
 

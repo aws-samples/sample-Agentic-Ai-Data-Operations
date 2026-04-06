@@ -107,7 +107,7 @@ aws bedrock-agent list-agents | grep data-onboarding
 - Existing resources are reused
 
 **Issue**: "MCP server failed to connect"
-- See: `../../MCP_SETUP.md`
+- See: `../../docs/mcp-setup.md`
 - Check: `uv --version` (need 0.9+)
 - Check: Python 3.12+ installed
 
@@ -118,7 +118,7 @@ aws bedrock-agent list-agents | grep data-onboarding
 
 ## Related Documentation
 
-- `../../MCP_SETUP.md` - MCP server configuration guide
+- `../../docs/mcp-setup.md` - MCP server configuration guide
 - `agentcore/gateway/GATEWAY_ARCHITECTURE.md` - Gateway architecture
 - `../../CLAUDE.md` - Project-level configuration
 - `../data-onboarding-agent/README.md` - Next step after setup
