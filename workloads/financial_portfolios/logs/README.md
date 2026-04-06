@@ -8,14 +8,27 @@ This folder contains execution traces and logs for the financial_portfolios pipe
 logs/
 ├── trace_events.jsonl          # Cumulative trace history (all runs)
 ├── run_YYYYMMDD_HHMMSS/       # Per-run logs
-│   ├── trace.jsonl            # This run's trace events
+│   ├── README.md              # Run summary
 │   ├── orchestrator.log       # Phase transitions, test gates
 │   ├── extract.log            # Bronze extraction logs
 │   ├── transform.log          # Silver transformation logs
 │   ├── quality.log            # Quality check results
-│   └── load.log               # Gold load logs
+│   ├── load.log               # Gold load logs
+│   └── lineage.jsonl          # Data lineage events
 └── latest -> run_YYYYMMDD_HHMMSS/  # Symlink to latest run
 ```
+
+## Demo Data (Historical Runs)
+
+This directory contains **sample logs** from historical pipeline runs to demonstrate the system:
+
+| Run ID | Date | Status | Rows | Duration | Quality (Silver/Gold) |
+|--------|------|--------|------|----------|---------------------|
+| `run-20260320-130512` | 2026-03-20 | ✅ Initial Deployment | - | 362s | - |
+| `run-20260322-091523` | 2026-03-22 | ✅ Success | 203 | 111s | 0.98 / 0.99 |
+| `run-20260323-091545` | 2026-03-23 | ✅ Success | 203 | 110s | 0.98 / 0.99 |
+
+**Sample Run Directory**: `run_20260322_091523/` contains detailed logs showing all three logging layers in action.
 
 ## Log Layers
 

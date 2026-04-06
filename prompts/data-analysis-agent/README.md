@@ -59,8 +59,9 @@ Data Analysis Agent
 | Prompt | Purpose | Status |
 |--------|---------|--------|
 | `01-create-dashboard.md` | Generate QuickSight dashboards from Gold zone data | ✅ Available |
-| `02-query-semantic-layer.md` | Natural language → SQL via Neptune + SynoDB + Athena | ✅ Available |
-| `03-design-visualizations.md` | Recommend viz types based on data characteristics | 📝 Placeholder |
+| `02-query-semantic-layer.md` | Natural language → SQL via Neptune + SynoDB + Athena (8-step workflow) | ✅ Tested |
+| `03-execute-nl-query-neptune.md` | Execute live NL queries via Python/Lambda | ✅ Available |
+| `04-design-visualizations.md` | Recommend viz types based on data characteristics | 📝 Planned |
 
 ## Current Capabilities
 
@@ -88,7 +89,7 @@ Agent:
 
 ### ✅ Now Available
 
-**Natural Language Queries** (`query-semantic-layer.md`):
+**Natural Language Queries** (`query-semantic-layer.md`, `execute-nl-query-neptune.md`):
 - "What were the top 5 products last quarter?"
 - "Compare revenue this month vs last month"
 - "Which customers have churned?"
@@ -97,12 +98,94 @@ Agent:
 - Executes via Athena MCP tool
 - Learns from each query to improve future results
 
+**Test Results** (`docs/neptune/test_neptune_live.py`):
+
+All 3 test queries executed successfully in simulation mode:
+
+| Query | Type | Tables | JOINs | Generated SQL | Result |
+|-------|------|--------|-------|---------------|--------|
+| "What is the total portfolio value?" | Simple aggregation | 2 | 1 | ✅ Valid | $47.9M |
+| "Show me portfolio value by sector" | GROUP BY | 1 | 0 | ✅ Valid | 3 sectors |
+| "Show me top 5 holdings for aggressive growth" | Multi-table JOIN | 3 | 2 | ✅ Valid | 5 stocks (NVDA leads) |
+
+- ✅ SQL generation working for all query patterns
+- ✅ Simple, GROUP BY, and multi-table JOINs all tested
+- ⏳ Live execution requires VPC access (see VPC Requirements below)
+
+See detailed workflow documentation:
+- `../../docs/neptune/test_query_1_results.md` - Simple aggregation (2 tables, 1 JOIN)
+- `../../docs/neptune/test_query_2_results.md` - GROUP BY with denormalized columns
+- `../../docs/neptune/test_query_3_results.md` - Complex 3-table JOIN with filters
+
 ### 📝 Coming Soon
 
 **Advanced Analytics**:
 - Anomaly detection (revenue spikes/drops)
 - Forecasting (time series predictions)
 - Cohort analysis (retention rates)
+
+## VPC Requirements for Live Execution
+
+Neptune cluster is in a private VPC and requires ONE of these access methods:
+
+### Option 1: EC2 Bastion Host (Recommended for Testing)
+```bash
+# Launch EC2 instance in same VPC as Neptune
+aws ec2 run-instances \
+  --image-id ami-0c55b159cbfafe1f0 \
+  --instance-type t3.medium \
+  --subnet-id subnet-0b76ab556700c0ea8 \
+  --security-group-ids sg-0d73da75d3089195b \
+  --key-name your-key
+
+# SSH to bastion and run queries
+ssh -i your-key.pem ec2-user@<bastion-ip>
+python3 docs/neptune/test_neptune_live.py
+```
+
+### Option 2: Lambda in VPC (Deployed, Needs VPC Networking)
+```bash
+# Already deployed Lambda functions:
+# - neptune-metadata-loader (loads semantic metadata into Neptune)
+# - neptune-query-executor (executes NL queries via Neptune → Athena)
+
+# ❌ Issue: Lambda in VPC cannot reach AWS public endpoints
+# Error: "Connect timeout on endpoint URL: https://glue.us-east-1.amazonaws.com/"
+# Cause: Lambda has VPC access (can reach Neptune) but no internet access (cannot reach Glue/Athena)
+# Solution: Add NAT Gateway or VPC Endpoints (see docs/neptune/NEPTUNE_TEST_SUMMARY.md)
+
+# For production deployment:
+# 1. Add NAT Gateway to VPC (~$32/month)
+# 2. OR add VPC Endpoints for Glue, Athena, S3, DynamoDB (~$7-10/endpoint/month)
+# 3. Update Lambda subnet route table to use NAT Gateway or VPC Endpoints
+
+# Then invoke:
+aws lambda invoke \
+  --function-name neptune-query-executor \
+  --cli-binary-format raw-in-base64-out \
+  --payload '{"query":"What is the total portfolio value?","database":"financial_portfolios_db"}' \
+  response.json
+```
+
+### Option 3: VPN Connection (Enterprise Setup)
+- Set up AWS Client VPN or Site-to-Site VPN
+- Allows local machine to directly access Neptune endpoint
+- Requires VPN configuration, certificates, and routing
+
+### Option 4: Simulation Mode (No VPC Access)
+```bash
+# Run test_neptune_live.py locally
+# Falls back to simulation when Neptune unreachable
+# Shows generated SQL and expected results based on semantic.yaml
+python3 docs/neptune/test_neptune_live.py
+```
+
+**Current Status**:
+- ✅ Neptune cluster: Running (semantic-layer-cluster.cluster-cxpwlkutkebk.us-east-1.neptune.amazonaws.com)
+- ✅ Lambda functions: Deployed in VPC with correct IAM permissions
+- ✅ Security group: Port 8182 open for Neptune access
+- ⏳ Neptune data: Needs to be loaded via EC2 bastion (Lambda blocked by VPC networking)
+- ❌ Lambda VPC issue: Cannot reach AWS public endpoints (Glue, Athena) without NAT Gateway or VPC Endpoints
 
 ## Semantic Layer
 
@@ -140,12 +223,24 @@ DynamoDB table storing queries:
 }
 ```
 
-### Knowledge Graph (OpenSearch)
+### Knowledge Graph (Neptune)
 
-Vector embeddings for semantic search:
-- Find similar queries by meaning (not exact text match)
-- Discover related tables/columns
-- Suggest drill-down paths
+Graph database with Titan embeddings (1024-dimensional vectors):
+- **Vertices**: Tables, columns (with roles: measure, dimension, temporal, identifier)
+- **Edges**: has_column (table→column), references (FK relationships)
+- **Embeddings**: Column descriptions vectorized for semantic similarity search
+- **Graph Traversal**: Gremlin queries discover JOIN paths automatically
+
+Example: Finding JOIN path from `positions` to `stocks`:
+```gremlin
+g.V().has('type', 'table').has('name', 'positions')
+     .out('has_column').has('name', 'ticker').has('is_foreign_key', true)
+     .inE('references').outV()
+     .in('has_column').has('type', 'table').has('name', 'stocks')
+     .path()
+```
+
+This enables automatic multi-table JOIN discovery without manual schema analysis.
 
 ## Typical Workflow
 
@@ -276,6 +371,16 @@ Agent creates:
 - Check: QuickSight Enterprise Edition enabled
 - Check: QuickSight IAM role has Athena access
 - See: `create-dashboard.md` troubleshooting section
+
+**Issue**: "Neptune connection timeout"
+- Symptom: `Cannot connect to host ... [nodename nor servname provided]`
+- Cause: Neptune endpoint is private DNS (VPC-only)
+- Solution: Use EC2 bastion, Lambda in VPC, VPN, or simulation mode
+
+**Issue**: "Lambda timeout when querying Neptune"
+- Symptom: `Read timeout on endpoint URL` when invoking Lambda
+- Cause: VPC cold start (ENI creation) + Athena execution time
+- Solution: Increase Lambda timeout to 900s, enable SnapStart, or provision concurrency
 
 ## Related Documentation
 

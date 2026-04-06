@@ -94,7 +94,7 @@ sed -i 's/us-east-1/your-region/g' .mcp.json
 sed -i 's/"default"/"your-profile"/g' .mcp.json
 ```
 
-See `MCP_SETUP.md` for full setup guide.
+See `mcp-setup.md` for full setup guide.
 
 ### AWS Credentials
 

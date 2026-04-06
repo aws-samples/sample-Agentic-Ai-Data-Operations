@@ -5,7 +5,10 @@ Failure Analyzer: Extract failure patterns from trace logs.
 import json
 import re
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .patch_registry import PromptEvolver
 from collections import defaultdict
 
 from .schemas import (
@@ -353,3 +356,29 @@ Add this question to discovery checklist BEFORE profiling."""
         cross_patterns = self.aggregate_cross_workload(all_patterns)
 
         return all_patterns, cross_patterns
+
+    def analyze_and_evolve(
+        self,
+        prompt_evolver: "PromptEvolver",
+        auto_graft: bool = True,
+        min_confidence: float = 0.60,
+    ) -> Dict[str, Any]:
+        """
+        Full self-healing cycle: analyze -> filter -> harvest -> auto-graft.
+
+        This is the method called by the nightly Lambda and CLI.
+        """
+        failures, cross_patterns = self.analyze_all_workloads()
+        patchable = [
+            p for p in cross_patterns
+            if p.prompt_patch and p.confidence >= min_confidence
+        ]
+        result = prompt_evolver.harvest_insights(patchable, auto_graft=auto_graft)
+        workload_names = set()
+        for f in failures:
+            workload_names.add(f.workload)
+        return {
+            "workloads_analyzed": len(workload_names),
+            "patterns_found": len(cross_patterns),
+            **result,
+        }

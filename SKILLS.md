@@ -75,52 +75,32 @@ MAIN CONVERSATION
 
 ### Sub-Agent Output Format (MANDATORY)
 
-Every sub-agent MUST structure its final response using this format. The orchestrator parses this to decide whether to proceed, retry, or escalate.
+Every sub-agent MUST return its result by calling the `submit_agent_output` tool.
+Do NOT write a markdown response — call the tool with a JSON payload.
 
-```
-================================================================
-  AGENT: {Your Agent Name}
-  WORKLOAD: {workload_name}
-  PHASE: {phase_number}
-  RUN_ID: {run_id}
-================================================================
+The orchestrator reads your output via `AgentOutput.from_bedrock_tool_call()` — if you
+respond in plain text or markdown, the orchestrator cannot parse your output and will
+treat it as a failure.
 
-## ARTIFACTS CREATED
-| Path | Type | Checksum (SHA-256) |
-|------|------|-------------------|
-| workloads/{name}/config/source.yaml | config | abc123... |
-| workloads/{name}/tests/unit/test_metadata.py | test | def456... |
+**Schema**: `shared/templates/agent_output_schema.py` — `AgentOutput` dataclass + `SUBMIT_OUTPUT_TOOL` dict.
 
-## TESTS EXECUTED
-### Unit Tests: {X}/{Y} passed
-- PASS test_schema_valid
-- PASS test_pii_detection
-- FAIL test_lineage_complete (REASON: missing FK mapping)
+**Required fields** (tool call will fail without these):
+- `agent_name`, `agent_type`, `workload_name`, `run_id`, `started_at`, `completed_at`, `status`
+- `artifacts`: list of `{path, type, checksum}` for every file you created
+- `blocking_issues`: empty list `[]` if none — required even when empty
+- `tests`: `{unit: {passed, failed, total}, integration: {passed, failed, total}}`
 
-### Integration Tests: {X}/{Y} passed
-- PASS test_catalog_registration
+**Optional but valuable fields:**
 
-## BLOCKING ISSUES (must fix before proceeding)
-- None | List issues
-
-## WARNINGS (non-blocking)
-- None | List warnings
-
-## DECISIONS (cognitive trace — MANDATORY)
-You MUST include a `decisions` array documenting every significant choice you made.
-For each decision, explain your reasoning, what alternatives you considered,
-and why you rejected them. This is critical for audit trails and debugging.
-
-| decision_id | category | choice_made | confidence |
-|-------------|----------|-------------|------------|
-| d-001 | {schema_inference|rule_selection|transformation_choice|format_selection|partition_strategy} | {what you chose} | {high|medium|low} |
-
-Each decision must include:
-- **reasoning**: Free text explaining your thought process
-- **choice_made**: What was actually chosen
-- **alternatives_considered**: List of other options you evaluated
-- **rejection_reasons**: Why each alternative was rejected
-- **confidence**: high (clear best choice), medium (trade-offs), low (uncertain)
+`decisions` — cognitive trace (MANDATORY for audit trails):
+Document every non-trivial choice you make. Each decision:
+- `decision_id`: auto-incremented via `add_decision()` helper
+- `category`: schema_inference | rule_selection | transformation_choice | format_selection | partition_strategy
+- `reasoning`: free text explaining your thought process
+- `choice_made`: what was actually chosen
+- `alternatives_considered`: list of other options you evaluated
+- `rejection_reasons`: why each alternative was rejected
+- `confidence`: high (clear best choice) | medium (trade-offs) | low (uncertain)
 
 Example decisions by agent type:
 - Metadata Agent: schema inference, PII classification, column role assignment
@@ -128,14 +108,10 @@ Example decisions by agent type:
 - Quality Agent: threshold selection, rule priority, anomaly detection config
 - DAG Agent: task grouping, retry strategy, dependency ordering, parallelism
 
-## NEXT STEPS FOR ORCHESTRATOR
-1. Proceed to {next_agent}
-2. OR: Retry with {context}
-
-================================================================
-```
-
-Schema implementation: `shared/templates/agent_output_schema.py` (AgentOutput dataclass, includes `decisions` field and `add_decision()` helper).
+`memory_hints` — durable facts the system should remember for future runs:
+Each hint: `{type, content}` where type is one of: `user` (preferences), `feedback` (corrections),
+`project` (schema facts, known quirks), `reference` (S3 paths, Glue DB names).
+Example: `{"type": "project", "content": "pe_ratio has expected 5% nulls in financial_portfolios — do not quarantine"}`
 
 ### Determinism Requirements (MANDATORY)
 
@@ -435,9 +411,22 @@ Both Step 0.1 and Step 0.2 must complete before proceeding:
 
 ## Phase 1: Discovery (ALWAYS START HERE — after Phase 0 passes)
 
-Before doing ANYTHING, gather information by asking the human these questions. Do not proceed until you have answers. Adapt the questions based on the DATA DOMAIN the user describes.
+### Memory-Aware Discovery
+
+**Before asking the human any questions**, check for existing workload memory:
+
+1. Check if `workloads/{workload_name}/memory/MEMORY.md` exists
+2. If yes: load the ledger via `WorkloadMemory.read_ledger()`, note what is already known
+3. Pre-fill known answers from memory — only ask about unknowns or changed facts
+4. Always tell the human what you loaded from memory and ask if it's still accurate:
+   _"From previous runs I know: source is S3 CSV with PK=ticker, SOX-compliant. Still correct? [Y/n]"_
+
+This ensures sessions start with context, not cold.
+See `shared/memory/workload_memory.py` for the `WorkloadMemory` class.
 
 ### Required Questions
+
+Before doing ANYTHING else, gather information by asking the human these questions. Do not proceed until you have answers. Adapt the questions based on the DATA DOMAIN the user describes.
 
 Ask these in order. Each category serves a different agent/layer — do NOT mix them.
 
@@ -1246,6 +1235,12 @@ After sub-agent returns, run:
 ✓ Metadata Agent complete. Tests: 5/5 unit, 4/4 integration passed.
 → Proceeding to Transformation Agent.
 ```
+
+**Post-Gate Memory Extraction**: After each test gate passes, memory hints from the
+sub-agent's `AgentOutput.memory_hints` are extracted and stored to
+`workloads/{workload_name}/memory/` for future runs. The orchestrator calls
+`extract_memories_from_run()` from `shared/memory/extractor.py` with the AgentOutput.
+This runs asynchronously — it does not block proceeding to the next sub-agent.
 
 ### Step 4.3: Transformation Agent (SUB-AGENT)
 

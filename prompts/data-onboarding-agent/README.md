@@ -205,7 +205,7 @@ For regulated data, run a regulation prompt DURING Phase 1 discovery:
 
 **Issue**: "MCP server failed"
 - Check: `claude mcp list`
-- See: `../../MCP_SETUP.md`
+- See: `../../docs/mcp-setup.md`
 
 **Issue**: "Quality gate failed (score < 0.80)"
 - Review: `workloads/{name}/tests/quality_report.json`
@@ -224,7 +224,7 @@ For regulated data, run a regulation prompt DURING Phase 1 discovery:
 - `../data-analysis-agent/README.md` - Run this after onboarding
 - `../../SKILLS.md` - Detailed agent skill definitions
 - `../../MCP_GUARDRAILS.md` - MCP tool selection rules per phase
-- `../../WORKFLOW.md` - Visual diagrams of the workflow
+- `../../docs/workflow-diagrams.md` - Visual diagrams of the workflow
 - `../../CLAUDE.md` - Project-level configuration
 
 ## Examples

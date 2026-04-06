@@ -18,9 +18,9 @@ An autonomous data pipeline orchestration platform that moves data through **Bro
 | `SKILLS.md` | Agent skill definitions — prompts, workflows, constraints for all 7 agents |
 | `TOOLS.md` | AWS tooling reference — which specific service/tool to use at each pipeline step |
 | `MCP_GUARDRAILS.md` | **MCP tool selection guardrails** — actual MCP tool names, per-phase rules, fallback decisions, live server status |
-| `WORKFLOW.md` | Visual diagrams — end-to-end flow, sub-agent spawning, test gates, data zone progression, DAG tasks |
+| `docs/workflow-diagrams.md` | Visual diagrams — end-to-end flow, sub-agent spawning, test gates, data zone progression, DAG tasks |
 
-Read `design.md` before making architectural decisions. Read `SKILLS.md` before acting as any agent. Read `TOOLS.md` for AWS service selection. Read `MCP_GUARDRAILS.md` for which MCP tool vs CLI to use at each phase. See `WORKFLOW.md` for visual diagrams.
+Read `design.md` before making architectural decisions. Read `SKILLS.md` before acting as any agent. Read `TOOLS.md` for AWS service selection. Read `MCP_GUARDRAILS.md` for which MCP tool vs CLI to use at each phase. See `docs/workflow-diagrams.md` for visual diagrams.
 
 ## Architecture Overview
 
