@@ -70,6 +70,10 @@ Phase 5: Deploy ────── uploads to S3, creates Glue catalog, applies 
 Output: workloads/{dataset_name}/ with config/, scripts/, dags/, sql/, tests/
 ```
 
+### Workload Memory (Persistent Learning)
+
+Each workload maintains its own memory system in `workloads/{name}/memory/` that accumulates knowledge across pipeline runs — schema quirks, quality thresholds, operator preferences, and successful patterns — enabling future runs to start with context instead of cold discovery. When the same workload is re-processed, the agent loads this memory first, pre-filling known answers and avoiding repetitive questions, while continuously learning from new failures and successes to prevent recurring issues.
+
 ---
 
 ## 2. Data Analysis Agent
@@ -95,7 +99,48 @@ Output: workloads/{dataset_name}/ with config/, scripts/, dags/, sql/, tests/
 
 ---
 
-## 3. Prompt Intelligence Agent (Self-Healing)
+## 3. Environment Setup Agent
+
+**Purpose:** Automates one-time AWS infrastructure provisioning and MCP server deployment across local and cloud modes.
+
+**Runs in:** Development environment only (one-time setup)
+**Output:** AWS resources (S3, Glue, KMS, IAM), MCP server configurations, Agentcore Gateway/Runtime (optional)
+
+The Environment Setup Agent handles the foundational infrastructure setup that must happen before any data onboarding can begin. This includes AWS resource provisioning (S3 buckets, KMS keys, Glue databases, Lake Formation settings), MCP server installation and health checks, and optional Agentcore Gateway deployment for shared cloud-hosted tool access.
+
+---
+
+## 4. Semantic Layer (Data Ontology & Business Context)
+
+**Purpose:** Enables natural language to SQL query generation by creating a unified business context layer over technical schemas.
+
+**Runs in:** Development (for setup) AND Production (for query processing)
+**Output:** Neptune graph database, SynoDB query patterns, semantic.yaml configs, business term mappings
+
+The semantic layer creates a data ontology that bridges business terminology with technical table schemas, enabling AI agents to understand relationships between entities and generate accurate SQL from natural language queries. It captures column roles (measures, dimensions, temporal), hierarchical relationships (country→state→city), and business definitions that would otherwise require domain expertise.
+
+The implementation combines three storage systems working in concert: **SageMaker Catalog** stores column-level business metadata as custom properties in the Glue Data Catalog, **Neptune** provides a graph database with Titan embeddings for semantic search and relationship discovery, and **SynoDB** (DynamoDB) caches successful query patterns with embeddings for fast lookup. During deployment, semantic.yaml configs are parsed and loaded into all three stores, creating a queryable knowledge graph that agents can traverse to discover JOINs via foreign key relationships and find similar tables/columns through vector similarity search.
+
+The Analysis Agent uses this semantic layer to automatically generate complex SQL queries with proper JOINs, aggregations, and filters based on business intent rather than requiring users to know table schemas, column names, or technical relationships.
+
+---
+
+## 5. Organizational Tool Decision Engine
+
+**Purpose:** Dynamically selects the optimal tool for each operation based on organizational principles, available infrastructure, and real-time health status.
+
+**Runs in:** All phases (continuous tool selection)
+**Output:** Tool routing decisions, fallback strategies, organizational compliance reports
+
+Tools are decided on-the-fly based on a hierarchical decision framework that can be configured per organization's principles and infrastructure constraints. The system maintains a live inventory of available MCP servers, CLI tools, and cloud services, then routes each operation to the most appropriate tool based on factors like performance requirements, security policies, cost optimization, and organizational preferences (e.g., "always use MCP over CLI when available" or "prefer Athena over Redshift for ad-hoc queries").
+
+Organizations can define custom routing rules through policy files that specify tool preferences, security constraints (e.g., "PII operations must use designated KMS keys"), cost thresholds, and failover strategies. The decision engine evaluates these rules in real-time during pipeline execution, automatically falling back to alternative tools when primary choices are unavailable or violate organizational policies.
+
+This enables the same pipeline code to run across different organizational environments — startups might default to cost-optimized tools while enterprises enforce security-first tool selection — without requiring separate implementations or manual configuration per deployment.
+
+---
+
+## 6. Prompt Intelligence Agent (Self-Healing)
 
 **Purpose:** Learns from pipeline failures across all workloads and generates recommendations to prevent recurring issues.
 
@@ -157,7 +202,7 @@ See [shared/prompt_intelligence/QUICKSTART.md](shared/prompt_intelligence/QUICKS
 
 ---
 
-## 4. DevOps Agent (Coming Q2 2026)
+## 7. DevOps Agent (Coming Q2 2026)
 
 **Purpose:** Automates CI/CD, monitoring, cost optimization, and self-healing for deployed pipelines.
 
