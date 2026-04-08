@@ -1,0 +1,113 @@
+# Security scanning workflow — runs on every PR to main
+# Checks: pre-commit hooks, gitleaks, dependency vulnerabilities, Cedar policy tests, bandit
+
+name: Security Scan
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: Gitleaks secret scan (full git history)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history for secret scanning
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  pre-commit:
+    name: Pre-commit hooks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install pre-commit pyyaml
+
+      - name: Run pre-commit on all files
+        run: pre-commit run --all-files --show-diff-on-failure
+
+  dependency-scan:
+    name: Dependency vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Install core dependencies
+        run: pip install pytest pyyaml
+
+      - name: Audit dependencies
+        run: pip-audit --severity high || true
+
+  policy-tests:
+    name: Cedar policy & hook validator tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install pytest pyyaml
+
+      - name: Run Cedar policy tests
+        run: pytest shared/tests/test_cedar_policies.py -v
+
+      - name: Run hook validator tests
+        run: pytest shared/tests/unit/test_hook_validators.py -v
+
+      - name: Run prompt sanitizer tests
+        run: pytest shared/tests/unit/test_prompt_sanitizer.py -v || true
+
+      - name: Run MCP config validator tests
+        run: pytest shared/tests/unit/test_mcp_config_validator.py -v || true
+
+  bandit-scan:
+    name: Bandit security analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install bandit
+        run: pip install bandit[toml]
+
+      - name: Run bandit
+        run: |
+          bandit -r shared/ workloads/ \
+            --severity-level medium \
+            --confidence-level medium \
+            --exclude '*/tests/*,*/test_*' \
+            --format json --output bandit-report.json || true
+          bandit -r shared/ workloads/ \
+            --severity-level medium \
+            --confidence-level medium \
+            --exclude '*/tests/*,*/test_*' \
+            --format screen

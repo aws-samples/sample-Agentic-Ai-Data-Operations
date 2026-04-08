@@ -162,6 +162,7 @@ sample_data/*.csv
 
 # Sensitive information markers
 *secret*
+!.secrets.baseline
 *password*
 *credential*
 *token*

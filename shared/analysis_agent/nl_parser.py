@@ -10,6 +10,8 @@ from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from botocore.exceptions import ClientError
 
+from shared.utils.prompt_sanitizer import sanitize_identifier, sanitize_user_query
+
 
 @dataclass
 class QueryIntent:
@@ -164,11 +166,13 @@ class NLQueryParser:
         context_parts = []
 
         if available_tables:
-            context_parts.append(f"Available tables: {', '.join(available_tables)}")
+            safe_tables = [sanitize_identifier(t) for t in available_tables]
+            context_parts.append(f"Available tables: {', '.join(safe_tables)}")
 
         if available_columns:
             for table, columns in available_columns.items():
-                context_parts.append(f"Columns in {table}: {', '.join(columns[:20])}")
+                safe_cols = [sanitize_identifier(c) for c in columns[:20]]
+                context_parts.append(f"Columns in {sanitize_identifier(table)}: {', '.join(safe_cols)}")
 
         return "\n".join(context_parts) if context_parts else "No metadata available."
 
@@ -179,7 +183,7 @@ class NLQueryParser:
 Context:
 {context}
 
-Query: {nl_query}
+Query: {sanitize_user_query(nl_query)}
 
 Extract the following information and return as JSON:
 {{

@@ -13,6 +13,7 @@ from typing import Dict, List, Optional, Any
 from pathlib import Path
 
 from shared.metadata.glue_fetcher import GlueFetcher
+from shared.utils.prompt_sanitizer import sanitize_identifier, sanitize_description
 from shared.metadata.semantic_reader import read_semantic_yaml, validate_semantic_yaml, get_table_from_semantic
 from shared.metadata.lakeformation_fetcher import LakeFormationFetcher
 from shared.schemas.unified_metadata import UnifiedColumn, UnifiedTable, UnifiedMetadataGraph
@@ -200,10 +201,10 @@ class MetadataCombiner:
         column_lf_tags = lf_tags.get('column_tags', {})
 
         for col_def in table_def['columns']:
-            col_name = col_def['name']
+            col_name = sanitize_identifier(col_def['name'])
 
             # Get Glue column if exists
-            glue_col = glue_columns_map.get(col_name)
+            glue_col = glue_columns_map.get(col_def['name']) or glue_columns_map.get(col_name)
 
             # Get LF-Tags for this column
             col_tags = column_lf_tags.get(col_name, [])
@@ -224,7 +225,7 @@ class MetadataCombiner:
                 name=col_name,
                 data_type=data_type,
                 role=col_def['role'],
-                description=col_def.get('description', ''),
+                description=sanitize_description(col_def.get('description', '')),
                 is_partition_key=(col_name in partition_names),
                 is_nullable=col_def.get('nullable', True),
                 default_aggregation=col_def.get('default_aggregation'),

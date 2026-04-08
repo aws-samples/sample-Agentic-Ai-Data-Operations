@@ -1,0 +1,120 @@
+# Pre-commit hooks for security scanning, PII detection, and code quality
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+# Bypass (emergency): SKIP=hook-id git commit -m "EMERGENCY: reason"
+
+repos:
+  # ── Community Hooks ──────────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-yaml
+        name: validate-yaml-syntax
+        args: ['--allow-multiple-documents']
+      - id: check-added-large-files
+        name: block-large-files
+        args: ['--maxkb=5120']  # 5MB limit
+      - id: mixed-line-endings
+        args: ['--fix=lf']
+      - id: trailing-whitespace
+        args: ['--markdown-linebreak-ext=md']
+      - id: end-of-file-fixer
+      - id: no-commit-to-branch
+        name: protect-main-branch
+        args: ['--branch', 'main']
+
+  # Secret detection (broader than git-secrets — catches API keys, tokens, private keys)
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        name: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: |
+          (?x)^(
+            .*\.lock|
+            .*\.csv|
+            demo/sample_data/.*|
+            workloads/.*/sample_data/.*
+          )$
+
+  # Python static security analysis (SQL injection, hardcoded passwords, exec/eval, unsafe deserialization)
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.9
+    hooks:
+      - id: bandit
+        name: bandit-security-scan
+        args: ['-c', 'pyproject.toml', '--severity-level', 'medium', '--confidence-level', 'medium']
+        exclude: |
+          (?x)^(
+            .*/tests/.*|
+            demo/.*|
+            conftest\.py
+          )$
+
+  # ── Custom Local Hooks ───────────────────────────────────────────────
+
+  # PII pattern detection in source code (reuses patterns from shared/utils/pii_detection_and_tagging.py)
+  - repo: local
+    hooks:
+      - id: pii-code-scanner
+        name: pii-code-scanner
+        entry: python shared/utils/hook_validators/pii_code_scanner.py
+        language: python
+        types_or: [python, yaml, sql, markdown]
+        exclude: |
+          (?x)^(
+            .*/tests/.*|
+            .*test_.*\.py|
+            demo/.*|
+            shared/utils/pii_detection_and_tagging\.py|
+            shared/utils/hook_validators/.*|
+            \.pre-commit-config\.yaml|
+            docs/security\.md
+          )$
+
+      # Cedar policy syntax validation
+      - id: cedar-validator
+        name: cedar-policy-validator
+        entry: python shared/utils/hook_validators/cedar_validator.py
+        language: python
+        files: '\.(cedar|cedarschema)$'
+
+      # Workload YAML config schema validation
+      - id: yaml-config-validator
+        name: yaml-config-validator
+        entry: python shared/utils/hook_validators/yaml_config_validator.py
+        language: python
+        files: 'workloads/.*/config/.*\.yaml$'
+
+      # Sensitive information scanner (hardcoded secrets, infra details, connection strings)
+      - id: sensitive-info-scanner
+        name: sensitive-info-scanner
+        entry: python shared/utils/hook_validators/sensitive_info_scanner.py
+        language: python
+        types_or: [python, yaml, sql, json]
+        exclude: |
+          (?x)^(
+            .*/tests/.*|
+            .*test_.*\.py|
+            demo/.*|
+            \.pre-commit-config\.yaml|
+            shared/utils/hook_validators/.*|
+            docs/security\.md|
+            \.secrets\.baseline|
+            \.gitallowed
+          )$
+
+      # MCP config security validation (command allowlist, no creds, no absolute paths)
+      - id: mcp-config-validator
+        name: mcp-config-validator
+        entry: python shared/utils/hook_validators/mcp_config_validator.py
+        language: python
+        files: '\.mcp.*\.json$'
+
+      # Prompt injection detection in YAML metadata (column names, descriptions, business terms)
+      - id: prompt-injection-scanner
+        name: prompt-injection-scanner
+        entry: python shared/utils/hook_validators/prompt_injection_scanner.py
+        language: python
+        files: 'workloads/.*/config/.*\.yaml$'

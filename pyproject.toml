@@ -10,7 +10,12 @@ dependencies = [
 cedar = ["cedarpy"]
 avp = ["boto3"]
 reic = ["sentence-transformers>=2.2.0", "faiss-cpu>=1.7.0"]
+hooks = ["pre-commit>=3.7.0", "bandit[toml]>=1.7.9", "pip-audit>=2.7.0", "detect-secrets>=1.5.0"]
 
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"
 testpaths = ["workloads", "shared"]
+
+[tool.bandit]
+exclude_dirs = ["tests", "demo", "shared/tests"]
+skips = ["B101"]

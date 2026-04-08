@@ -13,6 +13,7 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 
 from shared.analysis_agent.nl_parser import NLQueryParser, QueryIntent
+from shared.utils.prompt_sanitizer import sanitize_identifier, sanitize_user_query, sanitize_description
 from shared.analysis_agent.neptune_search import NeptuneSemanticSearch
 from shared.synodb.search import SynoDBSearch
 
@@ -199,7 +200,7 @@ class SQLGenerator:
         prompt_parts = [
             "You are a SQL expert. Generate SQL to answer this natural language question.",
             "",
-            f"**Question**: {nl_query}",
+            f"**Question**: {sanitize_user_query(nl_query)}",
             ""
         ]
 
@@ -216,7 +217,7 @@ class SQLGenerator:
         # Section 3: Available tables
         prompt_parts.append("**Available Tables**:")
         for table in table_metadata:
-            prompt_parts.append(f"\nTable: `{database}.{table['table_name']}`")
+            prompt_parts.append(f"\nTable: `{sanitize_identifier(database)}.{sanitize_identifier(table['table_name'])}`")
             prompt_parts.append(f"- Type: {table['type']} (grain: {table['grain']})")
             prompt_parts.append(f"- Primary key: {', '.join(table['primary_key'])}")
 
@@ -226,28 +227,30 @@ class SQLGenerator:
                 prompt_parts.append("- Measures (aggregate these):")
                 for col in measures:
                     agg = col.get('default_aggregation', 'SUM')
-                    prompt_parts.append(f"  - `{col['name']}` ({col['data_type']}) - default: {agg}")
+                    prompt_parts.append(f"  - `{sanitize_identifier(col['name'])}` ({sanitize_identifier(col['data_type'])}) - default: {agg}")
 
             # Dimensions
             dimensions = [c for c in table['columns'] if c['role'] == 'dimension']
             if dimensions:
                 prompt_parts.append("- Dimensions (group by these):")
                 for col in dimensions:
-                    prompt_parts.append(f"  - `{col['name']}` ({col['data_type']})")
+                    prompt_parts.append(f"  - `{sanitize_identifier(col['name'])}` ({sanitize_identifier(col['data_type'])})")
 
             # Temporal
             temporal = [c for c in table['columns'] if c['role'] == 'temporal']
             if temporal:
                 prompt_parts.append("- Temporal columns:")
                 for col in temporal:
-                    prompt_parts.append(f"  - `{col['name']}` ({col['data_type']})")
+                    prompt_parts.append(f"  - `{sanitize_identifier(col['name'])}` ({sanitize_identifier(col['data_type'])})")
 
             # Relationships
             if table.get('relationships'):
                 prompt_parts.append("- Relationships:")
                 for rel in table['relationships']:
                     prompt_parts.append(
-                        f"  - JOIN {rel['target_table']} ON {table['table_name']}.{rel['source_column']} = {rel['target_table']}.{rel['target_column']}"
+                        f"  - JOIN {sanitize_identifier(rel['target_table'])} ON "
+                        f"{sanitize_identifier(table['table_name'])}.{sanitize_identifier(rel['source_column'])} = "
+                        f"{sanitize_identifier(rel['target_table'])}.{sanitize_identifier(rel['target_column'])}"
                     )
 
         prompt_parts.append("")

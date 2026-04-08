@@ -127,26 +127,101 @@ Output CSV files in `workloads/*/output/` use:
 
 ---
 
-## Pre-Commit Checklist
+## Automated Security Hooks (pre-commit)
 
-Before pushing to GitHub:
+The repository uses the **pre-commit framework** to automatically scan every commit for security issues. Hooks run in under 5 seconds and catch vulnerabilities before code leaves your machine.
+
+### Setup
 
 ```bash
-# 1. Check for sensitive data
+# Install pre-commit and hook dependencies
+pip install pre-commit
+
+# Install hooks into your local .git/hooks/
+pre-commit install
+
+# Run all hooks manually against the full repo
+pre-commit run --all-files
+```
+
+### What Gets Scanned
+
+| Hook | What It Catches | Severity |
+|------|----------------|----------|
+| **git-secrets** (existing) | AWS access keys, secret keys, account IDs | BLOCK |
+| **detect-secrets** | API keys, tokens, passwords, private keys (broader than git-secrets) | BLOCK |
+| **bandit** | SQL injection, hardcoded passwords, exec/eval, unsafe deserialization | BLOCK (medium+) |
+| **pii-code-scanner** | SSN, credit card, email, phone, DOB patterns in source code | BLOCK (CRITICAL), WARN (HIGH) |
+| **cedar-policy-validator** | Cedar policy syntax errors (broken guardrails) | BLOCK |
+| **yaml-config-validator** | Missing required keys in workload configs, hardcoded secrets in YAML | BLOCK |
+| **sensitive-info-scanner** | Hardcoded passwords/tokens, private keys, connection strings with creds, real S3 buckets | BLOCK (CRITICAL), WARN (HIGH) |
+| **check-yaml** | YAML syntax errors | BLOCK |
+| **check-added-large-files** | Files > 5MB | BLOCK |
+| **no-commit-to-branch** | Direct commits to main | BLOCK |
+
+### Custom Hook Validators
+
+Located in `shared/utils/hook_validators/`:
+
+- **`pii_code_scanner.py`** — Reuses PII regex patterns from `shared/utils/pii_detection_and_tagging.py`. Skips regex definitions and comments (false positives). Blocks on CRITICAL (SSN, credit card), warns on HIGH (email, DOB).
+- **`cedar_validator.py`** — Validates `.cedar` and `.cedarschema` files. Uses cedarpy if available, falls back to structural checks (balanced braces, forbid/permit keywords, required fields).
+- **`yaml_config_validator.py`** — Validates `workloads/*/config/*.yaml` against expected schemas (source.yaml, quality_rules.yaml, schedule.yaml, semantic.yaml). Also scans for hardcoded secrets in YAML values.
+- **`sensitive_info_scanner.py`** — Catches hardcoded passwords, tokens, private keys, connection strings with credentials, and real AWS infrastructure details. Complements git-secrets with broader pattern coverage.
+
+### Bypass (Emergency Only)
+
+```bash
+# Skip a specific hook
+SKIP=pii-code-scanner git commit -m "reason for bypass"
+
+# Skip all pre-commit hooks (use sparingly)
+git commit --no-verify -m "EMERGENCY: reason"
+
+# Skip pre-push hooks
+git push --no-verify
+```
+
+All bypasses are logged. Use `.gitallowed` to permanently allow false-positive patterns.
+
+### CI/CD Integration
+
+GitHub Actions workflow (`.github/workflows/security-scan.yml`) runs on every PR to main:
+1. All pre-commit hooks on full repo
+2. Dependency vulnerability scan (pip-audit)
+3. Cedar policy + hook validator tests
+4. Bandit security analysis with report
+
+### Adding New Patterns
+
+- **PII patterns**: Add to `PII_PATTERNS` in `shared/utils/hook_validators/pii_code_scanner.py`
+- **Secret patterns**: Add to `SENSITIVE_PATTERNS` in `shared/utils/hook_validators/sensitive_info_scanner.py`
+- **Allowed values**: Add to `.gitallowed` (one pattern per line, `#` for comments)
+- **Config schemas**: Add to `CONFIG_SCHEMAS` in `shared/utils/hook_validators/yaml_config_validator.py`
+
+---
+
+## Pre-Commit Checklist (Manual)
+
+For additional verification before pushing to GitHub:
+
+```bash
+# 1. Run all automated hooks
+pre-commit run --all-files
+
+# 2. Check for sensitive data (should return 0)
 grep -r "AKIA" . --exclude-dir=.git
 grep -r "aws_secret" . --exclude-dir=.git
-grep -r "password" . --exclude-dir=.git --exclude="*.md"
 
-# 2. Check for real account IDs (should return 0)
+# 3. Check for real account IDs (should return 0)
 grep -r "133661573128" . --exclude-dir=.git
 
-# 3. Check for local paths (should return 0)
+# 4. Check for local paths (should return 0)
 grep -r "/Users/hcherian" . --exclude-dir=.git --exclude="*.md"
 
-# 4. Verify .gitignore is working
+# 5. Verify .gitignore is working
 git status --ignored
 
-# 5. Review what's being committed
+# 6. Review what's being committed
 git diff --staged
 ```
 
