@@ -23,7 +23,7 @@ This repository has been sanitized for public GitHub release.
 |----------------|---------------|-------------|
 | AWS Account ID `133661573128` | `123456789012` | 130 |
 | S3 bucket `finsights-datalake` | `your-datalake-bucket` | 128 |
-| Local paths `>/path/to/user/...` | `/path/to/user/...` | 11 |
+| Local paths `/Users/{username}/...` | `/path/to/user/...` | 11 |
 | AWS ARNs with real account | Example ARNs | ~50 |
 
 ### ✅ Protected in .gitignore
