@@ -8,6 +8,8 @@ defined in config/transformations.yaml, and writes:
 
 This script is idempotent: running it multiple times produces identical output.
 
+Tracing: All transformations are traced via ScriptTracer for observability.
+
 Usage:
     python3 scripts/transform/bronze_to_silver.py
 """
@@ -22,14 +24,17 @@ from datetime import datetime
 
 import yaml
 
-# ---------------------------------------------------------------------------
-# Path setup
-# ---------------------------------------------------------------------------
-# Resolve the workload base directory (two levels up from this script)
+# Add project root to path for shared imports
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 WORKLOAD_DIR = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 PROJECT_ROOT = os.path.dirname(os.path.dirname(WORKLOAD_DIR))
+sys.path.insert(0, PROJECT_ROOT)
 
+from shared.utils.script_tracer import ScriptTracer
+
+# ---------------------------------------------------------------------------
+# Path setup (already set above for shared imports)
+# ---------------------------------------------------------------------------
 CONFIG_PATH = os.path.join(WORKLOAD_DIR, "config", "transformations.yaml")
 SOURCE_CSV = os.path.join(PROJECT_ROOT, "sample_data", "sales_transactions.csv")
 SILVER_DIR = os.path.join(WORKLOAD_DIR, "data", "silver")
@@ -214,11 +219,16 @@ def run(
     source_csv: str = SOURCE_CSV,
     silver_output: str = SILVER_OUTPUT,
     quarantine_output: str = QUARANTINE_OUTPUT,
+    tracer: ScriptTracer = None,
 ) -> dict:
     """Execute the full Bronze-to-Silver transformation pipeline.
 
     Returns a summary dict with counts for logging / testing.
     """
+    # Initialize tracer if not provided
+    if tracer is None:
+        tracer = ScriptTracer.for_script(__file__)
+
     config = load_config(config_path)
     b2s = config["bronze_to_silver"]
 
@@ -226,6 +236,7 @@ def run(
     rows = read_bronze(source_csv)
     original_count = len(rows)
     logger.info("Read %d rows from Bronze zone: %s", original_count, source_csv)
+    tracer.log_start(rows_in=original_count, source=source_csv)
 
     # Capture original fieldnames (from the first row's keys)
     fieldnames = list(rows[0].keys()) if rows else []
@@ -244,6 +255,13 @@ def run(
             dup_count,
             len(rows),
         )
+        tracer.log_transform(
+            "deduplicate",
+            key=dedup_cfg["key"],
+            strategy=dedup_cfg.get("strategy"),
+            duplicates_removed=dup_count,
+            rows_remaining=len(rows),
+        )
 
     # ---- 3. Quarantine null PKs ----
     quarantined: list[dict] = []
@@ -260,6 +278,11 @@ def run(
                     len(q),
                     cond["column"],
                 )
+                tracer.log_transform(
+                    "quarantine_null_pk",
+                    column=cond["column"],
+                    quarantined_count=len(q),
+                )
 
     # ---- 4. String normalisation: trim whitespace ----
     string_cols = get_string_columns(config)
@@ -267,6 +290,7 @@ def run(
     if trim_cfg.get("enabled"):
         rows = trim_whitespace(rows, string_cols)
         logger.info("Trimmed whitespace on %d string columns", len(string_cols))
+        tracer.log_transform("trim_whitespace", columns=string_cols)
 
     # ---- 5. String normalisation: lowercase ----
     lower_cfg = b2s.get("string_normalization", {}).get("lowercase", {})
@@ -274,6 +298,7 @@ def run(
         lc_cols = lower_cfg.get("columns", [])
         rows = lowercase_columns(rows, lc_cols)
         logger.info("Lowercased columns: %s", lc_cols)
+        tracer.log_transform("lowercase", columns=lc_cols)
 
     # ---- 6. Date validation ----
     date_rules = b2s.get("date_validation", {}).get("rules", [])
@@ -285,17 +310,25 @@ def run(
             len(bad_dates),
             len(rows),
         )
+        tracer.log_quality_check(
+            "date_validation",
+            passed=(len(bad_dates) == 0),
+            invalid_count=len(bad_dates),
+            valid_count=len(rows),
+        )
 
     # ---- 7. PII masking ----
     pii_cfg = b2s.get("pii_masking", {})
     if pii_cfg.get("enabled"):
         pii_rules = pii_cfg.get("rules", [])
         rows = apply_pii_masking(rows, pii_rules)
+        masked_cols = [r["column"] for r in pii_rules]
         logger.info(
             "PII masking applied to %d columns: %s",
             len(pii_rules),
-            [r["column"] for r in pii_rules],
+            masked_cols,
         )
+        tracer.log_transform("pii_masking", columns_masked=masked_cols)
 
     # ---- 8. Write outputs ----
     write_csv(rows, silver_output, fieldnames)
@@ -317,8 +350,24 @@ def run(
         "quarantine_output": quarantine_output,
     }
     logger.info("Pipeline summary: %s", summary)
+
+    # ---- Final trace events ----
+    tracer.log_rows(
+        rows_in=original_count,
+        rows_out=len(rows),
+        quarantined=len(quarantined),
+    )
+    tracer.log_complete(
+        status="success",
+        rows_out=len(rows),
+        quarantined=len(quarantined),
+        output_path=silver_output,
+    )
+    tracer.close()
+
     return summary
 
 
 if __name__ == "__main__":
-    run()
+    with ScriptTracer.for_script(__file__) as tracer:
+        run(tracer=tracer)

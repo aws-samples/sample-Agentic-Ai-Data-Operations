@@ -18,6 +18,13 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+# Add project root to path for shared imports
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from shared.utils.script_tracer import ScriptTracer
+
 def transform_glue_mode(glue_context, args):
     """Transform using AWS Glue (PySpark + Iceberg)"""
     from pyspark.sql import functions as F

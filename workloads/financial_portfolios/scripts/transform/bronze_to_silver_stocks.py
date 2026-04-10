@@ -9,6 +9,8 @@ Transformations:
 - Validations: Not null checks, positive values, price range checks
 - Output: Apache Iceberg table in Silver zone
 
+Tracing: All transformations are traced via ScriptTracer for observability.
+
 Usage:
   Glue: --bronze_path s3://bucket/bronze/... --silver_path s3://bucket/silver/...
   Local: --local --bronze_path ./data/bronze/stocks.csv --silver_path ./output/silver/stocks.parquet
@@ -18,6 +20,13 @@ import sys
 import json
 from datetime import datetime
 from pathlib import Path
+
+# Add project root to path for shared imports
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from shared.utils.script_tracer import ScriptTracer
 
 def transform_glue_mode(glue_context, args):
     """Transform using AWS Glue (PySpark + Iceberg)"""
@@ -141,10 +150,13 @@ def transform_glue_mode(glue_context, args):
     return lineage
 
 
-def transform_local_mode(bronze_path, silver_path):
+def transform_local_mode(bronze_path, silver_path, tracer=None):
     """Transform using pandas (local testing)"""
     import pandas as pd
     import hashlib
+
+    if tracer is None:
+        tracer = ScriptTracer.for_script(__file__)
 
     print(f"Reading from: {bronze_path}")
 
@@ -152,12 +164,14 @@ def transform_local_mode(bronze_path, silver_path):
     df = pd.read_csv(bronze_path)
     input_rows = len(df)
     print(f"Input rows: {input_rows}")
+    tracer.log_start(rows_in=input_rows, source=bronze_path)
 
     # Step 2: Deduplication - keep last
     df_original = df.copy()
     df = df.drop_duplicates(subset=['ticker'], keep='last')
     dedup_rows = len(df)
     print(f"After deduplication: {dedup_rows} rows ({input_rows - dedup_rows} duplicates removed)")
+    tracer.log_transform("deduplicate", key="ticker", duplicates_removed=input_rows - dedup_rows)
 
     # Step 3: Type conversions
     df['listing_date'] = pd.to_datetime(df['listing_date'])
@@ -189,6 +203,8 @@ def transform_local_mode(bronze_path, silver_path):
     quarantine_rows = len(quarantine_df)
     print(f"Valid rows: {valid_rows}")
     print(f"Quarantined rows: {quarantine_rows}")
+    tracer.log_quality_check("validation", passed=(quarantine_rows == 0),
+                             valid_count=valid_rows, quarantine_count=quarantine_rows)
 
     # Step 5: Write valid records to Silver (simulate Iceberg with Parquet)
     Path(silver_path).parent.mkdir(parents=True, exist_ok=True)
@@ -252,6 +268,11 @@ def transform_local_mode(bronze_path, silver_path):
         json.dump(lineage, f, indent=2)
     print(f"Lineage written to: {lineage_path}")
 
+    # Final trace events
+    tracer.log_rows(rows_in=input_rows, rows_out=valid_rows, quarantined=quarantine_rows)
+    tracer.log_complete(status="success", rows_out=valid_rows, output_path=silver_path)
+    tracer.close()
+
     return lineage
 
 
@@ -263,7 +284,8 @@ if __name__ == "__main__":
         bronze_path = sys.argv[bronze_idx]
         silver_path = sys.argv[silver_idx]
 
-        lineage = transform_local_mode(bronze_path, silver_path)
+        with ScriptTracer.for_script(__file__) as tracer:
+            lineage = transform_local_mode(bronze_path, silver_path, tracer=tracer)
         print(f"\n✓ Transformation complete (local mode)")
         print(f"  Input: {lineage['input_rows']} rows")
         print(f"  Output: {lineage['output_rows']} rows")

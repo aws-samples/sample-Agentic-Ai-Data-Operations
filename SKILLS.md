@@ -1972,6 +1972,44 @@ IMPORTANT: You are running as a SUB-AGENT. You must:
 4. Run all tests before returning. Report pass/fail counts in your response.
 5. If tests fail, fix the issue and re-run. Do NOT return with failing tests.
 6. Do NOT execute AWS operations (S3 uploads, Glue API calls, catalog registration). You do not have MCP access. Generate scripts and configs only — the main conversation will deploy via MCP.
+7. ALWAYS include ScriptTracer in every generated script for observability (see TRACING below).
+
+TRACING — REQUIRED IN ALL SCRIPTS:
+Every generated script MUST include ScriptTracer for observability. Add this pattern:
+
+```python
+# At top of script (after imports)
+from pathlib import Path
+import sys
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+from shared.utils.script_tracer import ScriptTracer
+
+# In main function
+def transform(tracer=None):
+    if tracer is None:
+        tracer = ScriptTracer.for_script(__file__)
+    
+    tracer.log_start(rows_in=input_count, source=source_path)
+    
+    # After each transformation step:
+    tracer.log_transform("deduplicate", duplicates_removed=dup_count)
+    tracer.log_transform("type_casting", columns_cast=["col1", "col2"])
+    tracer.log_quality_check("validation", passed=(invalid_count == 0), invalid_count=invalid_count)
+    
+    # At end:
+    tracer.log_rows(rows_in=input_count, rows_out=output_count, quarantined=quarantine_count)
+    tracer.log_complete(status="success", rows_out=output_count)
+    tracer.close()
+
+# In __main__ block
+if __name__ == "__main__":
+    with ScriptTracer.for_script(__file__) as tracer:
+        transform(tracer=tracer)
+```
+
+This enables full pipeline observability — every transformation step is traced to workloads/{name}/logs/.
 
 EXECUTION MODEL — ALWAYS GLUE ETL:
 - Scripts MUST target AWS Glue ETL runtime (PySpark with GlueContext, DynamicFrame, Iceberg catalog)
@@ -2234,6 +2272,34 @@ IMPORTANT: You are running as a SUB-AGENT. You must:
 4. Run all tests before returning. Report pass/fail counts in your response.
 5. If tests fail, fix the issue and re-run. Do NOT return with failing tests.
 6. Do NOT execute AWS operations (S3 uploads, Glue API calls, catalog registration). You do not have MCP access. Generate scripts and configs only — the main conversation will deploy via MCP.
+7. ALWAYS include ScriptTracer in every generated script for observability.
+
+TRACING — REQUIRED IN ALL QUALITY SCRIPTS:
+Every generated quality check script MUST include ScriptTracer. Add this pattern:
+
+```python
+from shared.utils.script_tracer import ScriptTracer
+
+class QualityChecker:
+    def __init__(self, ..., tracer=None):
+        self.tracer = tracer or ScriptTracer.for_script(__file__)
+    
+    def run_all_checks(self):
+        self.tracer.log_start(workload=self.workload, zone=self.zone)
+        
+        # After each check type:
+        self.tracer.log_quality_check("completeness", passed=(failures == 0), checks=total)
+        self.tracer.log_quality_check("uniqueness", passed=(failures == 0), checks=total)
+        
+        # At end:
+        self.tracer.log_complete(status="success" if passed else "failed", overall_score=score)
+        self.tracer.close()
+
+if __name__ == "__main__":
+    with ScriptTracer.for_script(__file__) as tracer:
+        checker = QualityChecker(..., tracer=tracer)
+        checker.run_all_checks()
+```
 
 ## Quality Dimensions
 

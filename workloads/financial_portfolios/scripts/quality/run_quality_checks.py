@@ -10,6 +10,8 @@ Supports 5 quality dimensions:
 4. Consistency - referential integrity and business rule compliance
 5. Anomaly Detection - statistical outliers
 
+Tracing: All quality checks are traced via ScriptTracer for observability.
+
 Usage:
   python run_quality_checks.py <rules_path> <data_path> <zone>
 
@@ -29,16 +31,24 @@ import numpy as np
 import sys
 from typing import Dict, List, Any
 
+# Add project root to path for shared imports
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from shared.utils.script_tracer import ScriptTracer
+
 
 class QualityChecker:
     """Execute data quality checks based on YAML rules"""
 
-    def __init__(self, rules_path: str, data_path: str, zone: str):
+    def __init__(self, rules_path: str, data_path: str, zone: str, tracer: ScriptTracer = None):
         self.rules = self.load_rules(rules_path)
         self.data_path = Path(data_path)
         self.zone = zone
         self.results = []
         self.quarantine_records = {}
+        self.tracer = tracer or ScriptTracer.for_script(__file__)
 
     def load_rules(self, path: str) -> Dict[str, Any]:
         """Load quality rules from YAML file"""
@@ -485,6 +495,8 @@ class QualityChecker:
         print(f"Running Quality Checks: {self.rules['workload']} - {self.zone} zone")
         print(f"{'='*80}\n")
 
+        self.tracer.log_start(workload=self.rules['workload'], zone=self.zone)
+
         # Load data for each table
         tables = ['stocks', 'portfolios', 'positions']
         dfs = {}
@@ -517,32 +529,49 @@ class QualityChecker:
             # 1. Completeness
             completeness_results = self.check_completeness(table_name, df)
             all_results.extend(completeness_results)
+            passed = sum(1 for r in completeness_results if r.get('passed', True))
+            self.tracer.log_quality_check(f"completeness_{table_name}", passed=(passed == len(completeness_results)),
+                                          checks=len(completeness_results), passed_count=passed)
             print(f"  ✓ Completeness: {len(completeness_results)} checks")
 
             # 2. Uniqueness
             uniqueness_results = self.check_uniqueness(table_name, df)
             all_results.extend(uniqueness_results)
+            passed = sum(1 for r in uniqueness_results if r.get('passed', True))
+            self.tracer.log_quality_check(f"uniqueness_{table_name}", passed=(passed == len(uniqueness_results)),
+                                          checks=len(uniqueness_results), passed_count=passed)
             print(f"  ✓ Uniqueness: {len(uniqueness_results)} checks")
 
             # 3. Validity
             validity_results = self.check_validity(table_name, df)
             all_results.extend(validity_results)
+            passed = sum(1 for r in validity_results if r.get('passed', True))
+            self.tracer.log_quality_check(f"validity_{table_name}", passed=(passed == len(validity_results)),
+                                          checks=len(validity_results), passed_count=passed)
             print(f"  ✓ Validity: {len(validity_results)} checks")
 
             # 4. Consistency - business rules
             consistency_results = self.check_consistency_rules(table_name, df)
             all_results.extend(consistency_results)
+            passed = sum(1 for r in consistency_results if r.get('passed', True))
+            self.tracer.log_quality_check(f"consistency_{table_name}", passed=(passed == len(consistency_results)),
+                                          checks=len(consistency_results), passed_count=passed)
             print(f"  ✓ Consistency: {len(consistency_results)} checks")
 
             # 5. Referential integrity (for positions)
             if table_name == 'positions':
                 fk_results = self.check_referential_integrity(table_name, df, dfs)
                 all_results.extend(fk_results)
+                passed = sum(1 for r in fk_results if r.get('passed', True))
+                self.tracer.log_quality_check(f"foreign_keys_{table_name}", passed=(passed == len(fk_results)),
+                                              checks=len(fk_results), passed_count=passed)
                 print(f"  ✓ Foreign Keys: {len(fk_results)} checks")
 
             # 6. Anomaly detection
             anomaly_results = self.detect_anomalies(table_name, df)
             all_results.extend(anomaly_results)
+            self.tracer.log_quality_check(f"anomaly_{table_name}", passed=True,
+                                          checks=len(anomaly_results))
             print(f"  ✓ Anomaly Detection: {len(anomaly_results)} checks")
 
         # Generate overall score
@@ -581,6 +610,16 @@ class QualityChecker:
         print(f"\nReport saved to: {report_path}")
         print(f"{'='*80}\n")
 
+        # Final trace event
+        self.tracer.log_complete(
+            status="success" if quality_score['passes_threshold'] else "failed",
+            overall_score=quality_score['overall_score'],
+            critical_passed=quality_score['critical_passed'],
+            critical_total=quality_score['critical_total'],
+            sox_compliant=report['sox_compliant'],
+        )
+        self.tracer.close()
+
         return report
 
 
@@ -598,8 +637,9 @@ if __name__ == "__main__":
     data_path = sys.argv[2]
     zone = sys.argv[3]
 
-    checker = QualityChecker(rules_path, data_path, zone)
-    report = checker.run_all_checks()
+    with ScriptTracer.for_script(__file__) as tracer:
+        checker = QualityChecker(rules_path, data_path, zone, tracer=tracer)
+        report = checker.run_all_checks()
 
     # Exit with error if quality checks fail
     if not report['quality_score']['passes_threshold']:

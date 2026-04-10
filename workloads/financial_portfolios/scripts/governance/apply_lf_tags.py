@@ -12,6 +12,8 @@ PII columns identified:
 
 All other columns: PII_Classification=NONE, Data_Sensitivity=LOW
 
+Tracing: All governance operations are traced via ScriptTracer for observability.
+
 Usage:
   python3 workloads/financial_portfolios/scripts/governance/apply_lf_tags.py
   python3 workloads/financial_portfolios/scripts/governance/apply_lf_tags.py --dry-run
@@ -21,9 +23,17 @@ import argparse
 import json
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
 import boto3
 from botocore.exceptions import ClientError
+
+# Add project root to path for shared imports
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from shared.utils.script_tracer import ScriptTracer
 
 
 DATABASE = "financial_portfolios_db"
@@ -230,6 +240,10 @@ def main():
     parser.add_argument("--database", default=DATABASE)
     args = parser.parse_args()
 
+    # Initialize tracer
+    tracer = ScriptTracer.for_script(__file__)
+    tracer.log_start(database=args.database, region=args.region, dry_run=args.dry_run)
+
     print("=" * 70)
     print("  Lake Formation LF-Tag Application")
     print(f"  Database: {args.database}")
@@ -243,6 +257,7 @@ def main():
 
     # Step 1: Create LF-Tags
     create_lf_tags(lf_client, dry_run=args.dry_run)
+    tracer.log_transform("create_lf_tags", tags_count=len(LF_TAGS))
 
     # Step 2: Apply tags to each table
     print("\n" + "=" * 70)
@@ -307,6 +322,16 @@ def main():
         print("  COMPLETE — All LF-Tags applied successfully.")
 
     print("=" * 70)
+
+    # Final trace event
+    tracer.log_complete(
+        status="success",
+        tables_tagged=len(results),
+        columns_tagged=total_tagged,
+        pii_columns=total_pii,
+        dry_run=args.dry_run,
+    )
+    tracer.close()
 
     # Write results JSON
     output = {
