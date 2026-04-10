@@ -23,7 +23,7 @@ from botocore.exceptions import ClientError
 
 AWS_REGION = "us-east-1"
 ACCOUNT_ID = "123456789012"
-QS_AUTHOR_ARN = "arn:aws:quicksight:us-east-1:123456789012:user/default/demo-role/demo-user"
+QS_AUTHOR_ARN = os.environ.get("QS_AUTHOR_ARN", f"arn:aws:quicksight:{AWS_REGION}:{ACCOUNT_ID}:user/default/demo-role/demo-user")
 
 # Resource IDs
 DATA_SOURCE_ID = "finsights-athena-simple"

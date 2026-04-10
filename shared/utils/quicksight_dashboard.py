@@ -22,10 +22,14 @@ Usage:
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+# Valid SQL table name pattern: schema.table or just table (alphanumeric, underscore, dot, hyphen)
+_TABLE_NAME_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*){0,2}$')
 
 
 # ---------------------------------------------------------------------------
@@ -135,6 +139,12 @@ def validate_analytics_config(config_path: str) -> list[str]:
                 if ds_id in dataset_ids:
                     errors.append(f"datasets[{i}]: duplicate id '{ds_id}'")
                 dataset_ids.add(ds_id)
+            source_table = ds.get("source_table")
+            if source_table and not _TABLE_NAME_PATTERN.match(source_table):
+                errors.append(
+                    f"datasets[{i}] ({ds_id}): invalid source_table '{source_table}' — "
+                    f"must match pattern 'schema.table' (alphanumeric and underscores only)"
+                )
             mode = ds.get("import_mode")
             if mode and mode not in _VALID_IMPORT_MODES:
                 errors.append(f"datasets[{i}] ({ds_id}): invalid import_mode '{mode}', must be one of {_VALID_IMPORT_MODES}")
@@ -231,7 +241,7 @@ def _build_dataset_definitions(
                     "CustomSql": {
                         "DataSourceArn": data_source_arn,
                         "Name": ds["name"],
-                        "SqlQuery": f"SELECT * FROM {ds['source_table']}",
+                        "SqlQuery": f"SELECT * FROM {_safe_table_name(ds['source_table'])}",
                         "Columns": [
                             {
                                 "Name": col["name"],
@@ -245,6 +255,13 @@ def _build_dataset_definitions(
         }
         definitions.append(ds_def)
     return definitions
+
+
+def _safe_table_name(table: str) -> str:
+    """Validate and return a safe SQL table name. Raises on injection attempts."""
+    if not _TABLE_NAME_PATTERN.match(table):
+        raise ValueError(f"Invalid table name '{table}' — possible SQL injection")
+    return table
 
 
 def _map_column_type(yaml_type: str) -> str:
