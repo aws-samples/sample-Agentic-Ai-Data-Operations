@@ -96,7 +96,7 @@ class TestPolicyFilesExist:
         "transformation_agent",
         "quality_agent",
         "dag_agent",
-        "analysis_agent",
+        "ontology_staging_agent",
     ])
     def test_agent_policy_exists(self, agent):
         path = AGENT_AUTH_DIR / f"{agent}.cedar"
@@ -650,7 +650,7 @@ class TestAgentAuthorization:
         allowed, _ = evaluator.authorize_agent(agent, "ReadData", zone)
         assert allowed is False
 
-    # -- Analysis Agent --
+    # -- ORION consumer --
     def test_analysis_can_read_publish(self, evaluator):
         agent = AgentPrincipal("analysis", "sub_agent")
         zone = DataZone("publish", "test")

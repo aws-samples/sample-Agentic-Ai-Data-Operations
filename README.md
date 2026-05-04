@@ -19,7 +19,7 @@ Traditional data pipeline development is slow, manual, and error-prone:
 | Data engineer writes PySpark ETL (2-3 days) | **Data Onboarding Agent** generates Bronze→Silver→Gold scripts from natural language (15 minutes) | **95%** |
 | Manually create quality rules per column (1-2 days) | **Data Quality Agent** auto-generates column-level checks from profiling (10 minutes) | **90%** |
 | Write Airflow DAG with task dependencies (1 day) | **Orchestration Agent** generates tested DAG from schedule config (15 minutes) | **95%** |
-| Build QuickSight dashboards manually (2-4 days) | **Data Analysis Agent** creates dashboards from natural language query (30 minutes) | **90%** |
+| Author OWL ontology + R2RML mappings by hand (1-2 weeks) | **Ontology Staging Agent** induces OWL + R2RML from `semantic.yaml` + Glue (10 minutes) | **99%** |
 | Debug recurring pipeline failures (ongoing) | **Prompt Intelligence Agent** learns from failures, prevents recurrence (automated) | **Hours per week** |
 
 **Result: Data pipeline development goes from 2-3 weeks → 2-3 hours.**
@@ -76,26 +76,23 @@ Each workload maintains its own memory system in `workloads/{name}/memory/` that
 
 ---
 
-## 2. Data Analysis Agent
+## 2. Ontology Staging Agent (ORION Handoff)
 
-**Purpose:** Enables natural language querying and dashboard creation on onboarded data.
+**Purpose:** Induces an OWL ontology + R2RML mappings from each workload's `semantic.yaml` + Glue Catalog schema, staged locally for handoff to **ORION** (external semantic layer platform, currently in development).
 
-**Runs in:** Development environment (for dashboard prototyping) OR Production (for end-user queries via QuickSight)
-**Output:** QuickSight dashboards, SQL queries, saved query patterns (SynoDB)
+**Runs in:** Development environment only (emits files to `workloads/{name}/config/`)
+**Output:** `ontology.ttl` (OWL2 classes/properties/hierarchy), `mappings.ttl` (R2RML linking classes to Glue tables), `ontology_manifest.json` (version, checksums, steward checklist)
 
-### Agent Workflow
-
-![Data Analysis Agent Workflow](docs/diagrams/data-analysis-agent-workflow.png)
+**Scope boundary:** ADOP generates and validates Turtle locally. ADOP does **NOT** run T-Box reasoning, author SHACL constraints, or publish to a VKG — those are the Data Steward's responsibilities inside ORION when ORION deploys.
 
 **How it works:**
 
-1. **QuickSight Integration** — User requests are authorized through **Amazon QuickSight** and routed via **Enterprise MCP Registry**
-2. **Data Analysis Agent** — Receives user query (e.g., "Show me top 10 customers by revenue"), checks **Cached Queries** for similar past queries
-3. **Validation Agent** — Validates user query against Cedar policies (**Amazon Verified Permissions**) and checks access permissions via **Policy/Access** layer
-4. **Query Execution** — Accesses **Semantic Layer** (business metadata) and **Data MCPs** (Athena, Redshift Spectrum) to generate and execute SQL
-5. **Publish** — Results delivered via **Snowflake** (data sharing), **Databricks** (notebooks), **Redshift** (queries), or back to **QuickSight** (dashboards)
+1. **OWL induction** — `semantic.yaml` entities → owl:Class, dimension/measure/temporal columns → owl:DatatypeProperty with xsd ranges, relationships → owl:ObjectProperty (+ owl:FunctionalProperty for many-to-one), hierarchies → rdfs:subClassOf chain, PII flags → ex:piiClassification annotations, Glue-only columns → ex:autoInduced annotation.
+2. **R2RML mapping** — one TriplesMap per entity, logical table = Athena SQL against the Gold zone, subject URI template = `http://orion.aws/{namespace}/data/{ClassName}/{pk}`, FK columns emit `rr:parentTriplesMap` references.
+3. **Turtle validation** — parse with `rdflib`, auto-fix common issues (unescaped quotes, missing semicolons), retry up to 2 times.
+4. **Staging** — write 3 artifacts to `workloads/{name}/config/` with SHA-256 checksums and `"state": "STAGED_LOCAL"`. Data Steward picks these up for ORION publish.
 
-**Key Features:** The agent learns from successful queries by saving them to SynoDB (cached queries), enabling faster responses over time. All queries are validated against Cedar policies before execution, ensuring data governance and access control.
+When ORION is deployed, a follow-up `ontology-publish-agent` (future) will read the committed TTL files and push them to Neptune SPARQL + S3 + DynamoDB + SNS.
 
 ---
 
@@ -110,18 +107,18 @@ The Environment Setup Agent handles the foundational infrastructure setup that m
 
 ---
 
-## 4. Semantic Layer (Data Ontology & Business Context)
+## 4. Semantic Layer (Business Context + Ontology Handoff)
 
-**Purpose:** Enables natural language to SQL query generation by creating a unified business context layer over technical schemas.
+**Purpose:** Captures business context (column roles, dimension hierarchies, relationships, PII flags) in `semantic.yaml` and emits a formal OWL ontology + R2RML mappings for handoff to **ORION** — the external semantic layer platform responsible for NL→SQL, reasoning, SHACL validation, and VKG publish.
 
-**Runs in:** Development (for setup) AND Production (for query processing)
-**Output:** Neptune graph database, SynoDB query patterns, semantic.yaml configs, business term mappings
+**Runs in:** Development (config authoring + ontology induction)
+**Output:** `workloads/{name}/config/semantic.yaml` (source of truth), `ontology.ttl` (OWL2), `mappings.ttl` (R2RML), `ontology_manifest.json`. All committed to git.
 
-The semantic layer creates a data ontology that bridges business terminology with technical table schemas, enabling AI agents to understand relationships between entities and generate accurate SQL from natural language queries. It captures column roles (measures, dimensions, temporal), hierarchical relationships (country→state→city), and business definitions that would otherwise require domain expertise.
+The semantic layer captures column roles (measures, dimensions, temporal, identifiers), hierarchical relationships (country→state→city), business terms, and PII classifications. **SageMaker Catalog** mirrors this on the Glue Data Catalog as custom metadata properties so downstream consumers see business context alongside technical schemas.
 
-The implementation combines three storage systems working in concert: **SageMaker Catalog** stores column-level business metadata as custom properties in the Glue Data Catalog, **Neptune** provides a graph database with Titan embeddings for semantic search and relationship discovery, and **SynoDB** (DynamoDB) caches successful query patterns with embeddings for fast lookup. During deployment, semantic.yaml configs are parsed and loaded into all three stores, creating a queryable knowledge graph that agents can traverse to discover JOINs via foreign key relationships and find similar tables/columns through vector similarity search.
+At Phase 7 Step 8.5 of the deploy flow, the **Ontology Staging Agent** induces an OWL ontology from `semantic.yaml` + the deployed Glue Gold table schema, generates R2RML mappings wiring each OWL class to its physical table, and validates Turtle syntax with rdflib. The resulting `ontology.ttl` + `mappings.ttl` + `ontology_manifest.json` land in `workloads/{name}/config/` for ORION to pick up.
 
-The Analysis Agent uses this semantic layer to automatically generate complex SQL queries with proper JOINs, aggregations, and filters based on business intent rather than requiring users to know table schemas, column names, or technical relationships.
+**Hard boundary:** ADOP stops at emission. ORION (in development) owns SHACL authoring, T-Box reasoning (HermiT/ELK), VKG publish (Ontop), and NL→SQL runtime. When ORION deploys, a future publish agent will push the committed TTL files from local to Neptune SPARQL + S3 + DynamoDB + SNS — no regeneration needed because the inducer is deterministic.
 
 ---
 
@@ -278,26 +275,24 @@ Dev Agent → Generate scripts/tests → Commit to Git → CI/CD pipeline → QA
 | AWS KMS | Encryption at rest (zone-specific keys) |
 | Lake Formation | Column-level security via LF-Tags |
 | Amazon MWAA | Airflow orchestration |
-| SageMaker Catalog | Business metadata (custom columns) |
-| Amazon Neptune | Knowledge graph with Titan embeddings for semantic search |
+| SageMaker Catalog | Business metadata (custom columns on Glue Catalog entries) |
+| Ontology artifacts (local) | `workloads/{name}/config/ontology.ttl` + `mappings.ttl` for ORION handoff |
 
 ### Semantic Layer
 
-The semantic layer enables natural language to SQL query generation by combining business context (semantic.yaml) with technical metadata (Glue Catalog, Lake Formation) in a queryable graph database.
-
-![Semantic Layer Architecture](docs/semantic-layer.png)
+The semantic layer in ADOP has two responsibilities: (1) capture business context in `semantic.yaml` and mirror it to SageMaker Catalog, (2) emit OWL + R2RML artifacts for handoff to ORION (external platform, in development).
 
 **How it works:**
-1. **Input**: Define business context in `semantic.yaml` (column roles, aggregations, relationships, business terms)
-2. **Transform**: Merge with Glue schemas and LF-Tags, generate 1024-dim Titan embeddings for tables/columns/terms/queries
-3. **Storage**: Load into **Amazon Neptune** (graph with embeddings) + **SynoDB** (DynamoDB query patterns with embeddings)
-4. **Query**: AI agent uses semantic search + graph traversal to auto-generate SQL with JOINs
+1. **Input**: Define business context in `workloads/{name}/config/semantic.yaml` (column roles, aggregations, relationships, business terms, hierarchies, PII flags). Source of truth.
+2. **Mirror to SageMaker Catalog**: Column roles, PII flags, and business terms are written as custom metadata on Glue Data Catalog entries so downstream tools see business context alongside technical schemas.
+3. **Induce OWL + R2RML** (Phase 7 Step 8.5): The Ontology Staging Agent converts `semantic.yaml` + Glue schema into `ontology.ttl` (OWL2) + `mappings.ttl` (R2RML) + `ontology_manifest.json`. Validated with rdflib, committed to git.
+4. **ORION handoff**: Data Steward picks up the committed TTL files in ORION (when deployed) for SHACL authoring, T-Box reasoning, and VKG publish.
 
-**Why two stores?**
-- **Neptune**: Graph relationships let AI discover JOINs via FK edges, semantic search finds similar tables/columns
-- **SynoDB**: Fast key-value lookup for past query patterns, learns from successful queries over time
-
-See [shared/semantic_layer/README.md](shared/semantic_layer/README.md) for detailed implementation.
+**What ADOP does NOT do:**
+- NL→SQL query generation (ORION's VKG)
+- SHACL constraint authoring (Data Steward in ORION)
+- T-Box reasoning (ORION, at publish time)
+- Any SPARQL/Neptune writes (future, when ORION deploys)
 
 ### MCP Servers (Model Context Protocol)
 
@@ -315,7 +310,7 @@ See [shared/semantic_layer/README.md](shared/semantic_layer/README.md) for detai
 | `redshift` | awslabs-redshift-mcp-server | Schema verification, Gold zone queries via Spectrum |
 | `cloudwatch` | awslabs-cloudwatch-mcp-server | Logs, metrics, alarms |
 | `cost-explorer` | awslabs-cost-explorer-mcp-server | Cost tracking, budget analysis |
-| `dynamodb` | awslabs-dynamodb-mcp-server | DynamoDB / SynoDB operations |
+| `dynamodb` | awslabs-dynamodb-mcp-server | DynamoDB operations (operational state, API cache) |
 
 **Custom Servers (4)** — built in-house using FastMCP, in `mcp-servers/`:
 
@@ -385,7 +380,6 @@ See [prompts/environment-setup-agent/agentcore/README.md](prompts/environment-se
 │
 ├── mcp-servers/                      # Custom MCP servers (4 FastMCP servers with SSE support)
 ├── docs/                             # Reference documentation
-│   ├── neptune/                      # Neptune semantic layer tests and guides
 │   ├── prompt_intelligence/          # Generated analysis reports
 │   ├── mcp-setup.md                  # MCP server configuration guide
 │   ├── workflow-diagrams.md          # Visual workflow diagrams (Mermaid)

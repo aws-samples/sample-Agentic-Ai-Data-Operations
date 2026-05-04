@@ -40,7 +40,7 @@
 | `cost-explorer` | Cost Explorer | Cost tracking, budget analysis |
 | `verified-permissions` | Amazon Verified Permissions | Cedar policy evaluation, agent authorization, guardrail enforcement |
 | `lakeformation` | Lake Formation | Column-level access control, permissions |
-| `dynamodb` | DynamoDB | SynoDB metrics store, API serving cache |
+| `dynamodb` | DynamoDB | Operational state tables, API serving cache |
 
 ---
 
@@ -66,7 +66,8 @@
 | Secrets | AWS Secrets Manager | Airflow Connections | `core` (Secrets Manager) |
 | Monitoring | Amazon CloudWatch | Airflow UI metrics | `cloudwatch` |
 | Alerting | Amazon SNS → Slack/Email | Airflow on_failure_callback | `sns-sqs` |
-| Knowledge graph / Vector search | Amazon Neptune (Property Graph + Titan embeddings) | Neo4j / Pinecone | AWS: `neptune` / Bedrock Titan |
+| OWL + R2RML generation (ontology staging) | rdflib (local Python) | — | None (local) |
+| Ontology publish (RDF/SPARQL, VKG) | **ORION** (external, not yet deployed) | — | **Future** — requires ORION deployment |
 | Serverless compute | AWS Lambda | — | `lambda` |
 | Query engine (Gold) | Amazon Athena | Redshift Spectrum | `aws-dataprocessing` or `redshift` |
 

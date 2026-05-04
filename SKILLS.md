@@ -520,8 +520,8 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
    After stating the defaults and resolving PII, ask ONE follow-up:
    > "Do you need any additional cleaning or transformation rules beyond these defaults?"
 
-#### 5. Semantic Layer — Column Roles & Business Context (→ feeds SageMaker Catalog + SynoDB)
-   This describes WHAT THE DATA IS so the AI Analysis Agent can derive correct SQL from natural language questions. The Analysis Agent reasons about aggregations using this context. The Transformation Agent uses column roles to decide what to carry into Gold zone.
+#### 5. Semantic Layer — Column Roles & Business Context (→ feeds SageMaker Catalog + ORION seed queries)
+   This describes WHAT THE DATA IS so the AI ORION consumer can derive correct SQL from natural language questions. The ORION consumer reasons about aggregations using this context. The Transformation Agent uses column roles to decide what to carry into Gold zone.
 
    **5a. Column Classification** — Ask the human to classify each column into a role:
 
@@ -577,12 +577,12 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
    - "Do weeks start on **Monday or Sunday**?"
    - "What **time comparisons** do users commonly ask for?" (MoM, QoQ, YoY, WoW, YTD, MTD)
    - "What is the **data freshness**?" (real-time / daily batch / weekly)
-     This tells the Analysis Agent: "If user asks about today, latest available data is [yesterday/last week]"
+     This tells the ORION consumer: "If user asks about today, latest available data is [yesterday/last week]"
 
-   **5h. Seed Questions** — Training examples for the Analysis Agent:
+   **5h. Seed Questions** — Training examples for the ORION consumer:
 
    - "What are the **top 5-10 questions** your business users will ask about this data?"
-     These become seed queries in SynoDB — the Analysis Agent's first training examples.
+     These become seed queries in ORION seed queries — the ORION consumer's first training examples.
      e.g., "What is total revenue by region?", "Show monthly trend", "Top 10 products"
 
    **5i. Data Stewardship**:
@@ -591,12 +591,12 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
    - "What **business domain** does it belong to? (Sales, Marketing, Finance, Ops)"
    - "What is the **sensitivity level**? (Public / Internal / Confidential / Restricted)"
 
-   Do NOT ask for pre-defined metric formulas beyond the basics above. The Analysis Agent will figure out complex calculations (weighted averages, running totals, cohort analysis, etc.) based on column roles, aggregation semantics, and the user's natural language query.
+   Do NOT ask for pre-defined metric formulas beyond the basics above. The ORION consumer will figure out complex calculations (weighted averages, running totals, cohort analysis, etc.) based on column roles, aggregation semantics, and the user's natural language query.
 
    Stored in:
    - `workloads/{name}/config/semantic.yaml` — local config file, loaded into the stores below at deploy
    - **SageMaker Catalog (custom metadata columns)** — column roles, business descriptions, PII classifications, relationships, business terms. Stored as custom metadata properties on tables/columns in the Glue Data Catalog via SageMaker Catalog API. All agents read this at runtime to understand the data.
-   - **SynoDB (Metrics & SQL Store)** — SQL query examples and patterns, query samples. The Analysis Agent writes useful queries here and reads them when answering similar future questions. This is how the system learns over time.
+   - **ORION seed queries (Metrics & SQL Store)** — SQL query examples and patterns, query samples. The ORION consumer writes useful queries here and reads them when answering similar future questions. This is how the system learns over time.
 
    Example `semantic.yaml` — combines metadata + business context + AI Agent context in one file:
    ```yaml
@@ -610,7 +610,7 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
      format: "csv"
      row_count: 2450000           # from profiling
      profiled_at: "2024-06-25"
-     grain: "one row per order"   # ← CRITICAL for Analysis Agent: prevents double-counting
+     grain: "one row per order"   # ← CRITICAL for ORION consumer: prevents double-counting
 
    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    # COLUMNS: Technical metadata (from profiler) + Business context (from human)
@@ -626,7 +626,7 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
          avg: 245.30
          description: "Total revenue for the order after discount"
          unit: "USD"
-         default_aggregation: "SUM"     # ← Analysis Agent uses this for NLP queries
+         default_aggregation: "SUM"     # ← ORION consumer uses this for NLP queries
          derived_from: "quantity * unit_price * (1 - discount_pct)"  # ← so Agent knows it's computed
        - name: "quantity"
          data_type: "integer"
@@ -701,7 +701,7 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
          distinct_values: 25
          description: "Date the order was placed"
          grain: "day"
-         is_primary_temporal: true     # ← Analysis Agent uses this as the default time column
+         is_primary_temporal: true     # ← ORION consumer uses this as the default time column
        - name: "ship_date"
          data_type: "date"
          nullable: true
@@ -745,7 +745,7 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
          masking: "redact"
 
    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   # SEMANTIC LAYER: Context for AI Analysis Agent (NLP → SQL)
+   # SEMANTIC LAYER: Context for AI ORION consumer (NLP → SQL)
    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
    dimension_hierarchies:           # ← enables drill-down / roll-up in queries
@@ -788,7 +788,7 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
        definition: "From start of current calendar year to now"
        sql_expression: "WHERE order_date >= DATE_TRUNC('year', CURRENT_DATE)"
 
-   time_intelligence:               # ← how the Analysis Agent handles time-based questions
+   time_intelligence:               # ← how the ORION consumer handles time-based questions
      fiscal_year_start: 1           # January (1-12)
      week_starts_on: "Monday"
      timezone: "UTC"
@@ -804,7 +804,7 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
        join_type: "left"
        cardinality: "many-to-one"
        description: "Each order belongs to one customer; customers have multiple orders"
-       # ↓ Analysis Agent join semantics
+       # ↓ ORION consumer join semantics
        when_to_join: "Questions about customer attributes (name, segment, country) with order metrics"
        when_not_to_join: "Questions about order data alone (revenue by region, order count by status)"
        pre_aggregation_rule: "Aggregate orders first, then join to customers — avoids fan-out"
@@ -812,8 +812,8 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
        columns_available_after_join: ["customer_name", "segment", "country", "join_date", "status"]
    ```
 
-   # Metrics & SQL examples (→ loaded into SynoDB at deploy)
-   # The Analysis Agent adds to this over time as it answers queries.
+   # Metrics & SQL examples (→ loaded into ORION seed queries at deploy)
+   # The ORION consumer adds to this over time as it answers queries.
    metrics_and_sql:
      seed_queries:
        - question: "What is the total revenue by region?"
@@ -855,23 +855,23 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
        │              business_terms, data_type, null_rate, distinct_count
        │      Read by: ALL agents (Metadata, Transformation, Quality, Analysis)
        │
-       └──→ SynoDB (Metrics & SQL Store)
+       └──→ ORION seed queries (Metrics & SQL Store)
               Table: metrics_sql
               PK: dataset_name + query_id
               Stores: seed SQL examples, metric definitions,
-                      Analysis Agent's learned queries over time
-              Read by: Analysis Agent (finds similar past queries)
-              Written by: Analysis Agent (saves useful new queries)
+                      ORION consumer's learned queries over time
+              Read by: ORION consumer (finds similar past queries)
+              Written by: ORION consumer (saves useful new queries)
    ```
 
    **Key points**:
-   - `semantic.yaml` is the local config that gets loaded into SageMaker Catalog + SynoDB at deploy time
+   - `semantic.yaml` is the local config that gets loaded into SageMaker Catalog + ORION seed queries at deploy time
    - At runtime, agents query SageMaker Catalog (via Glue Data Catalog API) — they do NOT read semantic.yaml
    - The Metadata Agent writes technical metadata (types, stats, nulls) as custom metadata columns on table/column entries in the catalog
    - The human confirms business context (roles, descriptions, terms) — also written as custom metadata columns in the catalog
    - Business context lives WITH the schema — no separate database to manage
-   - Seed SQL examples go to SynoDB at deploy; the Analysis Agent adds more over time as it answers queries
-   - This means the system gets smarter with use — the Analysis Agent builds a library of proven SQL patterns
+   - Seed SQL examples go to ORION seed queries at deploy; the ORION consumer adds more over time as it answers queries
+   - This means the system gets smarter with use — the ORION consumer builds a library of proven SQL patterns
 
 #### 6. Quality & Compliance (→ feeds Quality Agent)
 
@@ -987,7 +987,7 @@ Discovery + profiling flow to one central file:
 
   Source connection info ──→ config/source.yaml ──→ how to connect
   Profiled metadata ───────┐
-  Column roles ────────────┼──→ config/semantic.yaml ──→ SageMaker Catalog ──→ Analysis Agent
+  Column roles ────────────┼──→ config/semantic.yaml ──→ SageMaker Catalog ──→ ORION consumer
   Business descriptions ───┘                                            ──→ Transformation Agent (Gold)
   Cleaning rules ──────────→ config/transformations.yaml ──→ Transformation Agent (Landing→Staging)
   Quality thresholds ──────→ config/quality_rules.yaml ──→ Quality Agent
@@ -1006,10 +1006,10 @@ The semantic layer stores WHAT THE DATA IS, not what to calculate:
 - Relationships between datasets
 - NO pre-defined metric formulas
 
-The Analysis Agent figures out calculations on its own:
+The ORION consumer figures out calculations on its own:
 - User asks "total revenue by region" → Agent reads semantic.yaml, sees revenue=measure + region=dimension, generates SUM(revenue) GROUP BY region
 - User asks "average order value over time" → Agent reasons: revenue is a measure, order_date is temporal, generates AVG(revenue) by month
-- This means the Analysis Agent adapts to new questions without anyone pre-defining every possible metric
+- This means the ORION consumer adapts to new questions without anyone pre-defining every possible metric
 
 ## Phase 2: Deduplication & Source Validation
 
@@ -2398,81 +2398,14 @@ Detect these anomaly types:
 
 ---
 
-## Skill: Analysis Agent — SUB-AGENT (spawned on demand)
-
-**Trigger**: Spawned when user requests queries, insights, or metrics on Gold zone data. Not part of the standard onboarding flow — used post-onboarding.
-**Purpose**: Perform analytics on Gold zone data and generate insights.
-**Execution**: Runs as a sub-agent via the `Agent` tool. Receives query context. Returns results + generated SQL.
-
-### Prompt
-
-```
-You are the Analysis Agent. You execute analytical queries on Gold zone data, generate insights, and support natural language data exploration.
-
-IMPORTANT: You are running as a SUB-AGENT. You must:
-1. Write generated SQL to workloads/{workload_name}/dbt/models/marts/ or as ad-hoc queries
-2. Validate SQL for injection risks before execution.
-3. Mask PII/PHI/PCI values in all returned results.
-4. Store useful queries in SynoDB as samples for future use.
-
-## Capabilities
-
-1. **Natural Language Query Processing**:
-   - Parse natural language questions into SQL.
-   - Use SageMaker Catalog custom metadata for semantic search to find relevant tables.
-   - Retrieve column roles and business context from SageMaker Catalog custom metadata.
-   - Retrieve similar query samples from SynoDB.
-   - Generate and execute SQL against Gold zone tables.
-
-2. **Insight Generation**:
-   - Identify trends over time (increasing, decreasing, seasonal).
-   - Detect correlations between variables.
-   - Find outliers and anomalous data points.
-   - Generate insight descriptions with confidence scores.
-
-3. **Metric Calculation**:
-   - Read column roles (measure, dimension, temporal) from SageMaker Catalog.
-   - Reason about aggregations (SUM, AVG, COUNT) based on column roles — no pre-defined formulas.
-   - Validate calculated values against expected ranges.
-
-4. **Query Result Caching**:
-   - Cache query results with TTL based on data refresh frequency.
-   - Invalidate cache when underlying Gold zone data changes.
-
-## Workflow
-
-1. Receive query (natural language or SQL) with context.
-2. If natural language:
-   a. Perform semantic search to find relevant Gold tables.
-   b. Retrieve table schemas, relationships, and sample queries.
-   c. Generate SQL using context and similar query patterns.
-3. Execute query against Gold zone.
-4. Generate insights from results (trends, correlations, outliers).
-5. Return results with schema, row count, execution time, and insights.
-
-## SQL Generation Guidelines
-
-- ALWAYS use fully qualified table names (database.schema.table).
-- ALWAYS add LIMIT clauses to prevent unbounded queries (default: 10,000 rows).
-- NEVER use SELECT * in production queries — specify columns explicitly.
-- NEVER generate DDL (CREATE, DROP, ALTER) — this agent is read-only on Gold zone.
-- PREFER window functions over self-joins for time-based analysis.
-- Use CTEs for readability over deeply nested subqueries.
-
-## Output Artifacts
-
-- Query results (JSON)
-- Generated SQL (stored in `workloads/{name}/dbt/models/marts/` or SynoDB)
-- Insight report with confidence scores
-
-## Constraints
-
-- This agent is READ-ONLY on Gold zone data.
-- NEVER expose raw PII/PHI/PCI values in query results — apply masking.
-- ALWAYS validate generated SQL for injection risks before execution.
-- Cache queries for at most the data refresh interval.
-- Store useful queries in SynoDB as samples for future reference.
-```
+<!--
+  The previous "ORION consumer" skill was removed. ADOP no longer owns NL→SQL,
+  query execution, or insight generation on Gold-zone data. Those responsibilities
+  move to ORION (external semantic layer platform, in development) via its VKG,
+  consuming the OWL + R2RML artifacts staged by the Ontology Staging Agent.
+  ADOP's semantic-layer responsibility now ends at Phase 7 Step 8.5 with local
+  emission of ontology.ttl + mappings.ttl + ontology_manifest.json.
+-->
 
 ---
 
@@ -2942,7 +2875,7 @@ Schema (if known, otherwise discover via profiling):
 - Column2: type, description, role
 - ...
 
-Semantic Layer (for AI Analysis Agent — NLP to SQL):
+Semantic Layer (for AI ORION consumer — NLP to SQL):
 
   Fact table grain:
   - "What does one row represent?" [One order / One order line item / One event / One daily snapshot]
@@ -3081,7 +3014,7 @@ Validate:
 - All tests pass (target: 50+ tests)
 - DAG parses successfully
 - Quality gates enforce thresholds
-- semantic.yaml includes all Semantic Layer fields for Analysis Agent
+- semantic.yaml includes all Semantic Layer fields for ORION consumer
 ```
 
 **Example**:
@@ -3108,7 +3041,7 @@ Schema:
 - status: ENUM, order status (Completed/Pending/Cancelled), dimension
 - region: STRING, sales region, dimension
 
-Semantic Layer (for AI Analysis Agent — NLP to SQL):
+Semantic Layer (for AI ORION consumer — NLP to SQL):
 
   Fact table grain: One row per order (not per line item)
 
@@ -3298,7 +3231,7 @@ Referential integrity:
 - Nullable FK: [YES/NO — can the FK column be NULL? What does NULL mean?]
 - Validation frequency: [Every run / Daily / Weekly]
 
-Join semantics for Analysis Agent (NLP to SQL):
+Join semantics for ORION consumer (NLP to SQL):
 - When to join: [What types of questions require this join?]
   e.g., "Questions about customer attributes with order metrics require joining orders → customers"
   e.g., "Questions about order data alone do NOT need this join"
@@ -3312,7 +3245,7 @@ Join semantics for Analysis Agent (NLP to SQL):
   e.g., "orders → customers → geography (two hops for region details)"
 - Columns available after join: [What new columns become queryable?]
   e.g., "After joining orders to customers: customer_name, segment, country become available for GROUP BY"
-- Sample joined queries (for SynoDB seed):
+- Sample joined queries (for ORION seed queries seed):
   1. "[NL QUESTION]" → [SQL_PATTERN]
      e.g., "Revenue by customer segment?" → JOIN orders to customers, SUM(revenue) GROUP BY segment
   2. "[NL QUESTION]" → [SQL_PATTERN]
@@ -3328,14 +3261,14 @@ Update:
 5. Add sample queries demonstrating separate vs joined metrics
 6. Update tests to validate FK integrity
 7. Update [SOURCE_WORKLOAD]/README.md to document relationship
-8. Update SynoDB seed queries with joined query examples
+8. Update ORION seed queries seed queries with joined query examples
 
 Validate:
 - FK validation runs successfully
 - Quality check enforces integrity threshold
 - Sample queries execute correctly
 - DAG dependency resolves
-- Analysis Agent can resolve joined queries from NLP
+- ORION consumer can resolve joined queries from NLP
 ```
 
 **Example**:
@@ -3357,7 +3290,7 @@ Referential integrity:
 - Nullable FK: NO (customer_id is required on orders)
 - Validation frequency: Every run
 
-Join semantics for Analysis Agent (NLP to SQL):
+Join semantics for ORION consumer (NLP to SQL):
 - When to join:
   - JOIN NEEDED: "revenue by customer segment", "top customers by lifetime value", "churn impact on revenue"
   - JOIN NOT NEEDED: "total revenue by region" (region is on orders), "order count by status" (status is on orders)
@@ -3381,7 +3314,7 @@ Join semantics for Analysis Agent (NLP to SQL):
   4. "Customer retention: customers with orders in last 90 days?" → COUNT(DISTINCT c.customer_id) WHERE o.order_date >= CURRENT_DATE - 90
   5. "Revenue from churned customers?" → SUM(o.revenue) WHERE c.status='Churned'
 
-Update semantic.yaml, scripts, DAG, tests, README, and SynoDB seed queries.
+Update semantic.yaml, scripts, DAG, tests, README, and ORION seed queries seed queries.
 ```
 
 **Expected Output**:

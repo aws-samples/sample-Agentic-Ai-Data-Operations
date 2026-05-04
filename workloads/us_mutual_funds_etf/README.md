@@ -204,7 +204,7 @@ python3 workloads/us_mutual_funds_etf/scripts/gold/quality_checks_gold.py
 - **Fact grain:** One row per `fund_ticker` + `price_date` (monthly snapshot)
 - **Default aggregations:** SUM for AUM, AVG for returns/ratios, LAST for NAV
 - **Business terms:** 6 terms (AUM, returns, fees, risk, performance, rating) with synonyms
-- **Seed questions:** 6 example queries for Analysis Agent
+- **Seed questions:** 6 example queries (documentation only — runtime NL→SQL lives in ORION)
 - **Join semantics:** 3 joins (fact→fund, fact→category, fact→date) with pre-aggregation rules
 - **Time intelligence:** Calendar fiscal year, monthly freshness, 1Y default period
 
@@ -410,7 +410,7 @@ ORDER BY total_aum_billions DESC;
 ### Phase 2: QuickSight Integration (Next)
 - Create QuickSight datasets from Gold tables
 - Build 9 visual dashboard (KPIs, charts, pivot table)
-- Enable NLP queries via Analysis Agent
+- Enable NLP queries via ORION (when deployed) using the staged `ontology.ttl` + `mappings.ttl`
 - Schedule daily SPICE refresh
 
 ### Phase 3: Real Data Integration

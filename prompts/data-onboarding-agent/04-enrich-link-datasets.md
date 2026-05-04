@@ -3,13 +3,13 @@
 
 ## Purpose
 
-After two or more datasets are onboarded, use ENRICH to document foreign key relationships and teach the Analysis Agent how and when to join them.
+After two or more datasets are onboarded, use ENRICH to document foreign key relationships and join semantics in `semantic.yaml`. These relationships become `owl:ObjectProperty` triples and `rr:parentTriplesMap` R2RML references in the staged ontology for ORION.
 
 ## When to Use
 
 - After both source and target workloads exist (ONBOARD complete for both)
 - When datasets share a common key (e.g., customer_id)
-- To enable cross-dataset queries in the Analysis Agent
+- To enrich the OWL ontology with cross-dataset object properties before ORION handoff
 
 ## Prompt Template
 
@@ -29,7 +29,7 @@ Integrity:
 - Orphan handling: [QUARANTINE/DROP/KEEP]
 - Nullable FK: [YES/NO - what does NULL mean?]
 
-Join semantics for Analysis Agent:
+Join semantics (for OWL ObjectProperty + R2RML parentTriplesMap):
 - When to join: [What questions require this join?]
 - When NOT to join: [What questions don't need it?]
 - Pre-aggregation: [Aggregate before or after joining?]

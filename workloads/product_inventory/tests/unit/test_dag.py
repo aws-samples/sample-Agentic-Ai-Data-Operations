@@ -256,7 +256,6 @@ class TestTaskGroups:
 
         assert 'with TaskGroup("publish"' in code
         assert 'register_catalog_task = PythonOperator' in code
-        assert 'update_semantic_layer_task = PythonOperator' in code
 
 
 class TestTaskDependencies:
@@ -276,15 +275,6 @@ class TestTaskDependencies:
 
         # Bronze → Silver → Quality → Gold → Quality
         assert "bronze_to_silver_task >> silver_quality_gate_task >> silver_to_gold_task >> gold_quality_gate_task" in code
-
-    def test_publish_stage_dependencies(self):
-        """Publish stage tasks have correct order."""
-        with open(DAG_FILE, 'r') as f:
-            code = f.read()
-
-        # Register catalog before updating semantic layer
-        assert "register_catalog_task >> update_semantic_layer_task" in code
-
 
 class TestSLAConfiguration:
     """Test SLA configuration."""

@@ -91,7 +91,7 @@ Schema:
 - [col1]: [type], [description], [role: measure/dimension/identifier/temporal]
 - [col2]: ...
 
-Semantic Layer (for AI Analysis Agent):
+Semantic Layer (for ORION handoff via Phase 7 Step 8.5):
 
 **REQUIRED (minimum for AI to answer questions):**
 

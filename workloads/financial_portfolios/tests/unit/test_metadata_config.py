@@ -384,7 +384,7 @@ class TestSemanticConfig:
         assert 'update_schedule' in stewardship
 
     def test_join_semantics_defined(self, semantic_config):
-        """Test that join semantics are defined for Analysis Agent."""
+        """Test that join semantics are defined for ORION consumer."""
         join_semantics = semantic_config['join_semantics']
         assert len(join_semantics) >= 3
 

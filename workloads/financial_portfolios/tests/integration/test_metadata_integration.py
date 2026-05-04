@@ -246,7 +246,7 @@ class TestBusinessSemantics:
 
 
 class TestJoinSemantics:
-    """Test that join semantics are properly defined for Analysis Agent."""
+    """Test that join semantics are properly defined for ORION consumer."""
 
     @pytest.fixture
     def semantic_config(self):

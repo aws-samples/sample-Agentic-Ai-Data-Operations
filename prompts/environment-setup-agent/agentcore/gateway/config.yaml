@@ -133,6 +133,6 @@ servers:
     package: awslabs-dynamodb-mcp-server
     entrypoint: awslabs.dynamodb-mcp-server
     iam_policy: iam/dynamodb-policy.json
-    description: DynamoDB / SynoDB operations
+    description: DynamoDB operational state operations
     health_check: list_tables
     required: false

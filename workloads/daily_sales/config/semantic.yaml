@@ -6,7 +6,7 @@ semantic:
   workload: daily_sales
   description: "Daily retail sales transactions — measures revenue, quantity, and discount across stores, products, regions, and time"
 
-  # Grain definition — critical for Analysis Agent to avoid double-counting
+  # Grain definition — critical for ORION consumer to avoid double-counting
   grain:
     description: "One row per sale_id per sale_date"
     grain_columns:

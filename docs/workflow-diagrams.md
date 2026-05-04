@@ -113,7 +113,7 @@ flowchart TD
 
     DEPLOY([Deploy Pipeline])
 
-    ANALYSIS_AGENT["Analysis Agent (sub-agent)<br/>Read-only Gold zone queries"]
+    ONTOLOGY_STAGING["Ontology Staging Agent (sub-agent)<br/>Emits OWL + R2RML for ORION (local)"]
     QUALITY_AGENT_ADHOC["Quality Agent (sub-agent)<br/>Ad-hoc quality checks"]
 
     style ROUTER_BLOCK fill:#f0f4ff,stroke:#4a6fa5
@@ -267,7 +267,7 @@ flowchart LR
         GOLD[(Aggregated Data<br/>Parquet, optimized<br/>pre-calculated metrics)]
     end
 
-    GOLD -->|Athena| ANALYSIS[Analysis Agent<br/>queries + insights]
+    GOLD -->|Glue schema<br/>+ semantic.yaml| STAGING[Ontology Staging Agent<br/>emits ontology.ttl + mappings.ttl<br/>for ORION handoff]
 
     BRONZE -->|Lineage| CATALOG[(Glue Data Catalog<br/>+ Lakehouse)]
     SILVER -->|Lineage| CATALOG

@@ -1,5 +1,5 @@
 # semantic.yaml — Semantic layer configuration for Customer Master
-# Loaded into SageMaker Catalog + SynoDB at deploy time
+# Loaded into SageMaker Catalog + ORION seed store at deploy time
 # Created: 2026-03-15
 
 dataset:
@@ -146,12 +146,12 @@ gold_schema:
       grain: [segment]
       measures: [customer_count, total_annual_value, avg_annual_value, total_credit_limit]
 
-# Default filters for Analysis Agent
+# Default filters for ORION consumer
 default_filters:
   active_customers: "status = 'Active'"
   high_value: "annual_value >= 100000"
 
-# Seed questions for SynoDB
+# Seed questions for ORION seed store
 seed_questions:
   - question: "How many customers do we have by segment?"
     sql: >

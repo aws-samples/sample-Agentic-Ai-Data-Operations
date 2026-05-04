@@ -1,7 +1,7 @@
 """
 Integration tests for US Mutual Funds & ETF metadata configuration.
 
-Tests validate that semantic.yaml can be parsed by Analysis Agent,
+Tests validate that semantic.yaml can be parsed by ORION consumer,
 seed questions have required columns, join semantics are complete,
 and business terms map to actual columns.
 """
@@ -57,9 +57,9 @@ def dim_tables_columns(semantic_config: Dict[str, Any]) -> Dict[str, Set[str]]:
     return result
 
 
-# Analysis Agent parsing tests
+# ORION consumer parsing tests
 class TestAnalysisAgentCompatibility:
-    """Tests that validate semantic.yaml can be parsed by Analysis Agent."""
+    """Tests that validate semantic.yaml can be parsed by ORION consumer."""
 
     def test_yaml_is_valid_and_parseable(self, semantic_config: Dict[str, Any]):
         """Test that semantic.yaml is valid YAML."""
@@ -74,7 +74,7 @@ class TestAnalysisAgentCompatibility:
             "business_context"
         ]
         for section in required_sections:
-            assert section in semantic_config, f"Missing section for Analysis Agent: {section}"
+            assert section in semantic_config, f"Missing section for ORION consumer: {section}"
 
         business_context = semantic_config["business_context"]
         nlp_sections = [
@@ -94,7 +94,7 @@ class TestAnalysisAgentCompatibility:
             for table_name, table_def in semantic_config["tables"][zone].items():
                 columns = table_def["columns"]
                 for col_name, col_def in columns.items():
-                    # Required fields for Analysis Agent
+                    # Required fields for ORION consumer
                     assert "type" in col_def, f"{table_name}.{col_name} missing type"
                     assert "role" in col_def, f"{table_name}.{col_name} missing role"
                     assert "description" in col_def, f"{table_name}.{col_name} missing description"
@@ -288,7 +288,7 @@ class TestJoinSemantics:
                     f"Join references non-existent column: {right_ref}"
 
     def test_join_provides_analysis_guidance(self, semantic_config: Dict[str, Any]):
-        """Test join semantics provide guidance for Analysis Agent."""
+        """Test join semantics provide guidance for ORION consumer."""
         joins = semantic_config["business_context"]["join_semantics"]
 
         for join in joins:
@@ -428,7 +428,7 @@ class TestBusinessTerms:
 
 # Completeness validation
 class TestMetadataCompleteness:
-    """Tests that validate metadata is complete enough for full Analysis Agent usage."""
+    """Tests that validate metadata is complete enough for full ORION consumer usage."""
 
     def test_fact_table_has_all_key_metrics(self, semantic_config: Dict[str, Any]):
         """Test fact table includes all key performance metrics."""

@@ -186,19 +186,6 @@ def register_catalog(**context):
     module.register_catalog(S3_GOLD)
 
 
-def update_semantic_layer(**context):
-    """Update SageMaker Catalog with business metadata."""
-    import importlib.util
-
-    script_path = SCRIPTS_ROOT / "load" / "update_semantic_layer.py"
-    spec = importlib.util.spec_from_file_location("update_semantic_layer", script_path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["update_semantic_layer"] = module
-    spec.loader.exec_module(module)
-
-    module.update_semantic_layer()
-
-
 # DAG Definition
 with DAG(
     dag_id=DAG_ID,
@@ -253,21 +240,12 @@ with DAG(
         bronze_to_silver_task >> silver_quality_gate_task >> silver_to_gold_task >> gold_quality_gate_task
 
     # Stage 3: Publish
-    with TaskGroup("publish", tooltip="Register in catalog and update semantic layer") as publish:
+    with TaskGroup("publish", tooltip="Register in Glue/SageMaker catalog") as publish:
         register_catalog_task = PythonOperator(
             task_id="register_catalog",
             python_callable=register_catalog,
             provide_context=True,
         )
-
-        update_semantic_layer_task = PythonOperator(
-            task_id="update_semantic_layer",
-            python_callable=update_semantic_layer,
-            provide_context=True,
-        )
-
-        # Publish stage dependencies
-        register_catalog_task >> update_semantic_layer_task
 
     # Pipeline dependencies
     ingest >> transform >> publish

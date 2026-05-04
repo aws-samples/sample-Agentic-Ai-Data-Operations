@@ -125,7 +125,7 @@ DevOps Agent (Automated, event-driven)
 
 **Works with**:
 - Data Onboarding Agent (deploys its generated artifacts)
-- Data Analysis Agent (monitors dashboard usage)
+- Ontology Staging Agent (watches for new `ontology.ttl` commits for ORION sync)
 - Environment Setup Agent (manages infrastructure drift)
 
 **Triggered by**:
@@ -187,7 +187,7 @@ DevOps Agent:
 
 **Milestones**:
 1. ✅ Data Onboarding Agent (complete)
-2. ✅ Data Analysis Agent (MVP complete)
+2. ✅ Ontology Staging Agent (complete — local emission)
 3. 🔄 DevOps Agent (design phase)
 4. ⏳ CI/CD automation (planned)
 5. ⏳ Monitoring & alerting (planned)

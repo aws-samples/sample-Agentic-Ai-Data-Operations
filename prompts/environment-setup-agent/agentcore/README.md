@@ -115,7 +115,7 @@ agentcore/
 │       ├── redshift-policy.json         # Redshift Data API
 │       ├── cloudwatch-policy.json       # Logs, metrics, alarms
 │       ├── cost-explorer-policy.json    # Cost tracking
-│       └── dynamodb-policy.json         # DynamoDB / SynoDB
+│       └── dynamodb-policy.json         # DynamoDB operational state
 ├── runtime/
 │   └── agent.yaml                       # Agent definition (all tools from Gateway)
 └── README.md

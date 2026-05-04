@@ -697,7 +697,7 @@ data_stewardship:
   compliance_owner: "Audit & Compliance (SOX)"
 
 # =============================================================================
-# JOIN SEMANTICS (For Analysis Agent)
+# JOIN SEMANTICS (For ORION consumer)
 # =============================================================================
 
 join_semantics:

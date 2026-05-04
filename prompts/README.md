@@ -9,16 +9,16 @@ This folder contains all prompts organized by agent responsibility. Each agent h
 │                           AGENTIC WORKFLOW                              │
 └─────────────────────────────────────────────────────────────────────────┘
 
-  🏗️ Environment Setup       📊 Data Onboarding        📈 Data Analysis      🚀 DevOps
+  🏗️ Environment Setup       📊 Data Onboarding        🧬 Ontology Staging   🚀 DevOps
        Agent                      Agent                     Agent             Agent
          │                          │                         │                 │
-         │ Sets up AWS              │ Onboards data           │ Creates         │ Automates
-         │ infrastructure           │ Bronze→Silver→Gold      │ dashboards      │ CI/CD
+         │ Sets up AWS              │ Onboards data           │ Emits OWL +     │ Automates
+         │ infrastructure           │ Bronze→Silver→Gold      │ R2RML for ORION │ CI/CD
          │                          │                         │                 │
          ▼                          ▼                         ▼                 ▼
-   IAM, S3, KMS,            Route → Discover →        Query Gold zone    Monitor, deploy,
-   Glue, LF-Tags,          Profile → Generate →       via semantic       optimize, heal
-   MWAA, Gateway            Deploy artifacts          layer (SynoDB)     pipelines
+   IAM, S3, KMS,            Route → Discover →        ontology.ttl +     Monitor, deploy,
+   Glue, LF-Tags,          Profile → Generate →       mappings.ttl       optimize, heal
+   MWAA, Gateway            Deploy artifacts          (local, for ORION) pipelines
 ```
 
 ## Quick Navigation
@@ -27,7 +27,7 @@ This folder contains all prompts organized by agent responsibility. Each agent h
 |-------|--------|-------------|--------|
 | **Environment Setup** | [`environment-setup-agent/`](environment-setup-agent/) | First time in AWS account | ✅ Ready |
 | **Data Onboarding** | [`data-onboarding-agent/`](data-onboarding-agent/) | Per data source (repeatable) | ✅ Ready |
-| **Data Analysis** | [`data-analysis-agent/`](data-analysis-agent/) | After data in Gold zone | ✅ MVP Ready |
+| **Ontology Staging** | [`data-onboarding-agent/ontology-staging-agent.md`](data-onboarding-agent/) | Phase 7 Step 8.5, optional | ✅ Ready |
 | **DevOps** | [`devops-agent/`](devops-agent/) | Continuous operations | 📝 Coming Soon |
 | **Examples & Helpers** | [`examples/`](examples/) | Demo data generation, testing | ✅ Ready |
 
@@ -125,24 +125,26 @@ This folder contains all prompts organized by agent responsibility. Each agent h
 
 ---
 
-### 📈 Data Analysis Agent
+### 🧬 Ontology Staging Agent
 
-**Purpose**: Consume semantic layer, create dashboards
+**Purpose**: Emit OWL ontology + R2RML mappings from `semantic.yaml` + Glue Catalog, staged locally for ORION handoff.
 
 **How it works**:
-1. Reads SageMaker Catalog (column roles: measure, dimension, temporal)
-2. Checks SynoDB (past SQL queries)
-3. Generates SQL query
-4. Executes via Athena
-5. Creates QuickSight dashboard
-6. Saves query to SynoDB (system learns over time)
+1. Reads `workloads/{name}/config/semantic.yaml` (column roles, relationships, hierarchies, PII)
+2. Reads deployed Glue table schema via `glue-athena` MCP (`get_table`)
+3. Induces OWL2 classes + datatype/object properties + subclass hierarchy
+4. Generates R2RML TriplesMaps wiring classes to physical tables
+5. Validates Turtle with rdflib (auto-fix + retry up to 2×)
+6. Writes `ontology.ttl`, `mappings.ttl`, `ontology_manifest.json` locally
 
-**Outputs**:
-- QuickSight dashboards
-- SQL queries saved to SynoDB
-- Visualization recommendations
+**Outputs** (all under `workloads/{name}/config/`):
+- `ontology.ttl` — OWL2 classes, properties, hierarchy, PII annotations
+- `mappings.ttl` — R2RML linking OWL to Glue tables
+- `ontology_manifest.json` — version, checksums, steward checklist, `state: STAGED_LOCAL`
 
-**Read more**: [`data-analysis-agent/README.md`](data-analysis-agent/README.md)
+**Not in scope**: T-Box reasoning, SHACL authoring, publish, VKG reload — all owned by Data Steward inside ORION.
+
+**Read more**: [`data-onboarding-agent/ontology-staging-agent.md`](data-onboarding-agent/ontology-staging-agent.md)
 
 ---
 

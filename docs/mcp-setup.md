@@ -50,7 +50,7 @@ The `.mcp.json` in the repo root configures 11 MCP servers. Claude Code reads th
 | `redshift` | `awslabs-redshift-mcp-server` | Schema verification, Gold zone queries via Spectrum |
 | `cloudwatch` | `awslabs-cloudwatch-mcp-server` | Logs, metrics, alarms |
 | `cost-explorer` | `awslabs-cost-explorer-mcp-server` | Cost tracking, budget analysis |
-| `dynamodb` | `awslabs-dynamodb-mcp-server` | DynamoDB / SynoDB operations |
+| `dynamodb` | `awslabs-dynamodb-mcp-server` | DynamoDB operations (operational state, API cache) |
 | `pii-detection` | Custom (local server) | PII detection + Lake Formation LF-Tag application |
 
 ### Not Available (dependency conflicts on PyPI)

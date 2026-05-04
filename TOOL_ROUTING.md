@@ -34,7 +34,7 @@ These are the **actually loaded** MCP servers. Do not assume others work.
 | ✅ **LOADED** | `redshift` | `list_clusters`, `list_databases`, `list_schemas`, `list_tables`, `list_columns`, `execute_query` | Schema verification, Gold zone validation, catalog checks via Spectrum |
 | ✅ **LOADED** | `cloudwatch` | Logs, metrics, alarms, dashboards | Monitoring, log queries, metric alarms |
 | ✅ **LOADED** | `cost-explorer` | Cost and usage data | Cost tracking, budget analysis |
-| ✅ **LOADED** | `dynamodb` | Table CRUD, query, scan | SynoDB metrics store, DynamoDB operations |
+| ✅ **LOADED** | `dynamodb` | Table CRUD, query, scan | Operational state, DynamoDB operations |
 | ✅ **LOADED** | `core` | S3, KMS, Secrets Manager | S3 operations, KMS key management, secrets (slow startup — may timeout on health check but works in conversation) |
 | ✅ **LOADED** | `pii-detection` | `detect_pii_in_table`, `scan_database_for_pii`, `create_lf_tags`, `get_pii_columns`, `apply_column_security`, `get_pii_report` | PII detection + LF-Tag application (custom server, slow startup) |
 | ✅ **LOADED** | `glue-athena` | `create_database`, `get_table`, `get_tables`, `create_crawler`, `start_crawler`, `start_job_run`, `get_job_run`, `athena_query` | Glue catalog + Athena queries (custom FastMCP server, replaces aws-dataprocessing) |

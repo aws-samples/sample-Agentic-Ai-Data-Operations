@@ -19,7 +19,7 @@
 | **redshift** | `mcp__redshift__list_clusters`, `mcp__redshift__list_databases`, `mcp__redshift__list_schemas`, `mcp__redshift__list_tables`, `mcp__redshift__list_columns`, `mcp__redshift__execute_query` | Query verification on Gold data, schema discovery via Spectrum, data validation |
 | **cloudwatch** | Logs, metrics, alarms, dashboards | Monitoring, log queries, metric alarms |
 | **cost-explorer** | Cost and usage data | Cost tracking, budget analysis |
-| **dynamodb** | Table CRUD, query, scan | SynoDB metrics store, DynamoDB operations |
+| **dynamodb** | Table CRUD, query, scan | Operational state tables, DynamoDB operations |
 | **core** | S3, KMS, Secrets Manager | S3 operations, KMS key management, secrets. *Slow startup — may timeout on health check but works in conversation.* |
 | **pii-detection** | `detect_pii_in_table`, `scan_database_for_pii`, `create_lf_tags`, `get_pii_columns`, `apply_column_security`, `get_pii_report` | PII detection + LF-Tag application. Custom server. *Slow startup.* |
 
@@ -112,7 +112,7 @@ If using Gateway mode, deploy the Gateway FIRST via `prompts/09-deploy-agentcore
 | `lambda` | OPTIONAL | Fall back to `aws lambda invoke` CLI |
 | `cloudwatch` | OPTIONAL | Defer monitoring setup |
 | `cost-explorer` | OPTIONAL | Defer cost tracking |
-| `dynamodb` | OPTIONAL | Defer SynoDB operations |
+| `dynamodb` | OPTIONAL | Defer operational-state table operations |
 | `aws.dp-mcp` | OPTIONAL | Glue-athena custom server is primary; this is supplemental |
 
 **Output:**
@@ -416,7 +416,7 @@ MCP Calls (live):
   redshift:          {count} calls  (execute_query, list_tables, ...)
   cloudwatch:        {count} calls  (log queries, metrics, ...)
   cost-explorer:     {count} calls  (cost analysis, ...)
-  dynamodb:          {count} calls  (SynoDB queries, ...)
+  dynamodb:          {count} calls  (operational state, ...)
   core:              {count} calls  (S3 ops, KMS, Secrets Manager, ...)
   pii-detection:     {count} calls  (detect_pii, apply_tags, ...)
   sagemaker-catalog: {count} calls  (put_custom_metadata, search_metadata, ...)
