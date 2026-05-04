@@ -2601,6 +2601,78 @@ Every DAG MUST include:
 
 ---
 
+## Skill: Ontology Staging Agent — SUB-AGENT (spawned by Data Onboarding Agent)
+
+**Trigger**: Spawned by Data Onboarding Agent during **Phase 7 Step 8.5** of the deploy flow, AFTER Step 8 (TBAC grants) and BEFORE Step 9 (MWAA DAG deploy). Runs ONLY if `workloads/{name}/config/semantic.yaml` exists AND the user opted in during Phase 1 discovery (default: yes). Optional — skip and proceed to Step 9 if the gate fails.
+
+**Purpose**: Induce an OWL2 ontology + R2RML mappings from the workload's `semantic.yaml` + Glue Gold-zone table schema; validate Turtle; stage three artifacts locally for handoff to **ORION** (external semantic layer platform, in development).
+
+**Execution**: Runs as a sub-agent via the `Agent` tool. Has MCP access to ONE tool only: `glue-athena` `get_table` (to read Gold-zone schema). Does NOT have write access to AWS — emission is file-only to `workloads/{name}/config/`.
+
+### Prompt
+
+Full spawn prompt: see `prompts/data-onboarding-agent/ontology-staging-agent.md`.
+
+Condensed responsibilities:
+
+```
+You are the Ontology Staging Agent. Your job is file emission, not runtime reasoning.
+
+1. Fetch Glue Gold-zone schema via glue-athena MCP get_table.
+2. Call shared.semantic_layer.induce_and_stage(
+       dataset_name, glue_database, glue_table, namespace,
+       glue_schema=<from step 1>, mode="local"
+   ).
+3. Report counts + artifact paths to the orchestrator.
+4. Emit AgentOutput with 3 artifacts (ontology.ttl, mappings.ttl,
+   ontology_manifest.json), SHA-256 checksums, and decisions for
+   PK selection, namespace choice, and auto-induced columns.
+
+You DO NOT:
+- Run T-Box reasoning (HermiT/ELK) — ORION's job at publish time.
+- Author SHACL constraints — Data Steward in ORION.
+- Publish to a VKG — Data Steward approves in ORION.
+- Write to Neptune, S3, DynamoDB, SNS — future (when ORION deploys).
+- Modify semantic.yaml, Glue catalog, or any data.
+```
+
+### Constraints
+
+- Local-only output in this iteration. `mode="orion"` raises
+  `NotImplementedError` until ORION deploys.
+- Deterministic: identical inputs MUST produce byte-identical TTL files
+  (the inducer sorts triples by IRI to enforce this).
+- If Turtle validation fails after the 2 auto-fix retries, STOP and
+  emit a blocking issue. Do not silently continue.
+- No fallback invention: if semantic.yaml lacks a PK or relationship,
+  surface a warning — do not guess.
+
+### Output
+
+Three artifacts written to `workloads/{dataset_name}/config/`:
+
+- `ontology.ttl` — OWL2 classes, properties, hierarchy, PII annotations.
+- `mappings.ttl` — R2RML TriplesMaps (one per entity) wiring classes to Glue.
+- `ontology_manifest.json` — `state: "STAGED_LOCAL"`, version, checksums, steward checklist, warnings.
+
+### Dependencies
+
+- `rdflib >=7.0,<8` (in `pyproject.toml` base deps).
+- Reuses `shared/metadata/semantic_reader.py` for YAML parsing.
+- Reuses `shared/metadata/glue_fetcher.py` or the `glue-athena` MCP for Glue schema.
+
+### Test Gate
+
+After the sub-agent returns, the orchestrator runs:
+
+- `workloads/{name}/tests/unit/test_owl_inducer.py`
+- `workloads/{name}/tests/unit/test_r2rml_mapper.py`
+- `workloads/{name}/tests/unit/test_turtle_validator.py`
+
+All must pass before Step 9 (MWAA deploy) proceeds. Failures block Step 9.
+
+---
+
 ## Agent Interaction Protocols
 
 ### How Sub-Agents Are Spawned

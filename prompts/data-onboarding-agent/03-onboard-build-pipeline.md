@@ -537,6 +537,49 @@ Present results to human. Do NOT proceed if any REQUIRED server fails.
    - Repeat for `Data_Sensitivity` and `PII_Type` tags with matching values
    - Verify: `SELECT * FROM {gold_table} LIMIT 5` in Athena — should return columns
 
+8.5. **Stage OWL + R2RML ontology for ORION handoff** (OPTIONAL — skip if
+     `workloads/{WORKLOAD}/config/semantic.yaml` is missing OR the user
+     opted out of ontology staging during Phase 1 discovery):
+
+   Spawn the **Ontology Staging Agent** sub-agent with this context:
+   - `dataset_name`: `{WORKLOAD}`
+   - `glue_database`: `{DATABASE_NAME}` (the Gold-zone database)
+   - `glue_table`: primary Gold-zone fact/dimension table
+   - `namespace`: short ORION namespace (default: derived from `{WORKLOAD}`,
+     e.g., `financial_portfolios` → `finance`)
+   - `version`: `v1` (increment on regeneration)
+
+   The sub-agent:
+   1. Calls `glue-athena` MCP `get_table` to fetch the Gold-zone schema.
+   2. Calls `shared.semantic_layer.induce_and_stage(mode="local", ...)`.
+   3. Writes three artifacts to `workloads/{WORKLOAD}/config/`:
+      - `ontology.ttl` — OWL2 classes, properties, hierarchy, PII annotations
+      - `mappings.ttl` — R2RML TriplesMaps wiring OWL classes to Glue tables
+      - `ontology_manifest.json` — `state: "STAGED_LOCAL"`, checksums, steward checklist
+   4. Validates both TTL files with rdflib (auto-fix + retry up to 2×).
+   5. Returns `AgentOutput` with 3 artifacts + counts + decisions.
+
+   **Test gate**: `pytest workloads/{WORKLOAD}/tests/unit/test_owl_inducer.py
+   workloads/{WORKLOAD}/tests/unit/test_r2rml_mapper.py
+   workloads/{WORKLOAD}/tests/unit/test_turtle_validator.py` MUST pass
+   before proceeding to Step 9. If it fails, block deployment and surface
+   the failure.
+
+   **What this step does NOT do** (these are ORION / Data Steward jobs
+   for when ORION deploys in AWS):
+   - No Neptune SPARQL writes.
+   - No S3 upload to a knowledge-layer bucket.
+   - No DynamoDB version record.
+   - No SNS steward notification.
+   - No T-Box reasoning, no SHACL authoring, no VKG publish.
+
+   When ORION deploys, a follow-up `ontology-publish-agent` will read
+   these committed local TTL files and push them to AWS. No regeneration
+   is needed — the inducer is deterministic.
+
+   Full spawn prompt: `prompts/data-onboarding-agent/ontology-staging-agent.md`.
+   Skill definition: SKILLS.md → "Skill: Ontology Staging Agent".
+
 9. **Deploy DAG + shared utils to MWAA** (if MWAA is configured):
    ```bash
    # Upload DAG file

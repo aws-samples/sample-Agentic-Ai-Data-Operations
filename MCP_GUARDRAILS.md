@@ -330,6 +330,27 @@ See [Phase 0 Step 0.2](#step-02-mcp-health-check) for the full 3-tier server tab
 | Verify IAM changes logged | `mcp__cloudtrail__lookup_events` (EventName=PutRolePolicy) | — | **MCP** |
 | Complex audit queries | `mcp__cloudtrail__lake_query` (SQL on CloudTrail Lake) | — | **MCP** |
 
+### Step 5.8: Ontology Staging (ORION handoff, Phase 7 Step 8.5)
+
+> Optional sub-agent runs between Step 8 (TBAC grants) and Step 9 (MWAA deploy). File-emission only in this iteration.
+
+| Operation | MCP Tool | Fallback | Status |
+|---|---|---|---|
+| Fetch Gold-zone Glue schema | `mcp__glue-athena__get_table` | `aws glue get-table` CLI | **MCP** |
+| Induce OWL + R2RML | `shared.semantic_layer.induce_and_stage` (local Python, no MCP) | — | **Local** |
+| Validate Turtle syntax | rdflib (local Python) | — | **Local** |
+| Write ontology.ttl + mappings.ttl + manifest | Local filesystem to `workloads/{name}/config/` | — | **Local** |
+| Publish to Neptune SPARQL | **FUTURE — requires ORION deployment** | — | Not available today |
+| Upload to `s3://{knowledge-layer-bucket}/` | **FUTURE — requires ORION deployment** | — | Not available today |
+| Write DynamoDB `orion-ontology-versions` | **FUTURE — requires ORION deployment** | — | Not available today |
+| SNS steward notification | **FUTURE — requires ORION deployment** | — | Not available today |
+
+**Rules for Step 5.8**:
+1. Sub-agent has ONE MCP permission: `mcp__glue-athena__get_table`. Everything else is local.
+2. `shared.semantic_layer.induce_and_stage(mode="orion", ...)` currently raises `NotImplementedError`. Do not call it with that mode until ORION ships.
+3. If the `glue-athena` MCP is down, fall back to `aws glue get-table` CLI — the function accepts a plain dict.
+4. If Turtle validation fails after 2 auto-fix retries, STOP and surface the error. Do not commit invalid TTL files.
+
 ### Guardrail Rules — Phase 5
 1. **MCP-FIRST**: For every operation, check the table above. If MCP Tool column has a value, use it. CLI only for "CLI required" rows.
 2. **Log every fallback**: When using CLI instead of MCP, print: `Warning: MCP fallback — {server} not loaded for {operation}. Using CLI.`

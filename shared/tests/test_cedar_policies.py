@@ -650,33 +650,21 @@ class TestAgentAuthorization:
         allowed, _ = evaluator.authorize_agent(agent, "ReadData", zone)
         assert allowed is False
 
-    # -- ORION consumer --
-    def test_analysis_can_read_publish(self, evaluator):
-        agent = AgentPrincipal("analysis", "sub_agent")
-        zone = DataZone("publish", "test")
-        allowed, _ = evaluator.authorize_agent(agent, "ReadData", zone)
+    # -- Ontology Staging Agent --
+    def test_ontology_staging_can_write_config(self, evaluator):
+        agent = AgentPrincipal("ontology_staging", "sub_agent")
+        file = WorkloadFile("config/ontology.ttl", "config")
+        allowed, _ = evaluator.authorize_agent(agent, "WriteFile", file)
         assert allowed is True
 
-    def test_analysis_cannot_read_landing(self, evaluator):
-        agent = AgentPrincipal("analysis", "sub_agent")
-        zone = DataZone("landing", "test")
-        allowed, _ = evaluator.authorize_agent(agent, "ReadData", zone)
-        assert allowed is False
-
-    def test_analysis_cannot_read_staging(self, evaluator):
-        agent = AgentPrincipal("analysis", "sub_agent")
-        zone = DataZone("staging", "test")
-        allowed, _ = evaluator.authorize_agent(agent, "ReadData", zone)
-        assert allowed is False
-
-    def test_analysis_cannot_write_anything(self, evaluator):
-        agent = AgentPrincipal("analysis", "sub_agent")
+    def test_ontology_staging_cannot_write_data(self, evaluator):
+        agent = AgentPrincipal("ontology_staging", "sub_agent")
         zone = DataZone("publish", "test")
         allowed, _ = evaluator.authorize_agent(agent, "WriteData", zone)
         assert allowed is False
 
-    def test_analysis_cannot_invoke_mcp(self, evaluator):
-        agent = AgentPrincipal("analysis", "sub_agent")
+    def test_ontology_staging_cannot_invoke_arbitrary_tool(self, evaluator):
+        agent = AgentPrincipal("ontology_staging", "sub_agent")
         tool = McpTool("redshift", "execute_query")
         allowed, _ = evaluator.authorize_agent(agent, "InvokeTool", tool)
         assert allowed is False

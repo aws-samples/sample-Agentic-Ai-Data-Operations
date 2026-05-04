@@ -1,0 +1,33 @@
+{
+  "auto_induced_count": 0,
+  "awaiting_action": "DATA_STEWARD_REVIEW",
+  "created_at": "2026-05-04T20:11:23Z",
+  "created_by": "ADOP/ontology-staging-agent",
+  "mappings_ttl_path": "workloads/financial_portfolios/config/mappings.ttl",
+  "mappings_ttl_sha256": "96b7a4b8623e5e59c63a3338ec0fec21477d881d2c4afc07d6119bc972eacac3",
+  "namespace": "finance",
+  "ontology_ttl_path": "workloads/financial_portfolios/config/ontology.ttl",
+  "ontology_ttl_sha256": "44c5c42cfd9c7ac05bc2398ebce4875ddb60057974deac1e0b0d61ce79d2c460",
+  "owl_class_count": 16,
+  "owl_datatype_property_count": 45,
+  "owl_object_property_count": 4,
+  "pii_flagged_count": 3,
+  "r2rml_column_mappings_count": 45,
+  "r2rml_fk_join_count": 4,
+  "r2rml_triples_map_count": 3,
+  "review_checklist": [
+    "Verify OWL class names match business terminology.",
+    "Review auto-induced properties (ex:autoInduced=true) for correctness.",
+    "Author SHACL constraints for business rules (in ORION).",
+    "Check PII-flagged properties have correct classification + sensitivity.",
+    "Validate R2RML mappings point to the correct Gold-zone tables.",
+    "Run T-Box reasoning and SHACL validation in ORION before publish."
+  ],
+  "source_glue_database": "gold_financial_portfolios",
+  "source_glue_table": "fact_positions",
+  "source_semantic_yaml_sha256": "44471eca8a32e74d23414d1aa54e0028e12ae73fffff32d2ee7f4b67b789cf44",
+  "source_workload": "financial_portfolios",
+  "state": "STAGED_LOCAL",
+  "version": "v1",
+  "warnings": []
+}

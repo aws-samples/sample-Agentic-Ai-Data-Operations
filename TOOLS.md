@@ -607,3 +607,39 @@ Is the source in S3?
                        │
                        └── Custom source → Lambda + custom connector → Iceberg tables
 ```
+
+---
+
+## Ontology Staging (ORION Handoff — Phase 7 Step 8.5)
+
+> ADOP's semantic-layer responsibility ends at local emission of OWL +
+> R2RML. The items below marked **Future** activate when ORION (external
+> semantic layer platform) is deployed.
+
+| Operation | Tool | Notes |
+|---|---|---|
+| OWL induction (classes, properties, hierarchy, PII) | `shared.semantic_layer.owl_inducer.induce_owl` (Python + rdflib) | Deterministic output — identical inputs give byte-identical `ontology.ttl` |
+| R2RML mapping (TriplesMaps linking OWL → Glue tables) | `shared.semantic_layer.r2rml_mapper.generate_r2rml` | One TriplesMap per entity, FK columns emit `rr:parentTriplesMap` |
+| Turtle validation + auto-fix | `shared.semantic_layer.turtle_validator.validate_and_fix` (rdflib parse) | Max 2 retries. STOP on persistent failure. |
+| Single entry point (all of the above) | `shared.semantic_layer.induce_and_stage(mode="local", ...)` | Called by the Ontology Staging sub-agent |
+| Fetch Gold-zone Glue schema | `mcp__glue-athena__get_table` | Feeds `glue_schema` arg into the inducer |
+| **Publish OWL to Neptune SPARQL** | **Future — requires ORION deployment** | SPARQL `INSERT DATA` into `neptune://orion/{namespace}/{version}/draft` |
+| **Upload TTL to S3 knowledge-layer bucket** | **Future — requires ORION deployment** | `s3://{knowledge-layer}/ontologies/{namespace}/{version}/staged/` |
+| **DynamoDB ontology version record** | **Future — requires ORION deployment** | Table `orion-ontology-versions`, `state=STAGED` |
+| **SNS steward notification** | **Future — requires ORION deployment** | Topic `orion-steward-notifications` |
+
+**Output artifacts (per workload, local)**:
+
+```
+workloads/{dataset_name}/config/
+├── ontology.ttl              OWL2, validated with rdflib
+├── mappings.ttl              R2RML, validated with rdflib
+└── ontology_manifest.json    state=STAGED_LOCAL, checksums, steward checklist
+```
+
+**Dependencies**: `rdflib >=7.0,<8` (in `pyproject.toml` base deps). No
+AWS SDK calls in this iteration — ADOP stages locally only.
+
+**Scope boundary**: ADOP does NOT run T-Box reasoning, author SHACL,
+validate SHACL, publish to a VKG, or write to Neptune/S3/DynamoDB/SNS.
+Those are Data Steward + ORION responsibilities at publish time.

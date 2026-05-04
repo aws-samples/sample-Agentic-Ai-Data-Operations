@@ -327,6 +327,26 @@ Read pattern?
 
 ---
 
+## Ontology Staging Routes (ORION handoff — Phase 7 Step 8.5)
+
+| Intent | Tool | Notes |
+|---|---|---|
+| Read `semantic.yaml` | Local filesystem (`shared/metadata/semantic_reader.py`) | Single source of truth for column roles, relationships, hierarchies, PII flags |
+| Fetch Gold-zone Glue schema | `mcp__glue-athena__get_table` | Fall back to `aws glue get-table` CLI if MCP is down — function accepts plain dict |
+| Induce OWL classes + R2RML mappings | `shared.semantic_layer.induce_and_stage(mode="local")` | Pure Python + rdflib; no AWS calls |
+| Validate Turtle syntax | rdflib (`shared/semantic_layer/turtle_validator.py`) | Auto-fix + retry up to 2× |
+| Write `ontology.ttl` + `mappings.ttl` + `ontology_manifest.json` | Local filesystem to `workloads/{name}/config/` | `state: "STAGED_LOCAL"` |
+| Publish triples to Neptune SPARQL | **Future — requires ORION deployment** | When ORION deploys, implement `mode="orion"` branch |
+| Upload TTL artifacts to S3 knowledge-layer bucket | **Future — requires ORION deployment** | ditto |
+| Write DynamoDB `orion-ontology-versions` record | **Future — requires ORION deployment** | ditto |
+| SNS steward notification | **Future — requires ORION deployment** | ditto |
+
+**Routing rule**: If the user says "generate ontology", "stage ontology
+for ORION", "emit OWL", or "onboard to semantic layer", route to the
+Ontology Staging Agent sub-agent (prompt: `prompts/data-onboarding-agent/ontology-staging-agent.md`).
+
+---
+
 ## Mandatory Rules (Enforced Always)
 
 1. **Never skip lineage** — `--enable-data-lineage: true` on every Glue ETL job, no exceptions

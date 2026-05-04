@@ -1,0 +1,246 @@
+@prefix rr:   <http://www.w3.org/ns/r2rml#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix ex:   <http://orion.aws/finance/ontology#> .
+@prefix :     <http://orion.aws/finance/ontology#> .
+
+
+<#PortfolioMapping> a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery """SELECT * FROM gold_financial_portfolios.portfolios""" ] ;
+    rr:subjectMap [
+        rr:template "http://orion.aws/finance/data/Portfolio/{portfolio_id}" ;
+        rr:class ex:Portfolio
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:avgPositionSize ;
+        rr:objectMap [ rr:column "avg_position_size" ; rr:datatype xsd:decimal ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:benchmark ;
+        rr:objectMap [ rr:column "benchmark" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:cashBalance ;
+        rr:objectMap [ rr:column "cash_balance" ; rr:datatype xsd:decimal ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:inceptionDate ;
+        rr:objectMap [ rr:column "inception_date" ; rr:datatype xsd:date ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:largestPositionPct ;
+        rr:objectMap [ rr:column "largest_position_pct" ; rr:datatype xsd:decimal ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:lastRebalanceDate ;
+        rr:objectMap [ rr:column "last_rebalance_date" ; rr:datatype xsd:date ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:managerName ;
+        rr:objectMap [ rr:column "manager_name" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:numPositions ;
+        rr:objectMap [ rr:column "num_positions" ; rr:datatype xsd:integer ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:hasPosition ;
+        rr:objectMap [
+            rr:parentTriplesMap <#PositionMapping> ;
+            rr:joinCondition [
+                rr:child "portfolio_id" ;
+                rr:parent "position_id"
+            ]
+        ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:portfolioId ;
+        rr:objectMap [ rr:column "portfolio_id" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:portfolioName ;
+        rr:objectMap [ rr:column "portfolio_name" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:rebalanceFrequency ;
+        rr:objectMap [ rr:column "rebalance_frequency" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:riskLevel ;
+        rr:objectMap [ rr:column "risk_level" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:status ;
+        rr:objectMap [ rr:column "status" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:strategy ;
+        rr:objectMap [ rr:column "strategy" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:totalValue ;
+        rr:objectMap [ rr:column "total_value" ; rr:datatype xsd:decimal ]
+    ] .
+
+<#PositionMapping> a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery """SELECT * FROM gold_financial_portfolios.positions""" ] ;
+    rr:subjectMap [
+        rr:template "http://orion.aws/finance/data/Position/{position_id}" ;
+        rr:class ex:Position
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:costBasis ;
+        rr:objectMap [ rr:column "cost_basis" ; rr:datatype xsd:decimal ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:currentPrice ;
+        rr:objectMap [ rr:column "current_price" ; rr:datatype xsd:decimal ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:entryDate ;
+        rr:objectMap [ rr:column "entry_date" ; rr:datatype xsd:date ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:holdingPeriodDays ;
+        rr:objectMap [ rr:column "holding_period_days" ; rr:datatype xsd:integer ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:lastUpdated ;
+        rr:objectMap [ rr:column "last_updated" ; rr:datatype xsd:dateTime ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:marketValue ;
+        rr:objectMap [ rr:column "market_value" ; rr:datatype xsd:decimal ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:hasPortfolio ;
+        rr:objectMap [
+            rr:parentTriplesMap <#PortfolioMapping> ;
+            rr:joinCondition [
+                rr:child "portfolio_id" ;
+                rr:parent "portfolio_id"
+            ]
+        ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:portfolioId ;
+        rr:objectMap [ rr:column "portfolio_id" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:positionId ;
+        rr:objectMap [ rr:column "position_id" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:positionStatus ;
+        rr:objectMap [ rr:column "position_status" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:purchasePrice ;
+        rr:objectMap [ rr:column "purchase_price" ; rr:datatype xsd:decimal ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:sector ;
+        rr:objectMap [ rr:column "sector" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:shares ;
+        rr:objectMap [ rr:column "shares" ; rr:datatype xsd:decimal ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:hasStock ;
+        rr:objectMap [
+            rr:parentTriplesMap <#StockMapping> ;
+            rr:joinCondition [
+                rr:child "ticker" ;
+                rr:parent "ticker"
+            ]
+        ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:ticker ;
+        rr:objectMap [ rr:column "ticker" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:unrealizedGainLoss ;
+        rr:objectMap [ rr:column "unrealized_gain_loss" ; rr:datatype xsd:decimal ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:unrealizedGainLossPct ;
+        rr:objectMap [ rr:column "unrealized_gain_loss_pct" ; rr:datatype xsd:decimal ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:weightPct ;
+        rr:objectMap [ rr:column "weight_pct" ; rr:datatype xsd:decimal ]
+    ] .
+
+<#StockMapping> a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery """SELECT * FROM gold_financial_portfolios.stocks""" ] ;
+    rr:subjectMap [
+        rr:template "http://orion.aws/finance/data/Stock/{ticker}" ;
+        rr:class ex:Stock
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:avgVolumeMillions ;
+        rr:objectMap [ rr:column "avg_volume_millions" ; rr:datatype xsd:decimal ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:beta ;
+        rr:objectMap [ rr:column "beta" ; rr:datatype xsd:decimal ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:companyName ;
+        rr:objectMap [ rr:column "company_name" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:currentPrice ;
+        rr:objectMap [ rr:column "current_price" ; rr:datatype xsd:decimal ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:dividendYield ;
+        rr:objectMap [ rr:column "dividend_yield" ; rr:datatype xsd:decimal ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:exchange ;
+        rr:objectMap [ rr:column "exchange" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:industry ;
+        rr:objectMap [ rr:column "industry" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:listingDate ;
+        rr:objectMap [ rr:column "listing_date" ; rr:datatype xsd:date ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:marketCapBillions ;
+        rr:objectMap [ rr:column "market_cap_billions" ; rr:datatype xsd:decimal ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:peRatio ;
+        rr:objectMap [ rr:column "pe_ratio" ; rr:datatype xsd:decimal ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:price52wHigh ;
+        rr:objectMap [ rr:column "price_52w_high" ; rr:datatype xsd:decimal ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:price52wLow ;
+        rr:objectMap [ rr:column "price_52w_low" ; rr:datatype xsd:decimal ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:sector ;
+        rr:objectMap [ rr:column "sector" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:hasPosition ;
+        rr:objectMap [
+            rr:parentTriplesMap <#PositionMapping> ;
+            rr:joinCondition [
+                rr:child "ticker" ;
+                rr:parent "position_id"
+            ]
+        ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:ticker ;
+        rr:objectMap [ rr:column "ticker" ; rr:datatype xsd:string ]
+    ] .

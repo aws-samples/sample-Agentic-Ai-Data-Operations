@@ -1,0 +1,511 @@
+@prefix ex: <http://orion.aws/finance/ontology#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+
+<http://orion.aws/finance/ontology/v1> a owl:Ontology ;
+    rdfs:label "finance ontology v1" ;
+    rdfs:comment "Induced from semantic.yaml + Glue table gold_financial_portfolios.fact_positions by ADOP." .
+
+
+ex:Date a owl:Class ;
+    rdfs:label "date" ;
+    rdfs:subClassOf ex:Month .
+
+
+ex:EquityClassification a owl:Class ;
+    rdfs:label "equity_classification" .
+
+
+ex:Industry a owl:Class ;
+    rdfs:label "industry" ;
+    rdfs:comment "Industry within sector (e.g., Software, Semiconductors)" ;
+    rdfs:subClassOf ex:Sector .
+
+
+ex:Manager a owl:Class ;
+    rdfs:label "manager" ;
+    rdfs:comment "Portfolio manager responsible for strategy" ;
+    rdfs:subClassOf ex:PortfolioManagement .
+
+
+ex:Month a owl:Class ;
+    rdfs:label "month" ;
+    rdfs:subClassOf ex:Quarter .
+
+
+ex:Portfolio a owl:Class ;
+    rdfs:label "portfolios" ;
+    ex:grain "One row per portfolio" ;
+    ex:tableType "dimension" ;
+    rdfs:comment "Individual portfolio identifier",
+        "Investment portfolios managed by the firm - dimension table for portfolio master data" ;
+    rdfs:subClassOf ex:RiskLevel .
+
+
+ex:PortfolioManagement a owl:Class ;
+    rdfs:label "portfolio_management" .
+
+
+ex:Position a owl:Class ;
+    rdfs:label "positions" ;
+    ex:grain "One row per portfolio-ticker combination (current position snapshot)" ;
+    ex:tableType "fact" ;
+    rdfs:comment "Current stock holdings across all portfolios - fact table for portfolio positions" .
+
+
+ex:Quarter a owl:Class ;
+    rdfs:label "quarter" ;
+    rdfs:subClassOf ex:Year .
+
+
+ex:RiskLevel a owl:Class ;
+    rdfs:label "risk_level" ;
+    rdfs:comment "Risk classification (Conservative to Aggressive)" ;
+    rdfs:subClassOf ex:Strategy .
+
+
+ex:Sector a owl:Class ;
+    rdfs:label "sector" ;
+    rdfs:comment "Broad business sector (e.g., Technology, Healthcare)" ;
+    rdfs:subClassOf ex:EquityClassification .
+
+
+ex:Stock a owl:Class ;
+    rdfs:label "stocks" ;
+    ex:grain "One row per unique stock ticker symbol" ;
+    ex:tableType "dimension" ;
+    rdfs:comment "Reference data for publicly traded stocks - dimension table for equity master data" .
+
+
+ex:Strategy a owl:Class ;
+    rdfs:label "strategy" ;
+    rdfs:comment "Investment strategy (Growth, Value, etc.)" ;
+    rdfs:subClassOf ex:Manager .
+
+
+ex:Temporal a owl:Class ;
+    rdfs:label "temporal" .
+
+
+ex:Ticker a owl:Class ;
+    rdfs:label "ticker" ;
+    rdfs:comment "Individual stock ticker symbol" ;
+    rdfs:subClassOf ex:Industry .
+
+
+ex:Year a owl:Class ;
+    rdfs:label "year" ;
+    rdfs:subClassOf ex:Temporal .
+
+
+ex:avgPositionSize a owl:DatatypeProperty ;
+    rdfs:label "avg_position_size" ;
+    ex:defaultAggregation "avg" ;
+    ex:role "measure" ;
+    ex:unit "USD" ;
+    rdfs:comment "Average position size in USD" ;
+    rdfs:domain ex:Portfolio ;
+    rdfs:range xsd:decimal .
+
+
+ex:avgVolumeMillions a owl:DatatypeProperty ;
+    rdfs:label "avg_volume_millions" ;
+    ex:defaultAggregation "avg" ;
+    ex:role "measure" ;
+    ex:unit "millions of shares" ;
+    rdfs:comment "Average daily trading volume in millions of shares" ;
+    rdfs:domain ex:Stock ;
+    rdfs:range xsd:decimal .
+
+
+ex:benchmark a owl:DatatypeProperty ;
+    rdfs:label "benchmark" ;
+    ex:role "dimension" ;
+    rdfs:comment "Benchmark index for performance comparison" ;
+    rdfs:domain ex:Portfolio ;
+    rdfs:range xsd:string .
+
+
+ex:beta a owl:DatatypeProperty ;
+    rdfs:label "beta" ;
+    ex:defaultAggregation "avg" ;
+    ex:role "measure" ;
+    rdfs:comment "Stock volatility relative to market (beta coefficient)" ;
+    rdfs:domain ex:Stock ;
+    rdfs:range xsd:decimal .
+
+
+ex:cashBalance a owl:DatatypeProperty ;
+    rdfs:label "cash_balance" ;
+    ex:defaultAggregation "sum" ;
+    ex:role "measure" ;
+    ex:unit "USD" ;
+    rdfs:comment "Uninvested cash balance in USD" ;
+    rdfs:domain ex:Portfolio ;
+    rdfs:range xsd:decimal .
+
+
+ex:companyName a owl:DatatypeProperty ;
+    rdfs:label "company_name" ;
+    ex:dataSensitivity "LOW" ;
+    ex:piiClassification "NAME" ;
+    ex:role "dimension" ;
+    rdfs:comment "Legal company name" ;
+    rdfs:domain ex:Stock ;
+    rdfs:range xsd:string .
+
+
+ex:costBasis a owl:DatatypeProperty ;
+    rdfs:label "cost_basis" ;
+    ex:defaultAggregation "sum" ;
+    ex:role "measure" ;
+    ex:unit "USD" ;
+    rdfs:comment "Total cost basis in USD (shares × purchase_price)" ;
+    rdfs:domain ex:Position ;
+    rdfs:range xsd:decimal .
+
+
+ex:currentPrice a owl:DatatypeProperty ;
+    rdfs:label "current_price" ;
+    ex:defaultAggregation "avg" ;
+    ex:role "measure" ;
+    ex:unit "USD" ;
+    rdfs:comment "Current market price per share in USD",
+        "Current trading price in USD per share" ;
+    rdfs:domain ex:Position,
+        ex:Stock ;
+    rdfs:range xsd:decimal .
+
+
+ex:dividendYield a owl:DatatypeProperty ;
+    rdfs:label "dividend_yield" ;
+    ex:defaultAggregation "avg" ;
+    ex:role "measure" ;
+    ex:unit "percentage" ;
+    rdfs:comment "Annual dividend yield as percentage" ;
+    rdfs:domain ex:Stock ;
+    rdfs:range xsd:decimal .
+
+
+ex:entryDate a owl:DatatypeProperty ;
+    rdfs:label "entry_date" ;
+    ex:role "temporal" ;
+    rdfs:comment "Date when position was first opened" ;
+    rdfs:domain ex:Position ;
+    rdfs:range xsd:date .
+
+
+ex:exchange a owl:DatatypeProperty ;
+    rdfs:label "exchange" ;
+    ex:role "dimension" ;
+    rdfs:comment "Stock exchange where traded (NASDAQ or NYSE)" ;
+    rdfs:domain ex:Stock ;
+    rdfs:range xsd:string .
+
+
+ex:hasPortfolio a owl:FunctionalProperty,
+        owl:ObjectProperty ;
+    rdfs:label "hasPortfolio" ;
+    ex:joinColumn "portfolio_id" ;
+    rdfs:comment "Each position belongs to one portfolio" ;
+    rdfs:domain ex:Position ;
+    rdfs:range ex:Portfolio .
+
+
+ex:hasPosition a owl:ObjectProperty ;
+    rdfs:label "hasPosition" ;
+    ex:joinColumn "portfolio_id",
+        "ticker" ;
+    rdfs:comment "Each portfolio contains multiple stock positions",
+        "Each stock can appear in multiple portfolio positions" ;
+    rdfs:domain ex:Portfolio,
+        ex:Stock ;
+    rdfs:range ex:Position .
+
+
+ex:hasStock a owl:FunctionalProperty,
+        owl:ObjectProperty ;
+    rdfs:label "hasStock" ;
+    ex:joinColumn "ticker" ;
+    rdfs:comment "Each position references one stock" ;
+    rdfs:domain ex:Position ;
+    rdfs:range ex:Stock .
+
+
+ex:holdingPeriodDays a owl:DatatypeProperty ;
+    rdfs:label "holding_period_days" ;
+    ex:defaultAggregation "avg" ;
+    ex:role "measure" ;
+    rdfs:comment "Number of days position has been held" ;
+    rdfs:domain ex:Position ;
+    rdfs:range xsd:integer .
+
+
+ex:inceptionDate a owl:DatatypeProperty ;
+    rdfs:label "inception_date" ;
+    ex:role "temporal" ;
+    rdfs:comment "Date when portfolio was created" ;
+    rdfs:domain ex:Portfolio ;
+    rdfs:range xsd:date .
+
+
+ex:industry a owl:DatatypeProperty ;
+    rdfs:label "industry" ;
+    ex:role "dimension" ;
+    rdfs:comment "Industry classification within sector" ;
+    rdfs:domain ex:Stock ;
+    rdfs:range xsd:string .
+
+
+ex:largestPositionPct a owl:DatatypeProperty ;
+    rdfs:label "largest_position_pct" ;
+    ex:defaultAggregation "max" ;
+    ex:role "measure" ;
+    ex:unit "percentage" ;
+    rdfs:comment "Percentage of portfolio in largest single position" ;
+    rdfs:domain ex:Portfolio ;
+    rdfs:range xsd:decimal .
+
+
+ex:lastRebalanceDate a owl:DatatypeProperty ;
+    rdfs:label "last_rebalance_date" ;
+    ex:role "temporal" ;
+    rdfs:comment "Date of most recent rebalancing" ;
+    rdfs:domain ex:Portfolio ;
+    rdfs:range xsd:date .
+
+
+ex:lastUpdated a owl:DatatypeProperty ;
+    rdfs:label "last_updated" ;
+    ex:role "temporal" ;
+    rdfs:comment "Timestamp of last price/value update" ;
+    rdfs:domain ex:Position ;
+    rdfs:range xsd:dateTime .
+
+
+ex:listingDate a owl:DatatypeProperty ;
+    rdfs:label "listing_date" ;
+    ex:role "temporal" ;
+    rdfs:comment "Date when stock was first listed on exchange" ;
+    rdfs:domain ex:Stock ;
+    rdfs:range xsd:date .
+
+
+ex:managerName a owl:DatatypeProperty ;
+    rdfs:label "manager_name" ;
+    ex:dataSensitivity "MEDIUM" ;
+    ex:piiClassification "NAME" ;
+    ex:role "dimension" ;
+    rdfs:comment "Portfolio manager name" ;
+    rdfs:domain ex:Portfolio ;
+    rdfs:range xsd:string .
+
+
+ex:marketCapBillions a owl:DatatypeProperty ;
+    rdfs:label "market_cap_billions" ;
+    ex:defaultAggregation "sum" ;
+    ex:role "measure" ;
+    ex:unit "USD billions" ;
+    rdfs:comment "Market capitalization in billions of USD" ;
+    rdfs:domain ex:Stock ;
+    rdfs:range xsd:decimal .
+
+
+ex:marketValue a owl:DatatypeProperty ;
+    rdfs:label "market_value" ;
+    ex:defaultAggregation "sum" ;
+    ex:role "measure" ;
+    ex:unit "USD" ;
+    rdfs:comment "Current market value in USD (shares × current_price)" ;
+    rdfs:domain ex:Position ;
+    rdfs:range xsd:decimal .
+
+
+ex:numPositions a owl:DatatypeProperty ;
+    rdfs:label "num_positions" ;
+    ex:defaultAggregation "sum" ;
+    ex:role "measure" ;
+    rdfs:comment "Number of stock positions held" ;
+    rdfs:domain ex:Portfolio ;
+    rdfs:range xsd:integer .
+
+
+ex:peRatio a owl:DatatypeProperty ;
+    rdfs:label "pe_ratio" ;
+    ex:defaultAggregation "avg" ;
+    ex:role "measure" ;
+    rdfs:comment "Price-to-earnings ratio" ;
+    rdfs:domain ex:Stock ;
+    rdfs:range xsd:decimal .
+
+
+ex:portfolioId a owl:DatatypeProperty ;
+    rdfs:label "portfolio_id" ;
+    ex:isPrimaryKey true ;
+    ex:role "identifier" ;
+    rdfs:comment "Foreign key to portfolios table",
+        "Unique portfolio identifier (e.g., PORT001)" ;
+    rdfs:domain ex:Portfolio,
+        ex:Position ;
+    rdfs:range xsd:string .
+
+
+ex:portfolioName a owl:DatatypeProperty ;
+    rdfs:label "portfolio_name" ;
+    ex:dataSensitivity "LOW" ;
+    ex:piiClassification "NAME" ;
+    ex:role "dimension" ;
+    rdfs:comment "Portfolio display name" ;
+    rdfs:domain ex:Portfolio ;
+    rdfs:range xsd:string .
+
+
+ex:positionId a owl:DatatypeProperty ;
+    rdfs:label "position_id" ;
+    ex:isPrimaryKey true ;
+    ex:role "identifier" ;
+    rdfs:comment "Unique position identifier" ;
+    rdfs:domain ex:Position ;
+    rdfs:range xsd:string .
+
+
+ex:positionStatus a owl:DatatypeProperty ;
+    rdfs:label "position_status" ;
+    ex:role "dimension" ;
+    rdfs:comment "Position status (Open, Closed, Partial)" ;
+    rdfs:domain ex:Position ;
+    rdfs:range xsd:string .
+
+
+ex:price52wHigh a owl:DatatypeProperty ;
+    rdfs:label "price_52w_high" ;
+    ex:defaultAggregation "max" ;
+    ex:role "measure" ;
+    ex:unit "USD" ;
+    rdfs:comment "52-week high price" ;
+    rdfs:domain ex:Stock ;
+    rdfs:range xsd:decimal .
+
+
+ex:price52wLow a owl:DatatypeProperty ;
+    rdfs:label "price_52w_low" ;
+    ex:defaultAggregation "min" ;
+    ex:role "measure" ;
+    ex:unit "USD" ;
+    rdfs:comment "52-week low price" ;
+    rdfs:domain ex:Stock ;
+    rdfs:range xsd:decimal .
+
+
+ex:purchasePrice a owl:DatatypeProperty ;
+    rdfs:label "purchase_price" ;
+    ex:defaultAggregation "avg" ;
+    ex:role "measure" ;
+    ex:unit "USD" ;
+    rdfs:comment "Average purchase price per share in USD" ;
+    rdfs:domain ex:Position ;
+    rdfs:range xsd:decimal .
+
+
+ex:rebalanceFrequency a owl:DatatypeProperty ;
+    rdfs:label "rebalance_frequency" ;
+    ex:role "dimension" ;
+    rdfs:comment "How often portfolio is rebalanced" ;
+    rdfs:domain ex:Portfolio ;
+    rdfs:range xsd:string .
+
+
+ex:riskLevel a owl:DatatypeProperty ;
+    rdfs:label "risk_level" ;
+    ex:role "dimension" ;
+    rdfs:comment "Portfolio risk classification" ;
+    rdfs:domain ex:Portfolio ;
+    rdfs:range xsd:string .
+
+
+ex:sector a owl:DatatypeProperty ;
+    rdfs:label "sector" ;
+    ex:role "dimension" ;
+    rdfs:comment "Business sector classification (e.g., Technology, Healthcare)",
+        "Stock sector (denormalized from stocks table)" ;
+    rdfs:domain ex:Position,
+        ex:Stock ;
+    rdfs:range xsd:string .
+
+
+ex:shares a owl:DatatypeProperty ;
+    rdfs:label "shares" ;
+    ex:defaultAggregation "sum" ;
+    ex:role "measure" ;
+    rdfs:comment "Number of shares held" ;
+    rdfs:domain ex:Position ;
+    rdfs:range xsd:decimal .
+
+
+ex:status a owl:DatatypeProperty ;
+    rdfs:label "status" ;
+    ex:role "dimension" ;
+    rdfs:comment "Portfolio status (Active, Closed, Suspended)" ;
+    rdfs:domain ex:Portfolio ;
+    rdfs:range xsd:string .
+
+
+ex:strategy a owl:DatatypeProperty ;
+    rdfs:label "strategy" ;
+    ex:role "dimension" ;
+    rdfs:comment "Investment strategy type" ;
+    rdfs:domain ex:Portfolio ;
+    rdfs:range xsd:string .
+
+
+ex:ticker a owl:DatatypeProperty ;
+    rdfs:label "ticker" ;
+    ex:isPrimaryKey true ;
+    ex:role "identifier" ;
+    rdfs:comment "Foreign key to stocks table",
+        "Stock ticker symbol (e.g., AAPL, MSFT)" ;
+    rdfs:domain ex:Position,
+        ex:Stock ;
+    rdfs:range xsd:string .
+
+
+ex:totalValue a owl:DatatypeProperty ;
+    rdfs:label "total_value" ;
+    ex:defaultAggregation "sum" ;
+    ex:role "measure" ;
+    ex:unit "USD" ;
+    rdfs:comment "Total portfolio market value in USD" ;
+    rdfs:domain ex:Portfolio ;
+    rdfs:range xsd:decimal .
+
+
+ex:unrealizedGainLoss a owl:DatatypeProperty ;
+    rdfs:label "unrealized_gain_loss" ;
+    ex:defaultAggregation "sum" ;
+    ex:role "measure" ;
+    ex:unit "USD" ;
+    rdfs:comment "Unrealized gain or loss in USD (market_value - cost_basis)" ;
+    rdfs:domain ex:Position ;
+    rdfs:range xsd:decimal .
+
+
+ex:unrealizedGainLossPct a owl:DatatypeProperty ;
+    rdfs:label "unrealized_gain_loss_pct" ;
+    ex:defaultAggregation "weighted_avg" ;
+    ex:role "measure" ;
+    ex:unit "percentage" ;
+    rdfs:comment "Unrealized gain or loss as percentage" ;
+    rdfs:domain ex:Position ;
+    rdfs:range xsd:decimal .
+
+
+ex:weightPct a owl:DatatypeProperty ;
+    rdfs:label "weight_pct" ;
+    ex:defaultAggregation "sum" ;
+    ex:role "measure" ;
+    ex:unit "percentage" ;
+    rdfs:comment "Position weight as percentage of portfolio total" ;
+    rdfs:domain ex:Position ;
+    rdfs:range xsd:decimal .
