@@ -113,7 +113,7 @@ flowchart TD
 
     DEPLOY([Deploy Pipeline])
 
-    ONTOLOGY_STAGING["Ontology Staging Agent (sub-agent)<br/>Emits OWL + R2RML for ORION (local)"]
+    ONTOLOGY_STAGING["Ontology Staging Agent (sub-agent)<br/>Emits OWL + R2RML for AWS Semantic Layer (local)"]
     QUALITY_AGENT_ADHOC["Quality Agent (sub-agent)<br/>Ad-hoc quality checks"]
 
     style ROUTER_BLOCK fill:#f0f4ff,stroke:#4a6fa5
@@ -267,7 +267,7 @@ flowchart LR
         GOLD[(Aggregated Data<br/>Parquet, optimized<br/>pre-calculated metrics)]
     end
 
-    GOLD -->|Glue schema<br/>+ semantic.yaml| STAGING[Ontology Staging Agent<br/>emits ontology.ttl + mappings.ttl<br/>for ORION handoff]
+    GOLD -->|Glue schema<br/>+ semantic.yaml| STAGING[Ontology Staging Agent<br/>emits ontology.ttl + mappings.ttl<br/>for AWS Semantic Layer handoff]
 
     BRONZE -->|Lineage| CATALOG[(Glue Data Catalog<br/>+ Lakehouse)]
     SILVER -->|Lineage| CATALOG

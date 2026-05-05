@@ -1,9 +1,9 @@
-# shared/semantic_layer — ADOP → ORION Ontology Staging
+# shared/semantic_layer — ADOP → AWS Semantic Layer Ontology Staging
 
 This package is ADOP's **only** semantic-layer code path. It generates an
 OWL2 ontology + R2RML mappings from each workload's `semantic.yaml` +
 Glue Gold-zone table schema, validates Turtle syntax, and emits three
-artifacts to `workloads/{name}/config/` for handoff to ORION.
+artifacts to `workloads/{name}/config/` for handoff to the AWS Semantic Layer (upcoming).
 
 ## Scope boundary
 
@@ -21,7 +21,7 @@ artifacts to `workloads/{name}/config/` for handoff to ORION.
 - Validate Turtle with `rdflib` + apply bounded auto-fixes (max 2 retries).
 - Write `ontology_manifest.json` with SHA-256 checksums + steward checklist.
 
-### ADOP does NOT (future / Data Steward / ORION)
+### ADOP does NOT (future / Data Steward / AWS Semantic Layer)
 
 - Run T-Box reasoning (HermiT / ELK).
 - Author SHACL constraints.
@@ -29,7 +29,7 @@ artifacts to `workloads/{name}/config/` for handoff to ORION.
 - Publish to a VKG (Ontop).
 - Write to Neptune, S3, DynamoDB, or SNS.
 
-Those are the Data Steward's responsibilities inside ORION, once ORION
+Those are the Data Steward's responsibilities inside the AWS Semantic Layer platform, once AWS Semantic Layer
 is deployed in AWS.
 
 ## Public API
@@ -44,7 +44,7 @@ result = induce_and_stage(
     namespace="finance",
     glue_schema=glue_schema_dict,   # optional; from glue-athena MCP get_table
     version="v1",                   # optional
-    mode="local",                   # default; mode="orion" raises NotImplementedError
+    mode="local",                   # default; mode="aws_semantic_layer" raises NotImplementedError
 )
 
 # result.ontology_ttl_path, result.mappings_ttl_path, result.manifest_path
@@ -66,7 +66,7 @@ Running `induce_and_stage` twice on the same `semantic.yaml` + same
 Turtle body is re-sorted before serialization. The SHA-256 checksums in
 the manifest will be stable across reruns.
 
-This matters when ORION ships: the already-committed local TTL files
+This matters when the AWS Semantic Layer platform ships: the already-committed local TTL files
 are the canonical source for publish. No regeneration needed — the
 future `ontology-publish-agent` just reads them and pushes to AWS.
 
@@ -80,22 +80,22 @@ Three artifacts land in `workloads/{dataset_name}/config/`:
 | `mappings.ttl` | R2RML `TriplesMap` per entity: `rr:logicalTable` (Athena SQL), `rr:subjectMap` (URI template on PK), `rr:predicateObjectMap` for each column + FK joins. |
 | `ontology_manifest.json` | `state`, `namespace`, `version`, `created_at`, SHA-256 checksums of inputs/outputs, counts, steward review checklist, warnings. `state="STAGED_LOCAL"` in this iteration. |
 
-## When ORION deploys
+## When the AWS Semantic Layer platform deploys
 
-The `mode="orion"` branch currently raises `NotImplementedError`. When
-ORION is deployed, a follow-up will:
+The `mode="aws_semantic_layer"` branch currently raises `NotImplementedError`. When
+The AWS Semantic Layer is deployed, a follow-up will:
 
-1. Implement `stage_ontology(mode="orion", orion_config=...)` to:
+1. Implement `stage_ontology(mode="aws_semantic_layer", aws_semantic_layer_config=...)` to:
    - Write triples to Neptune draft named graph via SPARQL `INSERT DATA`.
    - Upload TTL + manifest to `s3://{knowledge-layer-bucket}/ontologies/{namespace}/{version}/staged/`.
-   - Write DynamoDB record to `orion-ontology-versions` with `state=STAGED`.
+   - Write DynamoDB record to `aws-semantic-layer-ontology-versions` with `state=STAGED`.
    - Publish SNS notification to the steward topic.
 2. Add a new prompt `prompts/data-onboarding-agent/ontology-publish-agent.md`
    that reads the already-committed local TTL files and pushes them to
    AWS. No regeneration — deterministic inducer means identical inputs
    give identical outputs.
 
-Because the local files are canonical, switching to ORION is strictly
+Because the local files are canonical, switching to The AWS Semantic Layer is strictly
 additive: nothing about today's local output changes.
 
 ## Dependencies

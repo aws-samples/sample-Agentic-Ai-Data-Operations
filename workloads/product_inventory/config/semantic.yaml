@@ -1,5 +1,5 @@
 # semantic.yaml — Semantic layer configuration for Product Inventory
-# Loaded into SageMaker Catalog + ORION seed store at deploy time
+# Loaded into SageMaker Catalog + AWS Semantic Layer seed store at deploy time
 # Created: 2026-03-16
 
 dataset:
@@ -210,7 +210,7 @@ gold_schema:
       grain: [category]
       measures: [product_count, total_inventory_value, avg_margin_pct, total_quantity_on_hand]
 
-# Default filters for ORION consumer
+# Default filters for AWS Semantic Layer consumer
 default_filters:
   active_inventory: "status IN ('active', 'out_of_stock')"
   exclude_discontinued: "status != 'discontinued'"
@@ -240,7 +240,7 @@ time_intelligence:
   timezone: "UTC"
   data_freshness: "Daily snapshots at 00:00 UTC"
 
-# Seed questions for ORION seed store
+# Seed questions for AWS Semantic Layer seed store
 seed_questions:
   - question: "What is the total inventory value by category?"
     sql: >

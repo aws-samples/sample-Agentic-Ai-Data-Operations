@@ -7,7 +7,7 @@ Agent. Your job is to induce an OWL2 ontology + R2RML mappings from the
 workload's `semantic.yaml` and Glue Gold-zone table schema, validate the
 generated Turtle syntax, and stage the three artifacts
 (`ontology.ttl`, `mappings.ttl`, `ontology_manifest.json`) locally for
-handoff to **ORION** (external semantic layer platform, in development).
+handoff to **AWS Semantic Layer** (upcoming AWS Semantic Layer platform, in development).
 
 ---
 
@@ -25,11 +25,11 @@ handoff to **ORION** (external semantic layer platform, in development).
 
 ### You DO NOT
 
-- ❌ Run T-Box reasoning (HermiT / ELK) — ORION at publish time.
-- ❌ Author SHACL constraints — Data Steward in ORION.
-- ❌ Run SHACL validation — ORION at publish time.
-- ❌ Publish to a VKG — Data Steward approves in ORION.
-- ❌ Write to Neptune, S3, DynamoDB, or SNS — future (when ORION deploys).
+- ❌ Run T-Box reasoning (HermiT / ELK) — AWS Semantic Layer at publish time.
+- ❌ Author SHACL constraints — Data Steward in the AWS Semantic Layer.
+- ❌ Run SHACL validation — AWS Semantic Layer at publish time.
+- ❌ Publish to a VKG — Data Steward approves in the AWS Semantic Layer.
+- ❌ Write to Neptune, S3, DynamoDB, or SNS — future (when the AWS Semantic Layer platform deploys).
 - ❌ Modify semantic.yaml, the Glue catalog, or any data — your output is
   file-emission only.
 
@@ -90,7 +90,7 @@ result = induce_and_stage(
     namespace=namespace,
     version=version,
     glue_schema=glue_schema,   # from Step 1
-    mode="local",              # DO NOT pass "orion" — raises NotImplementedError today
+    mode="local",              # DO NOT pass "aws_semantic_layer" — raises NotImplementedError today
 )
 ```
 
@@ -130,7 +130,7 @@ Artifacts written to:
 Auto-fixes applied: {fixes_applied or "none"}
 Warnings:           {warnings or "none"}
 
-Next: Data Steward picks up these files in ORION (when deployed) to
+Next: Data Steward picks up these files in AWS Semantic Layer (when deployed) to
 author SHACL, run T-Box reasoning, and publish to the VKG.
 ```
 
@@ -157,7 +157,7 @@ Return the standard `AgentOutput` from
 | `semantic.yaml` missing | STOP. Emit blocking issue: "Metadata Agent must run first." |
 | Glue `get_table` fails | STOP. Emit blocking issue with the MCP error message. Do NOT fall back to semantic.yaml-only — R2RML needs the real schema. |
 | Turtle validation fails after auto-fix | STOP. Emit blocking issue with the last parse error + list of fixes tried. Surface `ontology.ttl` / `mappings.ttl` paths so the human can inspect. |
-| `mode="orion"` requested | STOP. That branch raises `NotImplementedError`. Use `mode="local"` (default). |
+| `mode="aws_semantic_layer"` requested | STOP. That branch raises `NotImplementedError`. Use `mode="local"` (default). |
 
 ---
 
@@ -169,7 +169,7 @@ Return the standard `AgentOutput` from
   guarantee this. If you observe divergence, file a bug — do not "fix"
   by changing output.
 - **Local-only**: Do NOT attempt any AWS writes in this iteration. No
-  S3, no Neptune, no DynamoDB, no SNS. Those come with ORION.
+  S3, no Neptune, no DynamoDB, no SNS. Those come with AWS Semantic Layer.
 - **Read-only on semantic.yaml + Glue**: You never edit these; you
   consume them.
 - **No fallback**: Do not guess missing Glue types, do not invent entity
@@ -185,5 +185,5 @@ All paths relative to `workloads/{dataset_name}/`:
 | Path | Contents |
 |---|---|
 | `config/ontology.ttl` | OWL2 classes, datatype/object properties, subclass hierarchy, PII annotations. |
-| `config/mappings.ttl` | One R2RML TriplesMap per entity, logical table = Athena SQL over Glue Gold table, subject URI = `http://orion.aws/{namespace}/data/{ClassName}/{pk}`, FK columns emit `rr:parentTriplesMap`. |
+| `config/mappings.ttl` | One R2RML TriplesMap per entity, logical table = Athena SQL over Glue Gold table, subject URI = `http://semantic.aws/{namespace}/data/{ClassName}/{pk}`, FK columns emit `rr:parentTriplesMap`. |
 | `config/ontology_manifest.json` | `state: "STAGED_LOCAL"`, version, timestamps, SHA-256 checksums of inputs + outputs, counts, steward review checklist, warnings. |

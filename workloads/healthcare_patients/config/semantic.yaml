@@ -1,5 +1,5 @@
 # Healthcare Patients Semantic Layer Configuration
-# For AI ORION consumer - Business Context and Query Patterns
+# For AI AWS Semantic Layer consumer - Business Context and Query Patterns
 
 dataset_name: healthcare_patients
 version: "1.0.0"

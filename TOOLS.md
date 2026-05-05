@@ -67,7 +67,7 @@
 | Monitoring | Amazon CloudWatch | Airflow UI metrics | `cloudwatch` |
 | Alerting | Amazon SNS → Slack/Email | Airflow on_failure_callback | `sns-sqs` |
 | OWL + R2RML generation (ontology staging) | rdflib (local Python) | — | None (local) |
-| Ontology publish (RDF/SPARQL, VKG) | **ORION** (external, not yet deployed) | — | **Future** — requires ORION deployment |
+| Ontology publish (RDF/SPARQL, VKG) | **AWS Semantic Layer** (external, not yet deployed) | — | **Future** — requires AWS Semantic Layer deployment |
 | Serverless compute | AWS Lambda | — | `lambda` |
 | Query engine (Gold) | Amazon Athena | Redshift Spectrum | `aws-dataprocessing` or `redshift` |
 
@@ -610,10 +610,10 @@ Is the source in S3?
 
 ---
 
-## Ontology Staging (ORION Handoff — Phase 7 Step 8.5)
+## Ontology Staging (AWS Semantic Layer Handoff — Phase 7 Step 8.5)
 
 > ADOP's semantic-layer responsibility ends at local emission of OWL +
-> R2RML. The items below marked **Future** activate when ORION (external
+> R2RML. The items below marked **Future** activate when the AWS Semantic Layer platform (external
 > semantic layer platform) is deployed.
 
 | Operation | Tool | Notes |
@@ -623,10 +623,10 @@ Is the source in S3?
 | Turtle validation + auto-fix | `shared.semantic_layer.turtle_validator.validate_and_fix` (rdflib parse) | Max 2 retries. STOP on persistent failure. |
 | Single entry point (all of the above) | `shared.semantic_layer.induce_and_stage(mode="local", ...)` | Called by the Ontology Staging sub-agent |
 | Fetch Gold-zone Glue schema | `mcp__glue-athena__get_table` | Feeds `glue_schema` arg into the inducer |
-| **Publish OWL to Neptune SPARQL** | **Future — requires ORION deployment** | SPARQL `INSERT DATA` into `neptune://orion/{namespace}/{version}/draft` |
-| **Upload TTL to S3 knowledge-layer bucket** | **Future — requires ORION deployment** | `s3://{knowledge-layer}/ontologies/{namespace}/{version}/staged/` |
-| **DynamoDB ontology version record** | **Future — requires ORION deployment** | Table `orion-ontology-versions`, `state=STAGED` |
-| **SNS steward notification** | **Future — requires ORION deployment** | Topic `orion-steward-notifications` |
+| **Publish OWL to Neptune SPARQL** | **Future — requires AWS Semantic Layer deployment** | SPARQL `INSERT DATA` into `neptune://aws-semantic-layer/{namespace}/{version}/draft` |
+| **Upload TTL to S3 knowledge-layer bucket** | **Future — requires AWS Semantic Layer deployment** | `s3://{knowledge-layer}/ontologies/{namespace}/{version}/staged/` |
+| **DynamoDB ontology version record** | **Future — requires AWS Semantic Layer deployment** | Table `aws-semantic-layer-ontology-versions`, `state=STAGED` |
+| **SNS steward notification** | **Future — requires AWS Semantic Layer deployment** | Topic `aws-semantic-layer-steward-notifications` |
 
 **Output artifacts (per workload, local)**:
 
@@ -642,4 +642,4 @@ AWS SDK calls in this iteration — ADOP stages locally only.
 
 **Scope boundary**: ADOP does NOT run T-Box reasoning, author SHACL,
 validate SHACL, publish to a VKG, or write to Neptune/S3/DynamoDB/SNS.
-Those are Data Steward + ORION responsibilities at publish time.
+Those are Data Steward + AWS Semantic Layer responsibilities at publish time.

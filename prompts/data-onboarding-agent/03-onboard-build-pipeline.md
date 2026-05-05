@@ -91,7 +91,7 @@ Schema:
 - [col1]: [type], [description], [role: measure/dimension/identifier/temporal]
 - [col2]: ...
 
-Semantic Layer (for ORION handoff via Phase 7 Step 8.5):
+Semantic Layer (for AWS Semantic Layer handoff via Phase 7 Step 8.5):
 
 **REQUIRED (minimum for AI to answer questions):**
 
@@ -537,7 +537,7 @@ Present results to human. Do NOT proceed if any REQUIRED server fails.
    - Repeat for `Data_Sensitivity` and `PII_Type` tags with matching values
    - Verify: `SELECT * FROM {gold_table} LIMIT 5` in Athena — should return columns
 
-8.5. **Stage OWL + R2RML ontology for ORION handoff** (OPTIONAL — skip if
+8.5. **Stage OWL + R2RML ontology for AWS Semantic Layer handoff** (OPTIONAL — skip if
      `workloads/{WORKLOAD}/config/semantic.yaml` is missing OR the user
      opted out of ontology staging during Phase 1 discovery):
 
@@ -545,7 +545,7 @@ Present results to human. Do NOT proceed if any REQUIRED server fails.
    - `dataset_name`: `{WORKLOAD}`
    - `glue_database`: `{DATABASE_NAME}` (the Gold-zone database)
    - `glue_table`: primary Gold-zone fact/dimension table
-   - `namespace`: short ORION namespace (default: derived from `{WORKLOAD}`,
+   - `namespace`: short ontology namespace (default: derived from `{WORKLOAD}`,
      e.g., `financial_portfolios` → `finance`)
    - `version`: `v1` (increment on regeneration)
 
@@ -565,15 +565,15 @@ Present results to human. Do NOT proceed if any REQUIRED server fails.
    before proceeding to Step 9. If it fails, block deployment and surface
    the failure.
 
-   **What this step does NOT do** (these are ORION / Data Steward jobs
-   for when ORION deploys in AWS):
+   **What this step does NOT do** (these are AWS Semantic Layer / Data Steward jobs
+   for when the AWS Semantic Layer platform deploys in AWS):
    - No Neptune SPARQL writes.
    - No S3 upload to a knowledge-layer bucket.
    - No DynamoDB version record.
    - No SNS steward notification.
    - No T-Box reasoning, no SHACL authoring, no VKG publish.
 
-   When ORION deploys, a follow-up `ontology-publish-agent` will read
+   When the AWS Semantic Layer platform deploys, a follow-up `ontology-publish-agent` will read
    these committed local TTL files and push them to AWS. No regeneration
    is needed — the inducer is deterministic.
 

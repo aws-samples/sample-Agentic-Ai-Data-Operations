@@ -19,10 +19,10 @@ from typing import Any, Dict, List, Optional
 DEFAULT_STEWARD_CHECKLIST: List[str] = [
     "Verify OWL class names match business terminology.",
     "Review auto-induced properties (ex:autoInduced=true) for correctness.",
-    "Author SHACL constraints for business rules (in ORION).",
+    "Author SHACL constraints for business rules (in AWS Semantic Layer).",
     "Check PII-flagged properties have correct classification + sensitivity.",
     "Validate R2RML mappings point to the correct Gold-zone tables.",
-    "Run T-Box reasoning and SHACL validation in ORION before publish.",
+    "Run T-Box reasoning and SHACL validation in the AWS Semantic Layer before publish.",
 ]
 
 
@@ -30,7 +30,7 @@ DEFAULT_STEWARD_CHECKLIST: List[str] = [
 class OntologyManifest:
     namespace: str
     version: str
-    state: str  # "STAGED_LOCAL" today; "STAGED_ORION" when ORION is wired.
+    state: str  # "STAGED_LOCAL" today; "STAGED_REMOTE" when the AWS Semantic Layer platform is wired.
     created_at: str
     created_by: str
     source_workload: str

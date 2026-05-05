@@ -520,8 +520,8 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
    After stating the defaults and resolving PII, ask ONE follow-up:
    > "Do you need any additional cleaning or transformation rules beyond these defaults?"
 
-#### 5. Semantic Layer — Column Roles & Business Context (→ feeds SageMaker Catalog + ORION seed queries)
-   This describes WHAT THE DATA IS so the AI ORION consumer can derive correct SQL from natural language questions. The ORION consumer reasons about aggregations using this context. The Transformation Agent uses column roles to decide what to carry into Gold zone.
+#### 5. Semantic Layer — Column Roles & Business Context (→ feeds SageMaker Catalog + AWS Semantic Layer seed queries)
+   This describes WHAT THE DATA IS so the AI AWS Semantic Layer consumer can derive correct SQL from natural language questions. The AWS Semantic Layer consumer reasons about aggregations using this context. The Transformation Agent uses column roles to decide what to carry into Gold zone.
 
    **5a. Column Classification** — Ask the human to classify each column into a role:
 
@@ -577,12 +577,12 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
    - "Do weeks start on **Monday or Sunday**?"
    - "What **time comparisons** do users commonly ask for?" (MoM, QoQ, YoY, WoW, YTD, MTD)
    - "What is the **data freshness**?" (real-time / daily batch / weekly)
-     This tells the ORION consumer: "If user asks about today, latest available data is [yesterday/last week]"
+     This tells the AWS Semantic Layer consumer: "If user asks about today, latest available data is [yesterday/last week]"
 
-   **5h. Seed Questions** — Training examples for the ORION consumer:
+   **5h. Seed Questions** — Training examples for the AWS Semantic Layer consumer:
 
    - "What are the **top 5-10 questions** your business users will ask about this data?"
-     These become seed queries in ORION seed queries — the ORION consumer's first training examples.
+     These become seed queries in AWS Semantic Layer seed queries — the AWS Semantic Layer consumer's first training examples.
      e.g., "What is total revenue by region?", "Show monthly trend", "Top 10 products"
 
    **5i. Data Stewardship**:
@@ -591,12 +591,12 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
    - "What **business domain** does it belong to? (Sales, Marketing, Finance, Ops)"
    - "What is the **sensitivity level**? (Public / Internal / Confidential / Restricted)"
 
-   Do NOT ask for pre-defined metric formulas beyond the basics above. The ORION consumer will figure out complex calculations (weighted averages, running totals, cohort analysis, etc.) based on column roles, aggregation semantics, and the user's natural language query.
+   Do NOT ask for pre-defined metric formulas beyond the basics above. The AWS Semantic Layer consumer will figure out complex calculations (weighted averages, running totals, cohort analysis, etc.) based on column roles, aggregation semantics, and the user's natural language query.
 
    Stored in:
    - `workloads/{name}/config/semantic.yaml` — local config file, loaded into the stores below at deploy
    - **SageMaker Catalog (custom metadata columns)** — column roles, business descriptions, PII classifications, relationships, business terms. Stored as custom metadata properties on tables/columns in the Glue Data Catalog via SageMaker Catalog API. All agents read this at runtime to understand the data.
-   - **ORION seed queries (Metrics & SQL Store)** — SQL query examples and patterns, query samples. The ORION consumer writes useful queries here and reads them when answering similar future questions. This is how the system learns over time.
+   - **AWS Semantic Layer seed queries (Metrics & SQL Store)** — SQL query examples and patterns, query samples. The AWS Semantic Layer consumer writes useful queries here and reads them when answering similar future questions. This is how the system learns over time.
 
    Example `semantic.yaml` — combines metadata + business context + AI Agent context in one file:
    ```yaml
@@ -610,7 +610,7 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
      format: "csv"
      row_count: 2450000           # from profiling
      profiled_at: "2024-06-25"
-     grain: "one row per order"   # ← CRITICAL for ORION consumer: prevents double-counting
+     grain: "one row per order"   # ← CRITICAL for AWS Semantic Layer consumer: prevents double-counting
 
    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    # COLUMNS: Technical metadata (from profiler) + Business context (from human)
@@ -626,7 +626,7 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
          avg: 245.30
          description: "Total revenue for the order after discount"
          unit: "USD"
-         default_aggregation: "SUM"     # ← ORION consumer uses this for NLP queries
+         default_aggregation: "SUM"     # ← AWS Semantic Layer consumer uses this for NLP queries
          derived_from: "quantity * unit_price * (1 - discount_pct)"  # ← so Agent knows it's computed
        - name: "quantity"
          data_type: "integer"
@@ -701,7 +701,7 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
          distinct_values: 25
          description: "Date the order was placed"
          grain: "day"
-         is_primary_temporal: true     # ← ORION consumer uses this as the default time column
+         is_primary_temporal: true     # ← AWS Semantic Layer consumer uses this as the default time column
        - name: "ship_date"
          data_type: "date"
          nullable: true
@@ -745,7 +745,7 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
          masking: "redact"
 
    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   # SEMANTIC LAYER: Context for AI ORION consumer (NLP → SQL)
+   # SEMANTIC LAYER: Context for AI AWS Semantic Layer consumer (NLP → SQL)
    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
    dimension_hierarchies:           # ← enables drill-down / roll-up in queries
@@ -788,7 +788,7 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
        definition: "From start of current calendar year to now"
        sql_expression: "WHERE order_date >= DATE_TRUNC('year', CURRENT_DATE)"
 
-   time_intelligence:               # ← how the ORION consumer handles time-based questions
+   time_intelligence:               # ← how the AWS Semantic Layer consumer handles time-based questions
      fiscal_year_start: 1           # January (1-12)
      week_starts_on: "Monday"
      timezone: "UTC"
@@ -804,7 +804,7 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
        join_type: "left"
        cardinality: "many-to-one"
        description: "Each order belongs to one customer; customers have multiple orders"
-       # ↓ ORION consumer join semantics
+       # ↓ AWS Semantic Layer consumer join semantics
        when_to_join: "Questions about customer attributes (name, segment, country) with order metrics"
        when_not_to_join: "Questions about order data alone (revenue by region, order count by status)"
        pre_aggregation_rule: "Aggregate orders first, then join to customers — avoids fan-out"
@@ -812,8 +812,8 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
        columns_available_after_join: ["customer_name", "segment", "country", "join_date", "status"]
    ```
 
-   # Metrics & SQL examples (→ loaded into ORION seed queries at deploy)
-   # The ORION consumer adds to this over time as it answers queries.
+   # Metrics & SQL examples (→ loaded into AWS Semantic Layer seed queries at deploy)
+   # The AWS Semantic Layer consumer adds to this over time as it answers queries.
    metrics_and_sql:
      seed_queries:
        - question: "What is the total revenue by region?"
@@ -855,23 +855,23 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
        │              business_terms, data_type, null_rate, distinct_count
        │      Read by: ALL agents (Metadata, Transformation, Quality, Analysis)
        │
-       └──→ ORION seed queries (Metrics & SQL Store)
+       └──→ AWS Semantic Layer seed queries (Metrics & SQL Store)
               Table: metrics_sql
               PK: dataset_name + query_id
               Stores: seed SQL examples, metric definitions,
-                      ORION consumer's learned queries over time
-              Read by: ORION consumer (finds similar past queries)
-              Written by: ORION consumer (saves useful new queries)
+                      AWS Semantic Layer consumer's learned queries over time
+              Read by: AWS Semantic Layer consumer (finds similar past queries)
+              Written by: AWS Semantic Layer consumer (saves useful new queries)
    ```
 
    **Key points**:
-   - `semantic.yaml` is the local config that gets loaded into SageMaker Catalog + ORION seed queries at deploy time
+   - `semantic.yaml` is the local config that gets loaded into SageMaker Catalog + AWS Semantic Layer seed queries at deploy time
    - At runtime, agents query SageMaker Catalog (via Glue Data Catalog API) — they do NOT read semantic.yaml
    - The Metadata Agent writes technical metadata (types, stats, nulls) as custom metadata columns on table/column entries in the catalog
    - The human confirms business context (roles, descriptions, terms) — also written as custom metadata columns in the catalog
    - Business context lives WITH the schema — no separate database to manage
-   - Seed SQL examples go to ORION seed queries at deploy; the ORION consumer adds more over time as it answers queries
-   - This means the system gets smarter with use — the ORION consumer builds a library of proven SQL patterns
+   - Seed SQL examples go to AWS Semantic Layer seed queries at deploy; the AWS Semantic Layer consumer adds more over time as it answers queries
+   - This means the system gets smarter with use — the AWS Semantic Layer consumer builds a library of proven SQL patterns
 
 #### 6. Quality & Compliance (→ feeds Quality Agent)
 
@@ -987,7 +987,7 @@ Discovery + profiling flow to one central file:
 
   Source connection info ──→ config/source.yaml ──→ how to connect
   Profiled metadata ───────┐
-  Column roles ────────────┼──→ config/semantic.yaml ──→ SageMaker Catalog ──→ ORION consumer
+  Column roles ────────────┼──→ config/semantic.yaml ──→ SageMaker Catalog ──→ AWS Semantic Layer consumer
   Business descriptions ───┘                                            ──→ Transformation Agent (Gold)
   Cleaning rules ──────────→ config/transformations.yaml ──→ Transformation Agent (Landing→Staging)
   Quality thresholds ──────→ config/quality_rules.yaml ──→ Quality Agent
@@ -1006,10 +1006,10 @@ The semantic layer stores WHAT THE DATA IS, not what to calculate:
 - Relationships between datasets
 - NO pre-defined metric formulas
 
-The ORION consumer figures out calculations on its own:
+The AWS Semantic Layer consumer figures out calculations on its own:
 - User asks "total revenue by region" → Agent reads semantic.yaml, sees revenue=measure + region=dimension, generates SUM(revenue) GROUP BY region
 - User asks "average order value over time" → Agent reasons: revenue is a measure, order_date is temporal, generates AVG(revenue) by month
-- This means the ORION consumer adapts to new questions without anyone pre-defining every possible metric
+- This means the AWS Semantic Layer consumer adapts to new questions without anyone pre-defining every possible metric
 
 ## Phase 2: Deduplication & Source Validation
 
@@ -2399,9 +2399,9 @@ Detect these anomaly types:
 ---
 
 <!--
-  The previous "ORION consumer" skill was removed. ADOP no longer owns NL→SQL,
+  The previous "AWS Semantic Layer consumer" skill was removed. ADOP no longer owns NL→SQL,
   query execution, or insight generation on Gold-zone data. Those responsibilities
-  move to ORION (external semantic layer platform, in development) via its VKG,
+  move to AWS Semantic Layer (upcoming AWS Semantic Layer platform, in development) via its VKG,
   consuming the OWL + R2RML artifacts staged by the Ontology Staging Agent.
   ADOP's semantic-layer responsibility now ends at Phase 7 Step 8.5 with local
   emission of ontology.ttl + mappings.ttl + ontology_manifest.json.
@@ -2605,7 +2605,7 @@ Every DAG MUST include:
 
 **Trigger**: Spawned by Data Onboarding Agent during **Phase 7 Step 8.5** of the deploy flow, AFTER Step 8 (TBAC grants) and BEFORE Step 9 (MWAA DAG deploy). Runs ONLY if `workloads/{name}/config/semantic.yaml` exists AND the user opted in during Phase 1 discovery (default: yes). Optional — skip and proceed to Step 9 if the gate fails.
 
-**Purpose**: Induce an OWL2 ontology + R2RML mappings from the workload's `semantic.yaml` + Glue Gold-zone table schema; validate Turtle; stage three artifacts locally for handoff to **ORION** (external semantic layer platform, in development).
+**Purpose**: Induce an OWL2 ontology + R2RML mappings from the workload's `semantic.yaml` + Glue Gold-zone table schema; validate Turtle; stage three artifacts locally for handoff to **AWS Semantic Layer** (upcoming AWS Semantic Layer platform, in development).
 
 **Execution**: Runs as a sub-agent via the `Agent` tool. Has MCP access to ONE tool only: `glue-athena` `get_table` (to read Gold-zone schema). Does NOT have write access to AWS — emission is file-only to `workloads/{name}/config/`.
 
@@ -2629,17 +2629,17 @@ You are the Ontology Staging Agent. Your job is file emission, not runtime reaso
    PK selection, namespace choice, and auto-induced columns.
 
 You DO NOT:
-- Run T-Box reasoning (HermiT/ELK) — ORION's job at publish time.
-- Author SHACL constraints — Data Steward in ORION.
-- Publish to a VKG — Data Steward approves in ORION.
-- Write to Neptune, S3, DynamoDB, SNS — future (when ORION deploys).
+- Run T-Box reasoning (HermiT/ELK) — AWS Semantic Layer's job at publish time.
+- Author SHACL constraints — Data Steward in the AWS Semantic Layer.
+- Publish to a VKG — Data Steward approves in the AWS Semantic Layer.
+- Write to Neptune, S3, DynamoDB, SNS — future (when the AWS Semantic Layer platform deploys).
 - Modify semantic.yaml, Glue catalog, or any data.
 ```
 
 ### Constraints
 
-- Local-only output in this iteration. `mode="orion"` raises
-  `NotImplementedError` until ORION deploys.
+- Local-only output in this iteration. `mode="aws_semantic_layer"` raises
+  `NotImplementedError` until the AWS Semantic Layer platform deploys.
 - Deterministic: identical inputs MUST produce byte-identical TTL files
   (the inducer sorts triples by IRI to enforce this).
 - If Turtle validation fails after the 2 auto-fix retries, STOP and
@@ -2947,7 +2947,7 @@ Schema (if known, otherwise discover via profiling):
 - Column2: type, description, role
 - ...
 
-Semantic Layer (for AI ORION consumer — NLP to SQL):
+Semantic Layer (for AI AWS Semantic Layer consumer — NLP to SQL):
 
   Fact table grain:
   - "What does one row represent?" [One order / One order line item / One event / One daily snapshot]
@@ -3086,7 +3086,7 @@ Validate:
 - All tests pass (target: 50+ tests)
 - DAG parses successfully
 - Quality gates enforce thresholds
-- semantic.yaml includes all Semantic Layer fields for ORION consumer
+- semantic.yaml includes all Semantic Layer fields for AWS Semantic Layer consumer
 ```
 
 **Example**:
@@ -3113,7 +3113,7 @@ Schema:
 - status: ENUM, order status (Completed/Pending/Cancelled), dimension
 - region: STRING, sales region, dimension
 
-Semantic Layer (for AI ORION consumer — NLP to SQL):
+Semantic Layer (for AI AWS Semantic Layer consumer — NLP to SQL):
 
   Fact table grain: One row per order (not per line item)
 
@@ -3303,7 +3303,7 @@ Referential integrity:
 - Nullable FK: [YES/NO — can the FK column be NULL? What does NULL mean?]
 - Validation frequency: [Every run / Daily / Weekly]
 
-Join semantics for ORION consumer (NLP to SQL):
+Join semantics for AWS Semantic Layer consumer (NLP to SQL):
 - When to join: [What types of questions require this join?]
   e.g., "Questions about customer attributes with order metrics require joining orders → customers"
   e.g., "Questions about order data alone do NOT need this join"
@@ -3317,7 +3317,7 @@ Join semantics for ORION consumer (NLP to SQL):
   e.g., "orders → customers → geography (two hops for region details)"
 - Columns available after join: [What new columns become queryable?]
   e.g., "After joining orders to customers: customer_name, segment, country become available for GROUP BY"
-- Sample joined queries (for ORION seed queries seed):
+- Sample joined queries (for AWS Semantic Layer seed queries seed):
   1. "[NL QUESTION]" → [SQL_PATTERN]
      e.g., "Revenue by customer segment?" → JOIN orders to customers, SUM(revenue) GROUP BY segment
   2. "[NL QUESTION]" → [SQL_PATTERN]
@@ -3333,14 +3333,14 @@ Update:
 5. Add sample queries demonstrating separate vs joined metrics
 6. Update tests to validate FK integrity
 7. Update [SOURCE_WORKLOAD]/README.md to document relationship
-8. Update ORION seed queries seed queries with joined query examples
+8. Update AWS Semantic Layer seed queries seed queries with joined query examples
 
 Validate:
 - FK validation runs successfully
 - Quality check enforces integrity threshold
 - Sample queries execute correctly
 - DAG dependency resolves
-- ORION consumer can resolve joined queries from NLP
+- AWS Semantic Layer consumer can resolve joined queries from NLP
 ```
 
 **Example**:
@@ -3362,7 +3362,7 @@ Referential integrity:
 - Nullable FK: NO (customer_id is required on orders)
 - Validation frequency: Every run
 
-Join semantics for ORION consumer (NLP to SQL):
+Join semantics for AWS Semantic Layer consumer (NLP to SQL):
 - When to join:
   - JOIN NEEDED: "revenue by customer segment", "top customers by lifetime value", "churn impact on revenue"
   - JOIN NOT NEEDED: "total revenue by region" (region is on orders), "order count by status" (status is on orders)
@@ -3386,7 +3386,7 @@ Join semantics for ORION consumer (NLP to SQL):
   4. "Customer retention: customers with orders in last 90 days?" → COUNT(DISTINCT c.customer_id) WHERE o.order_date >= CURRENT_DATE - 90
   5. "Revenue from churned customers?" → SUM(o.revenue) WHERE c.status='Churned'
 
-Update semantic.yaml, scripts, DAG, tests, README, and ORION seed queries seed queries.
+Update semantic.yaml, scripts, DAG, tests, README, and AWS Semantic Layer seed queries seed queries.
 ```
 
 **Expected Output**:

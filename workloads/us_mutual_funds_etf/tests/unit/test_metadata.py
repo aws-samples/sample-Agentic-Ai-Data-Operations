@@ -391,7 +391,7 @@ class TestCrossValidation:
 
 # Completeness tests
 class TestSemanticCompleteness:
-    """Tests that validate the semantic layer is complete enough for ORION consumer."""
+    """Tests that validate the semantic layer is complete enough for AWS Semantic Layer consumer."""
 
     def test_all_fact_measures_have_aggregations(self, semantic_config: Dict[str, Any]):
         """Test all fact table measures have default aggregations."""

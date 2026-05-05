@@ -1,13 +1,13 @@
 @prefix rr:   <http://www.w3.org/ns/r2rml#> .
 @prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
-@prefix ex:   <http://orion.aws/finance/ontology#> .
-@prefix :     <http://orion.aws/finance/ontology#> .
+@prefix ex:   <http://semantic.aws/finance/ontology#> .
+@prefix :     <http://semantic.aws/finance/ontology#> .
 
 
 <#PortfolioMapping> a rr:TriplesMap ;
     rr:logicalTable [ rr:sqlQuery """SELECT * FROM gold_financial_portfolios.portfolios""" ] ;
     rr:subjectMap [
-        rr:template "http://orion.aws/finance/data/Portfolio/{portfolio_id}" ;
+        rr:template "http://semantic.aws/finance/data/Portfolio/{portfolio_id}" ;
         rr:class ex:Portfolio
     ] ;
     rr:predicateObjectMap [
@@ -84,7 +84,7 @@
 <#PositionMapping> a rr:TriplesMap ;
     rr:logicalTable [ rr:sqlQuery """SELECT * FROM gold_financial_portfolios.positions""" ] ;
     rr:subjectMap [
-        rr:template "http://orion.aws/finance/data/Position/{position_id}" ;
+        rr:template "http://semantic.aws/finance/data/Position/{position_id}" ;
         rr:class ex:Position
     ] ;
     rr:predicateObjectMap [
@@ -175,7 +175,7 @@
 <#StockMapping> a rr:TriplesMap ;
     rr:logicalTable [ rr:sqlQuery """SELECT * FROM gold_financial_portfolios.stocks""" ] ;
     rr:subjectMap [
-        rr:template "http://orion.aws/finance/data/Stock/{ticker}" ;
+        rr:template "http://semantic.aws/finance/data/Stock/{ticker}" ;
         rr:class ex:Stock
     ] ;
     rr:predicateObjectMap [

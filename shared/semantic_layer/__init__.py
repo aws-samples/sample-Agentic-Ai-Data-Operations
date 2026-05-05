@@ -1,16 +1,16 @@
 """
-shared.semantic_layer — ORION ontology staging for ADOP.
+shared.semantic_layer — AWS Semantic Layer ontology staging for ADOP.
 
 ADOP's semantic-layer responsibility: generate OWL (ontology.ttl) + R2RML
 (mappings.ttl) from each workload's semantic.yaml + Glue Catalog schema,
-validate Turtle syntax, stage locally for handoff to ORION.
+validate Turtle syntax, stage locally for handoff to the AWS Semantic Layer (upcoming).
 
 What ADOP does NOT do:
-- Run T-Box reasoning (HermiT/ELK)  -> ORION at publish time
-- Author SHACL constraints           -> Data Steward in ORION
-- Run SHACL validation               -> ORION at publish time
-- Publish to VKG                     -> Data Steward approves in ORION
-- Write to Neptune/DynamoDB/S3       -> Future, when ORION deploys
+- Run T-Box reasoning (HermiT/ELK)  -> AWS Semantic Layer at publish time
+- Author SHACL constraints           -> Data Steward in the AWS Semantic Layer
+- Run SHACL validation               -> AWS Semantic Layer at publish time
+- Publish to VKG                     -> Data Steward approves in the AWS Semantic Layer
+- Write to Neptune/DynamoDB/S3       -> Future, when the AWS Semantic Layer platform deploys
 
 Top-level usage (called by the Ontology Staging sub-agent):
 

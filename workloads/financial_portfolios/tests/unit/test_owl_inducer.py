@@ -10,7 +10,7 @@ These tests run locally with zero AWS dependencies. They verify:
 - Glue enrichment -> ex:autoInduced annotations for Glue-only columns
 - Valid Turtle output (rdflib parse)
 - Deterministic output (two runs produce byte-identical files)
-- Namespace prefix @prefix ex: <http://orion.aws/{namespace}/ontology#>
+- Namespace prefix @prefix ex: <http://semantic.aws/{namespace}/ontology#>
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ from shared.semantic_layer.owl_inducer import induce_owl  # noqa: E402
 
 SEMANTIC_YAML = PROJECT_ROOT / "workloads" / "financial_portfolios" / "config" / "semantic.yaml"
 NAMESPACE = "finance"
-EX = Namespace(f"http://orion.aws/{NAMESPACE}/ontology#")
+EX = Namespace(f"http://semantic.aws/{NAMESPACE}/ontology#")
 
 
 @pytest.fixture
@@ -189,7 +189,7 @@ class TestValidTurtleOutput:
 class TestNamespacePrefix:
     def test_ex_prefix_in_turtle(self, induce):
         text = Path(induce.ontology_ttl_path).read_text(encoding="utf-8")
-        assert f"@prefix ex: <http://orion.aws/{NAMESPACE}/ontology#>" in text
+        assert f"@prefix ex: <http://semantic.aws/{NAMESPACE}/ontology#>" in text
 
 
 class TestDeterminism:

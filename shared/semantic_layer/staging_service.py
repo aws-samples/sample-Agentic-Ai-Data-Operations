@@ -7,10 +7,11 @@ artifacts to `workloads/{name}/config/` and performs NO AWS calls:
     - mappings.ttl                  (R2RML wiring OWL to Glue Gold tables)
     - ontology_manifest.json        (state=STAGED_LOCAL, checksums, steward checklist)
 
-The `mode="orion"` branch is stubbed with NotImplementedError so the
-call sites (sub-agent prompt, future orchestration) are stable. When
-ORION deploys, a follow-up implements that branch to read the already
-committed TTL files and push them to Neptune SPARQL + S3 + DynamoDB + SNS.
+The `mode="aws_semantic_layer"` branch is stubbed with NotImplementedError
+so the call sites (sub-agent prompt, future orchestration) are stable.
+When the upcoming AWS Semantic Layer deploys, a follow-up implements that
+branch to read the already committed TTL files and push them to
+Neptune SPARQL + S3 + DynamoDB + SNS.
 """
 
 from __future__ import annotations
@@ -56,8 +57,8 @@ def induce_and_stage(
     namespace: str,
     version: str = "v1",
     glue_schema: Optional[Dict[str, Any]] = None,
-    mode: Literal["local", "orion"] = "local",
-    orion_config: Optional[Dict[str, Any]] = None,
+    mode: Literal["local", "aws_semantic_layer"] = "local",
+    aws_semantic_layer_config: Optional[Dict[str, Any]] = None,
     workload_root: str = "workloads",
 ) -> StagingResult:
     """
@@ -68,13 +69,14 @@ def induce_and_stage(
         dataset_name: Workload directory name under workload_root/.
         glue_database: Glue database name for R2RML logical-table SQL.
         glue_table: Gold-zone table name that anchors the induction.
-        namespace: ORION namespace prefix (e.g., "finance").
+        namespace: Ontology namespace prefix (e.g., "finance").
         version: Ontology version string. Default "v1".
         glue_schema: Optional dict for Glue-enrichment of columns not
                      in semantic.yaml. Shape: {"columns":
                      [{"name": str, "type": str, "comment": str}]}.
-        mode: "local" (today) or "orion" (future, not implemented).
-        orion_config: Reserved for future `mode="orion"` parameters.
+        mode: "local" (today) or "aws_semantic_layer" (future, not implemented).
+        aws_semantic_layer_config: Reserved for future
+                                   `mode="aws_semantic_layer"` parameters.
         workload_root: Root directory where workloads live. Default
                        "workloads" (relative).
 
@@ -83,7 +85,7 @@ def induce_and_stage(
 
     Raises:
         FileNotFoundError: If semantic.yaml is missing.
-        NotImplementedError: If mode="orion" (ORION not yet deployed).
+        NotImplementedError: If mode="aws_semantic_layer" (platform not yet deployed).
         RuntimeError: If Turtle validation fails after max retries.
     """
     return stage_ontology(
@@ -94,7 +96,7 @@ def induce_and_stage(
         version=version,
         glue_schema=glue_schema,
         mode=mode,
-        orion_config=orion_config,
+        aws_semantic_layer_config=aws_semantic_layer_config,
         workload_root=workload_root,
     )
 
@@ -107,23 +109,26 @@ def stage_ontology(
     namespace: str,
     version: str = "v1",
     glue_schema: Optional[Dict[str, Any]] = None,
-    mode: Literal["local", "orion"] = "local",
-    orion_config: Optional[Dict[str, Any]] = None,
+    mode: Literal["local", "aws_semantic_layer"] = "local",
+    aws_semantic_layer_config: Optional[Dict[str, Any]] = None,
     workload_root: str = "workloads",
 ) -> StagingResult:
     """See induce_and_stage(). Same implementation; kept for API parity."""
-    if mode == "orion":
+    if mode == "aws_semantic_layer":
         raise NotImplementedError(
-            "ORION deployment pending. The `mode='orion'` branch will be "
-            "implemented in a follow-up prompt (prompts/data-onboarding-agent/"
-            "ontology-publish-agent.md) once ORION's Neptune cluster, "
+            "AWS Semantic Layer deployment pending. The "
+            "`mode='aws_semantic_layer'` branch will be implemented in a "
+            "follow-up prompt (prompts/data-onboarding-agent/"
+            "ontology-publish-agent.md) once the platform's Neptune cluster, "
             "DynamoDB version table, S3 knowledge-layer bucket, and SNS "
             "steward topic exist. For now, commit the local TTL files "
             "emitted by `mode='local'` and hand them off to the Data "
             "Steward out-of-band."
         )
     if mode != "local":
-        raise ValueError(f"Unknown mode: {mode!r}. Expected 'local' or 'orion'.")
+        raise ValueError(
+            f"Unknown mode: {mode!r}. Expected 'local' or 'aws_semantic_layer'."
+        )
 
     config_dir = Path(workload_root) / dataset_name / "config"
     semantic_yaml_path = config_dir / "semantic.yaml"

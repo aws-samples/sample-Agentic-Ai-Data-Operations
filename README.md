@@ -76,23 +76,23 @@ Each workload maintains its own memory system in `workloads/{name}/memory/` that
 
 ---
 
-## 2. Ontology Staging Agent (ORION Handoff)
+## 2. Ontology Staging Agent (AWS Semantic Layer Handoff)
 
-**Purpose:** Induces an OWL ontology + R2RML mappings from each workload's `semantic.yaml` + Glue Catalog schema, staged locally for handoff to **ORION** (external semantic layer platform, currently in development).
+**Purpose:** Induces an OWL ontology + R2RML mappings from each workload's `semantic.yaml` + Glue Catalog schema, staged locally for handoff to **AWS Semantic Layer** (upcoming AWS Semantic Layer platform, currently in development).
 
 **Runs in:** Development environment only (emits files to `workloads/{name}/config/`)
 **Output:** `ontology.ttl` (OWL2 classes/properties/hierarchy), `mappings.ttl` (R2RML linking classes to Glue tables), `ontology_manifest.json` (version, checksums, steward checklist)
 
-**Scope boundary:** ADOP generates and validates Turtle locally. ADOP does **NOT** run T-Box reasoning, author SHACL constraints, or publish to a VKG — those are the Data Steward's responsibilities inside ORION when ORION deploys.
+**Scope boundary:** ADOP generates and validates Turtle locally. ADOP does **NOT** run T-Box reasoning, author SHACL constraints, or publish to a VKG — those are the Data Steward's responsibilities inside the AWS Semantic Layer platform when the AWS Semantic Layer platform deploys.
 
 **How it works:**
 
 1. **OWL induction** — `semantic.yaml` entities → owl:Class, dimension/measure/temporal columns → owl:DatatypeProperty with xsd ranges, relationships → owl:ObjectProperty (+ owl:FunctionalProperty for many-to-one), hierarchies → rdfs:subClassOf chain, PII flags → ex:piiClassification annotations, Glue-only columns → ex:autoInduced annotation.
-2. **R2RML mapping** — one TriplesMap per entity, logical table = Athena SQL against the Gold zone, subject URI template = `http://orion.aws/{namespace}/data/{ClassName}/{pk}`, FK columns emit `rr:parentTriplesMap` references.
+2. **R2RML mapping** — one TriplesMap per entity, logical table = Athena SQL against the Gold zone, subject URI template = `http://semantic.aws/{namespace}/data/{ClassName}/{pk}`, FK columns emit `rr:parentTriplesMap` references.
 3. **Turtle validation** — parse with `rdflib`, auto-fix common issues (unescaped quotes, missing semicolons), retry up to 2 times.
-4. **Staging** — write 3 artifacts to `workloads/{name}/config/` with SHA-256 checksums and `"state": "STAGED_LOCAL"`. Data Steward picks these up for ORION publish.
+4. **Staging** — write 3 artifacts to `workloads/{name}/config/` with SHA-256 checksums and `"state": "STAGED_LOCAL"`. Data Steward picks these up for AWS Semantic Layer publish.
 
-When ORION is deployed, a follow-up `ontology-publish-agent` (future) will read the committed TTL files and push them to Neptune SPARQL + S3 + DynamoDB + SNS.
+When the AWS Semantic Layer platform is deployed, a follow-up `ontology-publish-agent` (future) will read the committed TTL files and push them to Neptune SPARQL + S3 + DynamoDB + SNS.
 
 ---
 
@@ -109,16 +109,16 @@ The Environment Setup Agent handles the foundational infrastructure setup that m
 
 ## 4. Semantic Layer (Business Context + Ontology Handoff)
 
-**Purpose:** Captures business context (column roles, dimension hierarchies, relationships, PII flags) in `semantic.yaml` and emits a formal OWL ontology + R2RML mappings for handoff to **ORION** — the external semantic layer platform responsible for NL→SQL, reasoning, SHACL validation, and VKG publish.
+**Purpose:** Captures business context (column roles, dimension hierarchies, relationships, PII flags) in `semantic.yaml` and emits a formal OWL ontology + R2RML mappings for handoff to **AWS Semantic Layer** — the upcoming AWS Semantic Layer platform responsible for NL→SQL, reasoning, SHACL validation, and VKG publish.
 
 **Runs in:** Development (config authoring + ontology induction)
 **Output:** `workloads/{name}/config/semantic.yaml` (source of truth), `ontology.ttl` (OWL2), `mappings.ttl` (R2RML), `ontology_manifest.json`. All committed to git.
 
 The semantic layer captures column roles (measures, dimensions, temporal, identifiers), hierarchical relationships (country→state→city), business terms, and PII classifications. **SageMaker Catalog** mirrors this on the Glue Data Catalog as custom metadata properties so downstream consumers see business context alongside technical schemas.
 
-At Phase 7 Step 8.5 of the deploy flow, the **Ontology Staging Agent** induces an OWL ontology from `semantic.yaml` + the deployed Glue Gold table schema, generates R2RML mappings wiring each OWL class to its physical table, and validates Turtle syntax with rdflib. The resulting `ontology.ttl` + `mappings.ttl` + `ontology_manifest.json` land in `workloads/{name}/config/` for ORION to pick up.
+At Phase 7 Step 8.5 of the deploy flow, the **Ontology Staging Agent** induces an OWL ontology from `semantic.yaml` + the deployed Glue Gold table schema, generates R2RML mappings wiring each OWL class to its physical table, and validates Turtle syntax with rdflib. The resulting `ontology.ttl` + `mappings.ttl` + `ontology_manifest.json` land in `workloads/{name}/config/` for AWS Semantic Layer to pick up.
 
-**Hard boundary:** ADOP stops at emission. ORION (in development) owns SHACL authoring, T-Box reasoning (HermiT/ELK), VKG publish (Ontop), and NL→SQL runtime. When ORION deploys, a future publish agent will push the committed TTL files from local to Neptune SPARQL + S3 + DynamoDB + SNS — no regeneration needed because the inducer is deterministic.
+**Hard boundary:** ADOP stops at emission. AWS Semantic Layer (in development) owns SHACL authoring, T-Box reasoning (HermiT/ELK), VKG publish (Ontop), and NL→SQL runtime. When the AWS Semantic Layer platform deploys, a future publish agent will push the committed TTL files from local to Neptune SPARQL + S3 + DynamoDB + SNS — no regeneration needed because the inducer is deterministic.
 
 ---
 
@@ -276,23 +276,23 @@ Dev Agent → Generate scripts/tests → Commit to Git → CI/CD pipeline → QA
 | Lake Formation | Column-level security via LF-Tags |
 | Amazon MWAA | Airflow orchestration |
 | SageMaker Catalog | Business metadata (custom columns on Glue Catalog entries) |
-| Ontology artifacts (local) | `workloads/{name}/config/ontology.ttl` + `mappings.ttl` for ORION handoff |
+| Ontology artifacts (local) | `workloads/{name}/config/ontology.ttl` + `mappings.ttl` for AWS Semantic Layer handoff |
 
 ### Semantic Layer
 
-The semantic layer in ADOP has two responsibilities: (1) capture business context in `semantic.yaml` and mirror it to SageMaker Catalog, (2) emit OWL + R2RML artifacts for handoff to ORION (external platform, in development).
+The semantic layer in ADOP has two responsibilities: (1) capture business context in `semantic.yaml` and mirror it to SageMaker Catalog, (2) emit OWL + R2RML artifacts for handoff to the AWS Semantic Layer (upcoming).
 
 **How it works:**
 1. **Input**: Define business context in `workloads/{name}/config/semantic.yaml` (column roles, aggregations, relationships, business terms, hierarchies, PII flags). Source of truth.
 2. **Mirror to SageMaker Catalog**: Column roles, PII flags, and business terms are written as custom metadata on Glue Data Catalog entries so downstream tools see business context alongside technical schemas.
 3. **Induce OWL + R2RML** (Phase 7 Step 8.5): The Ontology Staging Agent converts `semantic.yaml` + Glue schema into `ontology.ttl` (OWL2) + `mappings.ttl` (R2RML) + `ontology_manifest.json`. Validated with rdflib, committed to git.
-4. **ORION handoff**: Data Steward picks up the committed TTL files in ORION (when deployed) for SHACL authoring, T-Box reasoning, and VKG publish.
+4. **AWS Semantic Layer handoff**: Data Steward picks up the committed TTL files in AWS Semantic Layer (when deployed) for SHACL authoring, T-Box reasoning, and VKG publish.
 
 **What ADOP does NOT do:**
-- NL→SQL query generation (ORION's VKG)
-- SHACL constraint authoring (Data Steward in ORION)
-- T-Box reasoning (ORION, at publish time)
-- Any SPARQL/Neptune writes (future, when ORION deploys)
+- NL→SQL query generation (AWS Semantic Layer's VKG)
+- SHACL constraint authoring (Data Steward in the AWS Semantic Layer)
+- T-Box reasoning (AWS Semantic Layer, at publish time)
+- Any SPARQL/Neptune writes (future, when the AWS Semantic Layer platform deploys)
 
 ### MCP Servers (Model Context Protocol)
 

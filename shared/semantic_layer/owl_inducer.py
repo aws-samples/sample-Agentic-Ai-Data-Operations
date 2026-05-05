@@ -150,7 +150,7 @@ def induce_owl(
         semantic_yaml_path: Path to workloads/{name}/config/semantic.yaml
         glue_database: Glue database name the Gold table lives in
         glue_table: The Gold table name that grounds this induction
-        namespace: ORION namespace (e.g., "finance")
+        namespace: ontology namespace (e.g., "finance")
         version: Ontology version (default "v1")
         glue_schema: Optional dict {"columns": [{"name": str, "type": str,
                      "comment": Optional[str]}]} for the Gold table. If
@@ -170,7 +170,7 @@ def induce_owl(
         semantic = yaml.safe_load(f) or {}
 
     warnings: List[str] = []
-    EX = Namespace(f"http://orion.aws/{namespace}/ontology#")
+    EX = Namespace(f"http://semantic.aws/{namespace}/ontology#")
 
     g = Graph()
     g.bind("", EX)
@@ -180,7 +180,7 @@ def induce_owl(
     g.bind("xsd", XSD)
 
     # Ontology header
-    ontology_iri = URIRef(f"http://orion.aws/{namespace}/ontology/{version}")
+    ontology_iri = URIRef(f"http://semantic.aws/{namespace}/ontology/{version}")
     g.add((ontology_iri, RDF.type, OWL.Ontology))
     g.add((ontology_iri, RDFS.label, Literal(f"{namespace} ontology {version}")))
     g.add((ontology_iri, RDFS.comment, Literal(

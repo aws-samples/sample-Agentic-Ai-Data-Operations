@@ -13,12 +13,12 @@ This folder contains all prompts organized by agent responsibility. Each agent h
        Agent                      Agent                     Agent             Agent
          │                          │                         │                 │
          │ Sets up AWS              │ Onboards data           │ Emits OWL +     │ Automates
-         │ infrastructure           │ Bronze→Silver→Gold      │ R2RML for ORION │ CI/CD
+         │ infrastructure           │ Bronze→Silver→Gold      │ R2RML for AWS Semantic Layer │ CI/CD
          │                          │                         │                 │
          ▼                          ▼                         ▼                 ▼
    IAM, S3, KMS,            Route → Discover →        ontology.ttl +     Monitor, deploy,
    Glue, LF-Tags,          Profile → Generate →       mappings.ttl       optimize, heal
-   MWAA, Gateway            Deploy artifacts          (local, for ORION) pipelines
+   MWAA, Gateway            Deploy artifacts          (local, for AWS Semantic Layer) pipelines
 ```
 
 ## Quick Navigation
@@ -127,7 +127,7 @@ This folder contains all prompts organized by agent responsibility. Each agent h
 
 ### 🧬 Ontology Staging Agent
 
-**Purpose**: Emit OWL ontology + R2RML mappings from `semantic.yaml` + Glue Catalog, staged locally for ORION handoff.
+**Purpose**: Emit OWL ontology + R2RML mappings from `semantic.yaml` + Glue Catalog, staged locally for AWS Semantic Layer handoff.
 
 **How it works**:
 1. Reads `workloads/{name}/config/semantic.yaml` (column roles, relationships, hierarchies, PII)
@@ -142,7 +142,7 @@ This folder contains all prompts organized by agent responsibility. Each agent h
 - `mappings.ttl` — R2RML linking OWL to Glue tables
 - `ontology_manifest.json` — version, checksums, steward checklist, `state: STAGED_LOCAL`
 
-**Not in scope**: T-Box reasoning, SHACL authoring, publish, VKG reload — all owned by Data Steward inside ORION.
+**Not in scope**: T-Box reasoning, SHACL authoring, publish, VKG reload — all owned by Data Steward inside the AWS Semantic Layer platform.
 
 **Read more**: [`data-onboarding-agent/ontology-staging-agent.md`](data-onboarding-agent/ontology-staging-agent.md)
 

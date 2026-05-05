@@ -327,7 +327,7 @@ Read pattern?
 
 ---
 
-## Ontology Staging Routes (ORION handoff — Phase 7 Step 8.5)
+## Ontology Staging Routes (AWS Semantic Layer handoff — Phase 7 Step 8.5)
 
 | Intent | Tool | Notes |
 |---|---|---|
@@ -336,13 +336,13 @@ Read pattern?
 | Induce OWL classes + R2RML mappings | `shared.semantic_layer.induce_and_stage(mode="local")` | Pure Python + rdflib; no AWS calls |
 | Validate Turtle syntax | rdflib (`shared/semantic_layer/turtle_validator.py`) | Auto-fix + retry up to 2× |
 | Write `ontology.ttl` + `mappings.ttl` + `ontology_manifest.json` | Local filesystem to `workloads/{name}/config/` | `state: "STAGED_LOCAL"` |
-| Publish triples to Neptune SPARQL | **Future — requires ORION deployment** | When ORION deploys, implement `mode="orion"` branch |
-| Upload TTL artifacts to S3 knowledge-layer bucket | **Future — requires ORION deployment** | ditto |
-| Write DynamoDB `orion-ontology-versions` record | **Future — requires ORION deployment** | ditto |
-| SNS steward notification | **Future — requires ORION deployment** | ditto |
+| Publish triples to Neptune SPARQL | **Future — requires AWS Semantic Layer deployment** | When the AWS Semantic Layer platform deploys, implement `mode="aws_semantic_layer"` branch |
+| Upload TTL artifacts to S3 knowledge-layer bucket | **Future — requires AWS Semantic Layer deployment** | ditto |
+| Write DynamoDB `aws-semantic-layer-ontology-versions` record | **Future — requires AWS Semantic Layer deployment** | ditto |
+| SNS steward notification | **Future — requires AWS Semantic Layer deployment** | ditto |
 
 **Routing rule**: If the user says "generate ontology", "stage ontology
-for ORION", "emit OWL", or "onboard to semantic layer", route to the
+for AWS Semantic Layer", "emit OWL", or "onboard to semantic layer", route to the
 Ontology Staging Agent sub-agent (prompt: `prompts/data-onboarding-agent/ontology-staging-agent.md`).
 
 ---

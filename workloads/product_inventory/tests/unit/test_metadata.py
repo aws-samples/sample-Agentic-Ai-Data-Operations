@@ -263,7 +263,7 @@ class TestSemanticYaml:
         assert "tables" in gold
 
     def test_default_filters_present(self):
-        """semantic.yaml must have default_filters for ORION consumer."""
+        """semantic.yaml must have default_filters for AWS Semantic Layer consumer."""
         with open(SEMANTIC_YAML_PATH, "r") as f:
             config = yaml.safe_load(f)
         assert "default_filters" in config

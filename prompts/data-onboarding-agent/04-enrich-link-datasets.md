@@ -3,13 +3,13 @@
 
 ## Purpose
 
-After two or more datasets are onboarded, use ENRICH to document foreign key relationships and join semantics in `semantic.yaml`. These relationships become `owl:ObjectProperty` triples and `rr:parentTriplesMap` R2RML references in the staged ontology for ORION.
+After two or more datasets are onboarded, use ENRICH to document foreign key relationships and join semantics in `semantic.yaml`. These relationships become `owl:ObjectProperty` triples and `rr:parentTriplesMap` R2RML references in the staged ontology for AWS Semantic Layer.
 
 ## When to Use
 
 - After both source and target workloads exist (ONBOARD complete for both)
 - When datasets share a common key (e.g., customer_id)
-- To enrich the OWL ontology with cross-dataset object properties before ORION handoff
+- To enrich the OWL ontology with cross-dataset object properties before AWS Semantic Layer handoff
 
 ## Prompt Template
 

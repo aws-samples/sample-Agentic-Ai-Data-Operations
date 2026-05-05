@@ -4,7 +4,7 @@ Silver-to-Gold aggregation for sales_transactions workload.
 Reads cleaned data from the Silver zone, creates a summary table grouped
 by region and product_category, and writes to the Gold zone.
 
-The Gold table provides a curated structure; the ORION consumer decides
+The Gold table provides a curated structure; the AWS Semantic Layer consumer decides
 what further metrics to compute on top of it.
 
 Usage:

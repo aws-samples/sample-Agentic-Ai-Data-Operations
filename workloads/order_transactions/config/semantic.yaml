@@ -1,5 +1,5 @@
 # Semantic layer configuration for order_transactions
-# Defines column roles, aggregation semantics, join context for ORION consumer
+# Defines column roles, aggregation semantics, join context for AWS Semantic Layer consumer
 # Created: 2026-03-15
 
 dataset:
@@ -10,7 +10,7 @@ dataset:
   owner: Sales Operations
   steward: Data Engineering Team
 
-# Column roles for ORION consumer
+# Column roles for AWS Semantic Layer consumer
 columns:
   order_id:
     role: primary_key
@@ -119,7 +119,7 @@ time_intelligence:
   timezone: UTC
   data_freshness: daily
 
-# Join semantics for ORION consumer
+# Join semantics for AWS Semantic Layer consumer
 join_semantics:
   customer_master:
     join_type: LEFT
@@ -146,7 +146,7 @@ join_semantics:
           GROUP BY c.segment
           ORDER BY total_revenue DESC
 
-# Seed SQL examples for ORION seed store
+# Seed SQL examples for AWS Semantic Layer seed store
 seed_queries:
   - question: "What is total revenue by region?"
     sql: >

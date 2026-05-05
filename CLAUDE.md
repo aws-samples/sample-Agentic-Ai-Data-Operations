@@ -4,7 +4,7 @@ This file configures Claude Code for the Agentic Data Onboarding platform.
 
 ## Project Identity
 
-An autonomous data pipeline orchestration platform that moves data through **Bronze → Silver → Gold** zones using a multi-agent architecture. Integrates with AWS SageMaker Catalog (business metadata), Apache Airflow for orchestration, and emits OWL + R2RML ontology artifacts for handoff to ORION (external semantic layer platform).
+An autonomous data pipeline orchestration platform that moves data through **Bronze → Silver → Gold** zones using a multi-agent architecture. Integrates with AWS SageMaker Catalog (business metadata), Apache Airflow for orchestration, and emits OWL + R2RML ontology artifacts for handoff to the AWS Semantic Layer (upcoming).
 
 **Status**: Design-complete, implementation pending.
 
@@ -75,7 +75,7 @@ MAIN CONVERSATION
 **MCP-First Rule**: All AWS operations use MCP server tools first. Sub-agents do NOT have MCP access — they generate scripts/configs only. Deployment runs in the main conversation via MCP. See `MCP_GUARDRAILS.md` for actual tool names, per-phase rules, and fallback decisions. See `TOOLS.md` for the full AWS service mapping.
 
 **Data zones**: Bronze (raw, immutable) → Silver (cleaned, validated) → Gold (curated, aggregated)
-**Semantic layer**: SageMaker Catalog (custom metadata columns for business context) + MCP Layer. ADOP's semantic-layer responsibility ends at generating OWL + R2RML artifacts (`workloads/{name}/config/ontology.ttl` + `mappings.ttl`) for staging into ORION. NL→SQL, reasoning, SHACL, and VKG are ORION's responsibilities.
+**Semantic layer**: SageMaker Catalog (custom metadata columns for business context) + MCP Layer. ADOP's semantic-layer responsibility ends at generating OWL + R2RML artifacts (`workloads/{name}/config/ontology.ttl` + `mappings.ttl`) for staging into AWS Semantic Layer. NL→SQL, reasoning, SHACL, and VKG are AWS Semantic Layer's responsibilities.
 
 **Agent model**: Data Onboarding Agent runs in main conversation (human-facing). All specialized agents are sub-agents spawned via the `Agent` tool. Each sub-agent must write and pass unit + integration tests before the orchestrator proceeds.
 
@@ -85,7 +85,7 @@ MAIN CONVERSATION
 - **Cloud**: AWS — S3 + S3 Tables (data zones), Glue (catalog), SageMaker Catalog (business metadata), Apache Iceberg (table format), Athena (queries), Step Functions (workflows), Lambda (agents), KMS (encryption)
 - **Orchestration**: Apache Airflow
 - **Testing**: Jest + fast-check (property-based)
-- **Ontology format**: OWL2 + R2RML in Turtle (rdflib) — emitted locally as `workloads/{name}/config/ontology.ttl` + `mappings.ttl` for handoff to ORION
+- **Ontology format**: OWL2 + R2RML in Turtle (rdflib) — emitted locally as `workloads/{name}/config/ontology.ttl` + `mappings.ttl` for handoff to the AWS Semantic Layer (upcoming)
 - **Auth**: API Key, OAuth 2.0, SAML, JWT
 
 ## Agent Behavior Model
@@ -110,12 +110,12 @@ For new onboarding, follow the **Data Onboarding Agent** discovery phase. Ask qu
 - **Metrics & dimensions** (→ SageMaker Catalog / Semantic Layer, Silver→Gold): column roles, dimension hierarchies, business terms
 - **Quality** (→ Quality Agent): thresholds, compliance
 - **Scheduling** (→ DAG Agent): cron, dependencies, failure handling
-- **Ontology staging** (→ Ontology Staging Agent, optional): OWL + R2RML emission for ORION handoff
+- **Ontology staging** (→ Ontology Staging Agent, optional): OWL + R2RML emission for AWS Semantic Layer handoff
 
 **Semantic layer storage**:
 - `config/semantic.yaml` — local config file, source of truth for column roles, business terms, relationships, hierarchies, PII flags.
 - **SageMaker Catalog** (custom metadata columns) — column roles, data types, descriptions, PII flags, relationships, business terms. Stored as custom metadata properties on table/column entries in the Glue Data Catalog. All agents read this to understand the data.
-- **`config/ontology.ttl` + `config/mappings.ttl` + `config/ontology_manifest.json`** — OWL2 ontology + R2RML mappings induced from `semantic.yaml` and the Glue Catalog. Emitted locally by the Ontology Staging Agent at Phase 7 Step 8.5. Data Stewards pick these up in ORION (when deployed) for SHACL authoring, T-Box reasoning, and VKG publish. ADOP does NOT run reasoning, author SHACL, or publish — those are ORION/steward responsibilities.
+- **`config/ontology.ttl` + `config/mappings.ttl` + `config/ontology_manifest.json`** — OWL2 ontology + R2RML mappings induced from `semantic.yaml` and the Glue Catalog. Emitted locally by the Ontology Staging Agent at Phase 7 Step 8.5. Data Stewards pick these up in AWS Semantic Layer (when deployed) for SHACL authoring, T-Box reasoning, and VKG publish. ADOP does NOT run reasoning, author SHACL, or publish — those are AWS Semantic Layer/steward responsibilities.
 
 ### 3. Deduplicate & Validate Source (Phase 2)
 
@@ -349,8 +349,8 @@ Every pipeline run produces a structured trace across three layers, linked by `r
 | Apache Iceberg | Open table format for Silver and Gold zones — provides ACID transactions, time-travel, schema evolution, partition pruning |
 | S3 Tables | Amazon S3 bucket type optimized for Apache Iceberg tables — automatic compaction and catalog integration |
 | SageMaker Catalog | Extends Glue Data Catalog with custom metadata columns — stores column roles, business context, PII flags, relationships |
-| Ontology Staging | ADOP's final semantic-layer step: induces OWL + R2RML from `semantic.yaml` + Glue schema, emits `ontology.ttl` + `mappings.ttl` for ORION handoff |
-| ORION | External semantic layer platform (in development). Consumes ADOP's staged OWL/R2RML, owns SHACL authoring, T-Box reasoning, VKG publish, and NL→SQL. |
+| Ontology Staging | ADOP's final semantic-layer step: induces OWL + R2RML from `semantic.yaml` + Glue schema, emits `ontology.ttl` + `mappings.ttl` for AWS Semantic Layer handoff |
+| AWS Semantic Layer | External semantic layer platform (in development). Consumes ADOP's staged OWL/R2RML, owns SHACL authoring, T-Box reasoning, VKG publish, and NL→SQL. |
 | R2RML | W3C standard for mapping relational schemas to RDF — used here to wire OWL classes to physical Glue/Athena tables |
 | MCP Layer | Model Context Protocol — standard interface for AI model interaction with the platform |
 | Quality Gate | Threshold check that blocks data from advancing to the next zone |

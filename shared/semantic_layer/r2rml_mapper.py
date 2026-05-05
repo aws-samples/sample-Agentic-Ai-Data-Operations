@@ -123,7 +123,7 @@ def generate_r2rml(
         semantic_yaml_path: Path to workloads/{name}/config/semantic.yaml
         glue_database: Glue database name for the FROM clause of the
                        logical-table SQL (e.g., "gold_financial_portfolios").
-        namespace: ORION namespace (e.g., "finance"). Used for the
+        namespace: ontology namespace (e.g., "finance"). Used for the
                    ex: and subject URI prefixes.
 
     Returns:
@@ -143,8 +143,8 @@ def generate_r2rml(
         semantic = yaml.safe_load(f) or {}
 
     warnings: List[str] = []
-    ex_uri = f"http://orion.aws/{namespace}/ontology#"
-    subject_base = f"http://orion.aws/{namespace}/data"
+    ex_uri = f"http://semantic.aws/{namespace}/ontology#"
+    subject_base = f"http://semantic.aws/{namespace}/data"
 
     tables = sorted(semantic.get("tables") or [], key=lambda t: t.get("name", ""))
     # Track which columns are FKs per source table for rr:parentTriplesMap

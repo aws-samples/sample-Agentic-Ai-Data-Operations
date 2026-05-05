@@ -18,7 +18,7 @@ SEMANTIC_YAML = PROJECT_ROOT / "workloads" / "financial_portfolios" / "config" /
 NAMESPACE = "finance"
 GLUE_DB = "gold_financial_portfolios"
 RR = Namespace("http://www.w3.org/ns/r2rml#")
-EX = Namespace(f"http://orion.aws/{NAMESPACE}/ontology#")
+EX = Namespace(f"http://semantic.aws/{NAMESPACE}/ontology#")
 
 
 @pytest.fixture
@@ -69,7 +69,7 @@ class TestSubjectMap:
     def test_subject_uri_template(self, mappings):
         text = Path(mappings.mappings_ttl_path).read_text(encoding="utf-8")
         # subject URI template for Portfolio should key on portfolio_id
-        assert "http://orion.aws/finance/data/Portfolio/{portfolio_id}" in text
+        assert "http://semantic.aws/finance/data/Portfolio/{portfolio_id}" in text
 
     def test_subject_class_binding(self, mappings):
         text = Path(mappings.mappings_ttl_path).read_text(encoding="utf-8")

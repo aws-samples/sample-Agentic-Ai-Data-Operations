@@ -130,7 +130,7 @@ DevOps Agent (Automated, event-driven)
 
 **Works with**:
 - Data Onboarding Agent (deploys its generated artifacts)
-- Ontology Staging Agent (watches for new `ontology.ttl` commits for ORION sync)
+- Ontology Staging Agent (watches for new `ontology.ttl` commits for AWS Semantic Layer sync)
 - Environment Setup Agent (manages infrastructure drift)
 
 **Triggered by**:
