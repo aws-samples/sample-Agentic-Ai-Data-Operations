@@ -35,7 +35,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 
-VALID_AGENT_TYPES = {"metadata", "transformation", "quality", "dag", "analysis"}
+VALID_AGENT_TYPES = {"metadata", "transformation", "quality", "dag", "analysis", "devops"}
 VALID_STATUSES = {"success", "failed", "partial"}
 
 
@@ -53,7 +53,7 @@ SUBMIT_OUTPUT_TOOL = {
                 "type": "object",
                 "properties": {
                     "agent_name":      {"type": "string", "description": "Your agent name"},
-                    "agent_type":      {"type": "string", "enum": ["metadata", "transformation", "quality", "dag", "analysis"]},
+                    "agent_type":      {"type": "string", "enum": ["metadata", "transformation", "quality", "dag", "analysis", "devops"]},
                     "workload_name":   {"type": "string", "description": "Workload being processed"},
                     "run_id":          {"type": "string", "description": "UUID for tracing"},
                     "started_at":      {"type": "string", "description": "ISO 8601 timestamp"},
