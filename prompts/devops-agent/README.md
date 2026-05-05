@@ -2,11 +2,15 @@
 
 **Agent Type**: CI/CD / Operations
 **Runs**: Continuous (automated)
-**Status**: 📝 **Coming Soon**
+**Status**: 🟡 **Partial** — `iac-generator` available; CI/CD, monitoring, cost prompts still planned
 
 ## Purpose
 
 The DevOps Agent automates deployment, monitoring, and maintenance of data pipelines. It handles CI/CD, infrastructure as code, observability, and operational tasks.
+
+### Current capability
+
+Today, the agent can generate deployable IaC (Terraform / AWS CDK / CloudFormation) from a completed workload's artifacts. It does NOT apply the IaC — a human reviews and applies manually as a deliberate review step. See [`iac-generator.md`](./iac-generator.md).
 
 ## Planned Capabilities
 
@@ -111,10 +115,11 @@ DevOps Agent (Automated, event-driven)
       └── Bedrock Agent Runtime (decision-making)
 ```
 
-## Prompts (Coming Soon)
+## Prompts
 
 | Prompt | Purpose | Status |
 |--------|---------|--------|
+| `iac-generator.md` | Generate Terraform / CDK / CFN for a built workload (manual apply) | ✅ Available |
 | `setup-cicd-pipeline.md` | Create CI/CD for workload | 📝 Planned |
 | `configure-monitoring.md` | Set up alerts and dashboards | 📝 Planned |
 | `automate-maintenance.md` | Schedule operational tasks | 📝 Planned |
