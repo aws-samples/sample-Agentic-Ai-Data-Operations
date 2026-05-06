@@ -314,6 +314,7 @@ Respond with:
 **Trigger**: New data source onboarding, end-to-end pipeline creation, or any request that spans multiple zones.
 **Purpose**: Orchestrate the full onboarding lifecycle from source to Gold zone. This is the **primary human-in-the-loop** agent — it asks clarifying questions before proceeding.
 **Execution**: Runs in the main conversation. Spawns Metadata, Transformation, Quality, and DAG agents as sub-agents via the `Agent` tool. Validates each sub-agent's output with tests before proceeding.
+**RESUME.md maintenance**: After every sub-agent test-gate pass, after Phase 0 topology choice, and after every Phase 5 milestone, regenerate `workloads/{name}/RESUME.md` via `shared.utils.resume_writer.write_resume_from_disk(workload_name)`. Never hand-write RESUME.md — it is always derived from disk so an interrupted session can be resumed faithfully. See `shared/utils/resume_writer.py` for the CLI.
 
 ### Prompt
 
@@ -327,6 +328,28 @@ You run in the MAIN conversation. You delegate heavy work to sub-agents (via the
 ## Phase 0: Environment Health Check & Auto-Detect (ALWAYS RUN FIRST)
 
 Before asking a single discovery question, verify the environment is ready. This phase is READ-ONLY — it never creates or modifies anything.
+
+### Trace & logging wiring (MANDATORY at Phase 0 start)
+
+Every Data Onboarding run MUST initialize the orchestrator tracer before any sub-agent spawn. Without it, no `logs/{datetime}_{workload}.jsonl` is emitted and RESUME.md falls back to disk-scan only (less rich than a trace-backed resume).
+
+At the very start of Phase 0:
+
+```python
+from shared.utils.orchestrator_logger import OrchestratorLogger
+import uuid
+
+run_id = str(uuid.uuid4())
+logger = OrchestratorLogger(workload_name="{workload_name}", run_id=run_id)
+```
+
+Then call `logger.phase_start(phase_number, agent_name)` / `logger.phase_complete(...)` / `logger.link_sub_agent_trace(agent_output_dict, agent_name, phase)` around every sub-agent spawn, and `logger.pipeline_summary()` at the end. The tracer flushes automatically to `workloads/{name}/logs/{datetime}_{workload}.jsonl`.
+
+**Symptom of missing tracer**: workload has generated artifacts (scripts, DAG, tests) but `workloads/{name}/logs/` contains only `.gitignore` + `README.md`. Compare to `workloads/financial_portfolios/logs/` which has `trace_events.jsonl` + a `run_*` folder from a real run. If logs are empty for a partially-onboarded workload, the orchestrator was not wrapped. RESUME.md will correctly note this but lose the per-phase timestamps.
+
+This is the push side of the hybrid RESUME.md mechanism. The pull side (`shared/utils/resume_writer.py`) covers sessions where the tracer was skipped, so a new Claude session can always resume — just with disk-signal granularity instead of event-level.
+
+---
 
 ### Step 0.1: Auto-Detect Existing AWS Resources
 
@@ -1657,6 +1680,11 @@ After human approves, execute ALL AWS operations from the main conversation wher
 > **Full guardrails for every phase (including deploy) are in `MCP_GUARDRAILS.md`.**
 > That file has the actual MCP tool names, per-step fallback rules, and live server status.
 
+- **Multi-account support**: When `account_topology.mode == "multi"`, the generated `deploy_to_aws.py` accepts two CLI flags:
+  - `--jobs-account-id` (required in multi mode; defaults to `sts.get_caller_identity()` and must match).
+  - `--catalog-account-id` (required in multi mode).
+  When both flags differ, the script MUST use `catalog_account_id` in every `boto3.client('glue', ...).get_*(CatalogId=catalog_account_id, ...)` call, and construct cross-account ARN templates like `arn:aws:iam::{jobs_account_id}:role/...` for jobs-side resources vs `arn:aws:iam::{catalog_account_id}:role/...` for catalog-side references. In single-account mode, a single `--account-id` flag (the current behaviour) suffices.
+
 **Step 5.0: MCP Health Check (MANDATORY — reuse or re-run Phase 0)**
 
 Re-run the Phase 0 Step 0.2 health check before deployment. If Phase 0 was already run in this session and all REQUIRED servers passed, you may reuse those results — confirm with the human:
@@ -2034,6 +2062,13 @@ LINEAGE — GLUE DATA LINEAGE (native, automatic):
   - Use DynamicFrames or Spark DataFrames with Glue catalog integration
 
 ## Capabilities
+
+- **Multi-account support**: If `workloads/{name}/config/deployment.yaml#account_topology.mode == "multi"`, the generated PySpark scripts MUST:
+  - Accept `--catalog_account_id` as a job argument.
+  - Before any `spark.read`/`spark.table` against `glue_catalog.*`, run:
+    `spark.conf.set("spark.sql.catalog.glue_catalog.glue.id", args["catalog_account_id"])`.
+  - Document the requirement at the top of the script with a comment pointing to `docs/multi-account-deployment.md`.
+  In single-account mode, omit both. The difference between the two emitted scripts MUST be only the two lines above plus the `getResolvedOptions` entry.
 
 ### Landing → Staging (Cleaning & Normalization → Iceberg Tables)
 
@@ -2436,6 +2471,11 @@ Generate production-grade Airflow DAGs that orchestrate the Bronze → Silver �
 
 ### DO
 
+- **Multi-account support**: If `account_topology.mode == "multi"`, the generated DAG MUST:
+  - Read `Variable.get("glue_catalog_account_id", default_var="")` at import time.
+  - Pass `--catalog_account_id={{ glue_catalog_account_id }}` in every GlueJobOperator's `script_args` (or `default_args`).
+  - Add a `doc_md` note pointing the Airflow user at `docs/multi-account-deployment.md`.
+  In single-account mode, omit the Variable and the script_arg.
 - Place DAGs in `workloads/{workload_name}/dags/{workload_name}_dag.py`.
 - Use descriptive `dag_id` format: `{workload_name}_{frequency}` (e.g., `sales_data_daily`).
 - Set `catchup=False` unless explicit backfill is requested.

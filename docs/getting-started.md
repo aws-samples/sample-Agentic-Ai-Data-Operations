@@ -45,6 +45,8 @@ Existing resources: none
 
 This creates all AWS prerequisites (IAM roles, S3 bucket, KMS keys, Glue databases, LF-Tags) interactively. See `prompts/00-setup-environment.md` for full details.
 
+**Multi-account deployment**: The setup defaults to single-account. If you need the Glue catalog + Lake Formation in one account ("Account A") and Glue jobs + MWAA + S3 in a consumer account ("Account B"), see [`multi-account-deployment.md`](multi-account-deployment.md) — the setup prompt will ask a single-vs-multi question and wire `catalog_account_id` + `sts:AssumeRole` across generated artifacts.
+
 ---
 
 ## 🚀 Quick Start: Onboard Your First Dataset

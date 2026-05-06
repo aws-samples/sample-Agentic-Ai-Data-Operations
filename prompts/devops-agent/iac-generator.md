@@ -124,6 +124,40 @@ override before applying.
    and one consumer role. Silent-granting to the current IAM caller is not
    permitted."`
 
+3. **`account_topology`** — single-account (default) vs multi-account
+   (catalog in Account A, jobs/MWAA in Account B). Shape matches
+   `shared/templates/account_topology.yaml`.
+
+   **Preferred source of truth**: read
+   `workloads/{workload_name}/config/deployment.yaml#account_topology`
+   if it exists (populated by the onboarding prompt). If missing, ask
+   the user:
+
+   - `mode`: `single` *(default)* or `multi`
+   - If `multi`, ALSO ask:
+     - `catalog_account_id` (12-digit Account A ID)
+     - `jobs_account_id` (12-digit Account B ID — must equal caller)
+     - `catalog_assume_role_arn`
+       (`arn:aws:iam::<A>:role/<reader-role>`)
+     - `catalog_external_id` (optional)
+     - `region` (both accounts must share the same region)
+
+   **Validation**:
+   - If `mode == "multi"` and `jobs_account_id == catalog_account_id` →
+     `blocking_issue`: `"account_topology.mode=multi requires different
+     jobs_account_id and catalog_account_id."`
+   - If `mode == "multi"` and `catalog_assume_role_arn` is empty →
+     `blocking_issue`: `"Multi-account mode requires
+     catalog_assume_role_arn. Create the catalog-reader role in Account A
+     per docs/multi-account-deployment.md §1 before proceeding."`
+   - If `mode == "single"` → set `catalog_account_id = jobs_account_id`
+     and leave assume-role fields null. No provider aliases or
+     cross-account wiring will be emitted.
+
+   Record the decision in `decisions[]` under category `account_scope`
+   with `alternatives_considered: ["single"]` and `rejection_reasons`
+   describing why multi was chosen (or vice versa).
+
 ### Defaults applied silently (echo in `APPLY_GUIDE.md`)
 
 | Setting | Default | Rationale |
@@ -151,6 +185,10 @@ input_hash = compute_input_hash({
     "workload_name":     workload_name,
     "target_framework":  target_framework,
     "tbac_principals":   tbac_principals,
+    "account_topology":  account_topology,   # {mode, jobs_account_id,
+                                             #  catalog_account_id,
+                                             #  catalog_assume_role_arn,
+                                             #  catalog_external_id, region}
     "started_at":        started_at,
 })
 ```
@@ -385,6 +423,15 @@ workloads/{workload_name}/iac/terraform/
   `write.parquet.compression-codec=zstd`, plus a `lineage_hash` parameter
   sourced from upstream `transformation_agent_output#lineage_hash` when
   present.
+- **Multi-account (`account_topology.mode == "multi"`)**: every
+  `data "aws_glue_catalog_database"` / `data "aws_glue_catalog_table"` /
+  `aws_glue_catalog_table` resource MUST include
+  `catalog_id = var.catalog_account_id` AND carry
+  `provider = aws.catalog` so lookups resolve against Account A's catalog
+  via the assumed role (see §4.10). Databases are NOT declared in
+  Account B — only referenced. Fail-closed: if any Glue resource in
+  `catalog.tf` is missing `catalog_id` or `provider = aws.catalog` while
+  `mode == "multi"`, emit a `blocking_issue`.
 
 ### 4.3 Glue Jobs
 
@@ -434,6 +481,16 @@ Record under category `mwaa_upload_layout`.
 - TBAC grants: emit one `aws_lakeformation_permissions` with `lf_tag_policy`
   per entry in `tbac_principals`. Record under category `tbac_grant_scope`
   with the full principal list in `context`.
+- **Multi-account (`account_topology.mode == "multi"`)**:
+  - LF-Tags + assignments + grants are owned by **Account A**. Emit every
+    `aws_lakeformation_*` resource with `provider = aws.catalog` and, for
+    resource blocks that accept it (`aws_lakeformation_resource_lf_tags`,
+    `aws_lakeformation_permissions`), add `catalog_id = var.catalog_account_id`.
+  - `tbac_principals[*].role_arn` MUST be principals from the **jobs
+    account** (Account B), but grants are emitted in Account A so Account B
+    roles can read catalog resources owned by A.
+  - Do NOT emit LF-Tags into Account B — add a comment in `governance.tf`
+    explaining that LF administration lives in A for this topology.
 
 ### 4.7 IAM Roles
 
@@ -465,6 +522,92 @@ Generate only if `semantic_layer_scope == "per_workload"` (default is
 - SynoDB DynamoDB table: `{workload_name}_synodb` with `dataset_name` PK,
   `query_id` SK, on-demand billing, point-in-time recovery on, KMS
   encryption with publish-zone key.
+
+### 4.10 Multi-Account Provider Wiring
+
+This section applies ONLY when `account_topology.mode == "multi"`. In
+`mode == "single"` the IaC emits exactly one `aws` provider with no
+aliases and no `assume_role` block — unchanged from the previous behaviour.
+
+When multi, the IaC generator MUST:
+
+1. **Declare two providers** in `versions.tf` (Terraform), or their CDK /
+   CFN equivalents:
+
+   ```hcl
+   # Default provider — jobs account (Account B).
+   provider "aws" {
+     region = var.region
+     # No assume_role — caller's credentials are already for Account B.
+   }
+
+   # Named alias for the catalog account (Account A).
+   provider "aws" {
+     alias  = "catalog"
+     region = var.region
+
+     assume_role {
+       role_arn     = var.catalog_assume_role_arn
+       external_id  = var.catalog_external_id   # may be null
+       session_name = "adop-iac-{workload_name}"
+     }
+   }
+   ```
+
+   CDK Python: emit one `aws_cdk.Environment(account=jobs_account_id, ...)`
+   for the main stack plus a `CrossAccountStack` with `env=Environment(account=catalog_account_id, ...)`
+   that uses `Role.from_role_arn(..., role_arn=catalog_assume_role_arn)`
+   for its default role.
+
+   CloudFormation: emit two stacks (one per account) and wire the
+   catalog stack's outputs into the jobs stack via `!ImportValue`. CFN
+   does not support a per-resource provider alias, so the template is
+   split.
+
+2. **Add three Terraform variables** in `variables.tf`:
+
+   ```hcl
+   variable "jobs_account_id"         { type = string }
+   variable "catalog_account_id"      { type = string }
+   variable "catalog_assume_role_arn" { type = string }
+   variable "catalog_external_id"     { type = string, default = null }
+   ```
+
+   Populate defaults from the Phase 0 answers, but do not hard-code the
+   account IDs — they stay parameterized for per-environment overrides.
+
+3. **Tag every cross-account resource** with `provider = aws.catalog`.
+   This means: all `aws_glue_catalog_*`, all `aws_lakeformation_*`, and
+   any `data "aws_iam_role"` that references Account A roles. Everything
+   else (S3 buckets, KMS keys, Glue jobs, MWAA uploads, Athena
+   workgroups, IAM roles in Account B) stays on the default provider.
+
+4. **Cross-account IAM trust** — add a one-time `aws_iam_role_policy`
+   (under the default provider, attached to Account B's Glue service
+   role) allowing `sts:AssumeRole` on `var.catalog_assume_role_arn`.
+   Use a `Condition` matching `sts:ExternalId` when
+   `catalog_external_id` is set. Record the decision in `decisions[]`
+   under category `cross_account_assume_role`.
+
+5. **APPLY_GUIDE.md additions** (see Phase 7):
+   - Pre-flight: Account A reader role exists with trust policy for
+     Account B's Glue service role.
+   - Pre-flight: Account A Lake Formation grants on target DBs to the
+     reader role.
+   - Apply steps: `terraform init` / `plan` / `apply` run under
+     Account B credentials — Terraform assumes into Account A for the
+     `aws.catalog` provider automatically.
+   - Rollback notes: destroying in Account B does not remove anything
+     in Account A (by design). If you need to rollback LF grants in A,
+     do so manually.
+
+6. **Deterministic output** — for single-account, do NOT emit the
+   `aws.catalog` provider or any of the variables above. The single vs
+   multi output trees MUST differ only by these additions; the rest of
+   the layout is identical. Record the choice under `account_scope`.
+
+Refer to `docs/multi-account-deployment.md` for the AWS setup
+pre-requisites that are NOT automated here.
 
 ---
 
@@ -817,6 +960,8 @@ category applies to this run**:
 | `idempotency_handling`   | When `prevent_destroy` / `RemovalPolicy.RETAIN` was applied          |
 | `input_source_fallback`  | When upstream `.runs/{run_id}/` JSONs were absent                    |
 | `validator_availability` | When any Phase 6 validator was skipped due to missing tooling        |
+| `account_scope`          | Always (single vs multi). Record the chosen mode + Account A/B IDs.  |
+| `cross_account_assume_role` | Only when `mode == "multi"` and Phase 4.10 emits the sts:AssumeRole grant |
 
 Each entry MUST include `alternatives_considered` and `rejection_reasons` —
 even when the choice is obvious. "Other frameworks not configured for this
@@ -845,6 +990,12 @@ repo" is a valid rejection reason; absence of one is not.
   permits only.
 - **DO NOT** silently grant TBAC to the current IAM caller. Empty
   `tbac_principals` → `blocking_issue`.
+- **DO NOT silently mix account IDs.** When `account_topology.mode ==
+  "multi"`, every Glue or Lake Formation resource that targets the
+  catalog account MUST be emitted under `provider = aws.catalog` with an
+  explicit `catalog_id = var.catalog_account_id`. Defaulting a Glue
+  lookup to the caller's account in multi-account mode is a silent bug
+  — treat it as `blocking_issue`.
 - **DO NOT** proceed if any upstream `AgentOutput` is missing, failed, or
   has a checksum mismatch.
 - **DO NOT** respond in plain text or markdown. Call `submit_agent_output`.

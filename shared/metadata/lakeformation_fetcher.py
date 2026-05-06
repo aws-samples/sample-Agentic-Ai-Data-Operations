@@ -12,15 +12,35 @@ from botocore.exceptions import ClientError
 class LakeFormationFetcher:
     """Fetch LF-Tags and permissions from AWS Lake Formation."""
 
-    def __init__(self, region: str = 'us-east-1'):
+    def __init__(self, region: str = 'us-east-1', catalog_id: Optional[str] = None):
         """
         Initialize Lake Formation client.
 
         Args:
             region: AWS region
+            catalog_id: Lake Formation catalog ID (12-digit AWS account)
+                to target. When None, boto3 uses the caller's catalog
+                (single-account mode). When set, LF calls that accept a
+                Table.CatalogId carry it so reads hit a remote catalog
+                (multi-account mode). See docs/multi-account-deployment.md.
         """
         self.lf = boto3.client('lakeformation', region_name=region)
         self.region = region
+        self.catalog_id = catalog_id
+
+    def _resource_with_catalog(self, resource: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Inject CatalogId into an LF Resource dict when running multi-account.
+
+        LF accepts CatalogId inside Table/Database resource blocks rather
+        than as a top-level kwarg, so we mutate the inner dict.
+        """
+        if not self.catalog_id:
+            return resource
+        for key in ('Table', 'Database', 'TableWithColumns'):
+            if key in resource:
+                resource[key] = {**resource[key], 'CatalogId': self.catalog_id}
+        return resource
 
     def fetch_table_lf_tags(self, database: str, table: str) -> Dict[str, List[Dict[str, str]]]:
         """
@@ -44,12 +64,12 @@ class LakeFormationFetcher:
         """
         try:
             response = self.lf.get_resource_lf_tags(
-                Resource={
+                Resource=self._resource_with_catalog({
                     'Table': {
                         'DatabaseName': database,
                         'Name': table
                     }
-                },
+                }),
                 ShowAssignedLFTags=True
             )
 
@@ -138,7 +158,8 @@ class LakeFormationFetcher:
             ['PII_Classification', 'PII_Type', 'Data_Sensitivity']
         """
         try:
-            response = self.lf.list_lf_tags()
+            kwargs = {'CatalogId': self.catalog_id} if self.catalog_id else {}
+            response = self.lf.list_lf_tags(**kwargs)
             return response.get('LFTags', [])
         except ClientError:
             return []
@@ -162,12 +183,12 @@ class LakeFormationFetcher:
         """
         try:
             response = self.lf.list_permissions(
-                Resource={
+                Resource=self._resource_with_catalog({
                     'Table': {
                         'DatabaseName': database,
                         'Name': table
                     }
-                }
+                })
             )
             return response.get('PrincipalResourcePermissions', [])
         except ClientError:

@@ -4,6 +4,8 @@ This document covers every AWS prerequisite so the Landing -> Staging -> Publish
 
 > **Security**: All examples use placeholders (`${PROJECT}`, `${AWS_ACCOUNT_ID}`, `${REGION}`). Never commit real account IDs, bucket names, or key ARNs to source control.
 
+> **Account topology**: This guide assumes the default single-account deployment (all resources in one AWS account). For the opt-in multi-account topology — Glue catalog + Lake Formation in "Account A" and Glue jobs + MWAA + S3 in "Account B" — see [`multi-account-deployment.md`](multi-account-deployment.md) for the additional cross-account IAM, RAM, and `sts:AssumeRole` setup.
+
 ---
 
 ## 1. IAM Roles & Policies

@@ -5,6 +5,8 @@ OWL2 ontology + R2RML mappings from each workload's `semantic.yaml` +
 Glue Gold-zone table schema, validates Turtle syntax, and emits three
 artifacts to `workloads/{name}/config/` for handoff to the AWS Semantic Layer (upcoming).
 
+**Multi-account note**: When the workload's `account_topology.mode == "multi"` (see `shared/templates/account_topology.yaml` and `docs/multi-account-deployment.md`), the Ontology Staging Agent instantiates `GlueFetcher(..., catalog_id=catalog_account_id)` so the Gold-zone schema is fetched from Account A's catalog. The induced OWL + R2RML artifacts still land under `workloads/{name}/config/` in the local repo — only the metadata source is cross-account.
+
 ## Scope boundary
 
 ### ADOP does (this package)

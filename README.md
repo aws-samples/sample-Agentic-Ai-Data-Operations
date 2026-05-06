@@ -4,6 +4,46 @@
 
 ---
 
+## Starting the Agent
+
+Open Claude Code in this repo and paste a prompt describing **where the data lives, where it's going, the cadence, and any compliance requirements.** The Data Onboarding Agent asks clarifying questions, then spawns sub-agents to generate a fully tested workload under `workloads/<name>/`.
+
+**A good prompt includes:**
+- **Source** (S3 path / Kafka topic / Kinesis stream / JDBC)
+- **Sink cadence** (batch daily / micro-batch / streaming)
+- **Target zones** (Silver quality rules, Gold transformations)
+- **Compliance** (GDPR, CCPA, HIPAA, SOX, PCI DSS — or none)
+
+### Example 1 — Batch from S3 (CSV, daily)
+```
+Onboard claims data from s3://data-lake-<account>-us-east-1/bronze/claims/ingestion_date=YYYY-MM-DD/claims.csv
+into Silver with dedup on claim_id and not-null policy_number, and into a flat denormalized
+Gold Iceberg table with derived measures (net_paid_ratio, days_to_submission, denial_category).
+Run daily at 03:00 UTC. Apply HIPAA controls with PHI masking in Silver and PHI suppression in Gold.
+```
+
+### Example 2 — Streaming from Kafka (Glue Streaming ETL)
+```
+Onboard transaction events from Kafka topic `payments.auth.v1` (bootstrap:
+b-1.msk-prod.kafka.us-east-1.amazonaws.com:9098, IAM auth) using AWS Glue Streaming ETL.
+Land micro-batches every 60s into Bronze Iceberg on S3, dedup on event_id in Silver
+with schema validation, and aggregate to 5-minute windows in Gold (fraud_score by merchant, rolling
+auth_rate). Apply PCI DSS — tokenize PAN, drop CVV, Luhn check as a quality rule.
+```
+
+### Example 3 — Streaming from Kinesis (Glue Streaming ETL)
+```
+Onboard clickstream events from Kinesis Data Stream `web-events-prod` (shard count 8,
+PutRecord enhanced fan-out consumer) using AWS Glue Streaming ETL with a checkpoint on S3.
+Write Bronze Iceberg on 1-minute triggers, Silver with session stitching on user_id + 30-min
+inactivity gap, Gold hourly rollups (page_views, unique_users, bounce_rate by traffic_source).
+Apply GDPR — consent-based filter on user_id, 365-day retention, right-to-erasure hook.
+```
+
+Watch the agent run, approve the plan it presents, and the artifacts land under `workloads/<name>/` (config, scripts, DAG, tests, ontology).
+
+---
+
 ## Why Agentify Data Operations?
 
 Traditional data pipeline development is slow, manual, and error-prone:
@@ -281,6 +321,10 @@ Dev Agent → Generate scripts/tests → Commit to Git → CI/CD pipeline → QA
 ### Semantic Layer
 
 The semantic layer in ADOP has two responsibilities: (1) capture business context in `semantic.yaml` and mirror it to SageMaker Catalog, (2) emit OWL + R2RML artifacts for handoff to the AWS Semantic Layer (upcoming).
+
+### Deployment Topology
+
+By default the platform deploys to a single AWS account: Glue Data Catalog, Lake Formation, Glue jobs, MWAA, and S3 all live together. An opt-in multi-account topology is supported where the Glue catalog + Lake Formation live in one account ("Account A") and Glue jobs + MWAA + S3 live in a consumer account ("Account B"). The setup and onboarding prompts ask a single-vs-multi question up front; when multi is chosen, the generated IaC, PySpark, DAG, and deploy scripts all parameterize `catalog_account_id` and emit `sts:AssumeRole` wiring. See [`docs/multi-account-deployment.md`](docs/multi-account-deployment.md) for AWS pre-requisites and known limits (read-only from A to B today; write-back requires RAM).
 
 **How it works:**
 1. **Input**: Define business context in `workloads/{name}/config/semantic.yaml` (column roles, aggregations, relationships, business terms, hierarchies, PII flags). Source of truth.

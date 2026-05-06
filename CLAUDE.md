@@ -22,6 +22,8 @@ An autonomous data pipeline orchestration platform that moves data through **Bro
 
 Read `design.md` before making architectural decisions. Read `SKILLS.md` before acting as any agent. Read `TOOLS.md` for AWS service selection. Read `MCP_GUARDRAILS.md` for which MCP tool vs CLI to use at each phase. See `docs/workflow-diagrams.md` for visual diagrams.
 
+**Deployment topology**: Default is single-account (all AWS resources in one account). Opt-in multi-account (catalog in Account A, compute + MWAA + S3 in Account B) is described in [`docs/multi-account-deployment.md`](docs/multi-account-deployment.md) with schema at `shared/templates/account_topology.yaml`.
+
 ## Architecture Overview
 
 ```

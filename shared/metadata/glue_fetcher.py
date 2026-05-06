@@ -12,15 +12,25 @@ from botocore.exceptions import ClientError
 class GlueFetcher:
     """Fetch metadata from AWS Glue Data Catalog."""
 
-    def __init__(self, region: str = 'us-east-1'):
+    def __init__(self, region: str = 'us-east-1', catalog_id: Optional[str] = None):
         """
         Initialize Glue client.
 
         Args:
             region: AWS region
+            catalog_id: Glue Catalog ID (12-digit AWS account) to target.
+                When None, boto3 uses the caller's catalog (single-account
+                mode). When set, every Glue API call passes CatalogId so
+                reads hit a remote catalog (multi-account mode). See
+                docs/multi-account-deployment.md.
         """
         self.glue = boto3.client('glue', region_name=region)
         self.region = region
+        self.catalog_id = catalog_id
+
+    def _catalog_kwargs(self) -> Dict[str, str]:
+        """Return {'CatalogId': ...} if multi-account, else {} (caller's catalog)."""
+        return {'CatalogId': self.catalog_id} if self.catalog_id else {}
 
     def fetch_database_metadata(self, database: str) -> Dict[str, Any]:
         """
@@ -36,7 +46,7 @@ class GlueFetcher:
             ClientError: If database not found
         """
         try:
-            response = self.glue.get_database(Name=database)
+            response = self.glue.get_database(Name=database, **self._catalog_kwargs())
             db_meta = response['Database']
 
             return {
@@ -73,7 +83,9 @@ class GlueFetcher:
             ValueError: If table not found
         """
         try:
-            response = self.glue.get_table(DatabaseName=database, Name=table)
+            response = self.glue.get_table(
+                DatabaseName=database, Name=table, **self._catalog_kwargs()
+            )
             table_meta = response['Table']
             storage_desc = table_meta.get('StorageDescriptor', {})
 
@@ -138,7 +150,7 @@ class GlueFetcher:
             ValueError: If database not found
         """
         try:
-            response = self.glue.get_tables(DatabaseName=database)
+            response = self.glue.get_tables(DatabaseName=database, **self._catalog_kwargs())
             return [table['Name'] for table in response['TableList']]
 
         except ClientError as e:
@@ -153,5 +165,5 @@ class GlueFetcher:
         Returns:
             List of database names
         """
-        response = self.glue.get_databases()
+        response = self.glue.get_databases(**self._catalog_kwargs())
         return [db['Name'] for db in response['DatabaseList']]

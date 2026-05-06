@@ -114,13 +114,68 @@ Action: Determine MCP hosting mode, verify connectivity, build endpoint inventor
     - Run prompts/09-deploy-agentcore-gateway.md FIRST to deploy Gateway
     - Run prompts/10-deploy-agentcore-runtime.md for cloud-hosted agent (optional)
 
-── 1b. Verify AWS Credentials ──────────────────────────────────────
+── 1b. Choose Account Topology (single vs multi-account) ──────────
+
+  Two options (ask the user):
+
+  SINGLE ACCOUNT (default):
+    - Glue Data Catalog + Lake Formation + Glue jobs + MWAA + S3 all
+      live in the same AWS account (the one `aws sts get-caller-identity`
+      returns).
+    - No cross-account IAM, no assume-role wiring. Most users pick this.
+
+  MULTI-ACCOUNT (catalog/consumer split):
+    - Glue Data Catalog + Lake Formation live in Account A.
+    - Glue jobs + MWAA + S3 buckets + IAM roles live in Account B.
+    - Read-only from Account B jobs to Account A catalog; write-back to
+      Account A is NOT supported by this setup (requires RAM share —
+      see docs/multi-account-deployment.md).
+
+  If MULTI-ACCOUNT is chosen, collect these from the user:
+    - catalog_account_id        (12-digit AWS account ID for Account A)
+    - jobs_account_id           (12-digit AWS account ID for Account B —
+                                 must match current `aws sts get-caller-identity`)
+    - catalog_assume_role_arn   (arn:aws:iam::<A>:role/adop-catalog-reader
+                                 or similar — MUST already exist, see
+                                 pre-requisites in docs/multi-account-deployment.md)
+    - catalog_external_id       (optional; the sts:ExternalId the trust
+                                 policy requires — may be null)
+
+  Pre-requisite gate (for multi-account only):
+    1. docs/multi-account-deployment.md §1 is complete — catalog-reader
+       role exists in Account A with the right trust policy.
+    2. docs/multi-account-deployment.md §2 is complete — LF grants on
+       target databases to the reader role.
+    3. docs/multi-account-deployment.md §3 is complete — jobs Glue role
+       in Account B has sts:AssumeRole on the reader role.
+    STOP and point the user to docs/multi-account-deployment.md if any
+    of the above is not done. Do NOT proceed to Step 2 until the pre-
+    requisites are in place — the setup would succeed but cross-account
+    reads would fail at runtime.
+
+  Persist the answer:
+    - Write an Airflow Variable `glue_catalog_account_id` = catalog_account_id
+      (in single mode, this equals the caller's account).
+    - Write an Airflow Variable `glue_catalog_assume_role_arn` =
+      catalog_assume_role_arn (null / empty string in single mode).
+    - Write an Airflow Variable `glue_catalog_external_id` =
+      catalog_external_id (null / empty string in single mode).
+    - These Variables are read by generated DAGs and deploy scripts.
+    - The full account_topology block (see
+      shared/templates/account_topology.yaml) is stored per-workload when
+      Phase 1 of prompts/data-onboarding-agent/03-onboard-build-pipeline.md
+      runs.
+
+── 1c. Verify AWS Credentials ──────────────────────────────────────
 
 CLI:    aws sts get-caller-identity
 Output: Account ID, region confirmed
-Gate:   Must succeed before proceeding
+Gate:   Must succeed before proceeding.
+        If multi-account mode selected in 1b: the account returned here
+        MUST equal jobs_account_id. If it doesn't, STOP — the caller is
+        in the wrong account.
 
-── 1c. MCP Health Check + Endpoint Inventory ────────────────────────
+── 1d. MCP Health Check + Endpoint Inventory ────────────────────────
 
 MCP:    mcp__iam__list_roles (verify IAM access)
         mcp__cloudtrail__lookup_events (verify CloudTrail access)

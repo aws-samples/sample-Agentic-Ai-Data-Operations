@@ -1,5 +1,7 @@
 # Workflow Diagrams — Agentic Data Onboarding System
 
+> **Account topology note**: All diagrams below assume the default single-account deployment. For the opt-in multi-account topology (catalog in Account A, Glue jobs/MWAA/S3 in Account B), see [`multi-account-deployment.md`](multi-account-deployment.md) — the same flow applies, with cross-account `sts:AssumeRole` wiring on catalog reads/writes.
+
 ## 1. End-to-End Orchestration Flow
 
 ```mermaid

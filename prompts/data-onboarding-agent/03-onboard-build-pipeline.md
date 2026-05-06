@@ -87,6 +87,37 @@ Source:
 - Credentials: [Airflow Connection ID or Secrets Manager ARN]
 - Estimated size: [ROW_COUNT] rows, [SIZE] GB
 
+Deployment Scope (account_topology — see shared/templates/account_topology.yaml):
+
+- Scope: [single / multi]
+
+**If single (default):** nothing else to specify. Glue catalog, Glue jobs,
+MWAA, S3, IAM all live in the account returned by `aws sts get-caller-identity`.
+
+**If multi (catalog in Account A, jobs/MWAA in Account B):**
+- catalog_account_id: [12-digit AWS account ID — Account A, owns Glue Data
+  Catalog + Lake Formation]
+- jobs_account_id: [12-digit AWS account ID — Account B, runs Glue jobs,
+  MWAA, owns S3 buckets + KMS keys; MUST equal current caller identity]
+- catalog_assume_role_arn: [arn:aws:iam::<A>:role/<catalog-reader> — IAM
+  role in Account A that Account B's Glue service role assumes; MUST
+  already exist per docs/multi-account-deployment.md §1]
+- catalog_external_id: [optional sts:ExternalId string, or "null" if the
+  trust policy doesn't require one]
+- Region: [us-east-1 / ... — both accounts must be same region]
+
+Pre-requisites for multi-account (STOP and refuse onboarding if any is missing):
+  1. Account A: catalog-reader IAM role exists with trust policy allowing
+     Account B's Glue service role (see docs/multi-account-deployment.md §1).
+  2. Account A: Lake Formation grants the reader role DESCRIBE + SELECT on
+     target databases/tables (see §2 of the same doc).
+  3. Account B: Glue service role has `sts:AssumeRole` on the Account A
+     reader role ARN (see §3).
+  4. Airflow Variables `glue_catalog_account_id`,
+     `glue_catalog_assume_role_arn`, and `glue_catalog_external_id` are
+     already set by `prompts/environment-setup-agent/01-setup-aws-infrastructure.md`
+     Step 1b.
+
 Schema:
 - [col1]: [type], [description], [role: measure/dimension/identifier/temporal]
 - [col2]: ...
@@ -334,6 +365,68 @@ Build complete pipeline with tests.
 | `FIXTURE_PATH` | CSV fixture for integration tests | `demo/sample_data/orders.csv` |
 | `CSV/JSON/Parquet` | Source format | JSON |
 | `Daily/Hourly` | Ingestion frequency | Hourly |
+
+### Deployment Scope
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `Scope` | `single` (default) or `multi` | `single` |
+| `catalog_account_id` | Account A (Glue catalog owner) if multi | `111111111111` |
+| `jobs_account_id` | Account B (Glue jobs + MWAA + S3) — matches caller | `222222222222` |
+| `catalog_assume_role_arn` | IAM role Account B assumes into Account A | `arn:aws:iam::111111111111:role/adop-catalog-reader` |
+| `catalog_external_id` | Optional sts:ExternalId | `adop-b-to-a` |
+
+**Persistence**: Once the user answers the Deployment Scope block in the
+prompt template, write the full structure to
+`workloads/{DATASET_NAME}/config/deployment.yaml` using the schema at
+`shared/templates/account_topology.yaml`. In single mode, set
+`catalog_account_id == jobs_account_id` and leave assume-role fields null.
+
+**Sub-agent threading**: Include the `account_topology` block in every
+sub-agent spawn prompt (Metadata, Transformation, Quality, DAG, Ontology
+Staging, IaC Generator). Each sub-agent reads it and:
+
+- **Metadata Agent** instantiates `GlueFetcher` / `LakeFormationFetcher`
+  with `catalog_id=catalog_account_id` so Phase 3 profiling hits the
+  correct catalog.
+- **Transformation Agent** — when `mode=multi`, the generated PySpark
+  MUST include `spark.conf.set("spark.sql.catalog.glue_catalog.glue.id", args["catalog_account_id"])`
+  and accept `--catalog_account_id` as a job arg.
+- **DAG Agent** — when `mode=multi`, the generated DAG MUST read
+  `Variable.get("glue_catalog_account_id")` and pass it as
+  `--catalog_account_id` to every GlueJobOperator default_args.
+- **IaC Generator** reads the block in its Phase 0 (see
+  `prompts/devops-agent/iac-generator.md`) and emits provider aliases
+  + CatalogId references accordingly.
+- See `docs/multi-account-deployment.md` for the full generation
+  contract.
+
+### RESUME.md maintenance (push side of hybrid)
+
+After **every** sub-agent test gate passes (Metadata, Transformation,
+Quality, DAG, Ontology Staging), the orchestrator MUST regenerate
+`workloads/{workload_name}/RESUME.md`. Call the shared util:
+
+```python
+from shared.utils.resume_writer import write_resume_from_disk
+write_resume_from_disk(workload_name="{workload_name}")
+```
+
+…or via CLI: `python3 -m shared.utils.resume_writer --workload {workload_name}`.
+
+RESUME.md is the **durable handoff contract** when the session is
+interrupted. A human (or a future Claude Code session) reads RESUME.md
+to know which phases completed, what's blocking, and the exact prompt
+to paste to resume. Do NOT hand-write RESUME.md — always regenerate
+from disk so the file matches reality.
+
+Update RESUME.md also at:
+- Phase 0 topology choice persisted to `config/deployment.yaml`.
+- Phase 5 deploy dry-run started (writes a `trace_events.jsonl`).
+- Phase 5 deploy completed (writes `deployment_summary.json`).
+
+If the agent cannot call Python (e.g., Claude Code tool budget
+exhausted), instruct the user to run the CLI command shown above.
 
 ### Schema
 

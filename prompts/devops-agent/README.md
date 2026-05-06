@@ -12,6 +12,8 @@ The DevOps Agent automates deployment, monitoring, and maintenance of data pipel
 
 Today, the agent can generate deployable IaC (Terraform / AWS CDK / CloudFormation) from a completed workload's artifacts. It does NOT apply the IaC — a human reviews and applies manually as a deliberate review step. See [`iac-generator.md`](./iac-generator.md).
 
+By default the generator assumes **single-account** deployment. If you answer "multi" to the Phase 0 `account_topology` question, the generator emits provider aliases, cross-account `sts:AssumeRole` wiring, and `catalog_id`-aware Glue + Lake Formation resources so jobs in Account B can read from an Account A catalog. See [`../../docs/multi-account-deployment.md`](../../docs/multi-account-deployment.md) for the AWS-side pre-requisites (catalog-reader role in Account A, Lake Formation grants, and B → A assume-role trust) — those are NOT automated by the generator.
+
 ## Planned Capabilities
 
 ### 🚀 CI/CD Automation
@@ -132,6 +134,7 @@ DevOps Agent (Automated, event-driven)
 - Data Onboarding Agent (deploys its generated artifacts)
 - Ontology Staging Agent (watches for new `ontology.ttl` commits for AWS Semantic Layer sync)
 - Environment Setup Agent (manages infrastructure drift)
+- Multi-account: reads account_topology from workloads/{name}/config/deployment.yaml emitted by the Data Onboarding Agent (prompt 03)
 
 **Triggered by**:
 - Git push (CI/CD)
