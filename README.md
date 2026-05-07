@@ -87,13 +87,15 @@ A user describes their data source in natural language. The **Data Onboarding Ag
 
 ![Data Onboarding Agent Workflow](docs/diagrams/data-onboarding-workflow.png)
 
-**The Data Onboarding Agent (center, green) orchestrates 4 specialized sub-agents:**
+**The Data Onboarding Agent (center) orchestrates specialized sub-agents. The Router Agent gates entry on the left; Glue Catalog, Semantic Layer (OWL/SHACL), Decision Engine, Memory, and Agentrace logs are shared services on the right.**
 
 1. **Router Agent** — Checks if the data or workload already exists in `workloads/`
 2. **Metadata Agent** — Analyzes raw dataset, extracts metadata (data types, column datatypes, distinct values, quality issues), stores business context in **Semantic Layer**
-3. **Data Quality Agent** — Creates quality scripts for each column based on metadata agent inputs (column-level checks, parent-child relationships, quality thresholds, pass/fail gates)
-4. **Data Transformation Agent** — Creates AWS Glue scripts to run transformations (Bronze→Silver→Gold) based on user input and metadata agent analysis
-5. **Orchestration/Scheduling DAG Agent** — Creates the end-to-end orchestration DAG in Airflow or Step Functions
+3. **Ontology Agent** — Induces the OWL ontology for the Semantic Layer from Glue/SageMaker Catalog metadata (data types, column datatypes, distinct values, quality issues)
+4. **Data Quality Agent** — Creates quality scripts for each column based on metadata agent inputs (column-level checks, parent-child relationships, quality thresholds, pass/fail gates)
+5. **Data Transformation Agent** — Creates AWS Glue scripts to run transformations (Bronze→Silver→Gold) based on user input and metadata agent analysis
+6. **Orchestration/Scheduling DAG Agent** — Creates the end-to-end orchestration DAG in Airflow or Step Functions
+7. **DevOps Agent** — Creates CloudFormation, Terraform, and AWS CDK to promote the generated artifacts to higher environments
 
 **Workflow:**
 ```
@@ -265,7 +267,7 @@ See [shared/prompt_intelligence/QUICKSTART.md](shared/prompt_intelligence/QUICKS
 
 | Environment | What Runs | How |
 |-------------|-----------|-----|
-| **Development** | All 4 agents (Onboarding, Analysis, Prompt Intelligence, DevOps setup) | Interactive via Claude Code CLI |
+| **Development** | Active agents: Data Onboarding, Ontology Staging, Environment Setup, Prompt Intelligence. DevOps Agent planned for Q2 2026. | Interactive via Claude Code CLI |
 | **QA/Staging** | Generated scripts/DAGs/configs only | Deployed via CI/CD (GitHub Actions, MWAA) |
 | **Production** | Generated scripts/DAGs/configs only | Promoted via CI/CD after QA approval |
 
@@ -385,8 +387,8 @@ Claude Code → stdio → 13      Claude Code / API Client
                                        → Gateway (all 13 servers)
 ```
 
-- Deploy Gateway (all 13 servers): `prompts/environment-setup-agent/deploy-agentcore-gateway.md`
-- Deploy Runtime (agent + Gateway tools): `prompts/environment-setup-agent/deploy-agentcore-runtime.md`
+- Deploy Gateway (all 13 servers): `prompts/environment-setup-agent/02-deploy-agentcore-gateway.md`
+- Deploy Runtime (agent + Gateway tools): `prompts/environment-setup-agent/03-deploy-agentcore-runtime.md`
 - Config + 13 IAM policies: `prompts/environment-setup-agent/agentcore/`
 
 See [prompts/environment-setup-agent/agentcore/README.md](prompts/environment-setup-agent/agentcore/README.md) for details.
@@ -404,7 +406,10 @@ See [prompts/environment-setup-agent/agentcore/README.md](prompts/environment-se
 │   ├── product_inventory/            # Example: inventory with quality checks
 │   ├── us_mutual_funds_etf/          # Example: mutual funds (most complete)
 │   ├── healthcare_patients/          # Example: HIPAA compliance (deployed to MWAA)
-│   └── financial_portfolios/         # Example: SOX compliance (deployed to MWAA)
+│   ├── financial_portfolios/         # Example: SOX compliance (deployed to MWAA)
+│   ├── claims/                       # Example: HIPAA claims (deployed to MWAA, CloudTrail audit)
+│   ├── stocks/                       # Example: stocks pipeline
+│   └── daily_sales/                  # Example: daily sales aggregation
 │
 ├── shared/                           # Reusable code across workloads
 │   ├── memory/                       # Per-workload persistent memory system
@@ -435,7 +440,6 @@ See [prompts/environment-setup-agent/agentcore/README.md](prompts/environment-se
 ├── prompts/                          # Agent-based prompt organization
 │   ├── environment-setup-agent/      # One-time AWS infrastructure setup (includes agentcore/)
 │   ├── data-onboarding-agent/        # Bronze→Silver→Gold pipeline creation (main workflow)
-│   ├── data-analysis-agent/          # Dashboards, queries via semantic layer
 │   ├── devops-agent/                 # CI/CD, monitoring (coming soon)
 │   └── examples/                     # Demo data generation helpers
 │
@@ -702,6 +706,9 @@ Automatically validates all generated code BEFORE deployment to catch 95% of iss
 | `us_mutual_funds_etf` | 321 + 44* | Deployed | PII detection, QuickSight dashboards, MWAA DAG |
 | `financial_portfolios` | 200+ | Deployed | SOX compliance, 7 Iceberg tables, MWAA DAG |
 | `healthcare_patients` | Generated | Deployed | HIPAA compliance, PHI masking, TBAC, MWAA DAG |
+| `claims` | Generated | Deployed | HIPAA compliance, PHI masking, MWAA DAG, CloudTrail audit |
+| `stocks` | Generated | Local | Stocks pipeline |
+| `daily_sales` | Generated | Local | Daily sales aggregation |
 
 *Some tests require PySpark (Java) or pipeline output to be generated first. See [Running Tests](docs/running-tests.md).
 
