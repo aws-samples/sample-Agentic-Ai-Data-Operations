@@ -4,7 +4,7 @@ requires-python = ">=3.10"
 dependencies = [
     "pytest",
     "pyyaml",
-    "rdflib>=7.0,<8",
+    "rdflib>=7.6.0,<8",
 ]
 
 [project.optional-dependencies]
