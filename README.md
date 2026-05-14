@@ -40,6 +40,61 @@ inactivity gap, Gold hourly rollups (page_views, unique_users, bounce_rate by tr
 Apply GDPR — consent-based filter on user_id, 365-day retention, right-to-erasure hook.
 ```
 
+### Prompt Depth: Brief vs. Detailed
+
+You can be brief or detailed — the agent asks clarifying questions either way. Here's the same dataset at two levels of detail:
+
+**High-level** (agent fills in defaults, keeps moving):
+```
+Onboard e-commerce orders from s3://your-landing-bucket/ecommerce_orders/
+
+- CSV, 50 rows, GDPR, daily 09:30 UTC batch
+- Gold: flat denormalized table for ad-hoc queries (no star schema)
+- DQ: completeness > 85%, validate dates/emails/phones, quarantine bad rows
+- Transforms: mask credit cards, standardize phones, cast dates, derive order_month + days_to_ship
+
+Print a status box after each phase. Don't ask questions — use defaults and keep moving.
+```
+
+**Deep-dive** (fully specified, no questions needed):
+```
+Onboard a new e-commerce orders dataset.
+
+Source:
+- Location: s3://your-landing-bucket/ecommerce_orders/
+- Format: CSV, 50 rows, batch ingestion
+- Refresh: Daily at 09:30 UTC
+
+Compliance: GDPR
+- PII columns: customer_email, customer_phone, credit_card_number, customer_name, shipping_address
+- Require consent tracking, right-to-erasure support, 365-day retention
+
+Gold Zone: Flat denormalized table for ad-hoc analytics (NO star schema)
+
+Data Quality Rules:
+- Completeness threshold: 85% (block promotion if below)
+- Validate order_date format (reject invalid dates like month > 12)
+- Validate customer_email format (must contain @)
+- Validate customer_phone format (reject non-numeric junk)
+- Flag invalid credit_card_number values
+- Flag rows missing city/state/zip as incomplete
+- Anomaly: flag orders where total_amount != quantity × unit_price × (1 - discount_pct)
+
+Transformations (Bronze → Silver):
+- Standardize phone to E.164 format
+- Mask credit_card_number (show last 4 only: ****-****-****-1234)
+- Cast order_date and ship_date to DATE type
+- Trim whitespace on all string columns
+- Quarantine rows with invalid dates (don't drop silently)
+
+Transformations (Silver → Gold):
+- Flatten all columns into single wide table
+- Add derived columns: order_month, days_to_ship, is_returned, is_high_value (total > $100)
+- Keep only delivered + returned orders (exclude processing/cancelled)
+
+Schedule: Daily batch at 09:30 UTC, retries=3, exponential backoff, alert on failure
+```
+
 Watch the agent run, approve the plan it presents, and the artifacts land under `workloads/<name>/` (config, scripts, DAG, tests, ontology).
 
 ---
