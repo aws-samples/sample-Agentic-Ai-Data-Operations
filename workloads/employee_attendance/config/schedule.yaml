@@ -1,0 +1,41 @@
+# Orchestration schedule — feeds DAG Agent
+
+schedule:
+  dag_id: employee_attendance_pipeline
+  description: "Daily ETL: Bronze → Silver → Gold for employee attendance"
+  cron: "0 3 * * *"
+  timezone: "America/New_York"
+  start_date: "2026-05-01"
+  catchup: false
+  max_active_runs: 1
+  retries: 3
+  retry_delay_minutes: 5
+  retry_exponential_backoff: true
+
+  dependencies:
+    upstream_dags: []
+    sensors:
+      - type: s3_key
+        bucket: "${var:data_lake_bucket}"
+        prefix: "raw/hr/attendance/"
+        poke_interval: 300
+        timeout: 3600
+
+  sla:
+    critical_path_tasks:
+      - bronze_to_silver
+      - quality_gate_silver
+    max_duration_minutes: 60
+
+  notifications:
+    on_failure:
+      - type: sns
+        topic_arn: "${var:alert_sns_topic}"
+    on_sla_miss:
+      - type: sns
+        topic_arn: "${var:alert_sns_topic}"
+
+  tags:
+    - employee_attendance
+    - hr
+    - daily

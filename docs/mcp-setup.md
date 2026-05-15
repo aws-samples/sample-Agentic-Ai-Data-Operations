@@ -19,7 +19,7 @@ aws sts get-caller-identity
 claude mcp list
 ```
 
-That's it. All 11 MCP servers are pre-configured and will auto-install their dependencies via `uvx` on first use.
+That's it. All 13 MCP servers are pre-configured and will auto-install their dependencies via `uvx` on first use.
 
 ---
 
@@ -35,13 +35,13 @@ That's it. All 11 MCP servers are pre-configured and will auto-install their dep
 
 ## What's Configured
 
-The `.mcp.json` in the repo root configures 11 MCP servers. Claude Code reads this automatically.
+The `.mcp.json` in the repo root configures 13 MCP servers. Claude Code reads this automatically.
 
-### Connected Servers (11)
+### Connected Servers (13)
 
 | Server | Package | Purpose |
 |--------|---------|---------|
-| `aws.dp-mcp` | `awslabs.aws-dataprocessing-mcp-server` | Glue Crawlers, Glue ETL, Athena, Data Catalog |
+| `glue-athena` | Custom FastMCP (`mcp-servers/glue-athena-server/`) | Glue Crawlers, Glue ETL, Athena, Data Catalog |
 | `core` | `awslabs-core-mcp-server` | S3 operations, KMS key management, Secrets Manager |
 | `iam` | `awslabs-iam-mcp-server` | Role lookup, permission simulation, policy management |
 | `lambda` | `awslabs-lambda-mcp-server` | Lake Formation grants via Lambda, Spark execution |

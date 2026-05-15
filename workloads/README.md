@@ -254,7 +254,7 @@ See `docs/aws-account-setup.md` for detailed AWS configuration.
 |------|-------------|
 | `CLAUDE.md` | Agent configuration & rules |
 | `SKILLS.md` | Agent skill definitions |
-| `TOOLS.md` | AWS service mapping |
+| `TOOL_ROUTING.md` | Tool selection (intent routing + code examples) |
 | `docs/getting-started.md` | Quick start guide |
 | `docs/aws-account-setup.md` | AWS prerequisites |
 

@@ -1,0 +1,32 @@
+# Source configuration for employee_attendance workload
+# Phase 1: Discovery — populated from user answers
+
+source:
+  name: employee_attendance
+  description: "Daily employee attendance records with check-in/out times"
+  type: s3
+  format: csv
+  location:
+    bucket: "${var:data_lake_bucket}"
+    prefix: "raw/hr/attendance/"
+  credentials:
+    method: iam_role
+    role_arn: "${secret:glue_service_role_arn}"
+  schema:
+    inferred: true
+    crawler_database: employee_attendance_db
+  frequency: daily
+  partition_by: ingestion_date
+  owner: hr-analytics-team
+  contact: hr-data@company.com
+
+ingestion:
+  mode: batch
+  schedule: "0 2 * * *"
+  format_options:
+    delimiter: ","
+    header: true
+    quote_char: '"'
+    escape_char: "\\"
+    null_values: ["", "NULL", "null", "N/A"]
+  dedup_key: ["employee_id", "check_in"]

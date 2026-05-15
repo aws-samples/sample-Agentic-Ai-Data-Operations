@@ -462,7 +462,7 @@ See [prompts/environment-setup-agent/agentcore/README.md](prompts/environment-se
 │   ├── us_mutual_funds_etf/          # Example: mutual funds (most complete)
 │   ├── healthcare_patients/          # Example: HIPAA compliance (deployed to MWAA)
 │   ├── financial_portfolios/         # Example: SOX compliance (deployed to MWAA)
-│   ├── claims/                       # Example: HIPAA claims (deployed to MWAA, CloudTrail audit)
+│   ├── employee_attendance/          # Example: HR data, PII, star schema, tool-routing test
 │   ├── stocks/                       # Example: stocks pipeline
 │   └── daily_sales/                  # Example: daily sales aggregation
 │
@@ -498,11 +498,21 @@ See [prompts/environment-setup-agent/agentcore/README.md](prompts/environment-se
 │   ├── devops-agent/                 # CI/CD, monitoring (coming soon)
 │   └── examples/                     # Demo data generation helpers
 │
+├── tool-registry/                    # Canonical YAML registry (validated by CI)
+│   ├── servers.yaml                  # 13 MCP servers — single source of truth
+│   └── invariants.yaml               # 11 mandatory rules with testable IDs
+│
+├── scripts/                          # Utility scripts
+│   ├── validate_tool_registry.py     # Linter: YAML ↔ .mcp.json ↔ Markdown consistency
+│   └── wire_tracing.py               # Wire tracing utility
+│
+├── tests/unit/                       # Shared unit tests
+│   └── test_tool_registry.py         # 18 tests: server sync, stale refs, invariants
+│
 ├── CLAUDE.md                         # Agent configuration and conventions
 ├── SKILLS.md                         # Agent skill definitions and prompts
-├── TOOLS.md                          # AWS service mapping per agent phase
-├── MCP_GUARDRAILS.md                 # MCP tool selection rules (agent prompt)
-├── TOOL_ROUTING.md                   # Which tool to pick (agent prompt)
+├── TOOL_ROUTING.md                   # Tool selection (intent routing + code examples)
+├── MCP_GUARDRAILS.md                 # Per-phase runtime guardrails
 ├── conftest.py                       # Pytest configuration
 └── pyproject.toml                    # Python project config
 ```
@@ -733,7 +743,8 @@ Each agent (Router, Onboarding, Metadata, Transformation, Quality, DAG, Analysis
 ### Test-Driven Pipeline Generation
 - Every sub-agent writes unit + integration tests alongside artifacts
 - Tests must pass before the orchestrator proceeds (max 2 retries)
-- 728+ passing tests across 7 workloads, all runnable locally without AWS
+- 780+ passing tests across 11 workloads, all runnable locally without AWS
+- Tool-registry validation tests (18) ensure routing docs never drift from `.mcp.json`
 
 ### Pre-Deployment Code Validation (Step 4.5.1)
 Automatically validates all generated code BEFORE deployment to catch 95% of issues in seconds vs. minutes of MWAA debugging:
@@ -761,7 +772,7 @@ Automatically validates all generated code BEFORE deployment to catch 95% of iss
 | `us_mutual_funds_etf` | 321 + 44* | Deployed | PII detection, QuickSight dashboards, MWAA DAG |
 | `financial_portfolios` | 200+ | Deployed | SOX compliance, 7 Iceberg tables, MWAA DAG |
 | `healthcare_patients` | Generated | Deployed | HIPAA compliance, PHI masking, TBAC, MWAA DAG |
-| `claims` | Generated | Deployed | HIPAA compliance, PHI masking, MWAA DAG, CloudTrail audit |
+| `employee_attendance` | 40 | Local | PII (NAME, EMAIL), star schema, SCD2, GDPR, tool-routing validation |
 | `stocks` | Generated | Local | Stocks pipeline |
 | `daily_sales` | Generated | Local | Daily sales aggregation |
 
@@ -775,9 +786,9 @@ Automatically validates all generated code BEFORE deployment to catch 95% of iss
 |----------|---------|
 | [CLAUDE.md](CLAUDE.md) | Agent configuration, security rules, data zone rules |
 | [SKILLS.md](SKILLS.md) | Agent skill definitions, spawn prompts, workflows |
-| [TOOL_ROUTING.md](TOOL_ROUTING.md) | **Read first** — which tool to pick and why (intent-based) |
-| [TOOLS.md](TOOLS.md) | AWS service mapping per pipeline phase (how to use each tool) |
-| [MCP_GUARDRAILS.md](MCP_GUARDRAILS.md) | MCP tool selection rules per phase (actual tool names) |
+| [TOOL_ROUTING.md](TOOL_ROUTING.md) | **Read first** — tool selection (intent routing, server status, code examples, mandatory rules) |
+| [MCP_GUARDRAILS.md](MCP_GUARDRAILS.md) | Per-phase runtime guardrails (exact MCP tool names per deploy step) |
+| [tool-registry/](tool-registry/) | Canonical YAML registry (servers.yaml + invariants.yaml), validated by CI |
 | [Workflow Diagrams](docs/workflow-diagrams.md) | Visual workflow and data flow diagrams |
 | [MCP Setup](docs/mcp-setup.md) | MCP server configuration |
 | [Security](docs/security.md) | Security practices |
@@ -795,6 +806,7 @@ Automatically validates all generated code BEFORE deployment to catch 95% of iss
 - **Orchestration**: Apache Airflow (MWAA)
 - **Cloud**: AWS (S3, Glue, Athena, Lake Formation, KMS, MWAA)
 - **Testing**: pytest (unit + integration, property-based with fast-check)
+- **Tool Routing**: YAML registry (`tool-registry/`) + intent-based decision tree, validated by pre-commit
 - **Intent Routing**: REIC (TF-IDF / FAISS vector similarity + hierarchical classification)
 - **Policy Engine**: Cedar (23 policies via Amazon Verified Permissions)
 - **Agent Tracing**: AgentTrace-inspired three-layer observability (OTel-compatible JSONL)

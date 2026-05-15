@@ -1,44 +1,9 @@
-# MCP_GUARDRAILS.md — Tool Selection Guardrails for Every Phase
+# MCP_GUARDRAILS.md — Per-Phase Runtime Guardrails
 
-> Prescriptive rules for which tool to use at each pipeline phase.
+> Prescriptive rules for which MCP tool to call at each pipeline phase.
 > MCP tools are the FIRST choice. CLI/local fallback only when MCP is unavailable.
-> This file reflects the ACTUAL state of MCP server connectivity — not theoretical.
-
----
-
-## MCP Server Status (Live)
-
-### Loaded (tools available in main conversation)
-
-| MCP Server | Actual Tool Names | Use For |
-|---|---|---|
-| **iam** | `mcp__iam__list_roles`, `mcp__iam__simulate_principal_policy`, `mcp__iam__list_role_policies`, `mcp__iam__get_role_policy`, `mcp__iam__put_role_policy`, `mcp__iam__create_role`, `mcp__iam__list_users`, `mcp__iam__get_user`, `mcp__iam__attach_user_policy`, `mcp__iam__attach_group_policy` | Role/policy lookup, permission simulation, least-privilege verification |
-| **lambda** | `mcp__lambda__AWS_LambdaFn_LF_access_grant_new`, `mcp__lambda__AWS_Lambda_LF_revoke_access_new`, `mcp__lambda__spark_on_aws_lambda`, `mcp__lambda__tagging_finder`, `mcp__lambda__LF_access_grant` | Lake Formation grants/revokes via Lambda, Spark execution, resource tagging |
-| **s3-tables** | S3 Tables (Iceberg) operations | S3 Tables management, Iceberg table operations |
-| **cloudtrail** | `mcp__cloudtrail__lookup_events`, `mcp__cloudtrail__lake_query`, `mcp__cloudtrail__list_event_data_stores`, `mcp__cloudtrail__get_query_results`, `mcp__cloudtrail__get_query_status` | Audit trail verification, security investigation, compliance checks |
-| **redshift** | `mcp__redshift__list_clusters`, `mcp__redshift__list_databases`, `mcp__redshift__list_schemas`, `mcp__redshift__list_tables`, `mcp__redshift__list_columns`, `mcp__redshift__execute_query` | Query verification on Gold data, schema discovery via Spectrum, data validation |
-| **cloudwatch** | Logs, metrics, alarms, dashboards | Monitoring, log queries, metric alarms |
-| **cost-explorer** | Cost and usage data | Cost tracking, budget analysis |
-| **dynamodb** | Table CRUD, query, scan | Operational state tables, DynamoDB operations |
-| **core** | S3, KMS, Secrets Manager | S3 operations, KMS key management, secrets. *Slow startup — may timeout on health check but works in conversation.* |
-| **pii-detection** | `detect_pii_in_table`, `scan_database_for_pii`, `create_lf_tags`, `get_pii_columns`, `apply_column_security`, `get_pii_report` | PII detection + LF-Tag application. Custom server. *Slow startup.* |
-
-### Custom Servers (FastMCP, in mcp-servers/)
-
-| MCP Server | Tools | Use For |
-|---|---|---|
-| **glue-athena** | `create_database`, `get_table`, `get_tables`, `create_crawler`, `start_crawler`, `start_job_run`, `get_job_run`, `athena_query` + 5 more | Glue catalog operations + synchronous Athena queries. Replaces aws-dataprocessing. |
-| **lakeformation** | `create_lf_tag`, `list_lf_tags`, `add_lf_tags_to_resource`, `remove_lf_tags_from_resource`, `get_resource_lf_tags`, `grant_permissions`, `revoke_permissions`, `batch_grant_permissions`, `get_lf_tag` | LF-Tags, TBAC grants, column-level security. Replaces Lambda workaround. |
-| **sagemaker-catalog** | `put_custom_metadata`, `get_custom_metadata`, `list_tables_with_metadata`, `search_metadata`, `delete_custom_metadata` | Business metadata on Glue tables (column roles, PII flags, hierarchies). |
-| **pii-detection** | `detect_pii_in_table`, `scan_database_for_pii`, `create_lf_tags`, `get_pii_columns`, `apply_column_security`, `get_pii_report` | PII detection + LF-Tag application. *Slow startup.* |
-
-### Not Used in Codebase (CLI fallback if ever needed)
-
-| MCP Server | Reason | Fallback |
-|---|---|---|
-| `sns-sqs` | Not used in production code (comments only) | `aws sns` / `aws sqs` CLI |
-| `eventbridge` | Not used in production code | `aws events` CLI |
-| `stepfunctions` | Not used (Airflow handles orchestration) | `aws stepfunctions` CLI |
+> For the full server table and intent routing, see → [TOOL_ROUTING.md](./TOOL_ROUTING.md)
+> Canonical server list: [tool-registry/servers.yaml](./tool-registry/servers.yaml)
 
 ---
 
@@ -113,7 +78,6 @@ If using Gateway mode, deploy the Gateway FIRST via `prompts/09-deploy-agentcore
 | `cloudwatch` | OPTIONAL | Defer monitoring setup |
 | `cost-explorer` | OPTIONAL | Defer cost tracking |
 | `dynamodb` | OPTIONAL | Defer operational-state table operations |
-| `aws.dp-mcp` | OPTIONAL | Glue-athena custom server is primary; this is supplemental |
 
 **Output:**
 ```
@@ -141,7 +105,6 @@ lambda              [CONNECTED] stdio      [local / https://gw:PORT]
 cloudwatch          [CONNECTED] stdio      [local / https://gw:PORT]
 cost-explorer       [CONNECTED] stdio      [local / https://gw:PORT]
 dynamodb            [CONNECTED] stdio      [local / https://gw:PORT]
-aws.dp-mcp          [CONNECTED] stdio      [local / https://gw:PORT]
 ──────────────────────────────────────────────────────────────────
 Result: {N}/13 servers connected | Mode: {LOCAL/GATEWAY}
 ```
@@ -454,57 +417,10 @@ MCP Coverage: {mcp_pct}%
 
 ## MCP Server Installation
 
-All 13 servers are configured in `.mcp.json`. PyPI servers use `uvx` (uv tool runner). Custom servers use `uv run` with FastMCP.
+See [docs/mcp-setup.md](./docs/mcp-setup.md) for full installation instructions, or use the canonical registry at [tool-registry/servers.yaml](./tool-registry/servers.yaml).
 
-### PyPI Servers (9 — via uvx)
-
-| Server | Package | Command |
-|---|---|---|
-| `iam` | `awslabs-iam-mcp-server` | `uvx --from awslabs-iam-mcp-server awslabs.iam-mcp-server` |
-| `lambda` | `awslabs-lambda-mcp-server` | `uvx --from awslabs-lambda-mcp-server awslabs.lambda-mcp-server` |
-| `s3-tables` | `awslabs-s3-tables-mcp-server` | `uvx --from awslabs-s3-tables-mcp-server awslabs.s3-tables-mcp-server` |
-| `cloudtrail` | `awslabs-cloudtrail-mcp-server` | `uvx --from awslabs-cloudtrail-mcp-server awslabs.cloudtrail-mcp-server` |
-| `redshift` | `awslabs-redshift-mcp-server` | `uvx --from awslabs-redshift-mcp-server awslabs.redshift-mcp-server` |
-| `cloudwatch` | `awslabs-cloudwatch-mcp-server` | `uvx --from awslabs-cloudwatch-mcp-server awslabs.cloudwatch-mcp-server` |
-| `cost-explorer` | `awslabs-cost-explorer-mcp-server` | `uvx --from awslabs-cost-explorer-mcp-server awslabs.cost-explorer-mcp-server` |
-| `dynamodb` | `awslabs-dynamodb-mcp-server` | `uvx --from awslabs-dynamodb-mcp-server awslabs.dynamodb-mcp-server` |
-| `core` | `awslabs-core-mcp-server` | `uvx --from awslabs-core-mcp-server awslabs.core-mcp-server` |
-
-### Custom Servers (4 — FastMCP in mcp-servers/)
-
-| Server | Location | Command |
-|---|---|---|
-| `glue-athena` | `mcp-servers/glue-athena-server/server.py` | `uv run --no-project --with fastmcp --with boto3 --python 3.13 ...` |
-| `lakeformation` | `mcp-servers/lakeformation-server/server.py` | `uv run --no-project --with fastmcp --with boto3 --python 3.13 ...` |
-| `sagemaker-catalog` | `mcp-servers/sagemaker-catalog-server/server.py` | `uv run --no-project --with fastmcp --with boto3 --python 3.13 ...` |
-| `pii-detection` | `mcp-servers/pii-detection-server/server.py` | `uv run --no-project --with fastmcp --with boto3 --python 3.13 ...` |
-
-### Supplemental Server (1 — via uvx)
-
-| Server | Package | Notes |
-|---|---|---|
-| `aws.dp-mcp` | `awslabs.aws-dataprocessing-mcp-server@latest` | Glue/Athena operations. Supplemental to `glue-athena` custom server. |
-
-### Not Used in Codebase (CLI fallback if ever needed)
-
-| Server | Reason | Fallback |
-|---|---|---|
-| `sns-sqs` | Not used in production code | `aws sns` / `aws sqs` CLI |
-| `eventbridge` | Not used in production code | `aws events` CLI |
-| `stepfunctions` | Not used (Airflow handles orchestration) | `aws stepfunctions` CLI |
-
-### Test Connectivity
+All 13 servers are configured in `.mcp.json`. Test connectivity:
 
 ```bash
-# Health check all servers (Phase 0 Step 0.2)
 claude mcp list
-
-# Test a specific PyPI server
-uvx --from awslabs-iam-mcp-server awslabs.iam-mcp-server --help
-
-# Test a custom server
-uv run --no-project --with fastmcp --with boto3 --python 3.13 mcp-servers/glue-athena-server/server.py --help
-
-# Note: core, pii-detection, sagemaker-catalog have slow startup (~5-10s)
-# Health check may timeout but they work fine in conversation
 ```

@@ -118,3 +118,12 @@ repos:
         entry: python shared/utils/hook_validators/prompt_injection_scanner.py
         language: python
         files: 'workloads/.*/config/.*\.yaml$'
+
+      # Tool registry consistency (servers.yaml matches .mcp.json, no stale refs)
+      - id: tool-registry-validator
+        name: tool-registry-validator
+        entry: python scripts/validate_tool_registry.py
+        language: python
+        additional_dependencies: ['pyyaml']
+        pass_filenames: false
+        files: '(\.mcp\.json|tool-registry/.*\.yaml|TOOL_ROUTING\.md|MCP_GUARDRAILS\.md|CLAUDE\.md)$'

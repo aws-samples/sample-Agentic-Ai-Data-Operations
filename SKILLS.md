@@ -11,7 +11,7 @@ This platform orchestrates autonomous data pipelines through a medallion archite
 
 ### MCP-First Rule
 
-**All AWS operations MUST use MCP server tools first.** Fall back to AWS CLI or Boto3 only if MCP is unavailable or errors. See `TOOLS.md` for the full MCP Server → AWS Service mapping.
+**All AWS operations MUST use MCP server tools first.** Fall back to AWS CLI or Boto3 only if MCP is unavailable or errors. See `TOOL_ROUTING.md` for the full MCP Server → AWS Service mapping.
 
 **Critical constraint**: Sub-agents spawned via the `Agent` tool do **NOT** have MCP access. Sub-agents generate scripts, configs, and tests only — they do NOT execute AWS operations. All AWS deployment (S3 uploads, Glue registration, catalog enrichment) runs in the **main conversation** via MCP after sub-agents return artifacts.
 
@@ -59,7 +59,7 @@ MAIN CONVERSATION
     │  Phase 5: Deploy via MCP (main conversation — MCP available)
     │  ┌─────────────────────────────────────────────────────┐
     │  │ S3 upload        → `core` or `s3-tables` MCP       │
-    │  │ Glue registration→ `aws-dataprocessing` MCP        │
+    │  │ Glue registration→ `glue-athena` MCP               │
     │  │ Catalog enrichment→ `sagemaker-catalog` MCP        │
     │  │ KMS encryption   → `core` MCP                      │
     │  │ Lake Formation   → `lakeformation` MCP             │
@@ -410,7 +410,6 @@ lambda              [CONNECTED] stdio      [local / https://gw:PORT]
 cloudwatch          [CONNECTED] stdio      [local / https://gw:PORT]
 cost-explorer       [CONNECTED] stdio      [local / https://gw:PORT]
 dynamodb            [CONNECTED] stdio      [local / https://gw:PORT]
-aws.dp-mcp          [CONNECTED] stdio      [local / https://gw:PORT]
 ──────────────────────────────────────────────────────────────────
 Result: {N}/13 servers connected | Mode: {LOCAL/GATEWAY}
 ```
@@ -1059,7 +1058,7 @@ Scan ALL existing workloads to ensure this source is not already onboarded:
 ### Step 2.2: Source Connectivity Check
 
 Validate the source is reachable without moving data:
-- For databases: test connection with a `SELECT 1` or equivalent (see `TOOLS.md` for specific tools).
+- For databases: test connection with a `SELECT 1` or equivalent (see `TOOL_ROUTING.md` for specific tools).
 - For S3: verify the bucket/prefix exists and is accessible with current IAM role.
 - For APIs: send a health check or lightweight request.
 - Report connection status to the human before proceeding.
@@ -1077,7 +1076,7 @@ Present a summary to the human for approval:
 - Zone plan (Bronze → Silver → Gold)
 - Key metrics and dimensions identified
 - Estimated pipeline stages
-- Tools to be used (reference `TOOLS.md`)
+- Tools to be used (reference `TOOL_ROUTING.md`)
 
 Wait for explicit approval before proceeding.
 
@@ -1098,8 +1097,8 @@ Agent(
     Source: {source_details from Phase 1}
 
     Tasks:
-    1. Run Glue Crawler on the source (see TOOLS.md for config)
-    2. Run 5% profiling query via Athena (see TOOLS.md for SQL templates)
+    1. Run Glue Crawler on the source (see TOOL_ROUTING.md for config)
+    2. Run 5% profiling query via Athena (see TOOL_ROUTING.md for SQL templates)
     3. Detect PII/PHI/PCI patterns
     4. Return: schema definition, profiling report, classification report
 
@@ -1111,7 +1110,7 @@ Agent(
 
 ### Step 3.1: Run Crawler / Schema Discovery
 
-Use AWS Glue Crawler (or equivalent — see `TOOLS.md`) to:
+Use AWS Glue Crawler (or equivalent — see `TOOL_ROUTING.md`) to:
 - Crawl the source and auto-detect schema (column names, data types, partitioning).
 - Register the discovered schema in the Glue Data Catalog.
 - Detect file format, compression, and partitioning structure (for S3 sources).
@@ -1132,7 +1131,7 @@ Run a lightweight profiling query against ~5% of the data to extract:
 | **Sample rows** | 5-10 representative rows (PII masked) | Human can visually confirm the data looks right |
 | **Pattern detection** | Email, phone, date, SSN patterns in string columns | Feeds PII/PHI/PCI classification |
 
-Use AWS Athena or Glue ETL for the profiling queries (see `TOOLS.md` for specifics).
+Use AWS Athena or Glue ETL for the profiling queries (see `TOOL_ROUTING.md` for specifics).
 
 ### TEST GATE: Profiling Validation
 

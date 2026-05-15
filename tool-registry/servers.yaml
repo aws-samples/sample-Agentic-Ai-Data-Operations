@@ -1,0 +1,195 @@
+# tool-registry/servers.yaml
+# Single source of truth for MCP server metadata.
+# Must match .mcp.json exactly. Run: python scripts/validate_tool_registry.py
+
+servers:
+  # --- REQUIRED (block if failed) ---
+  - name: glue-athena
+    type: custom
+    category: REQUIRED
+    location: mcp-servers/glue-athena-server/server.py
+    tools:
+      - create_database
+      - get_table
+      - get_tables
+      - create_crawler
+      - start_crawler
+      - start_job_run
+      - get_job_run
+      - athena_query
+    use_for: "Glue catalog operations + synchronous Athena queries"
+    replaces: aws-dataprocessing
+    fallback: "aws glue / aws athena CLI"
+    notes: "Custom FastMCP server"
+
+  - name: lakeformation
+    type: custom
+    category: REQUIRED
+    location: mcp-servers/lakeformation-server/server.py
+    tools:
+      - create_lf_tag
+      - list_lf_tags
+      - add_lf_tags_to_resource
+      - remove_lf_tags_from_resource
+      - get_resource_lf_tags
+      - grant_permissions
+      - revoke_permissions
+      - batch_grant_permissions
+      - get_lf_tag
+    use_for: "LF-Tags, TBAC grants, column-level security"
+    fallback: "aws lakeformation CLI"
+    notes: "Custom FastMCP server. Replaces Lambda workaround."
+
+  - name: iam
+    type: pypi
+    category: REQUIRED
+    package: awslabs-iam-mcp-server
+    tools:
+      - list_roles
+      - simulate_principal_policy
+      - list_role_policies
+      - get_role_policy
+      - put_role_policy
+      - create_role
+      - list_users
+      - get_user
+      - attach_user_policy
+      - attach_group_policy
+    use_for: "Role/policy lookup, permission simulation, least-privilege verification"
+    fallback: "aws iam CLI"
+
+  # --- WARN (CLI fallback if failed) ---
+  - name: cloudtrail
+    type: pypi
+    category: WARN
+    package: awslabs-cloudtrail-mcp-server
+    tools:
+      - lookup_events
+      - lake_query
+      - list_event_data_stores
+      - get_query_results
+      - get_query_status
+    use_for: "Audit trail verification, security investigation, compliance checks"
+    fallback: "aws cloudtrail CLI"
+
+  - name: redshift
+    type: pypi
+    category: WARN
+    package: awslabs-redshift-mcp-server
+    tools:
+      - list_clusters
+      - list_databases
+      - list_schemas
+      - list_tables
+      - list_columns
+      - execute_query
+    use_for: "Query verification on Gold data, schema discovery via Spectrum"
+    fallback: "aws athena start-query-execution CLI"
+
+  - name: core
+    type: pypi
+    category: WARN
+    package: awslabs-core-mcp-server
+    tools:
+      - s3_operations
+      - kms_operations
+      - secrets_manager
+    use_for: "S3 operations, KMS key management, secrets"
+    fallback: "aws s3 / aws kms / aws secretsmanager CLI"
+    notes: "Slow startup (~5-10s). May timeout on health check but works in conversation."
+
+  - name: s3-tables
+    type: pypi
+    category: WARN
+    package: awslabs-s3-tables-mcp-server
+    tools:
+      - s3_tables_operations
+    use_for: "S3 Tables management, Iceberg table operations"
+    fallback: "aws s3 CLI"
+
+  - name: pii-detection
+    type: custom
+    category: WARN
+    location: mcp-servers/pii-detection-server/server.py
+    tools:
+      - detect_pii_in_table
+      - scan_database_for_pii
+      - create_lf_tags
+      - get_pii_columns
+      - apply_column_security
+      - get_pii_report
+    use_for: "PII detection + LF-Tag application"
+    fallback: "shared/utils/pii_detection_and_tagging.py"
+    notes: "Custom FastMCP server. Slow startup."
+
+  # --- OPTIONAL (defer if failed) ---
+  - name: sagemaker-catalog
+    type: custom
+    category: OPTIONAL
+    location: mcp-servers/sagemaker-catalog-server/server.py
+    tools:
+      - put_custom_metadata
+      - get_custom_metadata
+      - list_tables_with_metadata
+      - search_metadata
+      - delete_custom_metadata
+    use_for: "Business metadata on Glue tables (column roles, PII flags, hierarchies)"
+    fallback: "Defer metadata enrichment"
+    notes: "Custom FastMCP server. Slow startup."
+
+  - name: lambda
+    type: pypi
+    category: OPTIONAL
+    package: awslabs-lambda-mcp-server
+    tools:
+      - AWS_LambdaFn_LF_access_grant_new
+      - AWS_Lambda_LF_revoke_access_new
+      - spark_on_aws_lambda
+      - tagging_finder
+      - LF_access_grant
+    use_for: "Lake Formation grants/revokes via Lambda, Spark execution, resource tagging"
+    fallback: "aws lambda invoke CLI"
+
+  - name: cloudwatch
+    type: pypi
+    category: OPTIONAL
+    package: awslabs-cloudwatch-mcp-server
+    tools:
+      - logs
+      - metrics
+      - alarms
+      - dashboards
+    use_for: "Monitoring, log queries, metric alarms"
+    fallback: "aws cloudwatch CLI"
+
+  - name: cost-explorer
+    type: pypi
+    category: OPTIONAL
+    package: awslabs-cost-explorer-mcp-server
+    tools:
+      - cost_and_usage
+    use_for: "Cost tracking, budget analysis"
+    fallback: "aws ce CLI"
+
+  - name: dynamodb
+    type: pypi
+    category: OPTIONAL
+    package: awslabs-dynamodb-mcp-server
+    tools:
+      - table_crud
+      - query
+      - scan
+    use_for: "Operational state tables, DynamoDB operations"
+    fallback: "aws dynamodb CLI"
+
+# Servers NOT in .mcp.json (CLI fallback only)
+not_available:
+  - name: sns-sqs
+    reason: "Not used in production code"
+    fallback: "aws sns / aws sqs CLI"
+  - name: eventbridge
+    reason: "Not used in production code"
+    fallback: "aws events CLI"
+  - name: stepfunctions
+    reason: "Not used (Airflow handles orchestration)"
+    fallback: "aws stepfunctions CLI"

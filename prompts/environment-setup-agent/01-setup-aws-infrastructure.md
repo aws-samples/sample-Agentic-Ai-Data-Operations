@@ -206,7 +206,6 @@ Output:
   cloudwatch          [CONNECTED] stdio      [local / https://gw:PORT]
   cost-explorer       [CONNECTED] stdio      [local / https://gw:PORT]
   dynamodb            [CONNECTED] stdio      [local / https://gw:PORT]
-  aws.dp-mcp          [CONNECTED] stdio      [local / https://gw:PORT]
   ──────────────────────────────────────────────────────────────────
   Result: {N}/13 servers connected | Mode: {LOCAL/GATEWAY}
 
@@ -344,7 +343,7 @@ Output:
   ENVIRONMENT SETUP VERIFICATION: {PROJECT}
   ──────────────────────────────────────────
   AWS Credentials:  Account {ID}, Region {REGION}  [PASS]
-  MCP Servers:      {N}/11 connected               [PASS]
+  MCP Servers:      {N}/13 connected               [PASS]
   IAM Roles:        {PROJECT}-glue-service-role     [PASS/FAIL]
   S3 Bucket:        {BUCKET} with 7 zone folders    [PASS/FAIL]
   KMS Keys:         4 keys, rotation enabled        [PASS/FAIL]

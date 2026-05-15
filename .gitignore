@@ -249,6 +249,9 @@ grant_access_*.sh
 # Demo folder (synthetic data generation - optional, comment out to include in repo)
 # demo/
 
+# Generated demo workloads (output of Data Onboarding Agent demo runs)
+workloads/ecommerce_orders/
+
 
 # Mac system files
 .DS_Store

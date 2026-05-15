@@ -1,0 +1,71 @@
+# Quality rules — feeds Quality Agent
+# Phase 1: Discovery — thresholds, compliance requirements
+
+quality:
+  silver_threshold: 0.80
+  gold_threshold: 0.95
+  compliance:
+    - GDPR
+
+dimensions:
+  completeness:
+    - column: employee_id
+      rule: "Completeness 'employee_id' = 1.0"
+      severity: critical
+    - column: check_in
+      rule: "Completeness 'check_in' > 0.90"
+      severity: warning
+      note: "Absent/sick-leave rows have null check_in"
+    - column: full_name
+      rule: "Completeness 'full_name' = 1.0"
+      severity: critical
+
+  uniqueness:
+    - columns: ["employee_id", "attendance_date"]
+      rule: "Uniqueness ['employee_id', 'attendance_date'] = 1.0"
+      severity: critical
+      note: "One record per employee per day after dedup"
+
+  validity:
+    - column: hours_worked
+      rule: "ColumnValues 'hours_worked' between 0 and 24"
+      severity: critical
+    - column: status
+      rule: "ColumnValues 'status' in ['present', 'absent', 'half-day', 'sick-leave', 'vacation', 'remote']"
+      severity: critical
+    - column: email
+      rule: "ColumnValues 'email' matches '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z]{2,}'"
+      severity: warning
+
+  consistency:
+    - rule: "CustomSql 'SELECT COUNT(*) FROM {table} WHERE status = \"present\" AND hours_worked = 0' = 0"
+      description: "Present employees must have hours > 0"
+      severity: critical
+    - rule: "CustomSql 'SELECT COUNT(*) FROM {table} WHERE check_out < check_in AND status = \"present\"' = 0"
+      description: "Check-out must be after check-in"
+      severity: critical
+
+  anomaly_detection:
+    - metric: row_count
+      threshold: 0.20
+      description: "Flag if daily volume deviates >20% from baseline"
+    - metric: null_rate
+      column: hours_worked
+      threshold: 0.10
+      description: "Flag if null rate spikes above 10%"
+
+pii_rules:
+  detected_columns:
+    - column: full_name
+      type: NAME
+      action: mask_in_logs
+    - column: email
+      type: EMAIL
+      action: mask_in_logs
+  lf_tags:
+    - tag: PII_Classification
+      value: CONTAINS_PII
+    - tag: PII_Type
+      values: [NAME, EMAIL]
+    - tag: Data_Sensitivity
+      value: HIGH

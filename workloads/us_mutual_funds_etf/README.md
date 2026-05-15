@@ -435,9 +435,9 @@ ORDER BY total_aum_billions DESC;
 **Oncall:** PagerDuty rotation (see Confluence)
 
 **Documentation:**
-- Architecture: `.kiro/specs/agentic-data-onboarding/design.md`
+- Architecture: `CLAUDE.md`
 - Agent Skills: `SKILLS.md`
-- AWS Tooling: `TOOLS.md`
+- Tool Selection: `TOOL_ROUTING.md`
 - MCP Guardrails: `MCP_GUARDRAILS.md`
 
 ---

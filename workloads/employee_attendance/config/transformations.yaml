@@ -1,0 +1,96 @@
+# Transformation rules — Bronze to Silver to Gold
+# Phase 1: Discovery — feeds Transformation Agent
+
+bronze_to_silver:
+  deduplication:
+    key: ["employee_id", "check_in"]
+    strategy: keep_latest
+    order_by: check_in
+
+  null_handling:
+    - column: hours_worked
+      action: fill_zero
+      condition: "status IN ('absent', 'sick-leave')"
+    - column: check_in
+      action: quarantine
+      condition: "status = 'present'"
+    - column: check_out
+      action: quarantine
+      condition: "status = 'present'"
+
+  type_casting:
+    - column: check_in
+      from: string
+      to: timestamp
+      format: "yyyy-MM-dd HH:mm:ss"
+    - column: check_out
+      from: string
+      to: timestamp
+      format: "yyyy-MM-dd HH:mm:ss"
+    - column: hours_worked
+      from: string
+      to: double
+
+  validation:
+    - column: hours_worked
+      rule: "hours_worked >= 0 AND hours_worked <= 24"
+      action: quarantine
+    - column: status
+      rule: "status IN ('present', 'absent', 'half-day', 'sick-leave', 'vacation', 'remote')"
+      action: quarantine
+    - column: employee_id
+      rule: "employee_id IS NOT NULL AND employee_id != ''"
+      action: quarantine
+
+  derived_columns:
+    - name: attendance_date
+      expression: "CAST(check_in AS DATE)"
+      description: "Date portion of check-in timestamp"
+    - name: is_remote
+      expression: "CASE WHEN location = 'REMOTE' THEN true ELSE false END"
+      description: "Boolean flag for remote work"
+    - name: ingestion_ts
+      expression: "current_timestamp()"
+      description: "When this record was processed"
+
+silver_to_gold:
+  schema_type: star
+  fact_table:
+    name: fact_attendance
+    grain: ["employee_id", "attendance_date"]
+    measures:
+      - hours_worked
+    degenerate_dimensions:
+      - status
+      - is_remote
+    foreign_keys:
+      - column: employee_id
+        references: dim_employee.employee_id
+      - column: location
+        references: dim_location.location_code
+      - column: attendance_date
+        references: dim_date.date_key
+
+  dimension_tables:
+    - name: dim_employee
+      type: scd2
+      natural_key: employee_id
+      attributes:
+        - full_name
+        - email
+        - department
+        - manager_id
+      scd2_tracking:
+        - department
+        - manager_id
+
+    - name: dim_location
+      type: scd1
+      natural_key: location
+      attributes:
+        - location
+
+    - name: dim_date
+      type: static
+      grain: day
+      range: "2026-01-01 to 2026-12-31"

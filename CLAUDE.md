@@ -12,15 +12,14 @@ An autonomous data pipeline orchestration platform that moves data through **Bro
 
 | File | Purpose |
 |---|---|
-| `.kiro/specs/agentic-data-onboarding/design.md` | Full architecture, component interfaces (TypeScript), data flow diagrams, API specs, error handling |
-| `.kiro/specs/agentic-data-onboarding/requirements.md` | 40 requirements with acceptance criteria |
-| `.kiro/specs/agentic-data-onboarding/tasks.md` | 25 implementation tasks with subtasks |
 | `SKILLS.md` | Agent skill definitions — prompts, workflows, constraints for all 7 agents |
-| `TOOLS.md` | AWS tooling reference — which specific service/tool to use at each pipeline step |
-| `MCP_GUARDRAILS.md` | **MCP tool selection guardrails** — actual MCP tool names, per-phase rules, fallback decisions, live server status |
+| `TOOL_ROUTING.md` | **Tool selection** — intent routing, server status, code examples, mandatory rules (replaces old TOOLS.md) |
+| `MCP_GUARDRAILS.md` | **Per-phase runtime guardrails** — exact MCP tool names per deploy step, fallback decisions |
+| `tool-registry/servers.yaml` | Canonical MCP server list (13 servers) — single source of truth, validated against `.mcp.json` |
+| `tool-registry/invariants.yaml` | 11 mandatory rules with IDs — testable, referenced by TOOL_ROUTING.md |
 | `docs/workflow-diagrams.md` | Visual diagrams — end-to-end flow, sub-agent spawning, test gates, data zone progression, DAG tasks |
 
-Read `design.md` before making architectural decisions. Read `SKILLS.md` before acting as any agent. Read `TOOLS.md` for AWS service selection. Read `MCP_GUARDRAILS.md` for which MCP tool vs CLI to use at each phase. See `docs/workflow-diagrams.md` for visual diagrams.
+Read `SKILLS.md` before acting as any agent. Read `TOOL_ROUTING.md` for tool selection (intent routing + code examples). Read `MCP_GUARDRAILS.md` for per-phase deploy guardrails. See `docs/workflow-diagrams.md` for visual diagrams.
 
 **Deployment topology**: Default is single-account (all AWS resources in one account). Opt-in multi-account (catalog in Account A, compute + MWAA + S3 in Account B) is described in [`docs/multi-account-deployment.md`](docs/multi-account-deployment.md) with schema at `shared/templates/account_topology.yaml`.
 
@@ -37,7 +36,7 @@ Read `design.md` before making architectural decisions. Read `SKILLS.md` before 
 │  REQUIRED: glue-athena, lakeformation, iam  (block if down)                 │
 │  WARN:     cloudtrail, redshift, core, s3-tables, pii-detection             │
 │  OPTIONAL: sagemaker-catalog, lambda, cloudwatch, cost-explorer,            │
-│            dynamodb, aws.dp-mcp                                             │
+│            dynamodb                                                          │
 └────────────────────────────────┬────────────────────────────────────────────┘
                                  │ all phases use MCP tools
                                  ▼
@@ -74,7 +73,7 @@ MAIN CONVERSATION
     │  Audit trail     → cloudtrail MCP
 ```
 
-**MCP-First Rule**: All AWS operations use MCP server tools first. Sub-agents do NOT have MCP access — they generate scripts/configs only. Deployment runs in the main conversation via MCP. See `MCP_GUARDRAILS.md` for actual tool names, per-phase rules, and fallback decisions. See `TOOLS.md` for the full AWS service mapping.
+**MCP-First Rule**: All AWS operations use MCP server tools first. Sub-agents do NOT have MCP access — they generate scripts/configs only. Deployment runs in the main conversation via MCP. See `MCP_GUARDRAILS.md` for per-phase guardrails and fallback decisions. See `TOOL_ROUTING.md` for the full tool selection guide.
 
 **Data zones**: Bronze (raw, immutable) → Silver (cleaned, validated) → Gold (curated, aggregated)
 **Semantic layer**: SageMaker Catalog (custom metadata columns for business context) + MCP Layer. ADOP's semantic-layer responsibility ends at generating OWL + R2RML artifacts (`workloads/{name}/config/ontology.ttl` + `mappings.ttl`) for staging into AWS Semantic Layer. NL→SQL, reasoning, SHACL, and VKG are AWS Semantic Layer's responsibilities.
@@ -125,7 +124,7 @@ Before creating anything, confirm the source is not already onboarded in another
 
 ### 4. Profile Before Building (Phase 3)
 
-Run a 5% sample profiling pass using Glue Crawler + Athena (see `TOOLS.md`). Present metadata to the human — column types, distinct values, null rates, PII flags, sample rows. Get confirmation before generating pipeline code.
+Run a 5% sample profiling pass using Glue Crawler + Athena (see `TOOL_ROUTING.md`). Present metadata to the human — column types, distinct values, null rates, PII flags, sample rows. Get confirmation before generating pipeline code.
 
 ### 5. Test After Every Sub-Agent (Phase 4)
 

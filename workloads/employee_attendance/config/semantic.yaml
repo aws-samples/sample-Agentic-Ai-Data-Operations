@@ -1,0 +1,90 @@
+# Semantic layer configuration — column roles, business context, PII flags
+# Phase 1: Discovery — feeds Metadata Agent + SageMaker Catalog
+
+dataset:
+  name: employee_attendance
+  domain: human-resources
+  business_description: "Tracks daily attendance for all employees across locations"
+
+columns:
+  - name: employee_id
+    role: identifier
+    description: "Unique employee identifier"
+    pii: false
+
+  - name: full_name
+    role: attribute
+    description: "Employee full name"
+    pii: true
+    pii_type: NAME
+    sensitivity: HIGH
+
+  - name: email
+    role: attribute
+    description: "Corporate email address"
+    pii: true
+    pii_type: EMAIL
+    sensitivity: HIGH
+
+  - name: department
+    role: dimension
+    description: "Department the employee belongs to"
+    pii: false
+    hierarchy:
+      level: 1
+      parent: null
+
+  - name: check_in
+    role: temporal
+    description: "Check-in timestamp"
+    pii: false
+    grain: event_time
+
+  - name: check_out
+    role: temporal
+    description: "Check-out timestamp"
+    pii: false
+    grain: event_time
+
+  - name: location
+    role: dimension
+    description: "Office location or REMOTE"
+    pii: false
+    hierarchy:
+      level: 2
+      parent: department
+
+  - name: hours_worked
+    role: measure
+    description: "Total hours worked in the day"
+    pii: false
+    aggregation: sum
+
+  - name: status
+    role: dimension
+    description: "Attendance status (present, absent, half-day, sick-leave)"
+    pii: false
+
+  - name: manager_id
+    role: identifier
+    description: "Manager's employee ID (FK to self)"
+    pii: false
+    relationship:
+      target_table: employee_attendance
+      target_column: employee_id
+      type: many-to-one
+
+relationships:
+  - name: manager_relationship
+    from_column: manager_id
+    to_table: employee_attendance
+    to_column: employee_id
+    type: self-referential
+
+business_terms:
+  - term: "Attendance Rate"
+    definition: "Percentage of working days an employee was present"
+    formula: "COUNT(status='present') / COUNT(DISTINCT date)"
+  - term: "Average Hours"
+    definition: "Mean hours worked per present day"
+    formula: "AVG(hours_worked) WHERE status='present'"
