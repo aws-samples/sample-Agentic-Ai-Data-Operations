@@ -168,6 +168,51 @@ Result: {N}/13 servers connected | Mode: {LOCAL/GATEWAY}
 
 ---
 
+## Phase 2.5: Streaming Source Identification & Option Presentation
+
+> **CRITICAL**: This phase runs ONLY when user mentions streaming sources (Kinesis, Kafka, MSK) to S3.
+> Purpose: Prevent defaulting to batch Glue ETL jobs for streaming data.
+
+### Step 2.5.1: Detect Streaming Source
+
+| Intent Phrases | Tool | Action |
+|---|---|---|
+| "stream Kinesis to S3", "ingest from Kafka", "MSK to S3", "streaming data to lake", "real-time ingestion" | **stream-source-identify** (routing logic, no MCP) | Detect streaming scenario → route to Step 2.5.2 (do NOT proceed with batch Bronze ingestion) |
+
+### Step 2.5.2: Capture Requirements
+
+| Question | Tool | Purpose |
+|---|---|---|
+| "What's your latency requirement?" | **streaming-requirements-capture** (questionnaire, no MCP) | Determines if Firehose (60s+), Glue Streaming (configurable), or Lambda (<60s) is appropriate |
+| "Do you need transformations?" | **streaming-requirements-capture** | Simple delivery → Firehose/MSK Connect; Complex logic → Glue Streaming; Custom → Lambda/Python Consumer |
+| "What's your data volume?" | **streaming-requirements-capture** | Low volume → Lambda/Python; High volume → Firehose/Glue Streaming/MSK Connect |
+| "Operational overhead preference?" | **streaming-requirements-capture** | Minimize ops → Firehose/MSK Connect/DMS; Need control → Glue Streaming/Lambda/Python Consumer |
+
+### Step 2.5.3: Present Options
+
+| Source Type | Tool | Options Presented |
+|---|---|---|
+| **Kinesis → S3** | **streaming-ingestion-advisor** (presentation logic, no MCP) | 1. Kinesis Data Firehose (managed, zero-code, 60-900s latency, $0.029/GB)<br>2. AWS Glue Streaming (Spark, transformations, configurable latency, $0.44/DPU-hour)<br>3. AWS Lambda (event-driven, <60s latency, $0.20/million requests) |
+| **Kafka/MSK → S3** | **streaming-ingestion-advisor** | 1. MSK Connect with S3 Sink Connector (Kafka-native, no custom logic, $0.11/hour/worker)<br>2. AWS Glue Streaming (complex transforms, schema evolution, $0.44/DPU-hour)<br>3. Python Consumer + S3 SDK (custom logic, full control, EC2/ECS/Fargate compute costs) |
+
+**Recommendation logic**: Advisor recommends ONE option based on captured requirements, but user makes final choice.
+
+### Step 2.5.4: Validate Choice
+
+| Guard | Tool | Rule |
+|---|---|---|
+| **batch-vs-streaming-guard** | Validation logic (no MCP) | BLOCK if batch Glue ETL job is recommended for Kinesis/Kafka/MSK source. Force option presentation if not already done. |
+
+### Guardrail Rules — Phase 2.5
+1. **ALWAYS** run this phase when user mentions streaming sources (Kinesis, Kafka, MSK) to S3
+2. **NEVER** default to batch Glue ETL for streaming sources — always present 3 options first
+3. **ALWAYS** ask clarifying questions (latency, transformations, volume, ops preference) before recommending
+4. **ALWAYS** recommend ONE option based on requirements, but let user choose
+5. If user selects batch Glue ETL for streaming source, **batch-vs-streaming-guard** must BLOCK and re-present options
+6. These tools use NO MCP calls — pure routing/advisory/validation logic
+
+---
+
 ## Phase 3: Profiling & Metadata Discovery
 
 > Schema discovery + data sampling. Sub-agent generates profiling scripts; main conversation can verify via MCP.
