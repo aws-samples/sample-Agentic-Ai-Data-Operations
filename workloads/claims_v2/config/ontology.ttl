@@ -1,0 +1,201 @@
+@prefix ex: <http://semantic.aws/claims/ontology#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+
+<http://semantic.aws/claims/ontology/v1> a owl:Ontology ;
+    rdfs:label "claims ontology v1" ;
+    rdfs:comment "Induced from semantic.yaml + Glue table claims_v2_db.gold_claims_v2 by ADOP." .
+
+
+ex:Claim a owl:Class ;
+    rdfs:label "Claim" ;
+    ex:tableType "fact" ;
+    rdfs:comment "An insurance claim submitted for healthcare services" .
+
+
+ex:Member a owl:Class ;
+    rdfs:label "Member" ;
+    ex:tableType "dimension" ;
+    rdfs:comment "Insurance plan member who received healthcare services" .
+
+
+ex:Payer a owl:Class ;
+    rdfs:label "Payer" ;
+    ex:tableType "dimension" ;
+    rdfs:comment "Insurance payer processing the claim" .
+
+
+ex:Provider a owl:Class ;
+    rdfs:label "Provider" ;
+    ex:tableType "dimension" ;
+    rdfs:comment "Healthcare provider who delivered services" .
+
+
+ex:allowedAmount a owl:DatatypeProperty ;
+    rdfs:label "allowed_amount" ;
+    ex:role "measure" ;
+    rdfs:comment "Amount allowed by the payer" ;
+    rdfs:domain ex:Claim ;
+    rdfs:range xsd:decimal .
+
+
+ex:billedAmount a owl:DatatypeProperty ;
+    rdfs:label "billed_amount" ;
+    ex:role "measure" ;
+    rdfs:comment "Amount billed by the provider" ;
+    rdfs:domain ex:Claim ;
+    rdfs:range xsd:decimal .
+
+
+ex:claimId a owl:DatatypeProperty ;
+    rdfs:label "claim_id" ;
+    ex:isPrimaryKey true ;
+    ex:role "identifier" ;
+    rdfs:comment "Unique claim identifier" ;
+    rdfs:domain ex:Claim ;
+    rdfs:range xsd:string .
+
+
+ex:claimStatus a owl:DatatypeProperty ;
+    rdfs:label "claim_status" ;
+    ex:role "dimension" ;
+    rdfs:comment "Current claim processing status" ;
+    rdfs:domain ex:Claim ;
+    rdfs:range xsd:string .
+
+
+ex:claimType a owl:DatatypeProperty ;
+    rdfs:label "claim_type" ;
+    ex:role "dimension" ;
+    rdfs:comment "Type of claim (medical, dental, vision, pharmacy)" ;
+    rdfs:domain ex:Claim ;
+    rdfs:range xsd:string .
+
+
+ex:denialReason a owl:DatatypeProperty ;
+    rdfs:label "denial_reason" ;
+    ex:role "dimension" ;
+    rdfs:comment "Reason for claim denial (null if approved)" ;
+    rdfs:domain ex:Claim ;
+    rdfs:range xsd:string .
+
+
+ex:diagnosisCode a owl:DatatypeProperty ;
+    rdfs:label "diagnosis_code" ;
+    ex:role "dimension" ;
+    rdfs:comment "ICD-10 diagnosis code" ;
+    rdfs:domain ex:Claim ;
+    rdfs:range xsd:string .
+
+
+ex:memberId a owl:DatatypeProperty ;
+    rdfs:label "member_id" ;
+    ex:isPrimaryKey true ;
+    ex:role "identifier" ;
+    rdfs:comment "Unique member identifier" ;
+    rdfs:domain ex:Member ;
+    rdfs:range xsd:string .
+
+
+ex:networkStatus a owl:DatatypeProperty ;
+    rdfs:label "network_status" ;
+    ex:role "dimension" ;
+    rdfs:comment "Whether the provider was in-network or out-of-network" ;
+    rdfs:domain ex:Claim ;
+    rdfs:range xsd:string .
+
+
+ex:paidAmount a owl:DatatypeProperty ;
+    rdfs:label "paid_amount" ;
+    ex:role "measure" ;
+    rdfs:comment "Amount paid to the provider" ;
+    rdfs:domain ex:Claim ;
+    rdfs:range xsd:decimal .
+
+
+ex:patientResponsibility a owl:DatatypeProperty ;
+    rdfs:label "patient_responsibility" ;
+    ex:role "measure" ;
+    rdfs:comment "Amount the patient owes" ;
+    rdfs:domain ex:Claim ;
+    rdfs:range xsd:decimal .
+
+
+ex:payerName a owl:DatatypeProperty ;
+    rdfs:label "payer_name" ;
+    ex:isPrimaryKey true ;
+    ex:role "identifier" ;
+    rdfs:comment "Insurance company name" ;
+    rdfs:domain ex:Payer ;
+    rdfs:range xsd:string .
+
+
+ex:planType a owl:DatatypeProperty ;
+    rdfs:label "plan_type" ;
+    ex:role "dimension" ;
+    rdfs:comment "Insurance plan type (PPO, HMO, etc.)",
+        "Plan type offered by the payer" ;
+    rdfs:domain ex:Member,
+        ex:Payer ;
+    rdfs:range xsd:string .
+
+
+ex:policyNumber a owl:DatatypeProperty ;
+    rdfs:label "policy_number" ;
+    ex:isPrimaryKey true ;
+    ex:role "identifier" ;
+    rdfs:comment "Insurance policy number" ;
+    rdfs:domain ex:Member ;
+    rdfs:range xsd:string .
+
+
+ex:procedureCode a owl:DatatypeProperty ;
+    rdfs:label "procedure_code" ;
+    ex:role "dimension" ;
+    rdfs:comment "CPT procedure code" ;
+    rdfs:domain ex:Claim ;
+    rdfs:range xsd:string .
+
+
+ex:providerId a owl:DatatypeProperty ;
+    rdfs:label "provider_id" ;
+    ex:isPrimaryKey true ;
+    ex:role "identifier" ;
+    rdfs:comment "Unique provider identifier" ;
+    rdfs:domain ex:Provider ;
+    rdfs:range xsd:string .
+
+
+ex:providerName a owl:DatatypeProperty ;
+    rdfs:label "provider_name" ;
+    ex:role "dimension" ;
+    rdfs:comment "Provider or facility name" ;
+    rdfs:domain ex:Provider ;
+    rdfs:range xsd:string .
+
+
+ex:providerNpi a owl:DatatypeProperty ;
+    rdfs:label "provider_npi" ;
+    ex:isPrimaryKey true ;
+    ex:role "identifier" ;
+    rdfs:comment "National Provider Identifier (10-digit)" ;
+    rdfs:domain ex:Provider ;
+    rdfs:range xsd:string .
+
+
+ex:serviceDate a owl:DatatypeProperty ;
+    rdfs:label "service_date" ;
+    ex:role "temporal" ;
+    rdfs:comment "Date the healthcare service was provided" ;
+    rdfs:domain ex:Claim ;
+    rdfs:range xsd:date .
+
+
+ex:submissionDate a owl:DatatypeProperty ;
+    rdfs:label "submission_date" ;
+    ex:role "temporal" ;
+    rdfs:comment "Date the claim was submitted" ;
+    rdfs:domain ex:Claim ;
+    rdfs:range xsd:date .
