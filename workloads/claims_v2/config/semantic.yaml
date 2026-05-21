@@ -139,9 +139,3 @@ business_terms:
   - term: Clean Claim Rate
     definition: Percentage of claims paid on first submission without denial
     related_columns: [claim_status, denial_reason]
-  - term: Days to Adjudicate
-    definition: Calendar days between service_date and claim resolution
-    related_columns: [service_date, submission_date]
-  - term: Out-of-Network Leakage
-    definition: Percentage of claims from out-of-network providers
-    related_columns: [network_status]
