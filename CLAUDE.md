@@ -39,6 +39,7 @@ This is a human-in-the-loop gate. The HUMAN provides the rules. The agent does N
 [ ] Quality thresholds explicitly stated (or user says "use defaults")
 [ ] Schedule explicitly stated by user
 [ ] Ontology collection preference confirmed (opt-in/opt-out for semantic layer enrichment via Ontology agent)
+[ ] If ontology YES: use cases + consumers confirmed (NL→SQL, discovery, BI, ML, compliance — who uses it?)
 ```
 
 **If ANY item is missing, ASK THE USER. Do not proceed.**

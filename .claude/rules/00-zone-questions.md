@@ -137,11 +137,38 @@ Ask:
 3. **Relationships** — "I see these potential relationships: [Claim → Member via member_id, etc.]. Are these correct? Any missing relationships?"
 4. **Cardinality** — "Are these 1:many or many:many?" (important for R2RML join generation)
 
-**Step 3: Ask about business terms**
+**Step 3: Ask about use cases**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  USE CASES — What will this ontology power?                 │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
+│  │  NL → SQL   │  │  Data       │  │  Knowledge  │        │
+│  │  (ask data  │  │  Discovery  │  │  Graph      │        │
+│  │  questions) │  │  (find data)│  │  (lineage)  │        │
+│  └─────────────┘  └─────────────┘  └─────────────┘        │
+│                                                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
+│  │  BI / Dash  │  │  ML Feature │  │  Compliance │        │
+│  │  (reports)  │  │  (features) │  │  (audit)    │        │
+│  └─────────────┘  └─────────────┘  └─────────────┘        │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
 
 Ask:
-5. **Business terms** — "What are the key business terms your team uses for this data? Examples: 'Loss Ratio', 'Clean Claim Rate', 'Days to Adjudicate'. These become searchable in the semantic layer."
-6. **KPI definitions** — "For each term, what's the formula or definition?"
+5. **Use cases** — "What use cases will this ontology serve? Examples: NL→SQL (business users ask questions in plain English), Data Discovery (find relevant datasets by business concept), BI Dashboards (auto-generate metrics), ML Features (entity-centric feature store), Compliance Audit (trace data lineage for regulators). Which apply?"
+6. **Consumers** — "Who will use the semantic layer? (analysts, data scientists, compliance officers, business users via chatbot, BI tools)"
+
+This determines the depth of the ontology — a compliance audit needs full lineage and provenance annotations, while NL→SQL needs clear business term mappings.
+
+**Step 4: Ask about business terms**
+
+Ask:
+7. **Business terms** — "What are the key business terms your team uses for this data? Examples: 'Loss Ratio', 'Clean Claim Rate', 'Days to Adjudicate'. These become searchable in the semantic layer."
+8. **KPI definitions** — "For each term, what's the formula or definition?"
 
 **NEVER do these with ontology:**
 - NEVER auto-generate business terms from column names alone
