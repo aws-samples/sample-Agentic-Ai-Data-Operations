@@ -19,17 +19,15 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from shared.utils.structured_logger import StructuredLogger
 
 logger = StructuredLogger(
+    agent="gold_aggregate",
     workload="{{ dataset_name }}",
-    script="silver_to_gold",
+    run_id="standalone",
 )
 
 
 def aggregate(glue_context, args):
     spark = glue_context.spark_session
-    logger.log_event("gold_transform_start", {
-        "source": "{{ source_table }}",
-        "schema_type": "{{ schema_type }}",
-    })
+    logger.log("info", "gold_transform_start", source="{{ source_table }}", schema_type="{{ schema_type }}")
 
     silver_df = spark.table("{{ source_table }}")
     input_rows = silver_df.count()
@@ -99,14 +97,8 @@ def aggregate(glue_context, args):
     output_rows = gold_df.count()
 {% endif %}
 
-    logger.log_event("gold_transform_complete", {
-        "input_rows": input_rows,
-        "output_rows": output_rows,
-        "target_table": table_name,
-{% if quality_threshold is defined %}
-        "quality_threshold": {{ quality_threshold }},
-{% endif %}
-    })
+    logger.log("info", "gold_transform_complete",
+        input_rows=input_rows, output_rows=output_rows, target_table=table_name)
 
     return {
         "workload": "{{ dataset_name }}",

@@ -163,6 +163,74 @@ After deploying ANY workload to AWS, you MUST run `shared/utils/post_deployment_
 
 Deployment is NOT complete until all checks PASS. If any fail, fix and re-verify.
 
+## Mandatory: Post-Deployment Sequence (Steps 5.10 → 5.11)
+
+After deployment verification (Step 5.9) passes, you MUST follow this two-step sequence. Both questions are mandatory — never skip either one.
+
+### Step 5.10 — E2E Pipeline Test Offer
+
+Ask the user:
+```
+┌────────────────────────────────────────────────────────────────────┐
+│  E2E PIPELINE TEST (on AWS)                                        │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  Deployment verified. Want to run the full pipeline end-to-end?    │
+│                                                                    │
+│  What this does:                                                   │
+│    1. Trigger Bronze ingestion (sample data -> Iceberg)            │
+│    2. Run Silver transform (dedup + mask + cast)                   │
+│    3. Run quality gate (score >= threshold?)                        │
+│    4. Run Gold aggregation (KPIs)                                  │
+│    5. Query Gold table via Athena (verify data)                    │
+│                                                                    │
+│  Uses: Glue jobs on AWS, real Iceberg tables, ~5-10 min            │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+Options:
+- **Yes, run E2E** → Trigger each Glue job in sequence, verify row counts, query Gold via Athena
+- **No, skip** → Pipeline will run on next scheduled trigger
+
+### Step 5.11 — DevOps Agent Offer (ask AFTER E2E completes OR after user skips E2E)
+
+Regardless of whether the user ran E2E, ALWAYS ask this next:
+```
+┌────────────────────────────────────────────────────────────────────┐
+│  DEVOPS AGENT — Production Readiness                               │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  The DevOps Agent can set up production operations:                │
+│                                                                    │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐               │
+│  │ CloudWatch  │  │  Alerting   │  │  Runbook    │               │
+│  │  Dashboards │  │  (SNS/PD)   │  │  (auto-gen) │               │
+│  └─────────────┘  └─────────────┘  └─────────────┘               │
+│                                                                    │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐               │
+│  │  Log Groups │  │  Cost Tags  │  │  Backup/DR  │               │
+│  │  & Metrics  │  │  & Budget   │  │  Strategy   │               │
+│  └─────────────┘  └─────────────┘  └─────────────┘               │
+│                                                                    │
+│  Steps:                                                            │
+│    1. CloudWatch alarms (Glue job failures, latency, costs)        │
+│    2. SNS alerting topic + subscriptions                           │
+│    3. Auto-generated runbook (troubleshooting playbook)            │
+│    4. Cost allocation tags on all resources                        │
+│    5. Backup/disaster recovery configuration                       │
+│    6. Log retention policies (HIPAA: 7-year audit trail)           │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+Options:
+- **Yes, run DevOps Agent** → Spawns DevOps sub-agent for monitoring, alerting, runbook, cost tags
+- **No, skip** → Production readiness steps deferred (can run later)
+
+**NEVER skip asking these questions.** The flow is always:
+  Deploy → Verify → Ask E2E → (run or skip) → Ask DevOps → (run or skip) → Done
+
 ## Additional Rules
 
 Coding conventions, error handling, logging protocol, testing strategy, transformation rules, and glossary are in `.claude/rules/`. These load automatically — path-scoped rules load only when editing matching files.

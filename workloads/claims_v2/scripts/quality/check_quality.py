@@ -1,6 +1,6 @@
 # spec_hash: 443cf3198768bbc2d498f052e8c66983e535f1faa0a9e45a5eed928adf084c14
 # template_id: quality_check
-# template_hash: 98e2375fc13c3a9f463ec0a9a551b53e14d45312fcefd63864622ca85dac2011
+# template_hash: 0db9facab8f5f4808dbfbcd6c832bd034e5e56e9b2aa50e3708bbd26b212df7a
 # schema_version: v1
 # rendered_at: 2026-05-21T06:00:00Z
 import sys
@@ -19,16 +19,14 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from shared.utils.structured_logger import StructuredLogger
 
 logger = StructuredLogger(
+    agent="quality_check",
     workload="claims_v2",
-    script="quality_check",
+    run_id="standalone",
 )
 
 
 def check_quality(spark, table_name, zone):
-    logger.log_event("quality_check_start", {
-        "table": table_name,
-        "zone": zone,
-    })
+    logger.log("info", "quality_check_start", table=table_name, zone=zone)
 
     df = spark.table(table_name)
     total_rows = df.count()
@@ -154,13 +152,10 @@ def check_quality(spark, table_name, zone):
 
     gate_passed = overall_score >= gate_threshold and critical_failures <= max_critical
 
-    logger.log_event("quality_check_complete", {
-        "total_rows": total_rows,
-        "overall_score": overall_score,
-        "critical_failures": critical_failures,
-        "gate_passed": gate_passed,
-        "rules_checked": len(results),
-    })
+    logger.log("info", "quality_check_complete",
+        total_rows=total_rows, overall_score=overall_score,
+        critical_failures=critical_failures, gate_passed=gate_passed,
+        rules_checked=len(results))
 
     return {
         "workload": "claims_v2",

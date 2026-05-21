@@ -18,8 +18,9 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from shared.utils.structured_logger import StructuredLogger
 
 logger = StructuredLogger(
+    agent="bronze_ingestion",
     workload="{{ dataset_name }}",
-    script="bronze_ingestion",
+    run_id="standalone",
 )
 
 
@@ -28,10 +29,7 @@ def ingest(glue_context, args):
     source_path = args.get("source_path", "{{ source_path }}")
     landing_zone = args.get("landing_zone", "{{ landing_zone }}")
 
-    logger.log_event("ingestion_start", {
-        "source": source_path,
-        "format": "{{ source_format }}",
-    })
+    logger.log("info", "ingestion_start", source=source_path, format="{{ source_format }}")
 
 {% if source_format == "csv" %}
     df = spark.read.format("csv") \
@@ -66,13 +64,7 @@ def ingest(glue_context, args):
         .save(landing_zone)
 {% endif %}
 
-    logger.log_event("ingestion_complete", {
-        "input_rows": input_rows,
-        "target": landing_zone,
-{% if compression is defined %}
-        "compression": "{{ compression }}",
-{% endif %}
-    })
+    logger.log("info", "ingestion_complete", input_rows=input_rows, target=landing_zone)
 
     return {
         "workload": "{{ dataset_name }}",

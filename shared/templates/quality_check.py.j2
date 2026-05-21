@@ -18,16 +18,14 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from shared.utils.structured_logger import StructuredLogger
 
 logger = StructuredLogger(
+    agent="quality_check",
     workload="{{ dataset_name }}",
-    script="quality_check",
+    run_id="standalone",
 )
 
 
 def check_quality(spark, table_name, zone):
-    logger.log_event("quality_check_start", {
-        "table": table_name,
-        "zone": zone,
-    })
+    logger.log("info", "quality_check_start", table=table_name, zone=zone)
 
     df = spark.table(table_name)
     total_rows = df.count()
@@ -123,13 +121,10 @@ def check_quality(spark, table_name, zone):
 
     gate_passed = overall_score >= gate_threshold and critical_failures <= max_critical
 
-    logger.log_event("quality_check_complete", {
-        "total_rows": total_rows,
-        "overall_score": overall_score,
-        "critical_failures": critical_failures,
-        "gate_passed": gate_passed,
-        "rules_checked": len(results),
-    })
+    logger.log("info", "quality_check_complete",
+        total_rows=total_rows, overall_score=overall_score,
+        critical_failures=critical_failures, gate_passed=gate_passed,
+        rules_checked=len(results))
 
     return {
         "workload": "{{ dataset_name }}",

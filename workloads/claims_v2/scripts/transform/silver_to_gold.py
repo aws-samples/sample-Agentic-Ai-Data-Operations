@@ -1,6 +1,6 @@
 # spec_hash: e12dafbd6668baa28ec6772798bb88fbc33d859b3d370ae9bd1557463d08b6c9
 # template_id: gold_aggregate
-# template_hash: d353a6119751f96f58aae8eaeb55c4216a4487219393c64bdc8c1e037f03b485
+# template_hash: c97da7e461be6526a00cdb227ceb5608d212ed58c77e38bd4f7dc6e6df9574c1
 # schema_version: v1
 # rendered_at: 2026-05-21T06:00:00Z
 import sys
@@ -20,17 +20,15 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from shared.utils.structured_logger import StructuredLogger
 
 logger = StructuredLogger(
+    agent="gold_aggregate",
     workload="claims_v2",
-    script="silver_to_gold",
+    run_id="standalone",
 )
 
 
 def aggregate(glue_context, args):
     spark = glue_context.spark_session
-    logger.log_event("gold_transform_start", {
-        "source": "glue_catalog.claims_v2_db.silver_claims_v2",
-        "schema_type": "flat_iceberg",
-    })
+    logger.log("info", "gold_transform_start", source="glue_catalog.claims_v2_db.silver_claims_v2", schema_type="flat_iceberg")
 
     silver_df = spark.table("glue_catalog.claims_v2_db.silver_claims_v2")
     input_rows = silver_df.count()
@@ -53,12 +51,8 @@ def aggregate(glue_context, args):
     gold_df.writeTo(table_name).using("iceberg").createOrReplace()
     output_rows = gold_df.count()
 
-    logger.log_event("gold_transform_complete", {
-        "input_rows": input_rows,
-        "output_rows": output_rows,
-        "target_table": table_name,
-        "quality_threshold": 0.95,
-    })
+    logger.log("info", "gold_transform_complete",
+        input_rows=input_rows, output_rows=output_rows, target_table=table_name)
 
     return {
         "workload": "claims_v2",

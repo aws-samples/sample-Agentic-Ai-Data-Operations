@@ -214,6 +214,85 @@ class OrchestratorLogger:
             },
         )
 
+    # ── Conversation Flow Capture ──────────────────────────────────────
+
+    def log_question(
+        self,
+        question_text: str,
+        *,
+        options: Optional[List[str]] = None,
+        phase: Optional[int] = None,
+        agent_name: str = "orchestrator",
+        context: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Log a question posed to the user. Returns thread_id for linking."""
+        thread_id = AgentTracer.new_thread_id()
+        self.tracer.question_asked(
+            question_text,
+            options=options,
+            agent_name=agent_name,
+            phase=phase,
+            thread_id=thread_id,
+            context=context,
+        )
+        return thread_id
+
+    def log_user_response(
+        self,
+        answer_text: str,
+        thread_id: str,
+        *,
+        selected_options: Optional[List[str]] = None,
+        phase: Optional[int] = None,
+        agent_name: str = "orchestrator",
+    ):
+        """Log the user's response to a question."""
+        self.tracer.user_responded(
+            answer_text,
+            selected_options=selected_options,
+            agent_name=agent_name,
+            phase=phase,
+            thread_id=thread_id,
+        )
+
+    def log_discovery(
+        self,
+        title: str,
+        findings: List[str],
+        *,
+        phase: Optional[int] = None,
+        agent_name: str = "orchestrator",
+        data_source: str = "",
+    ):
+        """Log auto-discovered findings presented to the user."""
+        self.tracer.discovery_presented(
+            title, findings,
+            agent_name=agent_name,
+            phase=phase,
+            data_source=data_source,
+        )
+
+    def log_tool_call(
+        self,
+        tool_name: str,
+        params: Dict[str, Any],
+        *,
+        result_summary: str = "",
+        phase: Optional[int] = None,
+        agent_name: str = "orchestrator",
+        duration_ms: Optional[float] = None,
+    ):
+        """Log a tool/MCP invocation."""
+        self.tracer.tool_called(
+            tool_name, params,
+            result_summary=result_summary,
+            agent_name=agent_name,
+            phase=phase,
+            duration_ms=duration_ms,
+        )
+
+    # ────────────────────────────────────────────────────────────────────
+
     def to_json(self) -> str:
         """Export the full run log as JSON for archival."""
         return json.dumps(

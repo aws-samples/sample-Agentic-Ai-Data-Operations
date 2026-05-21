@@ -21,18 +21,19 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from shared.utils.structured_logger import StructuredLogger
 
 logger = StructuredLogger(
+    agent="silver_transform",
     workload="{{ dataset_name }}",
-    script="bronze_to_silver",
+    run_id="standalone",
 )
 
 
 def transform(glue_context, args):
     spark = glue_context.spark_session
-    logger.log_event("transform_start", {"source": "{{ source_table }}"})
+    logger.log("info", "transform_start", source="{{ source_table }}")
 
     bronze_df = spark.table("{{ source_table }}")
     input_rows = bronze_df.count()
-    logger.log_event("input_count", {"rows": input_rows})
+    logger.log("info", "input_count", rows=input_rows)
 
     # Drop rows with null primary key columns
 {% for pk_col in primary_key %}
@@ -134,14 +135,13 @@ def transform(glue_context, args):
 {% endif %}
 
     output_rows = masked_df.count()
-    logger.log_event("transform_complete", {
-        "input_rows": input_rows,
-        "pk_null_dropped": input_rows - after_pk_filter,
-        "duplicates_removed": after_pk_filter - dedup_rows,
-        "output_rows": output_rows,
-        "target_table": table_name,
-        "quality_threshold": {{ quality_threshold }},
-    })
+    logger.log("info", "transform_complete",
+        input_rows=input_rows,
+        pk_null_dropped=input_rows - after_pk_filter,
+        duplicates_removed=after_pk_filter - dedup_rows,
+        output_rows=output_rows,
+        target_table=table_name,
+        quality_threshold={{ quality_threshold }})
 
     return {
         "workload": "{{ dataset_name }}",

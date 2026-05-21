@@ -5,8 +5,12 @@ Captures operational, cognitive, and contextual events across three layers:
   Layer 1 — Orchestrator (phase transitions, test gates, retries)
   Layer 2 — Generated Scripts (row counts, transforms, quality scores)
   Layer 3 — LLM Self-Reporting (decisions array from AgentOutput)
+  Layer 4 — Conversation Flow (questions, user answers, discoveries, tool calls)
 
 All events share a run_id and use parent_span_id to form a trace tree.
+Events carry a monotonic sequence_number for total ordering.
+Question/answer pairs share a thread_id for linkage.
+
 Output: one JSON object per line (JSONL), compatible with jq, CloudWatch, Splunk.
 
 Usage:
@@ -21,6 +25,13 @@ Usage:
                                phase=4, payload={"reasoning": "..."})
         tracer.operational_event("phase_complete", agent_name="Metadata Agent",
                                  phase=4, status="success")
+
+    # Conversation flow capture:
+    thread_id = AgentTracer.new_thread_id()
+    tracer.question_asked("What is the PK?", options=["claim_id", "auto"],
+                          agent_name="Discovery", phase=1, thread_id=thread_id)
+    tracer.user_responded("claim_id", selected_options=["claim_id"],
+                          agent_name="Discovery", phase=1, thread_id=thread_id)
 """
 
 import json
@@ -34,6 +45,14 @@ from typing import Any, Dict, List, Optional
 
 
 VALID_SURFACES = {"operational", "cognitive", "contextual"}
+
+CONVERSATION_EVENT_TYPES = {
+    "question_asked",
+    "user_responded",
+    "discovery_presented",
+    "tool_called",
+    "decision_made",
+}
 
 
 class TraceContext:
@@ -86,6 +105,9 @@ class AgentTracer:
         self._span_stack: List[TraceContext] = []
         self._events: List[Dict[str, Any]] = []
 
+        # Monotonic counter for total event ordering
+        self._sequence_counter: int = 0
+
     @property
     def current_span_id(self) -> Optional[str]:
         return self._span_stack[-1].span_id if self._span_stack else None
@@ -100,8 +122,10 @@ class AgentTracer:
               duration_ms: Optional[float] = None,
               span_id: Optional[str] = None,
               parent_span_id: Optional[str] = None,
+              thread_id: Optional[str] = None,
               payload: Optional[Dict[str, Any]] = None):
         """Core emit method — builds and writes one trace event."""
+        self._sequence_counter += 1
         event = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "run_id": self.run_id,
@@ -111,6 +135,8 @@ class AgentTracer:
                 self._span_stack[-2].span_id if len(self._span_stack) > 1
                 else None
             ),
+            "sequence_number": self._sequence_counter,
+            "thread_id": thread_id,
             "surface": surface,
             "event_type": event_type,
             "agent_name": agent_name,
@@ -256,4 +282,131 @@ class AgentTracer:
                 "tokens": tokens,
                 "latency": latency,
             },
+        )
+
+    # ── Conversation Flow Capture ──────────────────────────────────────
+
+    @staticmethod
+    def new_thread_id() -> str:
+        """Generate a short thread ID for linking question→answer pairs."""
+        return f"thr-{uuid.uuid4().hex[:8]}"
+
+    def conversation_event(
+        self,
+        event_type: str,
+        *,
+        agent_name: str = "",
+        phase: Optional[int] = None,
+        thread_id: Optional[str] = None,
+        payload: Optional[Dict[str, Any]] = None,
+    ):
+        """Emit a conversation-flow event on the contextual surface."""
+        self._emit(
+            "contextual", event_type,
+            agent_name=agent_name, phase=phase,
+            thread_id=thread_id,
+            payload=payload,
+        )
+
+    def question_asked(
+        self,
+        question_text: str,
+        *,
+        options: Optional[List[str]] = None,
+        agent_name: str = "",
+        phase: Optional[int] = None,
+        thread_id: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ):
+        """Agent presents a question to the user."""
+        payload = {
+            "question_text": question_text,
+            "options": options or [],
+            "context": context or {},
+        }
+        self.conversation_event(
+            "question_asked", agent_name=agent_name,
+            phase=phase, thread_id=thread_id, payload=payload,
+        )
+
+    def user_responded(
+        self,
+        answer_text: str,
+        *,
+        selected_options: Optional[List[str]] = None,
+        agent_name: str = "",
+        phase: Optional[int] = None,
+        thread_id: Optional[str] = None,
+    ):
+        """User provides an answer to a question."""
+        payload = {
+            "answer_text": answer_text,
+            "selected_options": selected_options or [],
+        }
+        self.conversation_event(
+            "user_responded", agent_name=agent_name,
+            phase=phase, thread_id=thread_id, payload=payload,
+        )
+
+    def discovery_presented(
+        self,
+        title: str,
+        findings: List[str],
+        *,
+        agent_name: str = "",
+        phase: Optional[int] = None,
+        data_source: str = "",
+    ):
+        """Agent presents auto-discovered findings to the user."""
+        payload = {
+            "title": title,
+            "findings": findings,
+            "data_source": data_source,
+        }
+        self.conversation_event(
+            "discovery_presented", agent_name=agent_name,
+            phase=phase, payload=payload,
+        )
+
+    def tool_called(
+        self,
+        tool_name: str,
+        params: Dict[str, Any],
+        *,
+        result_summary: str = "",
+        agent_name: str = "",
+        phase: Optional[int] = None,
+        duration_ms: Optional[float] = None,
+    ):
+        """Agent invokes a tool or MCP server."""
+        payload = {
+            "tool_name": tool_name,
+            "params": params,
+            "result_summary": result_summary,
+        }
+        self._emit(
+            "contextual", "tool_called",
+            agent_name=agent_name, phase=phase,
+            duration_ms=duration_ms,
+            payload=payload,
+        )
+
+    def decision_made(
+        self,
+        decision_text: str,
+        *,
+        triggered_by_thread: Optional[str] = None,
+        reasoning: str = "",
+        agent_name: str = "",
+        phase: Optional[int] = None,
+    ):
+        """Agent makes a decision influenced by user input."""
+        payload = {
+            "decision_text": decision_text,
+            "triggered_by_thread": triggered_by_thread,
+            "reasoning": reasoning,
+        }
+        self.conversation_event(
+            "decision_made", agent_name=agent_name,
+            phase=phase, payload=payload,
         )

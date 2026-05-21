@@ -1,6 +1,6 @@
 # spec_hash: 567a3af743016510400d1485d651649670991023857a83daf0edd87ba9c45e5f
 # template_id: silver_transform
-# template_hash: 05a607ac60644a14f9eb0204bbfe38c91a70fb2ee6690756cc864f305cb35d82
+# template_hash: 7729bb9af4a66a2cbd36206fc2f5e026cfe290d4dbb5921a5481153297e71284
 # schema_version: v1
 # rendered_at: 2026-05-21T06:00:00Z
 import sys
@@ -22,18 +22,19 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from shared.utils.structured_logger import StructuredLogger
 
 logger = StructuredLogger(
+    agent="silver_transform",
     workload="claims_v2",
-    script="bronze_to_silver",
+    run_id="standalone",
 )
 
 
 def transform(glue_context, args):
     spark = glue_context.spark_session
-    logger.log_event("transform_start", {"source": "glue_catalog.claims_v2_db.bronze_claims_v2"})
+    logger.log("info", "transform_start", source="glue_catalog.claims_v2_db.bronze_claims_v2")
 
     bronze_df = spark.table("glue_catalog.claims_v2_db.bronze_claims_v2")
     input_rows = bronze_df.count()
-    logger.log_event("input_count", {"rows": input_rows})
+    logger.log("info", "input_count", rows=input_rows)
 
     # Drop rows with null primary key columns
     bronze_df = bronze_df.filter(F.col("claim_id").isNotNull())
@@ -102,14 +103,13 @@ def transform(glue_context, args):
         .createOrReplace()
 
     output_rows = masked_df.count()
-    logger.log_event("transform_complete", {
-        "input_rows": input_rows,
-        "pk_null_dropped": input_rows - after_pk_filter,
-        "duplicates_removed": after_pk_filter - dedup_rows,
-        "output_rows": output_rows,
-        "target_table": table_name,
-        "quality_threshold": 0.8,
-    })
+    logger.log("info", "transform_complete",
+        input_rows=input_rows,
+        pk_null_dropped=input_rows - after_pk_filter,
+        duplicates_removed=after_pk_filter - dedup_rows,
+        output_rows=output_rows,
+        target_table=table_name,
+        quality_threshold=0.8)
 
     return {
         "workload": "claims_v2",

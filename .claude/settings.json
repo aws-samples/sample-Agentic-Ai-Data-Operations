@@ -24,6 +24,18 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/log_conversation.py",
+            "timeout": 3
+          }
+        ]
+      }
     ]
   }
 }
