@@ -842,6 +842,44 @@ Inspired by the **GCC (Guardrails, Cognitive traces, Checksums)** pattern for ma
 - **Cognitive Traces**: Every sub-agent must include a `decisions[]` array documenting every significant choice, alternatives considered, and rejection reasons — making LLM "thinking" auditable.
 - **Template-Driven Codegen**: All pipeline scripts and DAGs are generated from Jinja2 templates (`shared/templates/*.j2`) driven by spec contracts (`contracts/v1/*.schema.json`). The `shared/codegen/` module loads config, validates against schemas, extracts typed slots, renders templates, and validates drift. A PreToolUse hook blocks any direct write to artifact directories without the renderer token. See [docs/determinism.md](docs/determinism.md) for architecture details.
 
+### Agent Exchange Display
+
+Every agent interaction is rendered in a structured ASCII format for traceability. Example:
+
+```text
++--------------------------------------------------------------------+
+|  QUERY                                                             |
++--------------------------------------------------------------------+
+|  "Profile customer churn dataset and propose onboarding DAG"       |
+|  source: data_onboarding | user: claims_v2 | ts: 2026-05-21T06:00 |
++--------------------------------------------------------------------+
+                              |
+                              v
++--------------------------------------------------------------------+
+|  AGENT RESPONSE                                                    |
++--------------------------------------------------------------------+
+|  >> Generated profiling plan and DAG skeleton                      |
+|  STATUS: OK                                                        |
+|  tokens: 3.2k | latency: 4.1s | cost: n/a                         |
++--------------------------------------------------------------------+
+```
+
+Discovery findings are presented in visual blocks before asking questions:
+
+```text
++--------------------------------------------------------------------+
+|  DISCOVERED: Source Profile                                        |
++--------------------------------------------------------------------+
+|  * Format: CSV, 31 columns, 50 rows                               |
+|  * Likely PK: claim_id (unique, 0% nulls)                         |
+|  * PHI detected: member_ssn, member_dob, member_email              |
+|  * Measures: billed_amount, allowed_amount, paid_amount            |
+|  * Temporal: service_date, submission_date                         |
++--------------------------------------------------------------------+
+```
+
+The `shared/utils/ascii_display.py` module provides reusable builders: `query_block()`, `response_block()`, `exchange_block()`, `discovery_block()`, `entity_block()`, `checklist_block()`.
+
 ### Cedar Policy Guardrails
 Uses **Amazon Cedar** (the policy language behind Amazon Verified Permissions) to enforce safety invariants across the pipeline — 23 policies total:
 

@@ -64,7 +64,24 @@ If user says "onboard from Bronze through Gold" — ask questions for ALL zones,
 - Sample rows (5 rows)
 ```
 
-Present findings, then ask ONLY what you couldn't discover. This reduces questions by ~60%.
+**Display format**: Use `shared/utils/ascii_display.discovery_block()` to present findings in a visual box BEFORE asking questions. This makes discoveries stand out in the conversation and gets captured in agent traces.
+
+Example output:
+```text
++--------------------------------------------------------------------+
+|  DISCOVERED: Source Profile                                        |
++--------------------------------------------------------------------+
+|  * Format: CSV, 31 columns, 50 rows                               |
+|  * Likely PK: claim_id (unique, 0% nulls)                         |
+|  * PHI detected: member_ssn, member_dob, member_email              |
+|  * Nulls: denial_reason (82%), all others 0%                      |
+|  * Enums: claim_type (4 vals), claim_status (4), plan_type (5)    |
++--------------------------------------------------------------------+
+```
+
+After presenting, ask ONLY what you couldn't discover. This reduces questions by ~60%.
+
+**Trace capture**: Every discovery presentation and user response MUST be logged via `tracer.log_exchange()` so the full Q&A is in `trace_events.jsonl`.
 
 ## Ontology Collection (MANDATORY — ask for ALL zones)
 

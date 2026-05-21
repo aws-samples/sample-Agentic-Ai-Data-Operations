@@ -203,3 +203,57 @@ class AgentTracer:
         with open(out, "w") as f:
             for event in self._events:
                 f.write(json.dumps(event, default=str) + "\n")
+
+    def format_exchange(
+        self,
+        query: str,
+        summary: str,
+        status: str = "OK",
+        tokens: str = "",
+        latency: str = "",
+        agent_name: str = "",
+    ) -> str:
+        """Render a query/response exchange as ASCII art for trace logs."""
+        from shared.utils.ascii_display import exchange_block
+        return exchange_block(
+            question=query,
+            summary=summary,
+            status=status,
+            source=agent_name or "agent",
+            user=self.workload_name,
+            ts=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            tokens=tokens,
+            latency=latency,
+        )
+
+    def log_exchange(
+        self,
+        query: str,
+        summary: str,
+        status: str = "OK",
+        agent_name: str = "",
+        phase: Optional[int] = None,
+        tokens: str = "",
+        latency: str = "",
+    ):
+        """Log a query/response exchange as both ASCII display and trace event."""
+        ascii_art = self.format_exchange(
+            query=query, summary=summary, status=status,
+            tokens=tokens, latency=latency, agent_name=agent_name,
+        )
+        if self.write_to_stdout:
+            print(ascii_art, file=sys.stdout)
+
+        self.operational_event(
+            "exchange",
+            agent_name=agent_name,
+            phase=phase,
+            status=status,
+            payload={
+                "query": query,
+                "summary": summary,
+                "ascii_display": ascii_art,
+                "tokens": tokens,
+                "latency": latency,
+            },
+        )
