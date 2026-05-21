@@ -5,6 +5,13 @@ description: Insurance claims processing with member, provider, and payer entiti
 namespace: https://adop.internal/ontology/claims/
 version: v1
 
+use_cases:
+  - nl_to_sql
+  - data_discovery
+consumers:
+  - data_analysts
+  - business_users
+
 tables:
   - name: Claim
     table_type: fact
