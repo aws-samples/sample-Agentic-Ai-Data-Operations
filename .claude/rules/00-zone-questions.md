@@ -102,3 +102,51 @@ Options:
 - **No** → Skip ontology, can be added later via `/ontology` command
 
 Record the answer in the checklist. Do NOT assume "no" — always ask.
+
+### If User Says YES to Ontology — MANDATORY Follow-Up Questions
+
+When the user opts in to ontology enrichment, you MUST ask these confirmation questions BEFORE generating `semantic.yaml`. Do NOT auto-derive entities, relationships, or business terms without user confirmation.
+
+**Step 1: Present auto-discovered entities and ask for confirmation**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  DISCOVERED ENTITIES (from your schema)                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  I found these potential business entities:                 │
+│                                                             │
+│  ┌─────────┐     ┌──────────┐     ┌─────────┐             │
+│  │  Entity │     │  Entity  │     │  Entity │             │
+│  │  Name   │     │  Name    │     │  Name   │             │
+│  │ (N cols)│     │ (N cols) │     │ (N cols)│             │
+│  └─────────┘     └──────────┘     └─────────┘             │
+│                                                             │
+│  Each entity becomes an OWL Class with properties.          │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+Ask:
+1. **Entities** — "I identified these entities from your schema: [list]. Are these correct? Should any be added, removed, or renamed?"
+2. **Entity types** — "Which is the fact table (measures/events) and which are dimensions (descriptive attributes)?"
+
+**Step 2: Ask about relationships**
+
+Ask:
+3. **Relationships** — "I see these potential relationships: [Claim → Member via member_id, etc.]. Are these correct? Any missing relationships?"
+4. **Cardinality** — "Are these 1:many or many:many?" (important for R2RML join generation)
+
+**Step 3: Ask about business terms**
+
+Ask:
+5. **Business terms** — "What are the key business terms your team uses for this data? Examples: 'Loss Ratio', 'Clean Claim Rate', 'Days to Adjudicate'. These become searchable in the semantic layer."
+6. **KPI definitions** — "For each term, what's the formula or definition?"
+
+**NEVER do these with ontology:**
+- NEVER auto-generate business terms from column names alone
+- NEVER assume relationships without user confirmation
+- NEVER decide entity boundaries (what is a separate entity vs. a column group) without asking
+- NEVER skip these questions because "the schema is obvious"
+
+Present findings, then ask. The user's domain expertise determines the ontology — not the column names.

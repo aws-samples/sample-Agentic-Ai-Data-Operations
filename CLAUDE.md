@@ -52,6 +52,7 @@ This is a human-in-the-loop gate. The HUMAN provides the rules. The agent does N
 - NEVER assume PII columns from names alone — ask user to confirm
 - NEVER skip the transformation question — even if you auto-derived type casts and PII masking, you MUST ask about derived columns, calculations, and custom business logic
 - NEVER skip the ontology question — always ask whether the user wants semantic layer enrichment (opt-in)
+- NEVER auto-generate ontology entities, relationships, or business terms without user confirmation — present what you discovered, then ASK
 
 You MAY profile data and PRESENT observations, then MUST ask: "How would you like to handle these?"
 
