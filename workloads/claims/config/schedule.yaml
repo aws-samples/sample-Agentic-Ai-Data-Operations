@@ -1,0 +1,40 @@
+# Claims Pipeline Schedule
+# Daily 9:00 AM AEST (23:00 UTC previous day)
+
+dataset_name: claims
+version: "1.0.0"
+
+schedule:
+  cron: "0 23 * * *"
+  timezone: UTC
+  description: "Daily at 9:00 AM AEST (23:00 UTC)"
+  catchup: false
+  max_active_runs: 1
+
+retries:
+  count: 3
+  delay_seconds: 300
+  backoff: exponential
+  max_delay_seconds: 3600
+
+failure_handling:
+  on_failure_callback: true
+  notification:
+    email: claims-ops@company.com
+    slack_channel: "#claims-data-alerts"
+  escalation:
+    after_retries_exhausted: true
+    contact: claims-ops@company.com
+
+sla:
+  critical_tasks:
+    - task: bronze_to_silver
+      max_duration_minutes: 30
+    - task: silver_to_gold
+      max_duration_minutes: 20
+    - task: quality_checks
+      max_duration_minutes: 15
+
+dependencies:
+  upstream: []
+  downstream: []

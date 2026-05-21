@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/check-discovery-gate.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/check-logging.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

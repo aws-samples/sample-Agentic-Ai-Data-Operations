@@ -1,0 +1,233 @@
+# Claims Transformation Rules
+# HIPAA-Compliant Data Transformations with PII Masking
+
+dataset_name: claims
+version: "1.0.0"
+compliance: HIPAA
+
+# Bronze → Silver Transformations
+
+deduplication:
+  enabled: true
+  key_columns: [claim_id]
+  strategy: keep_latest
+  order_by: ingestion_timestamp
+  description: "Dedup by claim_id, keep latest record"
+
+null_handling:
+  strategy: drop_null_pk_only
+  critical_columns: [claim_id]
+  description: "Drop rows only where claim_id is null, keep all other nulls"
+
+type_casting:
+  - column: billed_amount
+    from_type: STRING
+    to_type: DECIMAL(10,2)
+    validation: value >= 0
+    on_error: quarantine
+
+  - column: allowed_amount
+    from_type: STRING
+    to_type: DECIMAL(10,2)
+    validation: value >= 0
+    on_error: quarantine
+
+  - column: paid_amount
+    from_type: STRING
+    to_type: DECIMAL(10,2)
+    validation: value >= 0
+    on_error: quarantine
+
+  - column: patient_responsibility
+    from_type: STRING
+    to_type: DECIMAL(10,2)
+    validation: value >= 0
+    on_error: quarantine
+
+  - column: service_date
+    from_type: STRING
+    to_type: DATE
+    format: "YYYY-MM-DD"
+    validation: value <= CURRENT_DATE
+    on_error: quarantine
+
+  - column: submission_date
+    from_type: STRING
+    to_type: DATE
+    format: "YYYY-MM-DD"
+    validation: value <= CURRENT_DATE
+    on_error: quarantine
+
+  - column: member_dob
+    from_type: STRING
+    to_type: DATE
+    format: "YYYY-MM-DD"
+    validation: value >= '1900-01-01' AND value <= CURRENT_DATE
+    on_error: quarantine
+
+validation_rules:
+  - column: claim_type
+    rule: value IN ('medical', 'dental', 'vision', 'pharmacy')
+    severity: critical
+    on_violation: quarantine
+
+  - column: claim_status
+    rule: value IN ('paid', 'denied', 'pending', 'appealed')
+    severity: critical
+    on_violation: quarantine
+
+  - column: network_status
+    rule: value IN ('in_network', 'out_of_network')
+    severity: critical
+    on_violation: quarantine
+
+  - column: plan_type
+    rule: value IN ('PPO', 'HMO', 'EPO', 'POS', 'HDHP')
+    severity: high
+    on_violation: keep_with_flag
+
+  - column: billed_amount
+    rule: value >= 0 AND value < 10000000
+    severity: critical
+    on_violation: quarantine
+
+  - column: service_date
+    rule: value <= CURRENT_DATE
+    severity: critical
+    on_violation: quarantine
+    description: "No future service dates"
+
+  - column: member_state
+    rule: valid_us_state_abbreviation
+    severity: high
+    on_violation: keep_with_flag
+
+# HIPAA PII Masking Rules
+
+pii_masking:
+  staging:
+    - column: member_ssn
+      method: hash
+      algorithm: SHA-256
+      description: "HIPAA requires SSN hashed in Silver"
+      reversible: false
+
+    - column: member_first_name
+      method: hash
+      algorithm: SHA-256
+      description: "Hash name for de-identification"
+      reversible: false
+
+    - column: member_last_name
+      method: hash
+      algorithm: SHA-256
+      description: "Hash name for de-identification"
+      reversible: false
+
+    - column: member_email
+      method: mask_email
+      description: "Mask email preserving domain"
+      reversible: false
+
+    - column: member_phone
+      method: mask_partial
+      description: "Mask middle digits"
+      reversible: false
+
+    - column: member_address
+      method: keep
+      reason: "Needed for geography analysis"
+      lf_tag_enforcement: true
+
+    - column: member_city
+      method: keep
+      reason: "Needed for geography analysis"
+      lf_tag_enforcement: true
+
+    - column: member_state
+      method: keep
+      reason: "Needed for geography analysis"
+      lf_tag_enforcement: true
+
+    - column: member_zip
+      method: keep
+      reason: "Needed for geography analysis"
+      lf_tag_enforcement: true
+
+  publish:
+    - method: aggregation_and_flat
+      description: "Gold zone contains flat denormalized table with PHI masked/hashed"
+      individual_records: true
+      phi_treatment: hashed_or_masked
+
+# Derived Columns
+
+derived_columns:
+  - name: member_age
+    formula: "YEAR(CURRENT_DATE) - YEAR(member_dob)"
+    data_type: INTEGER
+    phi: false
+
+  - name: days_to_submission
+    formula: "DATEDIFF(submission_date, service_date)"
+    data_type: INTEGER
+    phi: false
+
+  - name: payer_coverage_pct
+    formula: "CASE WHEN billed_amount > 0 THEN (paid_amount / billed_amount) * 100 ELSE 0 END"
+    data_type: DECIMAL(5,2)
+    phi: false
+
+  - name: claim_amount_tier
+    formula: |
+      CASE
+        WHEN billed_amount < 200 THEN 'Low'
+        WHEN billed_amount BETWEEN 200 AND 1000 THEN 'Medium'
+        WHEN billed_amount > 1000 THEN 'High'
+      END
+    data_type: STRING
+    phi: false
+
+# Quarantine Rules
+
+quarantine_rules:
+  enabled: true
+  location: s3://prod-data-lake/quarantine/claims/
+  retention_days: 90
+  reasons:
+    - invalid_type_cast
+    - validation_failure
+    - null_primary_key
+  notification:
+    on_quarantine: true
+    email: claims-ops@company.com
+
+# Silver → Gold Transformations (Flat Denormalized)
+
+gold_schema:
+  type: flat_denormalized
+  table_name: claims_analytical
+  description: "Flat denormalized Iceberg table for analytical reporting"
+  includes_all_silver_columns: true
+  additional_columns:
+    - member_age
+    - days_to_submission
+    - payer_coverage_pct
+    - claim_amount_tier
+  phi_columns_masked: true
+  time_travel: true
+
+idempotency:
+  enabled: true
+  strategy: upsert
+  merge_key: [claim_id]
+  description: "Running transformation twice produces identical output"
+
+lineage:
+  enabled: true
+  record_level: true
+  metadata:
+    - source_file
+    - ingestion_timestamp
+    - transformation_version
+    - processing_timestamp
