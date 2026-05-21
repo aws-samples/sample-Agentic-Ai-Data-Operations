@@ -1,0 +1,36 @@
+dataset_name: claims_v2
+schema_version: v1
+source_table: glue_catalog.claims_v2_db.silver_claims_v2
+schema_type: flat_iceberg
+grain:
+  dimensions:
+    - claim_type
+    - payer_name
+  temporal: monthly
+measures:
+  - name: total_billed
+    source_column: billed_amount
+    aggregation: sum
+  - name: total_paid
+    source_column: paid_amount
+    aggregation: sum
+  - name: total_allowed
+    source_column: allowed_amount
+    aggregation: sum
+  - name: total_patient_responsibility
+    source_column: patient_responsibility
+    aggregation: sum
+  - name: claim_count
+    source_column: claim_id
+    aggregation: count
+  - name: avg_billed
+    source_column: billed_amount
+    aggregation: avg
+  - name: denied_count
+    source_column: claim_id
+    aggregation: count
+    filter: "claim_status = 'denied'"
+quality_threshold: 0.95
+iceberg_database: claims_v2_db
+iceberg_table: gold_claims_v2
+iceberg_partition_spec: []

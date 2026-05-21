@@ -1,0 +1,65 @@
+dataset_name: claims_v2
+schema_version: v1
+source_table: glue_catalog.claims_v2_db.bronze_claims_v2
+primary_key:
+  - claim_id
+dedup_strategy: keep_latest
+dedup_order_by: submission_date
+null_handling:
+  strategy: drop_row
+  critical_columns:
+    - claim_id
+quality_threshold: 0.80
+iceberg_database: claims_v2_db
+iceberg_table: silver_claims_v2
+iceberg_partition_spec: []
+type_casts:
+  - column: billed_amount
+    from_type: STRING
+    to_type: DECIMAL
+    params:
+      precision: 10
+      scale: 2
+  - column: allowed_amount
+    from_type: STRING
+    to_type: DECIMAL
+    params:
+      precision: 10
+      scale: 2
+  - column: paid_amount
+    from_type: STRING
+    to_type: DECIMAL
+    params:
+      precision: 10
+      scale: 2
+  - column: patient_responsibility
+    from_type: STRING
+    to_type: DECIMAL
+    params:
+      precision: 10
+      scale: 2
+  - column: service_date
+    from_type: STRING
+    to_type: DATE
+    format: "yyyy-MM-dd"
+  - column: submission_date
+    from_type: STRING
+    to_type: DATE
+    format: "yyyy-MM-dd"
+  - column: member_dob
+    from_type: STRING
+    to_type: DATE
+    format: "yyyy-MM-dd"
+pii_masking:
+  enabled: true
+  columns:
+    - name: member_ssn
+      method: hash
+    - name: member_dob
+      method: hash
+    - name: member_email
+      method: hash
+quarantine:
+  enabled: true
+  location: s3://data-lake/claims_v2/quarantine/
+  retention_days: 90

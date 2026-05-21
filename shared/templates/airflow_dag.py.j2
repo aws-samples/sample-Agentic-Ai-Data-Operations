@@ -1,0 +1,111 @@
+{# template_id: airflow_dag #}
+{# template_version: 1.0.0 #}
+{# required_slots: dataset_name, schedule, tasks #}
+{# schema_version: v1 #}
+from datetime import datetime, timedelta
+
+from airflow import DAG
+from airflow.models import Variable
+from airflow.providers.amazon.aws.operators.glue import GlueJobOperator
+from airflow.operators.python import PythonOperator
+from airflow.operators.dummy import DummyOperator
+
+GLUE_SCRIPT_S3_PATH = Variable.get("glue_script_s3_path", default_var="s3://glue-scripts/")
+GLUE_IAM_ROLE = Variable.get("glue_iam_role", default_var="AWSGlueServiceRole")
+
+default_args = {
+    "owner": "data-engineering",
+    "depends_on_past": False,
+{% if retries is defined %}
+    "retries": {{ retries.count | default(3) }},
+    "retry_delay": timedelta(seconds={{ retries.delay_seconds | default(300) }}),
+{% if retries.max_delay_seconds is defined %}
+    "max_retry_delay": timedelta(seconds={{ retries.max_delay_seconds }}),
+{% endif %}
+{% if retries.backoff is defined and retries.backoff %}
+    "retry_exponential_backoff": True,
+{% endif %}
+{% else %}
+    "retries": 3,
+    "retry_delay": timedelta(seconds=300),
+{% endif %}
+    "email_on_failure": False,
+}
+
+{% if dag_id is defined %}
+DAG_ID = "{{ dag_id }}"
+{% else %}
+DAG_ID = "{{ dataset_name }}_pipeline"
+{% endif %}
+
+with DAG(
+    dag_id=DAG_ID,
+    default_args=default_args,
+    description="{{ dataset_name }} data pipeline (Bronze → Silver → Gold)",
+    schedule_interval="{{ schedule.cron }}",
+{% if schedule.start_date is defined %}
+    start_date=datetime.fromisoformat("{{ schedule.start_date }}"),
+{% else %}
+    start_date=datetime(2026, 1, 1),
+{% endif %}
+    catchup={{ schedule.catchup | default(false) | string | capitalize }},
+    max_active_runs={{ schedule.max_active_runs | default(1) }},
+{% if tags is defined %}
+    tags={{ tags | tojson }},
+{% else %}
+    tags=["{{ dataset_name }}", "data-pipeline"],
+{% endif %}
+) as dag:
+
+{% for task in tasks %}
+{% if task.type == "glue_job" %}
+    {{ task.task_id }} = GlueJobOperator(
+        task_id="{{ task.task_id }}",
+        job_name="{{ dataset_name }}_{{ task.task_id }}",
+        script_location=f"{GLUE_SCRIPT_S3_PATH}{{ task.script_path | default(task.task_id + '.py') }}",
+        iam_role_name=GLUE_IAM_ROLE,
+        region_name=Variable.get("aws_region", default_var="us-east-1"),
+{% if task.timeout_minutes is defined %}
+        execution_timeout=timedelta(minutes={{ task.timeout_minutes }}),
+{% endif %}
+{% if task.params is defined %}
+        script_args={{ task.params | tojson }},
+{% endif %}
+    )
+{% elif task.type == "quality_check" %}
+    {{ task.task_id }} = GlueJobOperator(
+        task_id="{{ task.task_id }}",
+        job_name="{{ dataset_name }}_{{ task.task_id }}",
+        script_location=f"{GLUE_SCRIPT_S3_PATH}quality_check.py",
+        iam_role_name=GLUE_IAM_ROLE,
+        region_name=Variable.get("aws_region", default_var="us-east-1"),
+{% if task.params is defined %}
+        script_args={{ task.params | tojson }},
+{% endif %}
+    )
+{% elif task.type == "sensor" %}
+    {{ task.task_id }} = PythonOperator(
+        task_id="{{ task.task_id }}",
+        python_callable=lambda: True,
+{% if task.timeout_minutes is defined %}
+        execution_timeout=timedelta(minutes={{ task.timeout_minutes }}),
+{% endif %}
+    )
+{% elif task.type == "dummy" %}
+    {{ task.task_id }} = DummyOperator(task_id="{{ task.task_id }}")
+{% else %}
+    {{ task.task_id }} = PythonOperator(
+        task_id="{{ task.task_id }}",
+        python_callable=lambda: None,
+    )
+{% endif %}
+
+{% endfor %}
+    # Task dependencies
+{% for task in tasks %}
+{% if task.depends_on is defined and task.depends_on %}
+{% for dep in task.depends_on %}
+    {{ dep }} >> {{ task.task_id }}
+{% endfor %}
+{% endif %}
+{% endfor %}

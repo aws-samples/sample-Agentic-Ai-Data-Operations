@@ -1,0 +1,128 @@
+{# template_id: gold_aggregate #}
+{# template_version: 1.0.0 #}
+{# required_slots: dataset_name, source_table, schema_type, grain, measures #}
+{# schema_version: v1 #}
+import sys
+from datetime import datetime
+from pathlib import Path
+
+from pyspark.sql import functions as F
+from awsglue.context import GlueContext
+from awsglue.job import Job
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from shared.utils.structured_logger import StructuredLogger
+
+logger = StructuredLogger(
+    workload="{{ dataset_name }}",
+    script="silver_to_gold",
+)
+
+
+def aggregate(glue_context, args):
+    spark = glue_context.spark_session
+    logger.log_event("gold_transform_start", {
+        "source": "{{ source_table }}",
+        "schema_type": "{{ schema_type }}",
+    })
+
+    silver_df = spark.table("{{ source_table }}")
+    input_rows = silver_df.count()
+
+{% if schema_type == "star_schema" %}
+    # Star schema: build fact table with aggregated measures
+    fact_df = silver_df.groupBy(
+{% for dim in grain.dimensions %}
+        "{{ dim }}",
+{% endfor %}
+    ).agg(
+{% for measure in measures %}
+{% if measure.aggregation == "sum" %}
+        F.sum("{{ measure.source_column }}").alias("{{ measure.name }}"),
+{% elif measure.aggregation == "avg" %}
+        F.avg("{{ measure.source_column }}").alias("{{ measure.name }}"),
+{% elif measure.aggregation == "count" %}
+        F.count("{{ measure.source_column }}").alias("{{ measure.name }}"),
+{% elif measure.aggregation == "count_distinct" %}
+        F.countDistinct("{{ measure.source_column }}").alias("{{ measure.name }}"),
+{% elif measure.aggregation == "min" %}
+        F.min("{{ measure.source_column }}").alias("{{ measure.name }}"),
+{% elif measure.aggregation == "max" %}
+        F.max("{{ measure.source_column }}").alias("{{ measure.name }}"),
+{% endif %}
+{% endfor %}
+    )
+
+{% if iceberg_database is defined and iceberg_table is defined %}
+    table_name = "glue_catalog.{{ iceberg_database }}.{{ iceberg_table }}"
+{% else %}
+    table_name = "glue_catalog.{{ dataset_name }}_db.gold_{{ dataset_name }}"
+{% endif %}
+    fact_df.writeTo(table_name).using("iceberg").createOrReplace()
+    output_rows = fact_df.count()
+
+{% elif schema_type == "flat_iceberg" %}
+    # Flat Iceberg: denormalized table with all measures
+    gold_df = silver_df.groupBy(
+{% for dim in grain.dimensions %}
+        "{{ dim }}",
+{% endfor %}
+    ).agg(
+{% for measure in measures %}
+{% if measure.aggregation == "sum" %}
+        F.sum("{{ measure.source_column }}").alias("{{ measure.name }}"),
+{% elif measure.aggregation == "avg" %}
+        F.avg("{{ measure.source_column }}").alias("{{ measure.name }}"),
+{% elif measure.aggregation == "count" %}
+        F.count("{{ measure.source_column }}").alias("{{ measure.name }}"),
+{% elif measure.aggregation == "count_distinct" %}
+        F.countDistinct("{{ measure.source_column }}").alias("{{ measure.name }}"),
+{% elif measure.aggregation == "min" %}
+        F.min("{{ measure.source_column }}").alias("{{ measure.name }}"),
+{% elif measure.aggregation == "max" %}
+        F.max("{{ measure.source_column }}").alias("{{ measure.name }}"),
+{% endif %}
+{% endfor %}
+    )
+
+{% if iceberg_database is defined and iceberg_table is defined %}
+    table_name = "glue_catalog.{{ iceberg_database }}.{{ iceberg_table }}"
+{% else %}
+    table_name = "glue_catalog.{{ dataset_name }}_db.gold_{{ dataset_name }}"
+{% endif %}
+    gold_df.writeTo(table_name).using("iceberg").createOrReplace()
+    output_rows = gold_df.count()
+{% endif %}
+
+    logger.log_event("gold_transform_complete", {
+        "input_rows": input_rows,
+        "output_rows": output_rows,
+        "target_table": table_name,
+{% if quality_threshold is defined %}
+        "quality_threshold": {{ quality_threshold }},
+{% endif %}
+    })
+
+    return {
+        "workload": "{{ dataset_name }}",
+        "transformation": "silver_to_gold",
+        "source": "{{ source_table }}",
+        "target": table_name,
+        "input_rows": input_rows,
+        "output_rows": output_rows,
+    }
+
+
+if __name__ == "__main__":
+    args = getResolvedOptions(sys.argv, ["JOB_NAME"])
+    sc = SparkContext()
+    glue_context = GlueContext(sc)
+    job = Job(glue_context)
+    job.init(args["JOB_NAME"], args)
+    result = aggregate(glue_context, args)
+    job.commit()

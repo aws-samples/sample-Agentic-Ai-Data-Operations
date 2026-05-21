@@ -1,0 +1,93 @@
+{# template_id: bronze_ingestion #}
+{# template_version: 1.0.0 #}
+{# required_slots: dataset_name, source_path, source_format, landing_zone #}
+{# schema_version: v1 #}
+import sys
+from datetime import datetime
+from pathlib import Path
+
+from awsglue.context import GlueContext
+from awsglue.job import Job
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from shared.utils.structured_logger import StructuredLogger
+
+logger = StructuredLogger(
+    workload="{{ dataset_name }}",
+    script="bronze_ingestion",
+)
+
+
+def ingest(glue_context, args):
+    spark = glue_context.spark_session
+    source_path = args.get("source_path", "{{ source_path }}")
+    landing_zone = args.get("landing_zone", "{{ landing_zone }}")
+
+    logger.log_event("ingestion_start", {
+        "source": source_path,
+        "format": "{{ source_format }}",
+    })
+
+{% if source_format == "csv" %}
+    df = spark.read.format("csv") \
+        .option("header", "{{ format_options.header | default('true') }}") \
+{% if format_options is defined and format_options.delimiter is defined %}
+        .option("delimiter", "{{ format_options.delimiter }}") \
+{% endif %}
+        .option("inferSchema", "false") \
+        .load(source_path)
+{% elif source_format == "parquet" %}
+    df = spark.read.format("parquet").load(source_path)
+{% elif source_format == "json" %}
+    df = spark.read.format("json") \
+{% if format_options is defined and format_options.multiline is defined %}
+        .option("multiLine", "{{ format_options.multiline | lower }}") \
+{% endif %}
+        .load(source_path)
+{% else %}
+    df = spark.read.format("{{ source_format }}").load(source_path)
+{% endif %}
+
+    input_rows = df.count()
+
+{% if partition_keys is defined and partition_keys %}
+    df.write.format("parquet") \
+        .mode("append") \
+        .partitionBy({{ partition_keys | tojson }}) \
+        .save(landing_zone)
+{% else %}
+    df.write.format("parquet") \
+        .mode("append") \
+        .save(landing_zone)
+{% endif %}
+
+    logger.log_event("ingestion_complete", {
+        "input_rows": input_rows,
+        "target": landing_zone,
+{% if compression is defined %}
+        "compression": "{{ compression }}",
+{% endif %}
+    })
+
+    return {
+        "workload": "{{ dataset_name }}",
+        "operation": "bronze_ingestion",
+        "source": source_path,
+        "target": landing_zone,
+        "rows_ingested": input_rows,
+    }
+
+
+if __name__ == "__main__":
+    args = getResolvedOptions(sys.argv, ["JOB_NAME"])
+    sc = SparkContext()
+    glue_context = GlueContext(sc)
+    job = Job(glue_context)
+    job.init(args["JOB_NAME"], args)
+    result = ingest(glue_context, args)
+    job.commit()

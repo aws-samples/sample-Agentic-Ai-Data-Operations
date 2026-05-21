@@ -1,0 +1,61 @@
+dataset_name: claims_v2
+schema_version: v1
+dag_id: claims_v2_pipeline
+schedule:
+  cron: "0 6 * * *"
+  timezone: US/Eastern
+  catchup: false
+  max_active_runs: 1
+  start_date: "2026-01-01"
+retries:
+  count: 3
+  delay_seconds: 300
+  backoff: true
+  max_delay_seconds: 3600
+tasks:
+  - task_id: ingest_bronze
+    type: glue_job
+    script_path: scripts/extract/ingest_claims.py
+    timeout_minutes: 30
+  - task_id: transform_silver
+    type: glue_job
+    script_path: scripts/transform/bronze_to_silver.py
+    depends_on:
+      - ingest_bronze
+    timeout_minutes: 45
+  - task_id: quality_check_silver
+    type: quality_check
+    depends_on:
+      - transform_silver
+    timeout_minutes: 15
+    params:
+      "--TABLE_NAME": "glue_catalog.claims_v2_db.silver_claims_v2"
+      "--ZONE": "silver"
+  - task_id: aggregate_gold
+    type: glue_job
+    script_path: scripts/transform/silver_to_gold.py
+    depends_on:
+      - quality_check_silver
+    timeout_minutes: 30
+  - task_id: quality_check_gold
+    type: quality_check
+    depends_on:
+      - aggregate_gold
+    timeout_minutes: 15
+    params:
+      "--TABLE_NAME": "glue_catalog.claims_v2_db.gold_claims_v2"
+      "--ZONE": "gold"
+failure_handling:
+  on_failure_callback: sns_alert
+  notification_channel: claims-pipeline-alerts
+  escalation_after_minutes: 60
+sla:
+  deadline_minutes: 120
+  critical_tasks:
+    - transform_silver
+    - aggregate_gold
+tags:
+  - claims
+  - healthcare
+  - hipaa
+  - data-pipeline

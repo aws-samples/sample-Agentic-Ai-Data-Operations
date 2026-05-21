@@ -29,10 +29,11 @@ Ask:
 1. **Uniqueness** — what defines a unique record (PK)? How to handle duplicates?
 2. **Null handling** — acceptable null thresholds? Quarantine or drop bad records?
 3. **Business logic** — SCD Type 1 or 2? Late-arriving data? Entity matching?
-4. **Transformations** — standardizations, derived columns, joins?
+4. **Transformations (MANDATORY — NEVER SKIP)** — derived columns, business calculations, joins, renames? Even if you can infer type casts from the schema, you MUST ask the user about additional transformations beyond casting and dedup. Present what you auto-discovered (type casts, dedup, PII masking) and ask: "Beyond these, do you want any derived columns, calculations, or custom transforms?"
 5. **Refresh** — incremental or full refresh?
 
 Skip (auto-discover): current Bronze schema, column types, null rates
+NEVER skip: Transformations (item 4) — always ask even if you think there are none
 
 ## Gold Questions (Business Analytics)
 
@@ -64,3 +65,40 @@ If user says "onboard from Bronze through Gold" — ask questions for ALL zones,
 ```
 
 Present findings, then ask ONLY what you couldn't discover. This reduces questions by ~60%.
+
+## Ontology Collection (MANDATORY — ask for ALL zones)
+
+After zone-specific questions are answered, ALWAYS ask about ontology enrichment. This is **never skipped** regardless of zone.
+
+Present this as an opt-in choice with a visual summary:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  ONTOLOGY ENRICHMENT (Optional — but you must ask)      │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  The Ontology Agent can enrich your workload with:      │
+│                                                         │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────┐  │
+│  │  OWL Classes │───>│  R2RML Maps  │───>│  Semantic│  │
+│  │  (concepts)  │    │  (wiring)    │    │  Layer   │  │
+│  └──────────────┘    └──────────────┘    └──────────┘  │
+│                                                         │
+│  Benefits:                                              │
+│  • Business terms linked to physical columns            │
+│  • Relationships between entities discovered            │
+│  • NL→SQL enabled via AWS Semantic Layer                │
+│  • SageMaker Catalog custom metadata populated          │
+│                                                         │
+│  Cost: Adds ~2 min to pipeline build (one-time)         │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+Ask: "Would you like the Ontology Agent to generate semantic layer artifacts (OWL + R2RML) for this workload? This enables business term search and NL→SQL in downstream tools."
+
+Options:
+- **Yes** → Ontology Agent runs after Gold build, produces `config/ontology.ttl` + `config/mappings.ttl`
+- **No** → Skip ontology, can be added later via `/ontology` command
+
+Record the answer in the checklist. Do NOT assume "no" — always ask.

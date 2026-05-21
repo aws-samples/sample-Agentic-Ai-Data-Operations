@@ -34,9 +34,11 @@ This is a human-in-the-loop gate. The HUMAN provides the rules. The agent does N
 ```
 [ ] Zone identified (Bronze, Silver, Gold, or all)
 [ ] Zone-specific questions answered (see rules/00-zone-questions.md)
+[ ] Transformation rules confirmed by user (derived columns, calculations, custom logic — NEVER skip this even if you think "none needed")
 [ ] PII columns and compliance requirements confirmed by user
 [ ] Quality thresholds explicitly stated (or user says "use defaults")
 [ ] Schedule explicitly stated by user
+[ ] Ontology collection preference confirmed (opt-in/opt-out for semantic layer enrichment via Ontology agent)
 ```
 
 **If ANY item is missing, ASK THE USER. Do not proceed.**
@@ -48,6 +50,8 @@ This is a human-in-the-loop gate. The HUMAN provides the rules. The agent does N
 - NEVER assume quality thresholds without user stating them
 - NEVER generate a schedule based on source frequency — ask
 - NEVER assume PII columns from names alone — ask user to confirm
+- NEVER skip the transformation question — even if you auto-derived type casts and PII masking, you MUST ask about derived columns, calculations, and custom business logic
+- NEVER skip the ontology question — always ask whether the user wants semantic layer enrichment (opt-in)
 
 You MAY profile data and PRESENT observations, then MUST ask: "How would you like to handle these?"
 
@@ -124,6 +128,24 @@ Every workload MUST include a `logs/` directory. Every pipeline run MUST produce
 No pipeline is complete without logging. Do not skip `logs/` when creating a workload. Do not generate ETL scripts without `StructuredLogger` wired in.
 
 Key files: `shared/logging/agent_tracer.py`, `shared/logging/trace_viewer.py`, `shared/utils/structured_logger.py`
+
+## Deterministic Codegen (Non-Negotiable)
+
+All artifacts under `workloads/*/scripts/`, `dags/`, `sql/` MUST be produced by
+`shared.codegen.renderer.render()`. Free-form code generation is forbidden.
+
+1. Sub-agents do NOT write code directly. They produce a spec (validated against
+   `contracts/v1/*.schema.json`) and call the renderer.
+2. The PreToolUse hook (`.claude/hooks/enforce_template_codegen.py`) blocks any
+   Write/Edit/MultiEdit to those directories without the renderer token.
+3. Every generated artifact has a 5-line header: spec_hash, template_id,
+   template_hash, schema_version, rendered_at.
+4. The drift validator (`shared.codegen.drift_validator`) runs in CI and as
+   Step 4.5.2 in the orchestrator. Any drift fails the build.
+
+If a slot is missing from the spec, the renderer raises MissingSlotError.
+Do not work around this by editing the template — extend the spec schema and
+bump template_version.
 
 ## Mandatory: Post-Deployment Verification (Step 5.9)
 

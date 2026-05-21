@@ -840,6 +840,7 @@ Inspired by the **GCC (Guardrails, Cognitive traces, Checksums)** pattern for ma
 - **Idempotency Checks**: Before writing any file — same checksum skips, different checksum overwrites + logs diff, missing file creates.
 - **Template Versioning**: Every generated file includes a header with agent name, template version, and input hash for traceability.
 - **Cognitive Traces**: Every sub-agent must include a `decisions[]` array documenting every significant choice, alternatives considered, and rejection reasons — making LLM "thinking" auditable.
+- **Template-Driven Codegen**: All pipeline scripts and DAGs are generated from Jinja2 templates (`shared/templates/*.j2`) driven by spec contracts (`contracts/v1/*.schema.json`). The `shared/codegen/` module loads config, validates against schemas, extracts typed slots, renders templates, and validates drift. A PreToolUse hook blocks any direct write to artifact directories without the renderer token. See [docs/determinism.md](docs/determinism.md) for architecture details.
 
 ### Cedar Policy Guardrails
 Uses **Amazon Cedar** (the policy language behind Amazon Verified Permissions) to enforce safety invariants across the pipeline — 23 policies total:

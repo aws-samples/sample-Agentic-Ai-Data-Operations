@@ -1,0 +1,29 @@
+{# template_id: glue_job_config #}
+{# template_version: 1.0.0 #}
+{# required_slots: dataset_name, tasks #}
+{# schema_version: v1 #}
+glue_jobs:
+{% for task in tasks %}
+{% if task.type == "glue_job" or task.type == "quality_check" %}
+  - job_name: {{ dataset_name }}_{{ task.task_id }}
+    role: AWSGlueServiceRole
+    glue_version: "4.0"
+    worker_type: G.1X
+    number_of_workers: 2
+    timeout_minutes: {{ task.timeout_minutes | default(60) }}
+{% if task.script_path is defined %}
+    script_location: {{ task.script_path }}
+{% endif %}
+    default_arguments:
+      "--enable-metrics": "true"
+      "--enable-spark-ui": "true"
+      "--enable-continuous-cloudwatch-log": "true"
+      "--job-language": "python"
+      "--additional-python-modules": "pyyaml"
+{% if task.params is defined %}
+{% for key, value in task.params.items() %}
+      "{{ key }}": "{{ value }}"
+{% endfor %}
+{% endif %}
+{% endif %}
+{% endfor %}

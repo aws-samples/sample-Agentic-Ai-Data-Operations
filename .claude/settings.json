@@ -13,6 +13,16 @@
             "command": ".claude/hooks/check-logging.sh"
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/enforce_template_codegen.py",
+            "timeout": 5
+          }
+        ]
       }
     ]
   }
