@@ -119,6 +119,38 @@ mcp_server: glue-athena (REQUIRED); OR redshift (WARN) if Spectrum schema exists
 ### Bronze Zone (Raw Ingestion)
 
 ```yaml
+tool: stream-source-identify
+intent: ["stream Kinesis to S3", "ingest from Kafka", "MSK to S3", "streaming data to lake", "real-time ingestion"]
+use: Detect streaming source mention → route to streaming-ingestion-advisor (do NOT default to batch Glue ETL)
+not_when: Source is batch/scheduled — use standard Bronze ingestion instead
+mcp_server: none (routing logic)
+```
+
+```yaml
+tool: streaming-ingestion-advisor
+intent: ["which tool for streaming", "Kinesis or Firehose", "how to stream Kafka to S3", "streaming options"]
+use: Present 3 options based on source type (Kinesis: Firehose/Glue Streaming/Lambda; Kafka: MSK Connect/Glue Streaming/Python Consumer) with pros/cons/cost/latency
+not_when: Requirements already gathered and option selected by user
+mcp_server: none (advisory/presentation logic)
+```
+
+```yaml
+tool: streaming-requirements-capture
+intent: ["what's my latency need", "do I need transformations", "streaming requirements", "which streaming service"]
+use: Ask clarifying questions: (1) latency SLA, (2) transformation complexity, (3) volume/cost sensitivity, (4) operational overhead preference
+not_when: User has already stated requirements explicitly
+mcp_server: none (questionnaire logic)
+```
+
+```yaml
+tool: batch-vs-streaming-guard
+intent: ["validate streaming choice", "block batch for streaming", "prevent Glue ETL for streams"]
+use: BLOCK if batch Glue ETL job is recommended for a streaming source (Kinesis/Kafka/MSK) — streaming sources require Firehose/Glue Streaming/Lambda/MSK Connect/Python Consumer
+not_when: Source is actually batch/scheduled (not streaming)
+mcp_server: none (validation guard)
+```
+
+```yaml
 tool: s3-copy-sync
 intent: ["ingest raw data", "copy to Bronze", "land raw files", "S3 to S3 copy"]
 use: core MCP (S3 operations) or aws s3 sync / aws s3 cp CLI
@@ -279,8 +311,12 @@ REST API
   → Iceberg tables on S3 Tables
 
 Stream (Kafka / Kinesis / MSK)
-  → Schema Registry (MSK) or Kinesis Data Streams schema
-  → Glue Streaming ETL (CLI) → Iceberg tables
+  → stream-source-identify detects streaming scenario
+  → streaming-requirements-capture asks: latency? transformations? volume? ops preference?
+  → streaming-ingestion-advisor presents 3 options with trade-offs
+  → User selects: Firehose/Glue Streaming/Lambda/MSK Connect/Python Consumer
+  → batch-vs-streaming-guard validates (NEVER batch Glue ETL)
+  → Selected streaming service → Iceberg tables
 ```
 
 ---
@@ -338,6 +374,7 @@ Read pattern?
 9. **Log every CLI fallback** — print `Warning: MCP fallback — {server} not loaded for {operation}. Using CLI.`
 10. **Zone-scoped KMS keys** — separate CMK for Bronze, Silver, Gold per workload; never share keys across zones
 11. **MCP first** — use MCP server tools FIRST for all AWS operations; CLI only when unavailable or errored
+12. **Never use batch Glue ETL for streaming sources** — Kinesis/Kafka/MSK require streaming-specific services (Firehose/Glue Streaming/Lambda/MSK Connect/Python Consumer). Always present options via streaming-ingestion-advisor.
 
 ---
 
