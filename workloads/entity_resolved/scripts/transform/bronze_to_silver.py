@@ -12,7 +12,6 @@ Idempotency: full-overwrite via createOrReplace. Re-running on the same Bronze
 input produces an identical Silver table.
 """
 
-import os
 import sys
 
 from awsglue.context import GlueContext
@@ -23,8 +22,10 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import IntegerType
 from pyspark.sql.window import Window
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
-from shared.utils.structured_logger import StructuredLogger  # noqa: E402
+# StructuredLogger is provided to Glue jobs via --extra-py-files=shared.zip
+# (which puts shared/ on PYTHONPATH at runtime). For local imports, the
+# repo root is on sys.path via the test harness / orchestrator.
+from shared.utils.structured_logger import StructuredLogger
 
 sc = SparkContext()
 glueContext = GlueContext(sc)
@@ -38,6 +39,7 @@ args = getResolvedOptions(sys.argv, [
     "target_database",
     "target_table",
     "run_id",
+    "data_lake_bucket",
 ])
 job.init(args["JOB_NAME"], args)
 
@@ -98,7 +100,7 @@ clean.writeTo(
 
 if quarantine_count > 0:
     quarantined.write.mode("append").parquet(
-        "s3://${var:data_lake_bucket}/quarantine/entity_resolved/"
+        f"s3://{args['data_lake_bucket']}/quarantine/entity_resolved/"
     )
     log.warn("Records quarantined", count=quarantine_count, reason="null entity_id/entity_name/country")
 

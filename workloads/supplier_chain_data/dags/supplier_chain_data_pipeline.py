@@ -95,6 +95,7 @@ with DAG(
             task_id="bronze_to_silver",
             job_name=f"{WORKLOAD}_bronze_to_silver",
             script_args={
+                "--data_lake_bucket": DATA_LAKE_BUCKET,
                 "--source_database": f"{WORKLOAD}_db",
                 "--source_table": f"bronze_{WORKLOAD}",
                 "--target_database": f"{WORKLOAD}_db",

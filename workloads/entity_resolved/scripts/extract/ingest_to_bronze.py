@@ -6,7 +6,6 @@ Tool routing decision:
   - Bronze is immutable: write to ingestion_date partition, never modify in place.
 """
 
-import os
 import sys
 from datetime import datetime
 
@@ -16,8 +15,10 @@ from awsglue.utils import getResolvedOptions
 from pyspark.context import SparkContext
 
 # Wired-in StructuredLogger (mandatory per CLAUDE.md "Mandatory: Workload Logs & Agent Tracing").
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
-from shared.utils.structured_logger import StructuredLogger  # noqa: E402
+# StructuredLogger is provided to Glue jobs via --extra-py-files=shared.zip
+# (which puts shared/ on PYTHONPATH at runtime). For local imports, the
+# repo root is on sys.path via the test harness / orchestrator.
+from shared.utils.structured_logger import StructuredLogger
 
 sc = SparkContext()
 glueContext = GlueContext(sc)

@@ -275,3 +275,6 @@ shared/semantic_layer/neptune_config.sh
 
 # Cleanup artifacts
 cleanup_*.sh
+
+# Local Phase 5 deployment orchestrator (not part of the workload artifacts)
+.deploy/
