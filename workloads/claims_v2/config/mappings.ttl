@@ -1,0 +1,117 @@
+@prefix rr:   <http://www.w3.org/ns/r2rml#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix ex:   <http://semantic.aws/claims/ontology#> .
+@prefix :     <http://semantic.aws/claims/ontology#> .
+
+
+<#ClaimMapping> a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery """SELECT * FROM claims_v2_db.Claim""" ] ;
+    rr:subjectMap [
+        rr:template "http://semantic.aws/claims/data/Claim/{claim_id}" ;
+        rr:class ex:Claim
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:allowedAmount ;
+        rr:objectMap [ rr:column "allowed_amount" ; rr:datatype xsd:decimal ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:billedAmount ;
+        rr:objectMap [ rr:column "billed_amount" ; rr:datatype xsd:decimal ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:claimId ;
+        rr:objectMap [ rr:column "claim_id" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:claimStatus ;
+        rr:objectMap [ rr:column "claim_status" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:claimType ;
+        rr:objectMap [ rr:column "claim_type" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:denialReason ;
+        rr:objectMap [ rr:column "denial_reason" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:diagnosisCode ;
+        rr:objectMap [ rr:column "diagnosis_code" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:networkStatus ;
+        rr:objectMap [ rr:column "network_status" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:paidAmount ;
+        rr:objectMap [ rr:column "paid_amount" ; rr:datatype xsd:decimal ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:patientResponsibility ;
+        rr:objectMap [ rr:column "patient_responsibility" ; rr:datatype xsd:decimal ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:procedureCode ;
+        rr:objectMap [ rr:column "procedure_code" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:serviceDate ;
+        rr:objectMap [ rr:column "service_date" ; rr:datatype xsd:date ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:submissionDate ;
+        rr:objectMap [ rr:column "submission_date" ; rr:datatype xsd:date ]
+    ] .
+
+<#MemberMapping> a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery """SELECT * FROM claims_v2_db.Member""" ] ;
+    rr:subjectMap [
+        rr:template "http://semantic.aws/claims/data/Member/{member_id}" ;
+        rr:class ex:Member
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:memberId ;
+        rr:objectMap [ rr:column "member_id" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:planType ;
+        rr:objectMap [ rr:column "plan_type" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:policyNumber ;
+        rr:objectMap [ rr:column "policy_number" ; rr:datatype xsd:string ]
+    ] .
+
+<#PayerMapping> a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery """SELECT * FROM claims_v2_db.Payer""" ] ;
+    rr:subjectMap [
+        rr:template "http://semantic.aws/claims/data/Payer/{payer_name}" ;
+        rr:class ex:Payer
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:payerName ;
+        rr:objectMap [ rr:column "payer_name" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:planType ;
+        rr:objectMap [ rr:column "plan_type" ; rr:datatype xsd:string ]
+    ] .
+
+<#ProviderMapping> a rr:TriplesMap ;
+    rr:logicalTable [ rr:sqlQuery """SELECT * FROM claims_v2_db.Provider""" ] ;
+    rr:subjectMap [
+        rr:template "http://semantic.aws/claims/data/Provider/{provider_id}" ;
+        rr:class ex:Provider
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:providerId ;
+        rr:objectMap [ rr:column "provider_id" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:providerName ;
+        rr:objectMap [ rr:column "provider_name" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate ex:providerNpi ;
+        rr:objectMap [ rr:column "provider_npi" ; rr:datatype xsd:string ]
+    ] .

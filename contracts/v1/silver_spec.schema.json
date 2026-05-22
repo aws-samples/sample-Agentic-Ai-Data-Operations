@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://adop.internal/contracts/v1/silver_spec.schema.json",
+  "title": "Silver Transform Spec",
+  "description": "Defines Bronze-to-Silver transformation: dedup, nulls, casting, PII masking, quality threshold.",
+  "type": "object",
+  "required": ["dataset_name", "schema_version", "source_table", "primary_key", "dedup_strategy", "quality_threshold"],
+  "additionalProperties": false,
+  "properties": {
+    "dataset_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,40}$"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "v1"
+    },
+    "source_table": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Bronze table or path to read from"
+    },
+    "primary_key": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+      "minItems": 1,
+      "description": "Columns defining uniqueness"
+    },
+    "dedup_strategy": {
+      "type": "string",
+      "enum": ["keep_latest", "keep_first", "none"],
+      "description": "How to handle duplicate records"
+    },
+    "dedup_order_by": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Column to order by when dedup_strategy is keep_latest or keep_first"
+    },
+    "null_handling": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "enum": ["drop_row", "fill_default", "quarantine", "allow"]
+        },
+        "critical_columns": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "description": "Columns where null is never acceptable"
+        },
+        "fill_values": {
+          "type": "object",
+          "additionalProperties": { "type": ["string", "number", "boolean"] },
+          "description": "Column-name to default-value mapping"
+        }
+      }
+    },
+    "transformations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "column"],
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["cast", "rename", "derive", "mask", "validate", "trim", "lower", "upper", "split", "concat"]
+          },
+          "column": { "type": "string" },
+          "params": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "default": []
+    },
+    "type_casts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["column", "from_type", "to_type"],
+        "additionalProperties": false,
+        "properties": {
+          "column": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "from_type": { "type": "string" },
+          "to_type": { "type": "string" },
+          "format": { "type": "string" },
+          "params": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "on_error": {
+            "type": "string",
+            "enum": ["null", "quarantine", "fail"],
+            "default": "null"
+          }
+        }
+      },
+      "default": []
+    },
+    "pii_masking": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "method"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+              "method": {
+                "type": "string",
+                "enum": ["hash", "mask_partial", "redact", "tokenize", "encrypt"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "quality_threshold": {
+      "type": "number",
+      "minimum": 0.80,
+      "maximum": 1.00,
+      "description": "Minimum quality score to pass Silver gate"
+    },
+    "iceberg_partition_spec": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+      "default": [],
+      "description": "Iceberg partition columns for Silver table"
+    },
+    "iceberg_database": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Glue catalog database name"
+    },
+    "iceberg_table": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Target Iceberg table name"
+    },
+    "quarantine": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "location": { "type": "string" },
+        "retention_days": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

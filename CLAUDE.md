@@ -1,360 +1,238 @@
+---
+project: agentic-data-onboarding
+stack: Python (Glue PySpark, Airflow DAGs), SQL, AWS, Apache Iceberg
+status: design-complete, implementation pending
+---
+
 # CLAUDE.md — Agentic Data Onboarding System
 
-This file configures Claude Code for the Agentic Data Onboarding platform.
+Bronze → Silver → Gold data pipeline orchestration. Multi-agent architecture with AWS integration.
 
-## Project Identity
+## STOP — Human-in-the-Loop Gate (Phase 1 Discovery)
 
-An autonomous data pipeline orchestration platform that moves data through **Bronze → Silver → Gold** zones using a multi-agent architecture. Integrates with AWS SageMaker Catalog (business metadata), Apache Airflow for orchestration, and emits OWL + R2RML ontology artifacts for handoff to the AWS Semantic Layer (upcoming).
+**DO NOT GENERATE ANY PIPELINE CODE, SCRIPTS, CONFIGS, OR DAGS UNTIL YOU HAVE EXPLICIT HUMAN ANSWERS FOR ALL ITEMS BELOW.**
 
-**Status**: Design-complete, implementation pending.
+This is a human-in-the-loop gate. The HUMAN provides the rules. The agent does NOT guess or infer them.
 
-## Key Files
+### Required Questions (ask ALL before proceeding)
 
-| File | Purpose |
-|---|---|
-| `SKILLS.md` | Agent skill definitions — prompts, workflows, constraints for all 7 agents |
-| `TOOL_ROUTING.md` | **Tool selection** — intent routing, server status, code examples, mandatory rules (replaces old TOOLS.md) |
-| `MCP_GUARDRAILS.md` | **Per-phase runtime guardrails** — exact MCP tool names per deploy step, fallback decisions |
-| `tool-registry/servers.yaml` | Canonical MCP server list (13 servers) — single source of truth, validated against `.mcp.json` |
-| `tool-registry/invariants.yaml` | 11 mandatory rules with IDs — testable, referenced by TOOL_ROUTING.md |
-| `docs/workflow-diagrams.md` | Visual diagrams — end-to-end flow, sub-agent spawning, test gates, data zone progression, DAG tasks |
+**Identify the zone first**, then ask zone-targeted questions (see `.claude/rules/00-zone-questions.md`):
 
-Read `SKILLS.md` before acting as any agent. Read `TOOL_ROUTING.md` for tool selection (intent routing + code examples). Read `MCP_GUARDRAILS.md` for per-phase deploy guardrails. See `docs/workflow-diagrams.md` for visual diagrams.
+- **Bronze** → source path, credentials, ingestion pattern, retention
+- **Silver** → PK, dedup strategy, null handling, business logic, transformations
+- **Gold** → business outcome, KPIs, aggregation grain, schema choice, BI tool
 
-**Deployment topology**: Default is single-account (all AWS resources in one account). Opt-in multi-account (catalog in Account A, compute + MWAA + S3 in Account B) is described in [`docs/multi-account-deployment.md`](docs/multi-account-deployment.md) with schema at `shared/templates/account_topology.yaml`.
+**Always ask regardless of zone:**
+1. **PII/compliance** → which columns are PII? GDPR/CCPA/HIPAA/SOX/PCI?
+2. **Quality** → thresholds per dimension, critical vs warning rules
+3. **Scheduling** → cron expression, dependencies, failure handling
 
-## Architecture Overview
+**Auto-discover first** (schema, format, nulls, row count) — then ask only what you couldn't discover. Present findings before questions.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  MCP SERVERS (set up FIRST — before any phase)                              │
-│                                                                             │
-│  Local mode (.mcp.json, stdio)     OR    Gateway mode (.mcp.gateway.json)   │
-│  13 servers on laptop                    13 servers on Agentcore Gateway     │
-│                                          (deploy via prompts/environment-setup-agent/ first) │
-│                                                                             │
-│  REQUIRED: glue-athena, lakeformation, iam  (block if down)                 │
-│  WARN:     cloudtrail, redshift, core, s3-tables, pii-detection             │
-│  OPTIONAL: sagemaker-catalog, lambda, cloudwatch, cost-explorer,            │
-│            dynamodb                                                          │
-└────────────────────────────────┬────────────────────────────────────────────┘
-                                 │ all phases use MCP tools
-                                 ▼
-MAIN CONVERSATION
-├── Router (inline) — check workloads/, found or not found
-└── Data Onboarding Agent (orchestrator, human-facing)
-    │
-    │  Phase 0: Health Check & Auto-Detect (read-only, always first)
-    │  ├── Step 0.1: Scan AWS — IAM roles, S3, KMS, Glue DBs, LF-Tags, MWAA
-    │  ├── Step 0.2: MCP Health Check — verify 13 servers connected
-    │  │   status, transport (stdio/SSE), endpoint (local/gateway URL)
-    │  └── Gate: critical resources + required MCP → pass or block
-    │
-    │  Phase 1-2: inline (questions, dedup, validation)
-    │  │  Uses: iam, cloudtrail, redshift, core (discovery checks)
-    │  │
-    │  Phase 3-4: spawns sub-agents via Agent tool
-    │  │  Sub-agents have NO MCP access — generate artifacts + tests only
-    │  │  spawn → Metadata Agent ──→ TEST GATE ──→ proceed
-    │  │  spawn → Transformation Agent ──→ TEST GATE ──→ proceed
-    │  │  spawn → Quality Agent ──→ TEST GATE ──→ proceed
-    │  │  spawn → Orchestration DAG Agent ──→ TEST GATE ──→ proceed
-    │  │
-    │  └── Present all artifacts + test results → human approves
-    │
-    │  Phase 5: Deploy artifacts to AWS (uses MCP tools)
-    │  Step 5.0: Reuse Phase 0 health check or re-run
-    │  S3 upload       → core, s3-tables MCP
-    │  Glue catalog    → glue-athena MCP
-    │  IAM/Permissions → iam MCP
-    │  LF-Tags/TBAC   → lakeformation MCP
-    │  PII detection   → pii-detection MCP
-    │  Query verify    → redshift MCP
-    │  Audit trail     → cloudtrail MCP
-```
-
-**MCP-First Rule**: All AWS operations use MCP server tools first. Sub-agents do NOT have MCP access — they generate scripts/configs only. Deployment runs in the main conversation via MCP. See `MCP_GUARDRAILS.md` for per-phase guardrails and fallback decisions. See `TOOL_ROUTING.md` for the full tool selection guide.
-
-**Data zones**: Bronze (raw, immutable) → Silver (cleaned, validated) → Gold (curated, aggregated)
-**Semantic layer**: SageMaker Catalog (custom metadata columns for business context) + MCP Layer. ADOP's semantic-layer responsibility ends at generating OWL + R2RML artifacts (`workloads/{name}/config/ontology.ttl` + `mappings.ttl`) for staging into AWS Semantic Layer. NL→SQL, reasoning, SHACL, and VKG are AWS Semantic Layer's responsibilities.
-
-**Agent model**: Data Onboarding Agent runs in main conversation (human-facing). All specialized agents are sub-agents spawned via the `Agent` tool. Each sub-agent must write and pass unit + integration tests before the orchestrator proceeds.
-
-## Tech Stack
-
-- **Language**: TypeScript (implementation), Python (Airflow DAGs, scripts)
-- **Cloud**: AWS — S3 + S3 Tables (data zones), Glue (catalog), SageMaker Catalog (business metadata), Apache Iceberg (table format), Athena (queries), Step Functions (workflows), Lambda (agents), KMS (encryption)
-- **Orchestration**: Apache Airflow
-- **Testing**: Jest + fast-check (property-based)
-- **Ontology format**: OWL2 + R2RML in Turtle (rdflib) — emitted locally as `workloads/{name}/config/ontology.ttl` + `mappings.ttl` for handoff to the AWS Semantic Layer (upcoming)
-- **Auth**: API Key, OAuth 2.0, SAML, JWT
-
-## Agent Behavior Model
-
-When the user asks you to do something in this project, follow this protocol:
-
-### 1. Route First (Router Agent)
-
-Before anything else, check if the data the user is asking about already has a workload in `workloads/`. Search folder names, `config/source.yaml`, and `README.md` files for matches.
-
-- **If found**: Point the user to the existing `workloads/{name}/` folder and summarize what's there (source, zones populated, DAG schedule). Ask what they want to do with it.
-- **If not found**: Tell the user this data hasn't been onboarded yet and proceed to step 2.
-- **If partial** (e.g., only Bronze exists): Report what's there and what's missing. Ask if they want to complete the pipeline or start over.
-
-### 2. Ask Before Acting (Data Onboarding Agent — Phase 1)
-
-For new onboarding, follow the **Data Onboarding Agent** discovery phase. Ask questions in separate categories — each feeds a different agent/layer:
-
-- **Source** (→ Metadata Agent): location, format, credentials, frequency
-- **Column identification** (→ Metadata Agent): PK, PII columns, exclusions
-- **Cleaning rules** (→ Transformation Agent, Bronze→Silver): dedup, null handling, type casting ask more if required 
-- **Metrics & dimensions** (→ SageMaker Catalog / Semantic Layer, Silver→Gold): column roles, dimension hierarchies, business terms
-- **Quality** (→ Quality Agent): thresholds, compliance
-- **Scheduling** (→ DAG Agent): cron, dependencies, failure handling
-- **Ontology staging** (→ Ontology Staging Agent, optional): OWL + R2RML emission for AWS Semantic Layer handoff
-
-**Semantic layer storage**:
-- `config/semantic.yaml` — local config file, source of truth for column roles, business terms, relationships, hierarchies, PII flags.
-- **SageMaker Catalog** (custom metadata columns) — column roles, data types, descriptions, PII flags, relationships, business terms. Stored as custom metadata properties on table/column entries in the Glue Data Catalog. All agents read this to understand the data.
-- **`config/ontology.ttl` + `config/mappings.ttl` + `config/ontology_manifest.json`** — OWL2 ontology + R2RML mappings induced from `semantic.yaml` and the Glue Catalog. Emitted locally by the Ontology Staging Agent at Phase 7 Step 8.5. Data Stewards pick these up in AWS Semantic Layer (when deployed) for SHACL authoring, T-Box reasoning, and VKG publish. ADOP does NOT run reasoning, author SHACL, or publish — those are AWS Semantic Layer/steward responsibilities.
-
-### 3. Deduplicate & Validate Source (Phase 2)
-
-Before creating anything, confirm the source is not already onboarded in another workload. Scan every `workloads/*/config/source.yaml` for overlap. Block exact duplicates, warn on overlaps. Also check `shared/` for reusable assets.
-
-### 4. Profile Before Building (Phase 3)
-
-Run a 5% sample profiling pass using Glue Crawler + Athena (see `TOOL_ROUTING.md`). Present metadata to the human — column types, distinct values, null rates, PII flags, sample rows. Get confirmation before generating pipeline code.
-
-### 5. Test After Every Sub-Agent (Phase 4)
-
-Every sub-agent (Metadata, Transformation, Quality, DAG) must write unit and integration tests alongside its artifacts. After each sub-agent returns, run the tests:
-- **All pass** → proceed to next sub-agent
-- **Failures** → re-spawn sub-agent with error context (max 2 retries)
-- **Still failing** → escalate to human with full details
-
-Never skip test gates. Never proceed with failing tests.
-
-Edit existing files rather than creating duplicates.
-
-### 6. Follow the Folder Convention
-
-Every onboarding workload gets its own directory:
+### Completion Checklist — ALL must have HUMAN-PROVIDED answers
 
 ```
-workloads/{workload_name}/
-├── config/          # source.yaml, semantic.yaml (metadata+business context), transformations.yaml, quality_rules.yaml, schedule.yaml
-├── scripts/         # extract/, transform/, quality/, load/
-├── dags/            # {workload_name}_dag.py
-├── sql/             # bronze/, silver/, gold/
-├── tests/           # unit/, integration/
-├── logs/            # Pipeline execution traces and logs
-│   └── .gitignore  # Ignore run_*/ folders (keep trace_events.jsonl)
-└── README.md
+[ ] Zone identified (Bronze, Silver, Gold, or all)
+[ ] Zone-specific questions answered (see rules/00-zone-questions.md)
+[ ] Transformation rules confirmed by user (derived columns, calculations, custom logic — NEVER skip this even if you think "none needed")
+[ ] PII columns and compliance requirements confirmed by user
+[ ] Quality thresholds explicitly stated (or user says "use defaults")
+[ ] Schedule explicitly stated by user
+[ ] Ontology collection preference confirmed (opt-in/opt-out for semantic layer enrichment via Ontology agent)
+[ ] If ontology YES: use cases + consumers confirmed (NL→SQL, discovery, BI, ML, compliance — who uses it?)
 ```
 
-Shared code goes in:
+**If ANY item is missing, ASK THE USER. Do not proceed.**
 
-```
-shared/
-├── operators/       # Reusable Airflow operators
-├── hooks/           # Reusable Airflow hooks
-├── utils/           # quality_checks.py, schema_utils.py, encryption.py, notifications.py, pii_detection_and_tagging.py
-├── templates/       # dag_template.py, config_template.yaml, quality_rules_template.yaml
-└── sql/common/      # Cross-workload SQL
-```
+### NEVER do these
 
-**PII Detection Framework** (`shared/utils/pii_detection_and_tagging.py`):
-- Shared utility for AI-driven PII detection across all workloads
-- Scans columns using name-based + content-based patterns
-- Applies Lake Formation LF-Tags for column-level security (tag-based access control)
-- Supports 12 PII types: EMAIL, PHONE, SSN, CREDIT_CARD, NAME, ADDRESS, DOB, IP_ADDRESS, DRIVER_LICENSE, PASSPORT, NATIONAL_ID, FINANCIAL_ACCOUNT
-- Creates 3 LF-Tags: `PII_Classification`, `PII_Type`, `Data_Sensitivity`
-- Enables compliance with GDPR, CCPA, HIPAA, SOX, PCI DSS
-- Integrated into profiling (Phase 3) and runs after Staging load
-- **MCP Integration**: Custom MCP server at `mcp-servers/pii-detection-server/` enables natural language governance via Claude Code
+- NEVER guess dedup strategy from column names
+- NEVER infer null handling from data observations
+- NEVER assume quality thresholds without user stating them
+- NEVER generate a schedule based on source frequency — ask
+- NEVER assume PII columns from names alone — ask user to confirm
+- NEVER skip the transformation question — even if you auto-derived type casts and PII masking, you MUST ask about derived columns, calculations, and custom business logic
+- NEVER skip the ontology question — always ask whether the user wants semantic layer enrichment (opt-in)
+- NEVER auto-generate ontology entities, relationships, or business terms without user confirmation — present what you discovered, then ASK
 
-### 7. Present a Plan
+You MAY profile data and PRESENT observations, then MUST ask: "How would you like to handle these?"
 
-For non-trivial tasks (anything that creates multiple files or modifies pipeline logic), summarize your plan and get human approval before executing. Use `EnterPlanMode` for multi-file changes.
-
-## Coding Conventions
-
-### TypeScript (Core Platform)
-
-- All agent interfaces are defined in `design.md` — follow those type signatures exactly.
-- Use async/await for all I/O operations.
-- Return typed `Promise<T>` from all agent methods.
-- Errors must include context: agent name, operation, input summary — never raw stack traces to end users.
-- Use discriminated unions for status types (e.g., `'pending' | 'running' | 'completed' | 'failed'`).
-
-### Python (Airflow DAGs & Scripts)
-
-- Follow the DAG template in `SKILLS.md` (Orchestration DAG Agent section).
-- Use Airflow Variables and Connections for all configuration — zero hardcoded values.
-- Use `TaskGroup` (not `SubDagOperator`).
-- Use `PythonOperator` calling scripts in `workloads/{name}/scripts/`, not inline logic.
-- Set `catchup=False`, `max_active_runs=1`, `retries=3` with exponential backoff as defaults.
-- Every DAG must have `on_failure_callback`, `sla` on critical tasks, and `doc_md`.
-
-### YAML Configuration
-
-- Use the config schemas from `SKILLS.md` for `source.yaml`, `transformations.yaml`, `quality_rules.yaml`, and `schedule.yaml`.
-- Never put credentials in YAML — reference Secrets Manager ARNs or Airflow Connection IDs.
-- Include comments explaining non-obvious configuration choices.
-
-### SQL
-
-- Place SQL files in `workloads/{name}/sql/{zone}/`.
-- Use fully qualified table names: `database.schema.table`.
-- Always include `LIMIT` in analytical queries.
-- Use CTEs over nested subqueries.
-- Never use `SELECT *` in production queries.
-- Never include DDL in Gold zone SQL — Gold is read-only for analysis.
+See `.claude/rules/01-human-gate-examples.md` for correct/incorrect behavior examples.
 
 ## Security Rules (Non-Negotiable)
 
-These apply to ALL code generated in this project:
+1. **No hardcoded secrets** — use Secrets Manager, Airflow Connections, or env vars
+2. **No infrastructure details in code** — no account IDs, VPC IDs, bucket names in source
+3. **Encryption** — AES-256 at rest (KMS), TLS 1.3 in transit
+4. **PII detection mandatory** — all workloads run `shared/utils/pii_detection_and_tagging.py`, LF-Tags + TBAC for column-level access
+5. **Bronze immutability** — NEVER modify Bronze zone after ingestion
+6. **Quality gates block promotion** — no bypassing
+7. **Least privilege IAM** — no wildcard actions or resources
+8. **Audit logging** — who, what, when, where for all operations
 
-1. **No hardcoded secrets** — Credentials, connection strings, API keys, and tokens come from AWS Secrets Manager, Airflow Connections, or environment variables. Never in source code, YAML config, DAG files, or comments.
-2. **No infrastructure details in code** — Never include AWS account IDs, VPC IDs, subnet IDs, or S3 bucket names in code or comments. Use variables.
-3. **Encryption everywhere** — AES-256 at rest (KMS), TLS 1.3 in transit. Reference KMS keys by alias, never raw key material.
-4. **PII/PHI/PCI detection & masking** — ALL workloads MUST run PII detection (automatic via `shared/utils/pii_detection_and_tagging.py`). Classified fields must be masked in logs, error messages, query results, and debug output. Never log actual values of sensitive fields. Lake Formation LF-Tags applied for column-level access control.
-5. **Regulatory compliance** — Ask about GDPR, CCPA, HIPAA, SOX, PCI DSS requirements during discovery. Apply appropriate controls: tag-based access control (TBAC), data retention policies, audit trails, encryption at rest and in transit. See `prompts/data-onboarding-agent/regulation/` for regulation-specific controls — these prompts are loaded ONLY when a regulation is selected during discovery, not by default.
-6. **Audit logging** — All data access, transformations, quality checks, and PII tag changes log: who (user/agent ID), what (operation), when (timestamp), where (dataset). CloudTrail enabled for all Lake Formation operations.
-7. **Least privilege** — Each agent/task uses minimum required IAM permissions. No wildcard (`*`) actions or resources.
-8. **Input validation** — Validate all user inputs before use in SQL, file paths, shell commands, or API calls. Prevent injection attacks.
-9. **Bronze immutability** — Bronze zone data is NEVER modified after ingestion. Any code that attempts to update Bronze data is a bug.
-10. **Quality gates block promotion** — Data MUST pass quality checks before moving to the next zone. No bypassing quality gates.
-11. **Immutable audit logs** — Audit logs cannot be deleted or modified. Use append-only storage.
+## Agent Behavior Protocol
 
-## Data Zone Rules
+1. **Route First** → check `workloads/` for existing data (found/not-found/partial)
+2. **Ask Before Acting** → MANDATORY GATE above (Phase 1) — human provides all rules
+3. **Deduplicate** → scan `workloads/*/config/source.yaml` for overlap (Phase 2)
+4. **Profile** → 5% sample via Glue Crawler + Athena, present to human (Phase 3)
+5. **Test Gates** → every sub-agent writes + passes tests before proceeding (Phase 4)
+6. **Present Plan** → get human approval before multi-file changes
 
-| Zone | Mutability | Quality Gate | Partitioning | Format |
-|---|---|---|---|---|
-| Bronze | Immutable (write-once) | None (raw ingestion) | By ingestion date | Raw source format (CSV, JSON, Parquet) |
-| Silver | Updatable (schema-enforced) | Score >= 0.80, no critical failures | By business dimensions | **Apache Iceberg on Amazon S3 Tables** (always) |
-| Gold | Updatable (curated) | Score >= 0.95, no critical failures | By time + business dimensions | **Iceberg** (format/schema based on discovery — see below) |
+## Key Files
 
-**Silver is always Iceberg** — no exceptions. Registered in Glue Data Catalog. Time-travel enabled.
-
-**Gold format is determined by use case** (asked during Phase 1 discovery):
-
-| Use Case | Schema | Follow-up Questions |
-|---|---|---|
-| Reporting & Dashboards | Star Schema (fact + dims) | Data size, dashboard latency, SCD history |
-| Ad-hoc Analytics | Flat denormalized Iceberg | Data size, time-travel needs |
-| ML / Feature Engineering | Flat wide Iceberg | Data size, pre-computed features |
-| API / Real-time Serving | Iceberg + DynamoDB cache | Latency, QPS |
-
-Default: **Iceberg tables** (time-travel, ACID, schema evolution, works with Athena/Redshift/EMR).
-
-## Quality Standards
-
-- **5 dimensions**: Completeness, Accuracy, Consistency, Validity, Uniqueness
-- **Quality checks are deterministic** — same data always produces same score
-- **Critical rule failures block zone promotion** regardless of overall score
-- **Anomaly detection**: outliers (>3 std dev), distribution shifts, volume anomalies (>20% deviation), null spikes
-- **Historical comparison**: always compare current run against baseline
-- **PII detection** (automatic): AI-driven scanning after profiling, Lake Formation LF-Tags applied for column-level security, supports 12 PII types with 4 sensitivity levels (CRITICAL/HIGH/MEDIUM/LOW)
-
-## Testing Strategy
-
-- **Unit tests**: Jest + fast-check for every agent method. Mock external dependencies.
-- **Property-based tests**: Transformation idempotency, lineage completeness, quality monotonicity, schema preservation, Bronze immutability.
-- **Integration tests**: End-to-end Bronze→Silver→Gold pipeline, NL query processing, scheduled workflow execution, agent coordination, auth flows.
-- **Coverage target**: 80% minimum.
-
-When writing tests, place them in `workloads/{name}/tests/` for workload-specific tests or project-root `tests/` for shared infrastructure.
-
-## Transformation Rules
-
-- Transformations MUST be **idempotent** — running twice produces identical output.
-- Never drop records silently — quarantine failed records with error context.
-- Schema evolution: new fields → add with `nullable=true`; removed fields → keep with nulls; type changes → safe cast, quarantine failures.
-- Always record lineage: source dataset, target dataset, transformation type, timestamp.
-- Always validate output schema against the SageMaker Catalog before writing.
-
-## Airflow DAG Rules
-
-Detailed DO/DON'T list is in `SKILLS.md` under the Orchestration DAG Agent. Key highlights:
-
-**Always**: `catchup=False`, `max_active_runs=1`, `retries=3`, exponential backoff, `on_failure_callback`, `TaskGroup` for stage organization, Airflow Variables for config.
-
-**Never**: Hardcoded secrets, `SubDagOperator`, `provide_context=True`, `start_date=datetime.now()`, `depends_on_past=True` (without justification), inline computation in DAG files, disabled retries in production.
-
-## Working With This Repo
-
-### Starting a New Onboarding Workload
-
-1. Ask the user for source, destination, transformation, quality, and scheduling details.
-2. Check `workloads/` and `shared/` for existing assets to reuse.
-3. Create the workload folder structure under `workloads/{name}/`.
-4. Generate config YAML files from user answers.
-5. Generate transformation scripts, quality checks, and the Airflow DAG.
-6. Create a `README.md` in the workload folder.
-7. Present the full plan for approval before writing files.
-
-### Modifying an Existing Workload
-
-1. Read ALL existing files in `workloads/{name}/` before making changes.
-2. Understand the current pipeline flow from the DAG and config files.
-3. Make targeted edits — do not regenerate files that don't need changes.
-4. Update the workload `README.md` if behavior changes.
-5. Run existing tests to verify nothing breaks.
-
-### Adding Shared Utilities
-
-1. Check if a similar utility already exists in `shared/utils/`.
-2. If adding new shared code, ensure it has no workload-specific logic.
-3. Add tests for shared utilities.
-4. Update any workloads that could benefit from the new shared code.
-
-## Error Handling Philosophy
-
-Errors fall into three categories. The Data Onboarding Agent decides escalation:
-
-| Category | Examples | Action |
-|---|---|---|
-| **Retryable** | Network timeout, API throttling, transient S3 errors | Retry with exponential backoff (max 3 attempts) |
-| **Fixable** | Schema mismatch, missing config, quality below threshold | Ask the human for correction |
-| **Fatal** | Invalid credentials, source permanently offline, data corruption | Halt pipeline, alert human immediately |
-
-Never silently swallow errors. Log full context (agent, operation, input summary, error type) and escalate appropriately.
-
-## Agent Logging Protocol
-
-Every pipeline run produces a structured trace across three layers, linked by `run_id`:
-
-| Layer | What | Source | How |
-|-------|------|--------|-----|
-| **1. Orchestrator** | Phase transitions, test gates, retries | `OrchestratorLogger` + `AgentTracer` | Automatic — wired into orchestrator |
-| **2. Generated Scripts** | Row counts, transforms, quality scores | `StructuredLogger` in ETL scripts | Wire into every `workloads/*/scripts/` file |
-| **3. LLM Self-Reporting** | Reasoning, alternatives, confidence | `AgentOutput.decisions` array | Required in SKILLS.md spawn prompts |
-
-**Rules:**
-- Every pipeline run MUST produce a `trace_events.jsonl` (via `AgentTracer`)
-- Every sub-agent MUST include a `decisions` array in its `AgentOutput`
-- Every ETL script MUST use `StructuredLogger` for structured log output
-- All trace events use three surfaces: **operational** (what), **cognitive** (why), **contextual** (where)
-
-**Key files:** `shared/logging/agent_tracer.py`, `shared/logging/trace_viewer.py`, `shared/utils/orchestrator_logger.py`, `shared/utils/structured_logger.py`
-
-## Glossary
-
-| Term | Meaning |
+| File | Read When |
 |---|---|
-| Bronze Zone | Raw, immutable data as ingested from source (original format preserved) |
-| Silver Zone | Cleaned, validated, schema-enforced data — **always Apache Iceberg on S3 Tables** |
-| Gold Zone | Curated, business-ready data — Iceberg tables in format determined by use case (star schema, flat, etc.) |
-| Apache Iceberg | Open table format for Silver and Gold zones — provides ACID transactions, time-travel, schema evolution, partition pruning |
-| S3 Tables | Amazon S3 bucket type optimized for Apache Iceberg tables — automatic compaction and catalog integration |
-| SageMaker Catalog | Extends Glue Data Catalog with custom metadata columns — stores column roles, business context, PII flags, relationships |
-| Ontology Staging | ADOP's final semantic-layer step: induces OWL + R2RML from `semantic.yaml` + Glue schema, emits `ontology.ttl` + `mappings.ttl` for AWS Semantic Layer handoff |
-| AWS Semantic Layer | External semantic layer platform (in development). Consumes ADOP's staged OWL/R2RML, owns SHACL authoring, T-Box reasoning, VKG publish, and NL→SQL. |
-| R2RML | W3C standard for mapping relational schemas to RDF — used here to wire OWL classes to physical Glue/Athena tables |
-| MCP Layer | Model Context Protocol — standard interface for AI model interaction with the platform |
-| Quality Gate | Threshold check that blocks data from advancing to the next zone |
-| Lineage | Record of data provenance — which source produced which target via which transformation |
-| SCD Type 2 | Slowly Changing Dimension pattern — preserves historical records in Gold zone dimension tables |
-| Star Schema | Fact table (measures + FK keys) + dimension tables (attributes) — recommended for reporting/BI use cases |
+| `SKILLS.md` | Before acting as any agent |
+| `TOOL_ROUTING.md` | Selecting which MCP tool to use |
+| `MCP_GUARDRAILS.md` | Per-phase deploy guardrails |
+| `tool-registry/servers.yaml` | Canonical MCP server list (13 servers) |
+| `docs/workflow-diagrams.md` | Visual diagrams of flow |
+
+## Folder Convention
+
+```
+workloads/{name}/
+├── config/    # source.yaml, semantic.yaml, transformations.yaml, quality_rules.yaml, schedule.yaml
+├── scripts/   # extract/, transform/, quality/, load/
+├── dags/      # {name}_dag.py
+├── sql/       # bronze/, silver/, gold/
+├── tests/     # unit/, integration/
+├── logs/      # Pipeline execution traces (trace_events.jsonl, run_*/)
+└── README.md
+
+shared/
+├── operators/   # Reusable Airflow operators
+├── hooks/       # Reusable Airflow hooks
+├── utils/       # quality_checks.py, pii_detection_and_tagging.py, etc.
+├── templates/   # dag_template.py, config_template.yaml
+└── sql/common/  # Cross-workload SQL
+```
+
+## Data Zones
+
+| Zone | Mutability | Quality Gate | Format |
+|---|---|---|---|
+| Bronze | Immutable | None | Raw source format |
+| Silver | Updatable | >= 0.80 | Apache Iceberg on S3 Tables (always) |
+| Gold | Updatable | >= 0.95 | Iceberg (schema per use case) |
+
+Gold schema determined by use case (ask during Phase 1): Star Schema (reporting), Flat Iceberg (analytics/ML), Iceberg + DynamoDB (API serving).
+
+## Mandatory: Workload Logs & Agent Tracing
+
+Every workload MUST include a `logs/` directory. Every pipeline run MUST produce structured traces:
+
+1. **`trace_events.jsonl`** — generated by `AgentTracer` for every run (operational trace)
+2. **`decisions` array** — every sub-agent MUST include reasoning/alternatives in its `AgentOutput`
+3. **`StructuredLogger`** — every ETL script MUST use it for row counts, transforms, quality scores
+
+No pipeline is complete without logging. Do not skip `logs/` when creating a workload. Do not generate ETL scripts without `StructuredLogger` wired in.
+
+Key files: `shared/logging/agent_tracer.py`, `shared/logging/trace_viewer.py`, `shared/utils/structured_logger.py`
+
+## Deterministic Codegen (Non-Negotiable)
+
+All artifacts under `workloads/*/scripts/`, `dags/`, `sql/` MUST be produced by
+`shared.codegen.renderer.render()`. Free-form code generation is forbidden.
+
+1. Sub-agents do NOT write code directly. They produce a spec (validated against
+   `contracts/v1/*.schema.json`) and call the renderer.
+2. The PreToolUse hook (`.claude/hooks/enforce_template_codegen.py`) blocks any
+   Write/Edit/MultiEdit to those directories without the renderer token.
+3. Every generated artifact has a 5-line header: spec_hash, template_id,
+   template_hash, schema_version, rendered_at.
+4. The drift validator (`shared.codegen.drift_validator`) runs in CI and as
+   Step 4.5.2 in the orchestrator. Any drift fails the build.
+
+If a slot is missing from the spec, the renderer raises MissingSlotError.
+Do not work around this by editing the template — extend the spec schema and
+bump template_version.
+
+## Mandatory: Post-Deployment Verification (Step 5.9)
+
+After deploying ANY workload to AWS, you MUST run `shared/utils/post_deployment_verifier.py` with 7 checks:
+
+1. **Glue tables exist** — all Silver + Gold tables registered in catalog
+2. **Athena queries work** — tables are queryable, not empty
+3. **LF-Tags applied** — PHI columns tagged (PII_Classification, PII_Type, Data_Sensitivity)
+4. **TBAC access control** — CRITICAL columns restricted to authorized roles
+5. **KMS encryption** — key exists, rotation enabled
+6. **MWAA DAG loaded** — no import errors, visible in Airflow
+7. **CloudTrail events** — deployment operations logged (CreateTable, GrantPermissions)
+
+Deployment is NOT complete until all checks PASS. If any fail, fix and re-verify.
+
+## Mandatory: Post-Deployment Sequence (Steps 5.10 → 5.11)
+
+After deployment verification (Step 5.9) passes, you MUST follow this two-step sequence. Both questions are mandatory — never skip either one.
+
+### Step 5.10 — E2E Pipeline Test Offer
+
+Ask the user:
+```
+┌────────────────────────────────────────────────────────────────────┐
+│  E2E PIPELINE TEST (on AWS)                                        │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  Deployment verified. Want to run the full pipeline end-to-end?    │
+│                                                                    │
+│  What this does:                                                   │
+│    1. Trigger Bronze ingestion (sample data -> Iceberg)            │
+│    2. Run Silver transform (dedup + mask + cast)                   │
+│    3. Run quality gate (score >= threshold?)                        │
+│    4. Run Gold aggregation (KPIs)                                  │
+│    5. Query Gold table via Athena (verify data)                    │
+│                                                                    │
+│  Uses: Glue jobs on AWS, real Iceberg tables, ~5-10 min            │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+Options:
+- **Yes, run E2E** → Trigger each Glue job in sequence, verify row counts, query Gold via Athena
+- **No, skip** → Pipeline will run on next scheduled trigger
+
+### Step 5.11 — DevOps Agent Offer (ask AFTER E2E completes OR after user skips E2E)
+
+Regardless of whether the user ran E2E, ALWAYS ask this next:
+```
+┌────────────────────────────────────────────────────────────────────┐
+│  DEVOPS AGENT — Production Readiness                               │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  The DevOps Agent can set up production operations:                │
+│                                                                    │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐               │
+│  │ CloudWatch  │  │  Alerting   │  │  Runbook    │               │
+│  │  Dashboards │  │  (SNS/PD)   │  │  (auto-gen) │               │
+│  └─────────────┘  └─────────────┘  └─────────────┘               │
+│                                                                    │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐               │
+│  │  Log Groups │  │  Cost Tags  │  │  Backup/DR  │               │
+│  │  & Metrics  │  │  & Budget   │  │  Strategy   │               │
+│  └─────────────┘  └─────────────┘  └─────────────┘               │
+│                                                                    │
+│  Steps:                                                            │
+│    1. CloudWatch alarms (Glue job failures, latency, costs)        │
+│    2. SNS alerting topic + subscriptions                           │
+│    3. Auto-generated runbook (troubleshooting playbook)            │
+│    4. Cost allocation tags on all resources                        │
+│    5. Backup/disaster recovery configuration                       │
+│    6. Log retention policies (HIPAA: 7-year audit trail)           │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+Options:
+- **Yes, run DevOps Agent** → Spawns DevOps sub-agent for monitoring, alerting, runbook, cost tags
+- **No, skip** → Production readiness steps deferred (can run later)
+
+**NEVER skip asking these questions.** The flow is always:
+  Deploy → Verify → Ask E2E → (run or skip) → Ask DevOps → (run or skip) → Done
+
+## Additional Rules
+
+Coding conventions, error handling, logging protocol, testing strategy, transformation rules, and glossary are in `.claude/rules/`. These load automatically — path-scoped rules load only when editing matching files.
+
+**Deployment topology**: Default single-account. Multi-account opt-in via `docs/multi-account-deployment.md`.

@@ -1,0 +1,11 @@
+dataset_name: claims_v2
+schema_version: v1
+source_path: s3://prod-data-lake/raw/healthcare/claims/
+source_format: csv
+landing_zone: s3://data-lake/claims_v2/bronze/
+format_options:
+  header: true
+  delimiter: ","
+partition_keys: []
+compression: snappy
+ingestion_mode: full_load

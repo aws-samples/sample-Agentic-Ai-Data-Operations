@@ -1,0 +1,148 @@
+dataset_name: claims_v2
+domain: Healthcare Claims
+description: Insurance claims processing with member, provider, and payer entities
+
+namespace: https://adop.internal/ontology/claims/
+version: v1
+
+use_cases:
+  - nl_to_sql
+  - data_discovery
+consumers:
+  - data_analysts
+  - business_users
+
+tables:
+  - name: Claim
+    table_type: fact
+    description: An insurance claim submitted for healthcare services
+    physical_table: gold_claims_v2
+    primary_key: claim_id
+    columns:
+      - name: claim_id
+        type: string
+        description: Unique claim identifier
+        role: identifier
+      - name: claim_type
+        type: string
+        description: Type of claim (medical, dental, vision, pharmacy)
+        role: dimension
+      - name: claim_status
+        type: string
+        description: Current claim processing status
+        role: dimension
+      - name: service_date
+        type: date
+        description: Date the healthcare service was provided
+        role: temporal
+      - name: submission_date
+        type: date
+        description: Date the claim was submitted
+        role: temporal
+      - name: billed_amount
+        type: decimal
+        description: Amount billed by the provider
+        role: measure
+      - name: allowed_amount
+        type: decimal
+        description: Amount allowed by the payer
+        role: measure
+      - name: paid_amount
+        type: decimal
+        description: Amount paid to the provider
+        role: measure
+      - name: patient_responsibility
+        type: decimal
+        description: Amount the patient owes
+        role: measure
+      - name: diagnosis_code
+        type: string
+        description: ICD-10 diagnosis code
+        role: dimension
+      - name: procedure_code
+        type: string
+        description: CPT procedure code
+        role: dimension
+      - name: network_status
+        type: string
+        description: Whether the provider was in-network or out-of-network
+        role: dimension
+      - name: denial_reason
+        type: string
+        description: Reason for claim denial (null if approved)
+        role: dimension
+
+  - name: Member
+    table_type: dimension
+    description: Insurance plan member who received healthcare services
+    physical_table: silver_claims_v2
+    primary_key: member_id
+    columns:
+      - name: member_id
+        type: string
+        description: Unique member identifier
+        role: identifier
+      - name: policy_number
+        type: string
+        description: Insurance policy number
+        role: identifier
+      - name: plan_type
+        type: string
+        description: Insurance plan type (PPO, HMO, etc.)
+        role: dimension
+
+  - name: Provider
+    table_type: dimension
+    description: Healthcare provider who delivered services
+    physical_table: silver_claims_v2
+    primary_key: provider_id
+    columns:
+      - name: provider_id
+        type: string
+        description: Unique provider identifier
+        role: identifier
+      - name: provider_name
+        type: string
+        description: Provider or facility name
+        role: dimension
+      - name: provider_npi
+        type: string
+        description: National Provider Identifier (10-digit)
+        role: identifier
+
+  - name: Payer
+    table_type: dimension
+    description: Insurance payer processing the claim
+    physical_table: gold_claims_v2
+    primary_key: payer_name
+    columns:
+      - name: payer_name
+        type: string
+        description: Insurance company name
+        role: identifier
+      - name: plan_type
+        type: string
+        description: Plan type offered by the payer
+        role: dimension
+
+relationships:
+  - subject: Claim
+    predicate: hasMember
+    object: Member
+    join_key: member_id
+  - subject: Claim
+    predicate: hasProvider
+    object: Provider
+    join_key: provider_id
+  - subject: Claim
+    predicate: paidBy
+    object: Payer
+    join_key: payer_name
+
+business_terms:
+  - term: Loss Ratio
+    definition: Ratio of paid amount to billed amount (paid_amount / billed_amount)
+    related_columns: [paid_amount, billed_amount]
+  - term: Clean Claim Rate
+    definition: Percentage of claims paid on first submission without denial
+    related_columns: [claim_status, denial_reason]

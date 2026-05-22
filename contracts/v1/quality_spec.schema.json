@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://adop.internal/contracts/v1/quality_spec.schema.json",
+  "title": "Quality Rules Spec",
+  "description": "Defines data quality rules across 5 dimensions with thresholds and anomaly detection.",
+  "type": "object",
+  "required": ["dataset_name", "schema_version", "rules", "quality_gates"],
+  "additionalProperties": false,
+  "properties": {
+    "dataset_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,40}$"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "v1"
+    },
+    "rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "completeness": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/quality_rule" },
+          "default": []
+        },
+        "uniqueness": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/quality_rule" },
+          "default": []
+        },
+        "validity": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/quality_rule" },
+          "default": []
+        },
+        "consistency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/quality_rule" },
+          "default": []
+        },
+        "accuracy": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/quality_rule" },
+          "default": []
+        }
+      }
+    },
+    "quality_gates": {
+      "type": "object",
+      "required": ["bronze_to_silver", "silver_to_gold"],
+      "additionalProperties": false,
+      "properties": {
+        "bronze_to_silver": { "$ref": "#/$defs/gate_config" },
+        "silver_to_gold": { "$ref": "#/$defs/gate_config" }
+      }
+    },
+    "anomaly_detection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "methods": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["z_score", "iqr", "volume_change", "null_spike", "distribution_shift"]
+          }
+        },
+        "volume_threshold_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 20
+        }
+      }
+    },
+    "compliance_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "regulation": {
+          "type": "string",
+          "enum": ["HIPAA", "GDPR", "CCPA", "SOX", "PCI_DSS", "NONE"]
+        },
+        "phi_columns": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
+        },
+        "audit_retention_days": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "rules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/quality_rule" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "quality_rule": {
+      "type": "object",
+      "required": ["rule_id", "column", "check_type", "threshold"],
+      "additionalProperties": false,
+      "properties": {
+        "rule_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "column": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "check_type": {
+          "type": "string",
+          "enum": ["not_null", "unique", "range", "regex", "enum", "referential", "custom_sql", "format", "length"]
+        },
+        "threshold": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["critical", "warning", "info"],
+          "default": "warning"
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Check-type-specific parameters (min/max for range, pattern for regex, etc.)"
+        },
+        "description": { "type": "string" }
+      }
+    },
+    "gate_config": {
+      "type": "object",
+      "required": ["overall_score", "action_on_failure"],
+      "additionalProperties": false,
+      "properties": {
+        "overall_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "critical_failures": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Max allowed critical rule failures (0 = zero tolerance)"
+        },
+        "action_on_failure": {
+          "type": "string",
+          "enum": ["block", "quarantine", "warn"]
+        }
+      }
+    }
+  }
+}

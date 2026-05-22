@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://adop.internal/contracts/v1/bronze_spec.schema.json",
+  "title": "Bronze Ingestion Spec",
+  "description": "Defines how raw data is ingested into the Bronze zone.",
+  "type": "object",
+  "required": ["dataset_name", "schema_version", "source_path", "source_format", "landing_zone"],
+  "additionalProperties": false,
+  "properties": {
+    "dataset_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,40}$"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "v1"
+    },
+    "source_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "S3 path or local path to raw source data"
+    },
+    "source_format": {
+      "type": "string",
+      "enum": ["csv", "parquet", "json", "avro", "orc"]
+    },
+    "landing_zone": {
+      "type": "string",
+      "minLength": 1,
+      "description": "S3 path for Bronze landing"
+    },
+    "partition_keys": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+      "default": []
+    },
+    "compression": {
+      "type": "string",
+      "enum": ["gzip", "snappy", "zstd", "none"],
+      "default": "snappy"
+    },
+    "format_options": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "header": { "type": "boolean" },
+        "delimiter": { "type": "string", "maxLength": 1 },
+        "quote_char": { "type": "string", "maxLength": 1 },
+        "escape_char": { "type": "string", "maxLength": 1 },
+        "null_value": { "type": "string" },
+        "date_format": { "type": "string" },
+        "timestamp_format": { "type": "string" },
+        "multiline": { "type": "boolean" }
+      }
+    },
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "days": { "type": "integer", "minimum": 1 },
+        "archive_after_days": { "type": "integer", "minimum": 1 },
+        "archive_storage_class": {
+          "type": "string",
+          "enum": ["GLACIER", "DEEP_ARCHIVE", "INTELLIGENT_TIERING"]
+        }
+      }
+    },
+    "ingestion_mode": {
+      "type": "string",
+      "enum": ["full_load", "incremental", "cdc"],
+      "default": "full_load"
+    },
+    "file_pattern": {
+      "type": "string",
+      "description": "Glob pattern to match source files (e.g., *.csv)"
+    },
+    "schema_columns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+          "type": { "type": "string" }
+        }
+      }
+    }
+  }
+}

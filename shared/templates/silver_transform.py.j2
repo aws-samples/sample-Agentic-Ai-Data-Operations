@@ -1,0 +1,163 @@
+{# template_id: silver_transform #}
+{# template_version: 1.0.0 #}
+{# required_slots: dataset_name, source_table, primary_key, dedup_strategy, quality_threshold, iceberg_database, iceberg_table #}
+{# schema_version: v1 #}
+import sys
+import hashlib
+from datetime import datetime
+from pathlib import Path
+
+from pyspark.sql import functions as F
+from pyspark.sql.window import Window
+from awsglue.context import GlueContext
+from awsglue.job import Job
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from shared.utils.structured_logger import StructuredLogger
+
+logger = StructuredLogger(
+    agent="silver_transform",
+    workload="{{ dataset_name }}",
+    run_id="standalone",
+)
+
+
+def transform(glue_context, args):
+    spark = glue_context.spark_session
+    logger.log("info", "transform_start", source="{{ source_table }}")
+
+    bronze_df = spark.table("{{ source_table }}")
+    input_rows = bronze_df.count()
+    logger.log("info", "input_count", rows=input_rows)
+
+    # Drop rows with null primary key columns
+{% for pk_col in primary_key %}
+    bronze_df = bronze_df.filter(F.col("{{ pk_col }}").isNotNull())
+{% endfor %}
+    after_pk_filter = bronze_df.count()
+
+{% if dedup_strategy != "none" %}
+    # Deduplication: {{ dedup_strategy }}
+    window = Window.partitionBy(
+{% for pk_col in primary_key %}
+        "{{ pk_col }}",
+{% endfor %}
+{% if dedup_order_by is defined %}
+    ).orderBy(F.desc("{{ dedup_order_by }}"))
+{% else %}
+    ).orderBy(F.monotonically_increasing_id())
+{% endif %}
+    deduped_df = bronze_df \
+        .withColumn("_row_num", F.row_number().over(window)) \
+        .filter(F.col("_row_num") == 1) \
+        .drop("_row_num")
+{% else %}
+    deduped_df = bronze_df
+{% endif %}
+    dedup_rows = deduped_df.count()
+
+{% if type_casts is defined and type_casts %}
+    # Type casting
+    typed_df = deduped_df
+{% for cast in type_casts %}
+{% if cast.to_type == "DATE" %}
+    typed_df = typed_df.withColumn(
+        "{{ cast.column }}",
+        F.to_date(F.col("{{ cast.column }}"), "{{ cast.format | default('yyyy-MM-dd') }}")
+    )
+{% elif cast.to_type == "TIMESTAMP" %}
+    typed_df = typed_df.withColumn(
+        "{{ cast.column }}",
+        F.to_timestamp(F.col("{{ cast.column }}"), "{{ cast.format | default('yyyy-MM-dd HH:mm:ss') }}")
+    )
+{% elif cast.to_type == "DECIMAL" %}
+    typed_df = typed_df.withColumn(
+        "{{ cast.column }}",
+        F.col("{{ cast.column }}").cast("decimal({{ cast.params.precision | default(10) }},{{ cast.params.scale | default(2) }})")
+    )
+{% elif cast.to_type == "INTEGER" %}
+    typed_df = typed_df.withColumn(
+        "{{ cast.column }}",
+        F.col("{{ cast.column }}").cast("int")
+    )
+{% else %}
+    typed_df = typed_df.withColumn(
+        "{{ cast.column }}",
+        F.col("{{ cast.column }}").cast("{{ cast.to_type | lower }}")
+    )
+{% endif %}
+{% endfor %}
+{% else %}
+    typed_df = deduped_df
+{% endif %}
+
+{% if pii_masking is defined and pii_masking.enabled %}
+    # PII masking
+    masked_df = typed_df
+{% for col_mask in pii_masking.columns %}
+{% if col_mask.method == "hash" %}
+    masked_df = masked_df.withColumn(
+        "{{ col_mask.name }}",
+        F.sha2(F.col("{{ col_mask.name }}").cast("string"), 256)
+    )
+{% elif col_mask.method == "redact" %}
+    masked_df = masked_df.withColumn(
+        "{{ col_mask.name }}",
+        F.lit("***REDACTED***")
+    )
+{% elif col_mask.method == "mask_partial" %}
+    masked_df = masked_df.withColumn(
+        "{{ col_mask.name }}",
+        F.concat(F.substring(F.col("{{ col_mask.name }}"), 1, 2), F.lit("****"))
+    )
+{% endif %}
+{% endfor %}
+{% else %}
+    masked_df = typed_df
+{% endif %}
+
+    # Write to Iceberg Silver table
+    table_name = "glue_catalog.{{ iceberg_database }}.{{ iceberg_table }}"
+{% if iceberg_partition_spec is defined and iceberg_partition_spec %}
+    masked_df.writeTo(table_name) \
+        .using("iceberg") \
+        .partitionedBy({{ iceberg_partition_spec | tojson }}) \
+        .createOrReplace()
+{% else %}
+    masked_df.writeTo(table_name) \
+        .using("iceberg") \
+        .createOrReplace()
+{% endif %}
+
+    output_rows = masked_df.count()
+    logger.log("info", "transform_complete",
+        input_rows=input_rows,
+        pk_null_dropped=input_rows - after_pk_filter,
+        duplicates_removed=after_pk_filter - dedup_rows,
+        output_rows=output_rows,
+        target_table=table_name,
+        quality_threshold={{ quality_threshold }})
+
+    return {
+        "workload": "{{ dataset_name }}",
+        "transformation": "bronze_to_silver",
+        "source": "{{ source_table }}",
+        "target": table_name,
+        "input_rows": input_rows,
+        "output_rows": output_rows,
+    }
+
+
+if __name__ == "__main__":
+    args = getResolvedOptions(sys.argv, ["JOB_NAME"])
+    sc = SparkContext()
+    glue_context = GlueContext(sc)
+    job = Job(glue_context)
+    job.init(args["JOB_NAME"], args)
+    result = transform(glue_context, args)
+    job.commit()

@@ -1,0 +1,165 @@
+# Claims Quality Rules
+# HIPAA-Compliant Data Quality Checks
+
+dataset_name: claims
+version: "1.0.0"
+compliance: HIPAA
+
+completeness:
+  - columns: [claim_id]
+    threshold: 1.0
+    severity: critical
+    description: "Primary key must be non-null"
+
+  - columns: [policy_number, member_id, provider_id, service_date, billed_amount, claim_status]
+    threshold: 0.95
+    severity: high
+    description: "Core business columns must be mostly complete"
+
+  - columns: [member_email, member_phone, denial_reason, adjuster_id]
+    threshold: 0.80
+    severity: warning
+    description: "Optional columns tracked but not blocking"
+
+uniqueness:
+  - column: claim_id
+    threshold: 1.0
+    severity: critical
+    description: "Claim ID must be unique"
+
+validity:
+  - column: claim_type
+    values: ["medical", "dental", "vision", "pharmacy"]
+    threshold: 1.0
+    severity: critical
+    description: "Claim type must be valid"
+
+  - column: claim_status
+    values: ["paid", "denied", "pending", "appealed"]
+    threshold: 1.0
+    severity: critical
+    description: "Claim status must be valid"
+
+  - column: network_status
+    values: ["in_network", "out_of_network"]
+    threshold: 1.0
+    severity: critical
+    description: "Network status must be valid"
+
+  - column: billed_amount
+    range: [0, 10000000]
+    threshold: 1.0
+    severity: critical
+    description: "Billed amount must be non-negative"
+
+  - column: paid_amount
+    range: [0, 10000000]
+    threshold: 1.0
+    severity: critical
+    description: "Paid amount must be non-negative"
+
+  - column: service_date
+    range: ["2020-01-01", CURRENT_DATE]
+    threshold: 1.0
+    severity: critical
+    description: "Service date must not be in the future"
+
+consistency:
+  - rule: paid_lte_billed
+    check: paid_amount <= billed_amount
+    threshold: 0.95
+    severity: high
+    description: "Paid amount should not exceed billed amount"
+
+  - rule: submission_after_service
+    check: submission_date >= service_date
+    threshold: 1.0
+    severity: critical
+    description: "Submission date must be on or after service date"
+
+  - rule: denied_has_reason
+    check: "CASE WHEN claim_status = 'denied' THEN denial_reason IS NOT NULL ELSE TRUE END"
+    threshold: 0.95
+    severity: high
+    description: "Denied claims should have a denial reason"
+
+accuracy:
+  - rule: phi_columns_encrypted
+    check: encryption_enabled
+    columns: [member_first_name, member_last_name, member_dob, member_ssn, member_email, member_phone, member_address, member_city, member_state, member_zip]
+    threshold: 1.0
+    severity: critical
+    description: "HIPAA requires all PHI encrypted at rest"
+
+# HIPAA Compliance Rules
+
+hipaa_compliance:
+  regulation: HIPAA
+  phi_columns: [member_first_name, member_last_name, member_dob, member_ssn, member_email, member_phone, member_address, member_city, member_state, member_zip]
+  audit_retention_days: 2555
+  encryption_required: true
+  kms_key_alias: alias/hipaa-phi-key
+  access_logging: all_columns
+  minimum_necessary: true
+  baa_required: true
+  breach_notification_days: 60
+
+  rules:
+    - rule: phi_columns_encrypted
+      check: encryption_enabled_at_rest
+      columns: [member_first_name, member_last_name, member_dob, member_ssn, member_email, member_phone, member_address, member_city, member_state, member_zip]
+      threshold: 1.0
+      severity: critical
+
+    - rule: phi_columns_tagged
+      check: lf_tags_applied
+      columns: [member_first_name, member_last_name, member_dob, member_ssn, member_email, member_phone, member_address, member_city, member_state, member_zip]
+      threshold: 1.0
+      severity: critical
+      required_tags: [PII_Classification, PII_Type, Data_Sensitivity]
+
+    - rule: audit_logging_active
+      check: cloudtrail_enabled
+      threshold: 1.0
+      severity: critical
+
+    - rule: phi_not_in_logs
+      check: no_pii_in_logs
+      threshold: 1.0
+      severity: critical
+
+# Anomaly Detection
+
+anomaly_detection:
+  enabled: true
+  methods:
+    - type: outlier_detection
+      columns: [billed_amount, paid_amount]
+      threshold: 3_std_dev
+      action: flag
+
+    - type: distribution_shift
+      columns: [claim_type, claim_status, payer_name]
+      window: 30_days
+      threshold: 0.20
+      action: alert
+
+    - type: volume_anomaly
+      metric: row_count
+      window: 7_days
+      threshold: 0.20
+      action: alert
+
+# Quality Gates
+
+quality_gates:
+  landing_to_staging:
+    overall_score: 0.80
+    critical_failures: 0
+    action_on_failure: block
+
+  staging_to_publish:
+    overall_score: 0.95
+    critical_failures: 0
+    hipaa_checks: all_pass
+    action_on_failure: block

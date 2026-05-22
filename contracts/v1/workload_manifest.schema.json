@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://adop.internal/contracts/v1/workload_manifest.schema.json",
+  "title": "Workload Manifest",
+  "description": "Top-level manifest tying all spec hashes and template versions together for a workload.",
+  "type": "object",
+  "required": ["workload_name", "schema_version", "spec_hashes", "created_at", "created_by_agent", "template_versions"],
+  "additionalProperties": false,
+  "properties": {
+    "workload_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,40}$"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "v1"
+    },
+    "spec_hashes": {
+      "type": "object",
+      "required": ["bronze", "silver", "gold", "quality", "dag"],
+      "additionalProperties": false,
+      "properties": {
+        "bronze": { "$ref": "#/$defs/sha256_hash" },
+        "silver": { "$ref": "#/$defs/sha256_hash" },
+        "gold": { "$ref": "#/$defs/sha256_hash" },
+        "quality": { "$ref": "#/$defs/sha256_hash" },
+        "dag": { "$ref": "#/$defs/sha256_hash" }
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Must equal run_started_at from the orchestrator context"
+    },
+    "created_by_agent": {
+      "type": "string",
+      "enum": ["data_onboarding", "metadata", "transformation", "quality", "dag", "orchestrator"]
+    },
+    "template_versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9_]*$": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        }
+      },
+      "description": "Map of template_id to semver"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "template_id", "artifact_hash"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string" },
+          "template_id": { "type": "string" },
+          "artifact_hash": { "$ref": "#/$defs/sha256_hash" },
+          "spec_hash": { "$ref": "#/$defs/sha256_hash" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 hex digest (64 characters)"
+    }
+  }
+}

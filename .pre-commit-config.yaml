@@ -127,3 +127,21 @@ repos:
         additional_dependencies: ['pyyaml']
         pass_filenames: false
         files: '(\.mcp\.json|tool-registry/.*\.yaml|TOOL_ROUTING\.md|MCP_GUARDRAILS\.md|CLAUDE\.md)$'
+
+      # Validate contract JSON Schemas are valid Draft 2020-12
+      - id: contracts-schema-validator
+        name: validate-contracts-are-valid-jsonschema
+        entry: python scripts/validate_contracts.py
+        language: python
+        additional_dependencies: ['jsonschema']
+        pass_filenames: false
+        files: '^contracts/.*\.schema\.json$'
+
+      # Drift validator: re-render and check for hand-edits to generated artifacts
+      - id: drift-validator
+        name: artifact-spec-drift-check
+        entry: python -m shared.codegen.drift_validator --pre-commit
+        language: python
+        additional_dependencies: ['jinja2', 'jsonschema', 'pyyaml']
+        files: '^workloads/.*/(scripts|dags|sql)/.*'
+        pass_filenames: true

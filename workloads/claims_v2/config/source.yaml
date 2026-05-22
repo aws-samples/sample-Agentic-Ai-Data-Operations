@@ -1,0 +1,263 @@
+dataset_name: claims_v2
+version: "1.0.0"
+created_date: "2026-05-21"
+compliance: HIPAA
+
+source:
+  type: csv
+  location:
+    production: s3://prod-data-lake/raw/healthcare/claims/
+    local_simulation: /tmp/data-lake/landing/claims/
+    fixture: demo/sample_data/claims.csv
+  format: csv
+  frequency: daily
+  credentials:
+    type: airflow_connection
+    connection_id: healthcare_s3_conn
+  estimated_size:
+    rows: 10000
+    size_gb: 0.01
+    test_rows: 50
+
+schema:
+  columns:
+    - name: claim_id
+      type: STRING
+      role: identifier
+      primary_key: true
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: policy_number
+      type: STRING
+      role: identifier
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: member_id
+      type: STRING
+      role: identifier
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: member_first_name
+      type: STRING
+      role: dimension
+      nullable: false
+      phi: true
+      phi_type: NAME
+      sensitivity: HIGH
+
+    - name: member_last_name
+      type: STRING
+      role: dimension
+      nullable: false
+      phi: true
+      phi_type: NAME
+      sensitivity: HIGH
+
+    - name: member_dob
+      type: DATE
+      role: temporal
+      nullable: false
+      phi: true
+      phi_type: DOB
+      sensitivity: HIGH
+
+    - name: member_ssn
+      type: STRING
+      role: identifier
+      nullable: false
+      phi: true
+      phi_type: SSN
+      sensitivity: CRITICAL
+
+    - name: member_email
+      type: STRING
+      role: dimension
+      nullable: false
+      phi: true
+      phi_type: EMAIL
+      sensitivity: HIGH
+
+    - name: member_phone
+      type: STRING
+      role: dimension
+      nullable: false
+      phi: true
+      phi_type: PHONE
+      sensitivity: MEDIUM
+
+    - name: member_address
+      type: STRING
+      role: dimension
+      nullable: false
+      phi: true
+      phi_type: ADDRESS
+      sensitivity: MEDIUM
+
+    - name: member_city
+      type: STRING
+      role: dimension
+      nullable: false
+      phi: true
+      phi_type: ADDRESS
+      sensitivity: MEDIUM
+
+    - name: member_state
+      type: STRING
+      role: dimension
+      nullable: false
+      phi: true
+      phi_type: ADDRESS
+      sensitivity: MEDIUM
+
+    - name: member_zip
+      type: STRING
+      role: dimension
+      nullable: false
+      phi: true
+      phi_type: ADDRESS
+      sensitivity: MEDIUM
+
+    - name: provider_id
+      type: STRING
+      role: identifier
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: provider_name
+      type: STRING
+      role: dimension
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: provider_npi
+      type: STRING
+      role: identifier
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: claim_type
+      type: STRING
+      role: dimension
+      nullable: false
+      phi: false
+      sensitivity: LOW
+      valid_values: ["medical", "dental", "vision", "pharmacy"]
+
+    - name: service_date
+      type: DATE
+      role: temporal
+      primary_temporal: true
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: submission_date
+      type: DATE
+      role: temporal
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: diagnosis_code
+      type: STRING
+      role: dimension
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: procedure_code
+      type: STRING
+      role: dimension
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: billed_amount
+      type: DECIMAL
+      role: measure
+      nullable: false
+      phi: false
+      sensitivity: LOW
+      decimal_precision: 10
+      decimal_scale: 2
+
+    - name: allowed_amount
+      type: DECIMAL
+      role: measure
+      nullable: false
+      phi: false
+      sensitivity: LOW
+      decimal_precision: 10
+      decimal_scale: 2
+
+    - name: paid_amount
+      type: DECIMAL
+      role: measure
+      nullable: false
+      phi: false
+      sensitivity: LOW
+      decimal_precision: 10
+      decimal_scale: 2
+
+    - name: patient_responsibility
+      type: DECIMAL
+      role: measure
+      nullable: false
+      phi: false
+      sensitivity: LOW
+      decimal_precision: 10
+      decimal_scale: 2
+
+    - name: claim_status
+      type: STRING
+      role: dimension
+      nullable: false
+      phi: false
+      sensitivity: LOW
+      valid_values: ["paid", "denied", "pending", "appealed"]
+
+    - name: denial_reason
+      type: STRING
+      role: dimension
+      nullable: true
+      phi: false
+      sensitivity: LOW
+
+    - name: adjuster_id
+      type: STRING
+      role: identifier
+      nullable: true
+      phi: false
+      sensitivity: LOW
+
+    - name: payer_name
+      type: STRING
+      role: dimension
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: plan_type
+      type: STRING
+      role: dimension
+      nullable: false
+      phi: false
+      sensitivity: LOW
+      valid_values: ["PPO", "HMO", "EPO", "POS", "HDHP"]
+
+    - name: network_status
+      type: STRING
+      role: dimension
+      nullable: false
+      phi: false
+      sensitivity: LOW
+      valid_values: ["in_network", "out_of_network"]

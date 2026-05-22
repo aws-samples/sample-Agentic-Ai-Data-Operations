@@ -230,7 +230,7 @@ def export_markdown(events: List[Dict], output_path: Optional[str] = None) -> st
         f"",
         f"**Run ID**: `{run_id}`  ",
         f"**Events**: {len(events)}  ",
-        f"**Generated**: {datetime.utcnow().isoformat()}Z",
+        f"**Generated**: {datetime.now(tz=None).isoformat()}",
         "",
         "---",
         "",
@@ -265,6 +265,166 @@ def export_markdown(events: List[Dict], output_path: Optional[str] = None) -> st
                 lines.append(f"  - Choice: {payload['choice_made']}")
 
         lines.append("")
+
+    md = "\n".join(lines)
+
+    if output_path:
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, "w") as f:
+            f.write(md)
+        print(f"Exported: {output_path}")
+
+    return md
+
+
+CONVERSATION_EVENT_TYPES = {
+    "question_asked", "user_responded", "discovery_presented",
+    "tool_called", "decision_made",
+}
+
+
+def show_conversation(events: List[Dict]):
+    """Replay the Q&A conversation in sequence order."""
+    conv_events = [e for e in events
+                   if e.get("event_type") in CONVERSATION_EVENT_TYPES]
+
+    if not conv_events:
+        print("No conversation events found.")
+        return
+
+    conv_events.sort(key=lambda e: e.get("sequence_number", 0))
+
+    print(_bold(f"=== CONVERSATION REPLAY ({len(conv_events)} interactions) ==="))
+    print()
+
+    for e in conv_events:
+        seq = e.get("sequence_number", "?")
+        ts = e.get("timestamp", "")[:19]
+        event_type = e.get("event_type", "")
+        payload = e.get("payload", {})
+        thread = e.get("thread_id", "")
+        thread_str = f" [thread:{thread}]" if thread else ""
+        phase_str = f" (phase {e.get('phase')})" if e.get("phase") else ""
+
+        if event_type == "question_asked":
+            print(f"  {_cyan(f'[{seq}]')} {ts}{phase_str}{thread_str}")
+            print(f"    {_bold('AGENT ASKS:')} {payload.get('question_text', '')}")
+            if payload.get("options"):
+                for opt in payload["options"]:
+                    print(f"      - {opt}")
+            print()
+
+        elif event_type == "user_responded":
+            print(f"  {_cyan(f'[{seq}]')} {ts}{phase_str}{thread_str}")
+            print(f"    {_green('USER SAYS:')} {payload.get('answer_text', '')}")
+            if payload.get("selected_options"):
+                print(f"      Selected: {', '.join(payload['selected_options'])}")
+            print()
+
+        elif event_type == "discovery_presented":
+            print(f"  {_cyan(f'[{seq}]')} {ts}{phase_str}")
+            print(f"    {_yellow('DISCOVERED:')} {payload.get('title', '')}")
+            for finding in payload.get("findings", []):
+                print(f"      * {finding}")
+            print()
+
+        elif event_type == "tool_called":
+            print(f"  {_cyan(f'[{seq}]')} {ts}{phase_str}")
+            tool = payload.get("tool_name", "?")
+            result = payload.get("result_summary", "")
+            dur = f" ({e.get('duration_ms', 0):.0f}ms)" if e.get("duration_ms") else ""
+            print(f"    TOOL: {tool}{dur}")
+            if result:
+                print(f"      Result: {result}")
+            print()
+
+        elif event_type == "decision_made":
+            print(f"  {_cyan(f'[{seq}]')} {ts}{phase_str}")
+            print(f"    {_bold('DECISION:')} {payload.get('decision_text', '')}")
+            triggered = payload.get("triggered_by_thread")
+            if triggered:
+                print(f"      Triggered by: {triggered}")
+            if payload.get("reasoning"):
+                print(f"      Reasoning: {payload['reasoning']}")
+            print()
+
+
+def export_conversation_md(events: List[Dict],
+                           output_path: Optional[str] = None) -> str:
+    """Generate a Markdown transcript of the conversation flow."""
+    conv_events = [e for e in events
+                   if e.get("event_type") in CONVERSATION_EVENT_TYPES]
+    conv_events.sort(key=lambda e: e.get("sequence_number", 0))
+
+    if not conv_events:
+        return "# Conversation Transcript\n\nNo conversation events recorded.\n"
+
+    run_id = events[0].get("run_id", "unknown") if events else "unknown"
+    workload = events[0].get("workload_name", "unknown") if events else "unknown"
+
+    lines = [
+        f"# Conversation Transcript: {workload}",
+        "",
+        f"**Run ID**: `{run_id}`  ",
+        f"**Interactions**: {len(conv_events)}  ",
+        f"**Generated**: {datetime.now(tz=None).isoformat()}",
+        "",
+        "---",
+        "",
+    ]
+
+    for e in conv_events:
+        seq = e.get("sequence_number", "?")
+        ts = e.get("timestamp", "")[:19]
+        event_type = e.get("event_type", "")
+        payload = e.get("payload", {})
+        thread = e.get("thread_id", "")
+        phase = e.get("phase")
+
+        phase_str = f" | Phase {phase}" if phase else ""
+        thread_str = f" | Thread: `{thread}`" if thread else ""
+
+        if event_type == "question_asked":
+            lines.append(f"### [{seq}] Agent Question{phase_str}{thread_str}")
+            lines.append(f"> {payload.get('question_text', '')}")
+            if payload.get("options"):
+                lines.append("")
+                lines.append("Options:")
+                for opt in payload["options"]:
+                    lines.append(f"- {opt}")
+            lines.append("")
+
+        elif event_type == "user_responded":
+            lines.append(f"### [{seq}] User Response{phase_str}{thread_str}")
+            lines.append(f"**Answer:** {payload.get('answer_text', '')}")
+            if payload.get("selected_options"):
+                lines.append(f"  Selected: {', '.join(payload['selected_options'])}")
+            lines.append("")
+
+        elif event_type == "discovery_presented":
+            lines.append(f"### [{seq}] Discovery: {payload.get('title', '')}{phase_str}")
+            for finding in payload.get("findings", []):
+                lines.append(f"- {finding}")
+            if payload.get("data_source"):
+                lines.append(f"\n*Source: {payload['data_source']}*")
+            lines.append("")
+
+        elif event_type == "tool_called":
+            tool = payload.get("tool_name", "?")
+            dur = f" ({e.get('duration_ms', 0):.0f}ms)" if e.get("duration_ms") else ""
+            lines.append(f"### [{seq}] Tool Call: `{tool}`{dur}{phase_str}")
+            if payload.get("result_summary"):
+                lines.append(f"Result: {payload['result_summary']}")
+            lines.append("")
+
+        elif event_type == "decision_made":
+            lines.append(f"### [{seq}] Decision{phase_str}")
+            lines.append(f"**{payload.get('decision_text', '')}**")
+            if payload.get("triggered_by_thread"):
+                lines.append(f"  Triggered by thread: `{payload['triggered_by_thread']}`")
+            if payload.get("reasoning"):
+                lines.append(f"  Reasoning: {payload['reasoning']}")
+            lines.append("")
 
     md = "\n".join(lines)
 
@@ -333,9 +493,14 @@ def main():
                         help="Filter to specific phase number")
     parser.add_argument("--failures", action="store_true",
                         help="Show only errors, retries, escalations")
+    parser.add_argument("--conversation", action="store_true",
+                        help="Replay Q&A conversation in reading order")
     parser.add_argument("--export-md", type=str, default=None, nargs="?",
                         const="agent_log.md",
                         help="Generate agent_log.md (default: agent_log.md)")
+    parser.add_argument("--export-conversation", type=str, default=None, nargs="?",
+                        const="conversation_transcript.md",
+                        help="Export conversation as Markdown transcript")
     parser.add_argument("--export-map", type=str, default=None, nargs="?",
                         const="cognitive_map.json",
                         help="Generate cognitive_map.json")
@@ -346,7 +511,9 @@ def main():
     events = filter_events(events, agent=args.agent, phase=args.phase)
 
     if not any([args.summary, args.decisions, args.timeline, args.failures,
-                args.export_md is not None, args.export_map is not None]):
+                args.conversation,
+                args.export_md is not None, args.export_conversation is not None,
+                args.export_map is not None]):
         # Default: show summary
         show_summary(events)
         return
@@ -357,11 +524,17 @@ def main():
         show_decisions(events)
     if args.timeline:
         show_timeline(events)
+    if args.conversation:
+        show_conversation(events)
     if args.failures:
         show_failures(events)
     if args.export_md is not None:
         md = export_markdown(events, args.export_md)
         if not args.export_md or args.export_md == "agent_log.md":
+            print(md)
+    if args.export_conversation is not None:
+        md = export_conversation_md(events, args.export_conversation)
+        if not args.export_conversation or args.export_conversation == "conversation_transcript.md":
             print(md)
     if args.export_map is not None:
         tree = export_cognitive_map(events, args.export_map)

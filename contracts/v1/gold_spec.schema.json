@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://adop.internal/contracts/v1/gold_spec.schema.json",
+  "title": "Gold Aggregation Spec",
+  "description": "Defines Silver-to-Gold transformation: KPIs, grain, schema type, aggregations.",
+  "type": "object",
+  "required": ["dataset_name", "schema_version", "source_table", "schema_type", "grain", "measures"],
+  "additionalProperties": false,
+  "properties": {
+    "dataset_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,40}$"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "v1"
+    },
+    "source_table": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Silver Iceberg table to read from"
+    },
+    "schema_type": {
+      "type": "string",
+      "enum": ["star_schema", "flat_iceberg", "iceberg_dynamodb"],
+      "description": "Gold schema layout determined during discovery"
+    },
+    "grain": {
+      "type": "object",
+      "required": ["dimensions", "temporal"],
+      "additionalProperties": false,
+      "properties": {
+        "dimensions": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "minItems": 1,
+          "description": "Dimension columns defining the aggregation grain"
+        },
+        "temporal": {
+          "type": "string",
+          "enum": ["daily", "weekly", "monthly", "quarterly", "yearly", "none"],
+          "description": "Time grain for aggregation"
+        }
+      }
+    },
+    "measures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "source_column", "aggregation"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "description": "Output measure column name"
+          },
+          "source_column": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "aggregation": {
+            "type": "string",
+            "enum": ["sum", "avg", "count", "min", "max", "count_distinct", "percentile"]
+          },
+          "filter": {
+            "type": "string",
+            "description": "Optional SQL WHERE clause for filtered aggregation"
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "dimensions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "source_column"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "source_column": { "type": "string" },
+          "scd_type": {
+            "type": "integer",
+            "enum": [1, 2],
+            "description": "Slowly Changing Dimension type (star schema only)"
+          }
+        }
+      },
+      "default": []
+    },
+    "quality_threshold": {
+      "type": "number",
+      "minimum": 0.95,
+      "maximum": 1.00,
+      "default": 0.95,
+      "description": "Minimum quality score for Gold gate"
+    },
+    "iceberg_database": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "iceberg_table": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "iceberg_partition_spec": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "output_tables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "type": { "type": "string", "enum": ["fact", "dimension", "flat"] },
+          "columns": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      },
+      "description": "For star_schema: list of fact + dimension tables"
+    },
+    "freshness_sla_hours": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Maximum acceptable data staleness in hours"
+    }
+  }
+}

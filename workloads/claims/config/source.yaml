@@ -1,0 +1,322 @@
+# Claims Data Source Configuration
+# HIPAA-Compliant Healthcare Claims Pipeline
+
+dataset_name: claims
+version: "1.0.0"
+created_date: "2026-05-20"
+compliance: HIPAA
+
+source:
+  type: csv
+  location:
+    production: s3://prod-data-lake/raw/healthcare/claims/
+    local_simulation: /tmp/data-lake/landing/claims/
+    fixture: demo/sample_data/claims.csv
+  format: csv
+  frequency: daily
+  credentials:
+    type: airflow_connection
+    connection_id: healthcare_s3_conn
+  estimated_size:
+    rows: 10000
+    size_gb: 0.01
+    test_rows: 50
+
+schema:
+  columns:
+    - name: claim_id
+      type: STRING
+      description: Unique claim identifier
+      role: identifier
+      primary_key: true
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: policy_number
+      type: STRING
+      description: Insurance policy number
+      role: identifier
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: member_id
+      type: STRING
+      description: Member identifier
+      role: identifier
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: member_first_name
+      type: STRING
+      description: Member first name (PHI)
+      role: dimension
+      nullable: false
+      phi: true
+      phi_type: NAME
+      sensitivity: HIGH
+
+    - name: member_last_name
+      type: STRING
+      description: Member last name (PHI)
+      role: dimension
+      nullable: false
+      phi: true
+      phi_type: NAME
+      sensitivity: HIGH
+
+    - name: member_dob
+      type: DATE
+      description: Member date of birth (PHI)
+      role: temporal
+      nullable: false
+      phi: true
+      phi_type: DOB
+      sensitivity: HIGH
+
+    - name: member_ssn
+      type: STRING
+      description: Member Social Security Number (PHI - CRITICAL)
+      role: identifier
+      nullable: false
+      phi: true
+      phi_type: SSN
+      sensitivity: CRITICAL
+
+    - name: member_email
+      type: STRING
+      description: Member email address (PHI)
+      role: dimension
+      nullable: true
+      phi: true
+      phi_type: EMAIL
+      sensitivity: HIGH
+
+    - name: member_phone
+      type: STRING
+      description: Member phone number (PHI)
+      role: dimension
+      nullable: true
+      phi: true
+      phi_type: PHONE
+      sensitivity: MEDIUM
+
+    - name: member_address
+      type: STRING
+      description: Member street address (PHI)
+      role: dimension
+      nullable: true
+      phi: true
+      phi_type: ADDRESS
+      sensitivity: MEDIUM
+
+    - name: member_city
+      type: STRING
+      description: Member city (PHI)
+      role: dimension
+      nullable: true
+      phi: true
+      phi_type: ADDRESS
+      sensitivity: MEDIUM
+
+    - name: member_state
+      type: STRING
+      description: Member state abbreviation (PHI)
+      role: dimension
+      nullable: true
+      phi: true
+      phi_type: ADDRESS
+      sensitivity: MEDIUM
+
+    - name: member_zip
+      type: STRING
+      description: Member ZIP code (PHI)
+      role: dimension
+      nullable: true
+      phi: true
+      phi_type: ADDRESS
+      sensitivity: MEDIUM
+
+    - name: provider_id
+      type: STRING
+      description: Healthcare provider identifier
+      role: identifier
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: provider_name
+      type: STRING
+      description: Provider/hospital name
+      role: dimension
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: provider_npi
+      type: STRING
+      description: National Provider Identifier
+      role: identifier
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: claim_type
+      type: STRING
+      description: Type of claim (medical, dental, vision, pharmacy)
+      role: dimension
+      nullable: false
+      phi: false
+      sensitivity: LOW
+      valid_values: ["medical", "dental", "vision", "pharmacy"]
+
+    - name: service_date
+      type: DATE
+      description: Date service was provided
+      role: temporal
+      primary_temporal: true
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: submission_date
+      type: DATE
+      description: Date claim was submitted
+      role: temporal
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: diagnosis_code
+      type: STRING
+      description: ICD-10 diagnosis code
+      role: dimension
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: procedure_code
+      type: STRING
+      description: CPT procedure code
+      role: dimension
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: billed_amount
+      type: DECIMAL
+      description: Amount billed by provider
+      role: measure
+      nullable: false
+      phi: false
+      sensitivity: LOW
+      decimal_precision: 10
+      decimal_scale: 2
+
+    - name: allowed_amount
+      type: DECIMAL
+      description: Amount allowed by payer
+      role: measure
+      nullable: false
+      phi: false
+      sensitivity: LOW
+      decimal_precision: 10
+      decimal_scale: 2
+
+    - name: paid_amount
+      type: DECIMAL
+      description: Amount paid by payer
+      role: measure
+      nullable: false
+      phi: false
+      sensitivity: LOW
+      decimal_precision: 10
+      decimal_scale: 2
+
+    - name: patient_responsibility
+      type: DECIMAL
+      description: Amount patient owes
+      role: measure
+      nullable: false
+      phi: false
+      sensitivity: LOW
+      decimal_precision: 10
+      decimal_scale: 2
+
+    - name: claim_status
+      type: STRING
+      description: Current claim status
+      role: dimension
+      nullable: false
+      phi: false
+      sensitivity: LOW
+      valid_values: ["paid", "denied", "pending", "appealed"]
+
+    - name: denial_reason
+      type: STRING
+      description: Reason for denial (null if paid)
+      role: dimension
+      nullable: true
+      phi: false
+      sensitivity: LOW
+
+    - name: adjuster_id
+      type: STRING
+      description: Claims adjuster identifier
+      role: identifier
+      nullable: true
+      phi: false
+      sensitivity: LOW
+
+    - name: payer_name
+      type: STRING
+      description: Insurance payer name
+      role: dimension
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: plan_type
+      type: STRING
+      description: Insurance plan type
+      role: dimension
+      nullable: false
+      phi: false
+      sensitivity: LOW
+      valid_values: ["PPO", "HMO", "EPO", "POS", "HDHP"]
+
+    - name: network_status
+      type: STRING
+      description: Provider network status
+      role: dimension
+      nullable: false
+      phi: false
+      sensitivity: LOW
+      valid_values: ["in_network", "out_of_network"]
+
+data_steward:
+  owner: Claims Operations Team
+  domain: Healthcare Claims
+  sensitivity: Restricted
+  contact: claims-ops@company.com
+
+encryption:
+  landing:
+    kms_key_alias: alias/hipaa-phi-key
+    algorithm: AES-256
+    transport: TLS_1_3
+  staging:
+    kms_key_alias: alias/hipaa-phi-key
+    algorithm: AES-256
+    transport: TLS_1_3
+  publish:
+    kms_key_alias: alias/hipaa-phi-key
+    algorithm: AES-256
+    transport: TLS_1_3
+  glue_catalog:
+    kms_key_alias: alias/catalog-metadata-key
+  key_rotation:
+    enabled: true
+    frequency: annual

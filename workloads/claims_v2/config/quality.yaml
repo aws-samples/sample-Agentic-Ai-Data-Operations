@@ -1,0 +1,68 @@
+dataset_name: claims_v2
+schema_version: v1
+rules:
+  completeness:
+    - rule_id: comp_claim_id
+      column: claim_id
+      check_type: not_null
+      threshold: 1.0
+      severity: critical
+    - rule_id: comp_member_id
+      column: member_id
+      check_type: not_null
+      threshold: 1.0
+      severity: critical
+    - rule_id: comp_billed_amount
+      column: billed_amount
+      check_type: not_null
+      threshold: 0.99
+      severity: warning
+    - rule_id: comp_service_date
+      column: service_date
+      check_type: not_null
+      threshold: 1.0
+      severity: critical
+  uniqueness:
+    - rule_id: uniq_claim_id
+      column: claim_id
+      check_type: unique
+      threshold: 1.0
+      severity: critical
+  validity:
+    - rule_id: valid_claim_type
+      column: claim_type
+      check_type: enum
+      threshold: 1.0
+      severity: critical
+      params:
+        values: ["medical", "dental", "vision", "pharmacy"]
+    - rule_id: valid_claim_status
+      column: claim_status
+      check_type: enum
+      threshold: 1.0
+      severity: critical
+      params:
+        values: ["paid", "denied", "pending", "appealed"]
+    - rule_id: valid_billed_positive
+      column: billed_amount
+      check_type: range
+      threshold: 0.95
+      severity: warning
+      params:
+        min: 0
+        max: 10000000
+quality_gates:
+  bronze_to_silver:
+    overall_score: 0.80
+    critical_failures: 0
+    action_on_failure: block
+  silver_to_gold:
+    overall_score: 0.95
+    critical_failures: 0
+    action_on_failure: block
+anomaly_detection:
+  enabled: true
+  methods:
+    - z_score
+    - volume_change
+  volume_threshold_pct: 20

@@ -219,18 +219,110 @@ At Phase 7 Step 8.5 of the deploy flow, the **Ontology Staging Agent** induces a
 
 ---
 
-## 5. Organizational Tool Decision Engine
+## 5. AI Clone Decision Engine
 
-**Purpose:** Dynamically selects the optimal tool for each operation based on organizational principles, available infrastructure, and real-time health status.
+**Purpose:** An AI clone of you (or your organization) that makes tooling decisions the way you would — dynamically selecting the optimal tool for each operation based on your principles, available infrastructure, and real-time health status.
 
 **Runs in:** All phases (continuous tool selection)
 **Output:** Tool routing decisions, fallback strategies, organizational compliance reports
 
-Tools are decided on-the-fly based on a hierarchical decision framework that can be configured per organization's principles and infrastructure constraints. The system maintains a live inventory of available MCP servers, CLI tools, and cloud services, then routes each operation to the most appropriate tool based on factors like performance requirements, security policies, cost optimization, and organizational preferences (e.g., "always use MCP over CLI when available" or "prefer Athena over Redshift for ad-hoc queries").
+The AI Clone learns how you pick tools — your preferences, security posture, cost sensitivity, and fallback habits — then makes those decisions autonomously at runtime. It maintains a live inventory of available MCP servers, CLI tools, and cloud services, routing each operation the way you would based on performance requirements, security policies, cost optimization, and organizational preferences (e.g., "always use MCP over CLI when available" or "prefer Athena over Redshift for ad-hoc queries").
 
-Organizations can define custom routing rules through policy files that specify tool preferences, security constraints (e.g., "PII operations must use designated KMS keys"), cost thresholds, and failover strategies. The decision engine evaluates these rules in real-time during pipeline execution, automatically falling back to alternative tools when primary choices are unavailable or violate organizational policies.
+You encode your decision-making into policy files: tool preferences, security constraints (e.g., "PII operations must use designated KMS keys"), cost thresholds, and failover strategies. The clone evaluates these rules in real-time during pipeline execution, automatically falling back to alternative tools when primary choices are unavailable or violate your policies — exactly as you would if you were making the call yourself.
 
-This enables the same pipeline code to run across different organizational environments — startups might default to cost-optimized tools while enterprises enforce security-first tool selection — without requiring separate implementations or manual configuration per deployment.
+This means the same pipeline code runs across different environments without you being present. Your clone carries your judgment: startups might default to cost-optimized tools while enterprises enforce security-first tool selection — the clone adapts to whichever context it's deployed in, applying your encoded principles consistently.
+
+### How the Decision Engine Works
+
+The tool selection process follows a 5-step hierarchy, defined across three configuration layers:
+
+```
+User Intent → Step 1: Context Check → Step 2: Server Health → Step 3: Intent Match
+           → Step 4: Fallback Strategy → Step 5: Invariant Enforcement
+```
+
+**Configuration Sources:**
+
+| File | Role |
+|------|------|
+| [`TOOL_ROUTING.md`](TOOL_ROUTING.md) | Intent-to-tool mapping — matches natural language intent to specific MCP tools with `not_when` disqualifiers |
+| [`tool-registry/servers.yaml`](tool-registry/servers.yaml) | Single source of truth for 13 MCP servers — category, tools, fallbacks |
+| [`tool-registry/invariants.yaml`](tool-registry/invariants.yaml) | 11 mandatory rules (BLOCK/WARN severity) enforced regardless of phase |
+| [`MCP_GUARDRAILS.md`](MCP_GUARDRAILS.md) | Per-phase guardrails — exact tool names allowed per deploy step |
+| [`CLAUDE.md`](CLAUDE.md) | Architecture constraints — sub-agent limitations, MCP-first rule |
+
+### Step 1 — Context Gate (Sub-Agent vs Main Conversation)
+
+```
+Am I a sub-agent?
+├── YES → STOP. Generate files only. No MCP, no AWS, no CLI.
+└── NO  → Proceed to Step 2
+```
+
+Sub-agents (Metadata, Transformation, Quality, DAG) have zero tool access by design — enforced by Cedar policy (`shared/policies/agent_authorization/`) and the `sub-agent-no-mcp` invariant.
+
+### Step 2 — Server Health (3-Tier Classification)
+
+Before selecting a tool, the engine checks server availability from Phase 0 health check:
+
+| Tier | Servers | On Failure |
+|------|---------|-----------|
+| **REQUIRED** | `glue-athena`, `lakeformation`, `iam` | **Block** — cannot proceed |
+| **WARN** | `cloudtrail`, `redshift`, `core`, `s3-tables`, `pii-detection` | **CLI fallback** + log warning |
+| **OPTIONAL** | `sagemaker-catalog`, `lambda`, `cloudwatch`, `cost-explorer`, `dynamodb` | **Defer** — skip gracefully |
+
+### Step 3 — Intent Matching
+
+Each user operation is matched against intent phrases in `TOOL_ROUTING.md`:
+
+```yaml
+# Example: User says "check data quality in Silver"
+tool: glue-data-quality
+intent: ["run quality rules", "check completeness", "validate Silver data", "quality gate"]
+use: aws glue start-data-quality-ruleset-evaluation-run CLI (DQDL syntax)
+not_when: Quick one-off check — Athena SQL is faster
+mcp_server: glue-athena (REQUIRED)
+```
+
+The `not_when` field acts as a negative filter — if the disqualifier condition is true, skip this tool and try the next match.
+
+### Step 4 — Fallback Chain
+
+When the primary tool is unavailable:
+
+```
+MCP tool available?
+├── YES → Use MCP (preferred, always first)
+└── NO  → Is it REQUIRED tier?
+    ├── YES → BLOCK operation, escalate to human
+    └── NO  → Use CLI fallback + log: "Warning: MCP fallback — {server} not loaded"
+```
+
+### Step 5 — Invariant Enforcement (11 Rules, Always Active)
+
+Regardless of which tool is selected, these rules are enforced on every operation:
+
+| ID | Rule | Severity |
+|----|------|----------|
+| `lineage-always` | `--enable-data-lineage: true` on every Glue ETL job | BLOCK |
+| `no-credentials-in-code` | Credentials via Secrets Manager or Airflow Connections only | BLOCK |
+| `bronze-immutable` | Bronze zone data never modified after ingestion | BLOCK |
+| `quality-gates` | Silver >= 80%, Gold >= 95%; critical failures block promotion | BLOCK |
+| `sub-agent-no-mcp` | Sub-agents generate artifacts only; no MCP, no AWS execution | BLOCK |
+| `iam-simulate-first` | `simulate_principal_policy` must return allowed before source access | BLOCK |
+| `verify-deployment` | Confirm tables queryable after deploy (Redshift or Athena) | BLOCK |
+| `audit-after-deploy` | Run CloudTrail lookup after deploy to confirm logging | BLOCK |
+| `log-cli-fallback` | Print warning message on every CLI fallback | WARN |
+| `zone-scoped-kms` | Separate CMK for Bronze, Silver, Gold per workload | BLOCK |
+| `mcp-first` | Use MCP tools FIRST; CLI only when unavailable or errored | BLOCK |
+
+### Validation (CI-Enforced)
+
+The tool registry is validated by `scripts/validate_tool_registry.py` (18 tests):
+- `servers.yaml` ↔ `.mcp.json` — every server in YAML must exist in MCP config
+- `servers.yaml` ↔ `TOOL_ROUTING.md` — every server referenced in routing docs must exist in registry
+- `invariants.yaml` ↔ `TOOL_ROUTING.md` — mandatory rules in YAML match what's documented
+- No stale references — tools referenced in docs that no longer exist are caught
 
 ---
 
@@ -469,7 +561,7 @@ See [prompts/environment-setup-agent/agentcore/README.md](prompts/environment-se
 ├── shared/                           # Reusable code across workloads
 │   ├── memory/                       # Per-workload persistent memory system
 │   ├── reic/                         # REIC intent classification (vector search + agent selection)
-│   ├── utils/                        # pii_detection, quality_checks, encryption
+│   ├── utils/                        # pii_detection, quality_checks, encryption, post_deployment_verifier
 │   ├── policies/                     # Cedar policies (guardrails + authorization)
 │   ├── prompt_intelligence/          # Self-healing: failure analysis + adaptive patch registry
 │   ├── mcp/                          # MCP orchestrator + custom servers
@@ -602,6 +694,31 @@ aws s3 sync shared/ s3://{mwaa-bucket}/dags/shared/
 # The workload's DAG will appear in MWAA Airflow UI
 ```
 
+### Post-Deployment Verification (Mandatory)
+
+After deploying, run the end-to-end verification to confirm everything works:
+
+```bash
+uv run --no-project --with boto3 python3 shared/utils/post_deployment_verifier.py \
+  --workload {dataset} \
+  --database {dataset}_db \
+  --tables silver_{dataset} gold_{dataset}_analytical \
+  --kms-key alias/hipaa-phi-key \
+  --mwaa-env {your-mwaa-environment} \
+  --dag-id {dataset}_pipeline
+```
+
+**7 automated checks** (all must PASS):
+1. Glue tables exist in catalog
+2. Athena queries return data (not empty)
+3. LF-Tags applied on all PHI columns
+4. TBAC access control restricts CRITICAL columns
+5. KMS key exists with rotation enabled
+6. MWAA DAG loaded without import errors
+7. CloudTrail audit events logged
+
+Deployment is NOT complete until all checks pass. See `shared/utils/post_deployment_verifier.py`.
+
 See [docs/aws-account-setup.md](docs/aws-account-setup.md) for AWS configuration details.
 
 ---
@@ -723,6 +840,45 @@ Inspired by the **GCC (Guardrails, Cognitive traces, Checksums)** pattern for ma
 - **Idempotency Checks**: Before writing any file — same checksum skips, different checksum overwrites + logs diff, missing file creates.
 - **Template Versioning**: Every generated file includes a header with agent name, template version, and input hash for traceability.
 - **Cognitive Traces**: Every sub-agent must include a `decisions[]` array documenting every significant choice, alternatives considered, and rejection reasons — making LLM "thinking" auditable.
+- **Template-Driven Codegen**: All pipeline scripts and DAGs are generated from Jinja2 templates (`shared/templates/*.j2`) driven by spec contracts (`contracts/v1/*.schema.json`). The `shared/codegen/` module loads config, validates against schemas, extracts typed slots, renders templates, and validates drift. A PreToolUse hook blocks any direct write to artifact directories without the renderer token. See [docs/determinism.md](docs/determinism.md) for architecture details.
+
+### Agent Exchange Display
+
+Every agent interaction is rendered in a structured ASCII format for traceability. Example:
+
+```text
++--------------------------------------------------------------------+
+|  QUERY                                                             |
++--------------------------------------------------------------------+
+|  "Profile customer churn dataset and propose onboarding DAG"       |
+|  source: data_onboarding | user: claims_v2 | ts: 2026-05-21T06:00 |
++--------------------------------------------------------------------+
+                              |
+                              v
++--------------------------------------------------------------------+
+|  AGENT RESPONSE                                                    |
++--------------------------------------------------------------------+
+|  >> Generated profiling plan and DAG skeleton                      |
+|  STATUS: OK                                                        |
+|  tokens: 3.2k | latency: 4.1s | cost: n/a                         |
++--------------------------------------------------------------------+
+```
+
+Discovery findings are presented in visual blocks before asking questions:
+
+```text
++--------------------------------------------------------------------+
+|  DISCOVERED: Source Profile                                        |
++--------------------------------------------------------------------+
+|  * Format: CSV, 31 columns, 50 rows                               |
+|  * Likely PK: claim_id (unique, 0% nulls)                         |
+|  * PHI detected: member_ssn, member_dob, member_email              |
+|  * Measures: billed_amount, allowed_amount, paid_amount            |
+|  * Temporal: service_date, submission_date                         |
++--------------------------------------------------------------------+
+```
+
+The `shared/utils/ascii_display.py` module provides reusable builders: `query_block()`, `response_block()`, `exchange_block()`, `discovery_block()`, `entity_block()`, `checklist_block()`.
 
 ### Cedar Policy Guardrails
 Uses **Amazon Cedar** (the policy language behind Amazon Verified Permissions) to enforce safety invariants across the pipeline — 23 policies total:
@@ -775,6 +931,7 @@ Automatically validates all generated code BEFORE deployment to catch 95% of iss
 | `employee_attendance` | 40 | Local | PII (NAME, EMAIL), star schema, SCD2, GDPR, tool-routing validation |
 | `stocks` | Generated | Local | Stocks pipeline |
 | `daily_sales` | Generated | Local | Daily sales aggregation |
+| `claims` | Generated | Local | HIPAA compliance, PHI masking, flat denormalized Gold, daily 9AM AEST |
 
 *Some tests require PySpark (Java) or pipeline output to be generated first. See [Running Tests](docs/running-tests.md).
 
@@ -833,6 +990,53 @@ The platform enforces security at every layer:
 - **Bronze Immutability**: Source data is never modified after ingestion
 
 See [Security](docs/security.md) and [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
+
+---
+
+## Cost Estimation (LLM Token Usage)
+
+> **Disclaimer:** The following are estimates based on observed trace durations and agent complexity for the `financial_portfolios` workload (the only fully-traced end-to-end run). Actual token usage varies by dataset complexity, number of columns, cleaning rules, and human interaction. These figures do not include AWS infrastructure costs (Glue jobs, S3, Athena queries, etc.).
+
+### Per-Workload Onboarding (End-to-End)
+
+| Phase | Agent | Est. Tokens | Notes |
+|-------|-------|-------------|-------|
+| 0 | Health Check & Auto-Detect | ~2K | Mostly API calls, minimal LLM |
+| 1-2 | Discovery + Dedup | ~5K | Questions, validation, source scanning |
+| 3 | Profiling | ~8K | Schema inference, PII detection, cognitive decisions |
+| 4a | Metadata Agent | ~25K | Schema design, semantic.yaml, source.yaml + tests |
+| 4b | Transformation Agent | ~45K | Bronze→Silver→Gold scripts + tests (largest agent) |
+| 4c | Quality Agent | ~20K | Quality rules, threshold selection + tests |
+| 4d | DAG Agent | ~20K | Airflow DAG, schedule config + tests |
+| 5 | Deploy to AWS | ~10K | MCP tool calls (API-heavy, not LLM-heavy) |
+| | **Total per workload** | **~135K** | Input + output tokens combined |
+
+### Estimated Cost Per Workload
+
+| Model | Input Price | Output Price | Est. Cost/Workload |
+|-------|-------------|--------------|-------------------|
+| **Claude Opus** | $15 / 1M tokens | $75 / 1M tokens | ~$3.65 |
+| **Claude Sonnet** | $3 / 1M tokens | $15 / 1M tokens | ~$0.73 |
+
+*Assumes 80/20 input/output token split. Opus is used for orchestration and complex reasoning; Sonnet is a viable alternative for sub-agents (Metadata, Quality, DAG) where tasks are more structured.*
+
+### Platform-Wide Estimate (All Workloads)
+
+| Metric | Value |
+|--------|-------|
+| Workloads onboarded | 9 |
+| Avg tokens per workload | ~135K |
+| Total estimated tokens | ~1.2M |
+| **Total cost (all Opus)** | **~$33** |
+| **Total cost (Opus orchestrator + Sonnet sub-agents)** | **~$12** |
+
+### Cost Optimization Tips
+
+- Use **Sonnet for sub-agents** (Metadata, Transformation, Quality, DAG) — tasks are well-defined with structured outputs
+- Use **Opus for orchestration** (Phase 0-2, Phase 5) — requires judgment, multi-step reasoning
+- **Workload memory** reduces re-runs — learned facts carry forward, fewer retry cycles
+- **REIC routing** prevents mis-classification — correct agent on first try saves wasted tokens
+- **Prompt caching** (automatic with Anthropic API) — repeated system prompts are cached, reducing input tokens on retries
 
 ## License
 
