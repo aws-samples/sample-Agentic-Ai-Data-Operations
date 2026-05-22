@@ -1,0 +1,58 @@
+quality:
+  silver_threshold: 0.80
+  gold_threshold: null
+  compliance: []
+
+dimensions:
+  completeness:
+    - column: entity_id
+      rule: "Completeness 'entity_id' = 1.0"
+      severity: critical
+    - column: fiscal_period_id
+      rule: "Completeness 'fiscal_period_id' = 1.0"
+      severity: critical
+    - column: fiscal_year
+      rule: "Completeness 'fiscal_year' = 1.0"
+      severity: critical
+    - column: fiscal_period
+      rule: "Completeness 'fiscal_period' = 1.0"
+      severity: critical
+    - column: metric
+      rule: "Completeness 'metric' = 1.0"
+      severity: critical
+    - column: value_usd
+      rule: "Completeness 'value_usd' = 1.0"
+      severity: critical
+    - column: currency
+      rule: "Completeness 'currency' = 1.0"
+      severity: critical
+
+  uniqueness:
+    - columns: ["entity_id", "fiscal_period_id", "metric"]
+      rule: "Uniqueness ['entity_id','fiscal_period_id','metric'] = 1.0"
+      severity: critical
+      note: "PK after latest-wins dedup."
+
+  validity:
+    # User-confirmed: fiscal_period locked to (FY, Q1, Q2, Q3, Q4) — critical
+    - column: fiscal_period
+      rule: "ColumnValues 'fiscal_period' in ['FY','Q1','Q2','Q3','Q4']"
+      severity: critical
+    # User-confirmed: value_usd >= 0 — critical
+    - column: value_usd
+      rule: "ColumnValues 'value_usd' >= 0"
+      severity: critical
+    - column: currency
+      rule: "ColumnValues 'currency' matches '^[A-Z]{3}$'"
+      severity: warning
+
+  consistency:
+    # User-confirmed: FK to entity_resolved as warning
+    - rule: "CustomSql 'SELECT COUNT(*) FROM {table} t LEFT JOIN entity_resolved_db.silver_entity_resolved e ON t.entity_id = e.entity_id WHERE e.entity_id IS NULL' = 0"
+      description: "Every entity_id should match a row in entity_resolved.silver_entity_resolved."
+      severity: warning
+
+  anomaly_detection:
+    - metric: row_count
+      threshold: 0.20
+      description: "Flag if row count deviates >20% from previous baseline."

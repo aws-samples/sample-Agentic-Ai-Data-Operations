@@ -1,0 +1,47 @@
+bronze_to_silver:
+  deduplication:
+    key: ["buyer_ticker", "supplier_ticker", "effective_date", "product_category"]
+    strategy: keep_latest
+    order_by: ingestion_ts
+
+  null_handling: []
+
+  type_casting:
+    - column: effective_date
+      from: string
+      to: date
+      format: "yyyy-MM-dd"
+    - column: supply_concentration_pct
+      from: string
+      to: double
+    - column: contract_value_usd
+      from: string
+      to: double
+
+  validation:
+    # Quarantine rows that violate hard PK / data-validity invariants.
+    - column: buyer_ticker
+      rule: "buyer_ticker IS NOT NULL AND buyer_ticker != ''"
+      action: quarantine
+    - column: supplier_ticker
+      rule: "supplier_ticker IS NOT NULL AND supplier_ticker != ''"
+      action: quarantine
+      note: "Source has rows with null supplier_ticker; these go to quarantine."
+    - column: effective_date
+      rule: "effective_date IS NOT NULL"
+      action: quarantine
+      note: "Source has invalid dates (e.g., '2024-13-45') — to_date returns null and these are quarantined."
+    - column: supply_concentration_pct
+      rule: "supply_concentration_pct BETWEEN 0 AND 100"
+      action: quarantine
+      note: "Source has out-of-range values (e.g., 143.51, -21.7); these go to quarantine."
+
+  derived_columns:
+    - name: ingestion_ts
+      expression: "current_timestamp()"
+      description: "When this record was processed into Silver."
+
+  load_strategy:
+    mode: overwrite
+    target_format: iceberg
+    partitioning: none

@@ -1,0 +1,40 @@
+quality:
+  silver_threshold: 0.80
+  gold_threshold: null
+  compliance: []
+
+dimensions:
+  completeness:
+    - column: entity_id
+      rule: "Completeness 'entity_id' = 1.0"
+      severity: critical
+    - column: fiscal_period_id
+      rule: "Completeness 'fiscal_period_id' = 1.0"
+      severity: critical
+    - column: fiscal_year
+      rule: "Completeness 'fiscal_year' = 1.0"
+      severity: critical
+
+  uniqueness:
+    - columns: ["entity_id", "fiscal_period_id"]
+      rule: "Uniqueness ['entity_id','fiscal_period_id'] = 1.0"
+      severity: critical
+      note: "PK after latest-wins dedup."
+
+  validity:
+    # User-confirmed: pe_ratio sanity range as warning
+    - column: pe_ratio
+      rule: "ColumnValues 'pe_ratio' between -1000 and 1000"
+      severity: warning
+      note: "Catches catastrophic outliers without blocking; PE for unprofitable companies can legitimately swing wide."
+
+  consistency:
+    # User-confirmed: FK to entity_resolved as warning
+    - rule: "CustomSql 'SELECT COUNT(*) FROM {table} t LEFT JOIN entity_resolved_db.silver_entity_resolved e ON t.entity_id = e.entity_id WHERE e.entity_id IS NULL' = 0"
+      description: "Every entity_id should match a row in entity_resolved.silver_entity_resolved."
+      severity: warning
+
+  anomaly_detection:
+    - metric: row_count
+      threshold: 0.20
+      description: "Flag if row count deviates >20% from previous baseline."

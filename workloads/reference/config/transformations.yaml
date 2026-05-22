@@ -1,0 +1,27 @@
+bronze_to_silver:
+  deduplication:
+    key: ["entity_id", "classification_system"]
+    strategy: keep_latest
+    order_by: ingestion_ts
+
+  null_handling: []
+
+  type_casting: []
+
+  validation:
+    - column: entity_id
+      rule: "entity_id IS NOT NULL AND entity_id != ''"
+      action: quarantine
+    - column: classification_system
+      rule: "classification_system IS NOT NULL AND classification_system != ''"
+      action: quarantine
+
+  derived_columns:
+    - name: ingestion_ts
+      expression: "current_timestamp()"
+      description: "When this record was processed into Silver."
+
+  load_strategy:
+    mode: overwrite
+    target_format: iceberg
+    partitioning: none

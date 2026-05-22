@@ -1,0 +1,52 @@
+quality:
+  silver_threshold: 0.80
+  gold_threshold: null
+  compliance: []
+
+dimensions:
+  completeness:
+    - column: entity_id
+      rule: "Completeness 'entity_id' = 1.0"
+      severity: critical
+    - column: fiscal_period_id
+      rule: "Completeness 'fiscal_period_id' = 1.0"
+      severity: critical
+    - column: fiscal_year
+      rule: "Completeness 'fiscal_year' = 1.0"
+      severity: critical
+    - column: currency
+      rule: "Completeness 'currency' = 1.0"
+      severity: critical
+    - column: operating_cash_flow
+      rule: "Completeness 'operating_cash_flow' = 1.0"
+      severity: critical
+    - column: free_cash_flow
+      rule: "Completeness 'free_cash_flow' = 1.0"
+      severity: critical
+
+  uniqueness:
+    - columns: ["entity_id", "fiscal_period_id"]
+      rule: "Uniqueness ['entity_id','fiscal_period_id'] = 1.0"
+      severity: critical
+      note: "PK after latest-wins dedup."
+
+  validity:
+    - column: currency
+      rule: "ColumnValues 'currency' matches '^[A-Z]{3}$'"
+      severity: warning
+
+  consistency:
+    # User-confirmed: FCF identity within 0.5% tolerance — critical
+    # Tolerance scaled by ABS(operating_cash_flow) to handle FCF ≈ 0 or negative.
+    - rule: "CustomSql 'SELECT COUNT(*) FROM {table} WHERE ABS(operating_cash_flow) > 0 AND ABS(free_cash_flow - (operating_cash_flow - capital_expenditure)) / ABS(operating_cash_flow) > 0.005' = 0"
+      description: "FCF identity: free_cash_flow ≈ operating_cash_flow - capital_expenditure (0.5% tolerance)."
+      severity: critical
+    # User-confirmed: FK to entity_resolved as warning
+    - rule: "CustomSql 'SELECT COUNT(*) FROM {table} t LEFT JOIN entity_resolved_db.silver_entity_resolved e ON t.entity_id = e.entity_id WHERE e.entity_id IS NULL' = 0"
+      description: "Every entity_id should match a row in entity_resolved.silver_entity_resolved."
+      severity: warning
+
+  anomaly_detection:
+    - metric: row_count
+      threshold: 0.20
+      description: "Flag if row count deviates >20% from previous baseline."

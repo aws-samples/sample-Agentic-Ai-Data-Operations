@@ -1,0 +1,42 @@
+# Source configuration for entity_resolved workload
+# Phase 1: Discovery — populated from user answers (manual ad-hoc upload, no PII)
+
+source:
+  name: entity_resolved
+  description: "Canonical entity master — multi-region public-company reference data (entity_id, ticker, ISIN, CUSIP, aliases). Join key for stocks, pricing, fundamentals, estimates."
+  type: s3
+  format: csv
+  location:
+    bucket: "${var:data_lake_bucket}"
+    prefix: "raw/reference/entity_resolved/"
+  credentials:
+    method: iam_role
+    role_arn: "${secret:glue_service_role_arn}"
+  schema:
+    inferred: true
+    crawler_database: entity_resolved_db
+  # Reference data: small, low-frequency, manually uploaded
+  frequency: ad_hoc
+  partition_by: ingestion_date
+  owner: reference-data-team
+  contact: reference-data@company.com
+
+ingestion:
+  mode: batch
+  # Manual trigger only — schedule_interval=None on the DAG
+  schedule: null
+  format_options:
+    delimiter: ","
+    header: true
+    quote_char: '"'
+    escape_char: "\\"
+    null_values: ["", "NULL", "null", "N/A"]
+  # Latest-wins dedup on entity_id (Phase 1 user answer)
+  dedup_key: ["entity_id"]
+
+  # Bronze retention: keep all versions indefinitely (S3 versioning).
+  # Reference data is small and historical versions enable time-travel.
+  retention:
+    policy: keep_all_versions
+    s3_versioning: true
+    lifecycle_expiration_days: null

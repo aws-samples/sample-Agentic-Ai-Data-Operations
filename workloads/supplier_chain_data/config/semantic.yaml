@@ -1,0 +1,86 @@
+dataset:
+  name: supplier_chain_data
+  domain: supply-chain
+  business_description: "Buyer-supplier relationships, contract value, and supply concentration. Joins to entity_resolved via buyer_ticker (warning-level FK; ticker is not unique across countries in entity_resolved)."
+
+columns:
+  - name: buyer_name
+    role: attribute
+    description: "Buyer entity name."
+    pii: false
+
+  - name: buyer_ticker
+    role: identifier
+    description: "Buyer ticker. FK (warning) to entity_resolved.silver_entity_resolved.ticker."
+    pii: false
+    constraints:
+      - not_null
+    relationship:
+      target_table: silver_entity_resolved
+      target_column: ticker
+      type: many-to-one
+      enforcement: warning
+
+  - name: supplier_name
+    role: attribute
+    description: "Supplier entity name."
+    pii: false
+
+  - name: supplier_ticker
+    role: identifier
+    description: "Supplier ticker. Many suppliers are private/foreign so no FK enforced."
+    pii: false
+    constraints:
+      - not_null
+
+  - name: relationship_type
+    role: dimension
+    description: "Type of buyer-supplier relationship (Direct Supplier, Service Provider, Logistics Partner, Contract Manufacturer, ...)."
+    pii: false
+
+  - name: supply_concentration_pct
+    role: measure
+    description: "Share of total supply this relationship represents (0-100). Quarantined if outside range."
+    pii: false
+    aggregation: avg
+
+  - name: product_category
+    role: dimension
+    description: "Category of goods/services in the relationship. Part of PK."
+    pii: false
+    constraints:
+      - not_null
+
+  - name: effective_date
+    role: temporal
+    description: "Effective date of the relationship snapshot. Part of PK."
+    pii: false
+    grain: day
+    constraints:
+      - not_null
+
+  - name: contract_value_usd
+    role: measure
+    description: "Contract value in USD."
+    pii: false
+    aggregation: sum
+
+  - name: supplier_address
+    role: attribute
+    description: "Supplier mailing address."
+    pii: true
+    pii_type: ADDRESS
+    sensitivity: HIGH
+
+  - name: contact_email
+    role: attribute
+    description: "Supplier contact email."
+    pii: true
+    pii_type: EMAIL
+    sensitivity: HIGH
+
+  - name: ingestion_ts
+    role: temporal
+    description: "When this record was ingested into Silver. Used by latest-wins dedup."
+    pii: false
+    grain: event_time

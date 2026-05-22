@@ -1,0 +1,64 @@
+quality:
+  silver_threshold: 0.80
+  gold_threshold: null
+  compliance: []
+
+dimensions:
+  completeness:
+    - column: entity_id
+      rule: "Completeness 'entity_id' = 1.0"
+      severity: critical
+    - column: classification_system
+      rule: "Completeness 'classification_system' = 1.0"
+      severity: critical
+    - column: sector_code
+      rule: "Completeness 'sector_code' = 1.0"
+      severity: critical
+    - column: sector_name
+      rule: "Completeness 'sector_name' = 1.0"
+      severity: critical
+    - column: industry_group_code
+      rule: "Completeness 'industry_group_code' = 1.0"
+      severity: critical
+    - column: industry_group_name
+      rule: "Completeness 'industry_group_name' = 1.0"
+      severity: critical
+    - column: industry_code
+      rule: "Completeness 'industry_code' = 1.0"
+      severity: critical
+    - column: industry_name
+      rule: "Completeness 'industry_name' = 1.0"
+      severity: critical
+
+  uniqueness:
+    - columns: ["entity_id", "classification_system"]
+      rule: "Uniqueness ['entity_id','classification_system'] = 1.0"
+      severity: critical
+      note: "PK after latest-wins dedup."
+
+  validity:
+    # User-confirmed: GICS-style numeric code patterns — critical
+    - column: sector_code
+      rule: "ColumnValues 'sector_code' matches '^[0-9]{2,8}$'"
+      severity: critical
+    - column: industry_group_code
+      rule: "ColumnValues 'industry_group_code' matches '^[0-9]{2,8}$'"
+      severity: critical
+    - column: industry_code
+      rule: "ColumnValues 'industry_code' matches '^[0-9]{2,8}$'"
+      severity: critical
+
+  consistency:
+    # FK to entity_resolved as warning
+    - rule: "CustomSql 'SELECT COUNT(*) FROM {table} t LEFT JOIN entity_resolved_db.silver_entity_resolved e ON t.entity_id = e.entity_id WHERE e.entity_id IS NULL' = 0"
+      description: "Every entity_id should match a row in entity_resolved.silver_entity_resolved."
+      severity: warning
+    # GICS hierarchy: industry_group_code starts with sector_code; industry_code starts with industry_group_code.
+    - rule: "CustomSql 'SELECT COUNT(*) FROM {table} WHERE classification_system = ''GICS'' AND (industry_group_code NOT LIKE CONCAT(sector_code, ''%'') OR industry_code NOT LIKE CONCAT(industry_group_code, ''%''))' = 0"
+      description: "GICS hierarchy: industry_group_code must start with sector_code; industry_code must start with industry_group_code."
+      severity: warning
+
+  anomaly_detection:
+    - metric: row_count
+      threshold: 0.20
+      description: "Flag if row count deviates >20% from previous baseline."

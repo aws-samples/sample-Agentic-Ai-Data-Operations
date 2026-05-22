@@ -1,0 +1,81 @@
+dataset:
+  name: reference
+  domain: reference-data
+  business_description: "Hierarchical entity classifications. Sample is GICS only; PK includes classification_system to allow ICB/NAICS later."
+
+columns:
+  - name: entity_id
+    role: identifier
+    description: "Canonical entity ID. FK to entity_resolved.silver_entity_resolved.entity_id."
+    pii: false
+    constraints:
+      - not_null
+    relationship:
+      target_table: silver_entity_resolved
+      target_column: entity_id
+      type: many-to-one
+
+  - name: classification_system
+    role: identifier
+    description: "Classification scheme (GICS, ICB, NAICS, ...). Part of PK."
+    pii: false
+    constraints:
+      - not_null
+
+  - name: sector_code
+    role: dimension
+    description: "Top-level sector code (GICS: 2 digits)."
+    pii: false
+    hierarchy:
+      level: 1
+      parent: null
+
+  - name: sector_name
+    role: dimension
+    description: "Top-level sector name."
+    pii: false
+    hierarchy:
+      level: 1
+      parent: null
+
+  - name: industry_group_code
+    role: dimension
+    description: "Industry group code (GICS: 4 digits)."
+    pii: false
+    hierarchy:
+      level: 2
+      parent: sector_code
+
+  - name: industry_group_name
+    role: dimension
+    description: "Industry group name."
+    pii: false
+    hierarchy:
+      level: 2
+      parent: sector_name
+
+  - name: industry_code
+    role: dimension
+    description: "Industry code (GICS: 6 digits)."
+    pii: false
+    hierarchy:
+      level: 3
+      parent: industry_group_code
+
+  - name: industry_name
+    role: dimension
+    description: "Industry name."
+    pii: false
+    hierarchy:
+      level: 3
+      parent: industry_group_name
+
+  - name: ingestion_ts
+    role: temporal
+    description: "When this record was ingested into Silver. Used by latest-wins dedup."
+    pii: false
+    grain: event_time
+
+business_terms:
+  - term: "GICS"
+    definition: "Global Industry Classification Standard. 8-digit hierarchy: sector (2) -> industry group (4) -> industry (6) -> sub-industry (8)."

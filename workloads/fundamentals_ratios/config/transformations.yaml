@@ -1,0 +1,64 @@
+bronze_to_silver:
+  deduplication:
+    key: ["entity_id", "fiscal_period_id"]
+    strategy: keep_latest
+    order_by: ingestion_ts
+
+  null_handling:
+    - column: roa
+      action: drop_column
+      note: "100% null in source sample."
+    - column: debt_to_equity
+      action: drop_column
+      note: "100% null in source sample."
+    - column: current_ratio
+      action: drop_column
+      note: "100% null in source sample."
+    - column: load_timestamp
+      action: drop_column
+      note: "100% null in source sample."
+
+  dropped_columns:
+    - column: roa
+      reason: "100% null."
+    - column: debt_to_equity
+      reason: "100% null."
+    - column: current_ratio
+      reason: "100% null."
+    - column: load_timestamp
+      reason: "100% null."
+
+  type_casting:
+    - column: fiscal_year
+      from: string
+      to: integer
+    - column: pe_ratio
+      from: string
+      to: double
+    - column: pb_ratio
+      from: string
+      to: double
+    - column: ev_ebitda
+      from: string
+      to: double
+    - column: roe
+      from: string
+      to: double
+
+  validation:
+    - column: entity_id
+      rule: "entity_id IS NOT NULL AND entity_id != ''"
+      action: quarantine
+    - column: fiscal_period_id
+      rule: "fiscal_period_id IS NOT NULL AND fiscal_period_id != ''"
+      action: quarantine
+
+  derived_columns:
+    - name: ingestion_ts
+      expression: "current_timestamp()"
+      description: "When this record was processed into Silver."
+
+  load_strategy:
+    mode: overwrite
+    target_format: iceberg
+    partitioning: none

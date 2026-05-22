@@ -1,0 +1,49 @@
+# Transformation rules — Bronze to Silver only
+# Phase 1: Discovery — feeds Transformation Agent
+
+bronze_to_silver:
+  deduplication:
+    key: ["entity_id", "estimate_date", "period_type"]
+    strategy: keep_latest
+    order_by: ingestion_ts
+
+  null_handling: []
+
+  type_casting:
+    - column: estimate_date
+      from: string
+      to: date
+      format: "yyyy-MM-dd"
+    - column: eps_mean
+      from: string
+      to: double
+    - column: eps_high
+      from: string
+      to: double
+    - column: eps_low
+      from: string
+      to: double
+    - column: num_analysts
+      from: string
+      to: integer
+
+  validation:
+    - column: entity_id
+      rule: "entity_id IS NOT NULL AND entity_id != ''"
+      action: quarantine
+    - column: estimate_date
+      rule: "estimate_date IS NOT NULL"
+      action: quarantine
+    - column: period_type
+      rule: "period_type IN ('NTM','FY1','FY2')"
+      action: quarantine
+
+  derived_columns:
+    - name: ingestion_ts
+      expression: "current_timestamp()"
+      description: "When this record was processed into Silver. Used by latest-wins dedup."
+
+  load_strategy:
+    mode: overwrite
+    target_format: iceberg
+    partitioning: none

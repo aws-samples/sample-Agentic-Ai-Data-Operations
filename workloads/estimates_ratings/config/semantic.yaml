@@ -1,0 +1,84 @@
+# Semantic layer configuration — column roles, business context
+
+dataset:
+  name: estimates_ratings
+  domain: equity-research
+  business_description: "Consensus analyst ratings and target prices by entity and date."
+
+columns:
+  - name: entity_id
+    role: identifier
+    description: "Canonical entity ID. FK to entity_resolved.silver_entity_resolved.entity_id."
+    pii: false
+    constraints:
+      - not_null
+    relationship:
+      target_table: silver_entity_resolved
+      target_column: entity_id
+      type: many-to-one
+
+  - name: rating_date
+    role: temporal
+    description: "Date the consensus rating was computed."
+    pii: false
+    grain: day
+
+  - name: consensus_rating
+    role: dimension
+    description: "Consensus rating label: Buy, Hold, Sell, Outperform, Underperform."
+    pii: false
+
+  - name: buy_count
+    role: measure
+    description: "Number of analysts rating Buy."
+    pii: false
+    aggregation: sum
+
+  - name: hold_count
+    role: measure
+    description: "Number of analysts rating Hold."
+    pii: false
+    aggregation: sum
+
+  - name: sell_count
+    role: measure
+    description: "Number of analysts rating Sell."
+    pii: false
+    aggregation: sum
+
+  - name: target_price_mean
+    role: measure
+    description: "Mean 12-month target price across analysts."
+    pii: false
+    aggregation: avg
+
+  - name: target_price_high
+    role: measure
+    description: "Highest 12-month target price across analysts."
+    pii: false
+    aggregation: max
+
+  - name: target_price_low
+    role: measure
+    description: "Lowest 12-month target price across analysts."
+    pii: false
+    aggregation: min
+
+  - name: currency
+    role: attribute
+    description: "ISO 4217 currency code of target prices."
+    pii: false
+
+  - name: ingestion_ts
+    role: temporal
+    description: "When this record was ingested into Silver. Used by latest-wins dedup."
+    pii: false
+    grain: event_time
+
+business_terms:
+  - term: "Total Coverage"
+    definition: "Total analysts contributing to the consensus."
+    formula: "buy_count + hold_count + sell_count"
+  - term: "Buy Ratio"
+    definition: "Share of analysts rating Buy."
+    formula: "buy_count / (buy_count + hold_count + sell_count)"

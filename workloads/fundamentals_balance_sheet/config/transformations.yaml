@@ -1,0 +1,48 @@
+bronze_to_silver:
+  deduplication:
+    key: ["entity_id", "fiscal_period_id"]
+    strategy: keep_latest
+    order_by: ingestion_ts
+
+  null_handling: []
+
+  type_casting:
+    - column: fiscal_year
+      from: string
+      to: integer
+    - column: total_assets
+      from: string
+      to: double
+    - column: total_liabilities
+      from: string
+      to: double
+    - column: total_equity
+      from: string
+      to: double
+    - column: cash_and_equivalents
+      from: string
+      to: double
+    - column: total_debt
+      from: string
+      to: double
+    - column: value_usd_total_assets
+      from: string
+      to: double
+
+  validation:
+    - column: entity_id
+      rule: "entity_id IS NOT NULL AND entity_id != ''"
+      action: quarantine
+    - column: fiscal_period_id
+      rule: "fiscal_period_id IS NOT NULL AND fiscal_period_id != ''"
+      action: quarantine
+
+  derived_columns:
+    - name: ingestion_ts
+      expression: "current_timestamp()"
+      description: "When this record was processed into Silver."
+
+  load_strategy:
+    mode: overwrite
+    target_format: iceberg
+    partitioning: none

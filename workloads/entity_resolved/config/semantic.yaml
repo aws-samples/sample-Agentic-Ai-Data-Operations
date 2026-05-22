@@ -1,0 +1,102 @@
+# Semantic layer configuration — column roles, business context
+# Phase 1: Discovery — feeds Metadata Agent + SageMaker Catalog
+#
+# No PII (public-company reference data). Sedol dropped in Silver
+# because source column is 100% null in current sample.
+
+dataset:
+  name: entity_resolved
+  domain: reference-data
+  business_description: "Canonical multi-region equity entity master used as the join key across pricing, fundamentals, estimates, and ownership workloads."
+
+columns:
+  - name: entity_id
+    role: identifier
+    description: "Canonical entity ID, format {TICKER}-{COUNTRY} (e.g., AAPL-US). Primary key."
+    pii: false
+    constraints:
+      - unique
+      - not_null
+
+  - name: entity_name
+    role: attribute
+    description: "Legal entity name."
+    pii: false
+
+  - name: ticker
+    role: attribute
+    description: "Exchange ticker symbol (without country suffix)."
+    pii: false
+
+  - name: aliases
+    role: attribute
+    description: "Array of common name variants (split from pipe-delimited source string)."
+    pii: false
+    semantic_type: array_of_string
+    transformation: "split source string on '|'"
+
+  - name: isin
+    role: identifier
+    description: "ISO 6166 International Securities Identification Number (12 chars)."
+    pii: false
+
+  - name: cusip
+    role: identifier
+    description: "Committee on Uniform Securities Identification Procedures number (US/CA listings). Nullable — non-US entities may omit."
+    pii: false
+
+  - name: exchange
+    role: dimension
+    description: "Listing exchange code (NASDAQ, NYSE, LSE, XETRA, TSE, ...)."
+    pii: false
+    hierarchy:
+      level: 1
+      parent: null
+
+  - name: country
+    role: dimension
+    description: "ISO 3166-1 alpha-2 country code of primary listing."
+    pii: false
+    hierarchy:
+      level: 2
+      parent: exchange
+
+  - name: sector
+    role: dimension
+    description: "GICS-style sector classification."
+    pii: false
+    hierarchy:
+      level: 1
+      parent: null
+
+  - name: industry
+    role: dimension
+    description: "GICS-style industry classification."
+    pii: false
+    hierarchy:
+      level: 2
+      parent: sector
+
+  - name: fiscal_year_end_month
+    role: attribute
+    description: "Calendar month (1-12) of the entity's fiscal year end."
+    pii: false
+
+  - name: ingestion_ts
+    role: temporal
+    description: "When this record was ingested into Silver. Used by latest-wins dedup."
+    pii: false
+    grain: event_time
+
+# Source column dropped in Silver
+dropped_columns:
+  - name: sedol
+    reason: "100% null in source sample. Re-add with nullable=true if upstream begins populating."
+
+business_terms:
+  - term: "Entity ID"
+    definition: "Globally unique identifier for an equity entity, scoped by listing country."
+    formula: "CONCAT(ticker, '-', country)"
+  - term: "Coverage"
+    definition: "Count of distinct entities by exchange or country."
+    formula: "COUNT(DISTINCT entity_id) GROUP BY exchange"

@@ -1,0 +1,74 @@
+# Semantic layer configuration — column roles, business context
+# Phase 1: Discovery — feeds Metadata Agent + SageMaker Catalog
+#
+# No PII (sell-side aggregates, no individual analyst names).
+
+dataset:
+  name: estimates_eps
+  domain: equity-research
+  business_description: "Consensus EPS estimates by entity, date, and period type (NTM/FY1/FY2). High/mean/low across contributing analysts."
+
+columns:
+  - name: entity_id
+    role: identifier
+    description: "Canonical entity ID. FK to entity_resolved.silver_entity_resolved.entity_id."
+    pii: false
+    constraints:
+      - not_null
+    relationship:
+      target_table: silver_entity_resolved
+      target_column: entity_id
+      type: many-to-one
+
+  - name: estimate_date
+    role: temporal
+    description: "Date the consensus estimate was computed."
+    pii: false
+    grain: day
+
+  - name: period_type
+    role: dimension
+    description: "Forecast horizon: NTM (next twelve months), FY1 (current FY), FY2 (next FY)."
+    pii: false
+
+  - name: eps_mean
+    role: measure
+    description: "Mean EPS estimate across contributing analysts."
+    pii: false
+    aggregation: avg
+
+  - name: eps_high
+    role: measure
+    description: "Highest EPS estimate across contributing analysts."
+    pii: false
+    aggregation: max
+
+  - name: eps_low
+    role: measure
+    description: "Lowest EPS estimate across contributing analysts."
+    pii: false
+    aggregation: min
+
+  - name: num_analysts
+    role: measure
+    description: "Number of analysts contributing to the consensus."
+    pii: false
+    aggregation: sum
+
+  - name: currency
+    role: attribute
+    description: "ISO 4217 currency code of the EPS values."
+    pii: false
+
+  - name: ingestion_ts
+    role: temporal
+    description: "When this record was ingested into Silver. Used by latest-wins dedup."
+    pii: false
+    grain: event_time
+
+business_terms:
+  - term: "EPS Range"
+    definition: "Spread between high and low EPS estimates."
+    formula: "eps_high - eps_low"
+  - term: "NTM"
+    definition: "Next twelve months — rolling forward 12-month horizon, independent of fiscal year boundary."

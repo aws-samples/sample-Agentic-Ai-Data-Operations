@@ -1,0 +1,80 @@
+dataset:
+  name: fundamentals_balance_sheet
+  domain: equity-fundamentals
+  business_description: "Annual balance sheet line items by entity and fiscal period. Sample contains annual ('A') periods only."
+
+columns:
+  - name: entity_id
+    role: identifier
+    description: "Canonical entity ID. FK to entity_resolved.silver_entity_resolved.entity_id."
+    pii: false
+    constraints:
+      - not_null
+    relationship:
+      target_table: silver_entity_resolved
+      target_column: entity_id
+      type: many-to-one
+
+  - name: fiscal_period_id
+    role: identifier
+    description: "Period identifier, format {entity_id}_FY{year}_{period}. Annual today (suffix 'A')."
+    pii: false
+    constraints:
+      - not_null
+
+  - name: fiscal_year
+    role: temporal
+    description: "Fiscal year integer."
+    pii: false
+
+  - name: total_assets
+    role: measure
+    description: "Total assets in native currency."
+    pii: false
+    aggregation: sum
+
+  - name: total_liabilities
+    role: measure
+    description: "Total liabilities in native currency."
+    pii: false
+    aggregation: sum
+
+  - name: total_equity
+    role: measure
+    description: "Total equity in native currency."
+    pii: false
+    aggregation: sum
+
+  - name: cash_and_equivalents
+    role: measure
+    description: "Cash and equivalents in native currency."
+    pii: false
+    aggregation: sum
+
+  - name: total_debt
+    role: measure
+    description: "Total debt in native currency."
+    pii: false
+    aggregation: sum
+
+  - name: currency
+    role: attribute
+    description: "ISO 4217 native currency."
+    pii: false
+
+  - name: value_usd_total_assets
+    role: measure
+    description: "Total assets converted to USD (canonical for FX-agnostic analytics)."
+    pii: false
+    aggregation: sum
+
+  - name: ingestion_ts
+    role: temporal
+    description: "When this record was ingested into Silver. Used by latest-wins dedup."
+    pii: false
+    grain: event_time
+
+business_terms:
+  - term: "Accounting Identity"
+    definition: "Total assets must equal total liabilities plus total equity (within rounding)."
+    formula: "total_assets ≈ total_liabilities + total_equity"

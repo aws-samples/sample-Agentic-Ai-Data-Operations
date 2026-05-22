@@ -1,0 +1,51 @@
+dataset:
+  name: pricing
+  domain: equity-market-data
+  business_description: "Daily close price, volume, and market cap by entity."
+
+columns:
+  - name: entity_id
+    role: identifier
+    description: "Canonical entity ID. FK to entity_resolved.silver_entity_resolved.entity_id."
+    pii: false
+    constraints:
+      - not_null
+    relationship:
+      target_table: silver_entity_resolved
+      target_column: entity_id
+      type: many-to-one
+
+  - name: price_date
+    role: temporal
+    description: "Trading date."
+    pii: false
+    grain: day
+
+  - name: close_price
+    role: measure
+    description: "Closing price in native currency."
+    pii: false
+    aggregation: avg
+
+  - name: volume
+    role: measure
+    description: "Shares traded."
+    pii: false
+    aggregation: sum
+
+  - name: market_cap
+    role: measure
+    description: "Market capitalization in native currency."
+    pii: false
+    aggregation: avg
+
+  - name: currency
+    role: attribute
+    description: "ISO 4217 native currency."
+    pii: false
+
+  - name: ingestion_ts
+    role: temporal
+    description: "When this record was ingested into Silver. Used by latest-wins dedup."
+    pii: false
+    grain: event_time

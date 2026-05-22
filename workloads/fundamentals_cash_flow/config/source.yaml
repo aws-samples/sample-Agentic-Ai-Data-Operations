@@ -1,0 +1,34 @@
+source:
+  name: fundamentals_cash_flow
+  description: "Annual cash flow fundamentals (operating CF, capex, FCF, dividends, buybacks) by entity and fiscal period."
+  type: s3
+  format: csv
+  location:
+    bucket: "${var:data_lake_bucket}"
+    prefix: "raw/fundamentals/cash_flow/"
+  credentials:
+    method: iam_role
+    role_arn: "${secret:glue_service_role_arn}"
+  schema:
+    inferred: true
+    crawler_database: fundamentals_cash_flow_db
+  frequency: ad_hoc
+  partition_by: ingestion_date
+  owner: fundamentals-data-team
+  contact: fundamentals-data@company.com
+
+ingestion:
+  mode: batch
+  schedule: null
+  format_options:
+    delimiter: ","
+    header: true
+    quote_char: '"'
+    escape_char: "\\"
+    null_values: ["", "NULL", "null", "N/A"]
+  dedup_key: ["entity_id", "fiscal_period_id"]
+
+  retention:
+    policy: keep_all_versions
+    s3_versioning: true
+    lifecycle_expiration_days: null

@@ -1,0 +1,50 @@
+bronze_to_silver:
+  deduplication:
+    key: ["entity_id", "fiscal_period_id", "metric"]
+    strategy: keep_latest
+    order_by: ingestion_ts
+
+  null_handling: []
+
+  type_casting:
+    - column: fiscal_year
+      from: string
+      to: integer
+    - column: period_end_date
+      from: string
+      to: date
+      format: "yyyy-MM-dd"
+    - column: value
+      from: string
+      to: double
+    - column: value_usd
+      from: string
+      to: double
+    - column: load_timestamp
+      from: string
+      to: timestamp
+      format: "yyyy-MM-dd'T'HH:mm:ssXXX"
+
+  validation:
+    - column: entity_id
+      rule: "entity_id IS NOT NULL AND entity_id != ''"
+      action: quarantine
+    - column: fiscal_period_id
+      rule: "fiscal_period_id IS NOT NULL AND fiscal_period_id != ''"
+      action: quarantine
+    - column: metric
+      rule: "metric IS NOT NULL AND metric != ''"
+      action: quarantine
+    - column: fiscal_period
+      rule: "fiscal_period IN ('FY','Q1','Q2','Q3','Q4')"
+      action: quarantine
+
+  derived_columns:
+    - name: ingestion_ts
+      expression: "current_timestamp()"
+      description: "When this record was processed into Silver."
+
+  load_strategy:
+    mode: overwrite
+    target_format: iceberg
+    partitioning: none

@@ -1,0 +1,50 @@
+quality:
+  silver_threshold: 0.80
+  gold_threshold: null
+  compliance: []
+
+dimensions:
+  completeness:
+    - column: entity_id
+      rule: "Completeness 'entity_id' = 1.0"
+      severity: critical
+    - column: rating_date
+      rule: "Completeness 'rating_date' = 1.0"
+      severity: critical
+    - column: consensus_rating
+      rule: "Completeness 'consensus_rating' = 1.0"
+      severity: critical
+
+  uniqueness:
+    - columns: ["entity_id", "rating_date"]
+      rule: "Uniqueness ['entity_id','rating_date'] = 1.0"
+      severity: critical
+      note: "PK after latest-wins dedup."
+
+  validity:
+    # User-confirmed: target_price_low <= mean <= high — critical
+    - rule: "CustomSql 'SELECT COUNT(*) FROM {table} WHERE target_price_low > target_price_mean OR target_price_mean > target_price_high' = 0"
+      description: "Target price range invariant: low <= mean <= high."
+      severity: critical
+    # User-confirmed: total analyst count >= 1 — critical
+    - rule: "CustomSql 'SELECT COUNT(*) FROM {table} WHERE COALESCE(buy_count,0) + COALESCE(hold_count,0) + COALESCE(sell_count,0) < 1' = 0"
+      description: "At least one analyst must contribute to the consensus."
+      severity: critical
+    # User-confirmed: rating vocabulary — warning
+    - column: consensus_rating
+      rule: "ColumnValues 'consensus_rating' in ['Buy','Hold','Sell','Outperform','Underperform']"
+      severity: warning
+    - column: currency
+      rule: "ColumnValues 'currency' matches '^[A-Z]{3}$'"
+      severity: warning
+
+  consistency:
+    # User-confirmed: FK to entity_resolved as warning
+    - rule: "CustomSql 'SELECT COUNT(*) FROM {table} t LEFT JOIN entity_resolved_db.silver_entity_resolved e ON t.entity_id = e.entity_id WHERE e.entity_id IS NULL' = 0"
+      description: "Every entity_id should match a row in entity_resolved.silver_entity_resolved."
+      severity: warning
+
+  anomaly_detection:
+    - metric: row_count
+      threshold: 0.20
+      description: "Flag if row count deviates >20% from previous baseline."

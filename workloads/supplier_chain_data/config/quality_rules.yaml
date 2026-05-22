@@ -1,0 +1,70 @@
+quality:
+  silver_threshold: 0.80
+  gold_threshold: null
+  compliance:
+    - GDPR
+
+dimensions:
+  completeness:
+    - column: buyer_ticker
+      rule: "Completeness 'buyer_ticker' = 1.0"
+      severity: critical
+    - column: supplier_ticker
+      rule: "Completeness 'supplier_ticker' = 1.0"
+      severity: critical
+    - column: effective_date
+      rule: "Completeness 'effective_date' = 1.0"
+      severity: critical
+    - column: product_category
+      rule: "Completeness 'product_category' = 1.0"
+      severity: critical
+    - column: relationship_type
+      rule: "Completeness 'relationship_type' = 1.0"
+      severity: critical
+
+  uniqueness:
+    - columns: ["buyer_ticker", "supplier_ticker", "effective_date", "product_category"]
+      rule: "Uniqueness ['buyer_ticker','supplier_ticker','effective_date','product_category'] = 1.0"
+      severity: critical
+      note: "PK after latest-wins dedup."
+
+  validity:
+    # User-confirmed: supply_concentration_pct in [0, 100] — critical
+    - column: supply_concentration_pct
+      rule: "ColumnValues 'supply_concentration_pct' between 0 and 100"
+      severity: critical
+    # User-confirmed: contract_value_usd >= 0 — critical
+    - column: contract_value_usd
+      rule: "ColumnValues 'contract_value_usd' >= 0"
+      severity: critical
+    - column: contact_email
+      rule: "ColumnValues 'contact_email' matches '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z]{2,}$' OR contact_email IS NULL"
+      severity: warning
+
+  consistency:
+    # User-confirmed: FK warning on buyer_ticker (skip supplier_ticker — many private/foreign).
+    - rule: "CustomSql 'SELECT COUNT(*) FROM {table} t LEFT JOIN entity_resolved_db.silver_entity_resolved e ON t.buyer_ticker = e.ticker WHERE e.ticker IS NULL' = 0"
+      description: "Every buyer_ticker should match a row in entity_resolved.silver_entity_resolved.ticker. Note: entity_resolved.ticker is not unique across countries; warning only."
+      severity: warning
+
+  anomaly_detection:
+    - metric: row_count
+      threshold: 0.20
+      description: "Flag if row count deviates >20% from previous baseline."
+
+# User-confirmed: PII handling for contact_email and supplier_address.
+pii_rules:
+  detected_columns:
+    - column: contact_email
+      type: EMAIL
+      action: mask_in_logs
+    - column: supplier_address
+      type: ADDRESS
+      action: mask_in_logs
+  lf_tags:
+    - tag: PII_Classification
+      value: CONTAINS_PII
+    - tag: PII_Type
+      values: [EMAIL, ADDRESS]
+    - tag: Data_Sensitivity
+      value: HIGH

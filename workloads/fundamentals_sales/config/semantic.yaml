@@ -1,0 +1,84 @@
+dataset:
+  name: fundamentals_sales
+  domain: equity-fundamentals
+  business_description: "Reported sales/revenue by entity, fiscal period, and metric. Includes both annual (FY) and quarterly (Q1-Q4) periods. Schema is multi-metric ready."
+
+columns:
+  - name: entity_id
+    role: identifier
+    description: "Canonical entity ID. FK to entity_resolved.silver_entity_resolved.entity_id."
+    pii: false
+    constraints:
+      - not_null
+    relationship:
+      target_table: silver_entity_resolved
+      target_column: entity_id
+      type: many-to-one
+
+  - name: fiscal_period_id
+    role: identifier
+    description: "Period identifier, format {entity_id}_FY{year}_{period} where period is FY, Q1-Q4."
+    pii: false
+    constraints:
+      - not_null
+
+  - name: fiscal_year
+    role: temporal
+    description: "Fiscal year integer."
+    pii: false
+
+  - name: fiscal_period
+    role: dimension
+    description: "Fiscal period: FY (annual) or Q1, Q2, Q3, Q4 (quarterly)."
+    pii: false
+
+  - name: period_end_date
+    role: temporal
+    description: "Last day of the fiscal period."
+    pii: false
+    grain: day
+
+  - name: metric
+    role: dimension
+    description: "Metric identifier (e.g., FF_SALES). Part of PK for multi-metric extensibility."
+    pii: false
+
+  - name: value
+    role: measure
+    description: "Reported value in native currency."
+    pii: false
+    aggregation: sum
+
+  - name: currency
+    role: attribute
+    description: "ISO 4217 native currency."
+    pii: false
+
+  - name: value_usd
+    role: measure
+    description: "Reported value converted to USD (canonical for FX-agnostic analytics)."
+    pii: false
+    aggregation: sum
+
+  - name: source
+    role: attribute
+    description: "Source provider identifier (e.g., FDB_FF)."
+    pii: false
+
+  - name: load_timestamp
+    role: temporal
+    description: "Source-provided load timestamp."
+    pii: false
+    grain: event_time
+
+  - name: ingestion_ts
+    role: temporal
+    description: "When this record was ingested into Silver. Used by latest-wins dedup."
+    pii: false
+    grain: event_time
+
+business_terms:
+  - term: "FY"
+    definition: "Full fiscal year aggregate. Sum of Q1-Q4 within same fiscal_year."
+  - term: "FF"
+    definition: "Final Filed — reported (filed) financial figure (vs. forecast)."

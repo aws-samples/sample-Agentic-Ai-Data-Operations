@@ -1,0 +1,75 @@
+# Semantic layer configuration — column roles, business context
+
+dataset:
+  name: estimates_sales_ntm
+  domain: equity-research
+  business_description: "NTM (next-twelve-month) consensus sales/revenue estimates by entity and date. Schema is multi-metric ready for future additions (FE_EBITDA_NTM, etc.)."
+
+columns:
+  - name: entity_id
+    role: identifier
+    description: "Canonical entity ID. FK to entity_resolved.silver_entity_resolved.entity_id."
+    pii: false
+    constraints:
+      - not_null
+    relationship:
+      target_table: silver_entity_resolved
+      target_column: entity_id
+      type: many-to-one
+
+  - name: estimate_date
+    role: temporal
+    description: "Date the estimate was computed."
+    pii: false
+    grain: day
+
+  - name: metric
+    role: dimension
+    description: "Metric identifier (e.g., FE_SALES_NTM). Part of PK to allow multiple metrics in one table."
+    pii: false
+
+  - name: value
+    role: measure
+    description: "Estimate in native currency."
+    pii: false
+    aggregation: avg
+
+  - name: currency
+    role: attribute
+    description: "ISO 4217 code for native currency."
+    pii: false
+
+  - name: value_usd
+    role: measure
+    description: "Estimate converted to USD (canonical for FX-agnostic analytics)."
+    pii: false
+    aggregation: avg
+
+  - name: num_analysts
+    role: measure
+    description: "Number of analysts contributing."
+    pii: false
+    aggregation: sum
+
+  - name: source
+    role: attribute
+    description: "Source provider identifier (e.g., FDB_FE)."
+    pii: false
+
+  - name: load_timestamp
+    role: temporal
+    description: "Source-provided load timestamp (vendor publication time)."
+    pii: false
+    grain: event_time
+
+  - name: ingestion_ts
+    role: temporal
+    description: "When this record was ingested into Silver. Used by latest-wins dedup."
+    pii: false
+    grain: event_time
+
+business_terms:
+  - term: "NTM"
+    definition: "Next twelve months — rolling forward 12-month horizon."
+  - term: "FE"
+    definition: "Forward Estimate — sell-side consensus for a future period."

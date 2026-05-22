@@ -1,0 +1,34 @@
+source:
+  name: supplier_chain_data
+  description: "Buyer-supplier relationships with concentration and contract value. Contains PII (contact_email, supplier_address)."
+  type: s3
+  format: csv
+  location:
+    bucket: "${var:data_lake_bucket}"
+    prefix: "raw/supplier_chain_data/"
+  credentials:
+    method: iam_role
+    role_arn: "${secret:glue_service_role_arn}"
+  schema:
+    inferred: true
+    crawler_database: supplier_chain_data_db
+  frequency: ad_hoc
+  partition_by: ingestion_date
+  owner: supply-chain-team
+  contact: supply-chain-data@company.com
+
+ingestion:
+  mode: batch
+  schedule: null
+  format_options:
+    delimiter: ","
+    header: true
+    quote_char: '"'
+    escape_char: "\\"
+    null_values: ["", "NULL", "null", "N/A"]
+  dedup_key: ["buyer_ticker", "supplier_ticker", "effective_date", "product_category"]
+
+  retention:
+    policy: keep_all_versions
+    s3_versioning: true
+    lifecycle_expiration_days: null

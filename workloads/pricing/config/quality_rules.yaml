@@ -1,0 +1,52 @@
+quality:
+  silver_threshold: 0.80
+  gold_threshold: null
+  compliance: []
+
+dimensions:
+  completeness:
+    - column: entity_id
+      rule: "Completeness 'entity_id' = 1.0"
+      severity: critical
+    - column: price_date
+      rule: "Completeness 'price_date' = 1.0"
+      severity: critical
+    - column: close_price
+      rule: "Completeness 'close_price' = 1.0"
+      severity: critical
+    - column: currency
+      rule: "Completeness 'currency' = 1.0"
+      severity: critical
+
+  uniqueness:
+    - columns: ["entity_id", "price_date"]
+      rule: "Uniqueness ['entity_id','price_date'] = 1.0"
+      severity: critical
+      note: "PK after latest-wins dedup."
+
+  validity:
+    # User-confirmed: close_price > 0 — critical
+    - column: close_price
+      rule: "ColumnValues 'close_price' > 0"
+      severity: critical
+    # User-confirmed: volume >= 0 — critical
+    - column: volume
+      rule: "ColumnValues 'volume' >= 0"
+      severity: critical
+    # User-confirmed: market_cap > 0 — critical
+    - column: market_cap
+      rule: "ColumnValues 'market_cap' > 0"
+      severity: critical
+    - column: currency
+      rule: "ColumnValues 'currency' matches '^[A-Z]{3}$'"
+      severity: warning
+
+  consistency:
+    - rule: "CustomSql 'SELECT COUNT(*) FROM {table} t LEFT JOIN entity_resolved_db.silver_entity_resolved e ON t.entity_id = e.entity_id WHERE e.entity_id IS NULL' = 0"
+      description: "Every entity_id should match a row in entity_resolved.silver_entity_resolved."
+      severity: warning
+
+  anomaly_detection:
+    - metric: row_count
+      threshold: 0.20
+      description: "Flag if row count deviates >20% from previous baseline."

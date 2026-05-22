@@ -1,0 +1,47 @@
+bronze_to_silver:
+  deduplication:
+    key: ["entity_id", "estimate_date", "metric"]
+    strategy: keep_latest
+    order_by: ingestion_ts
+
+  null_handling: []
+
+  type_casting:
+    - column: estimate_date
+      from: string
+      to: date
+      format: "yyyy-MM-dd"
+    - column: value
+      from: string
+      to: double
+    - column: value_usd
+      from: string
+      to: double
+    - column: num_analysts
+      from: string
+      to: integer
+    - column: load_timestamp
+      from: string
+      to: timestamp
+      format: "yyyy-MM-dd'T'HH:mm:ssXXX"
+
+  validation:
+    - column: entity_id
+      rule: "entity_id IS NOT NULL AND entity_id != ''"
+      action: quarantine
+    - column: estimate_date
+      rule: "estimate_date IS NOT NULL"
+      action: quarantine
+    - column: metric
+      rule: "metric IS NOT NULL AND metric != ''"
+      action: quarantine
+
+  derived_columns:
+    - name: ingestion_ts
+      expression: "current_timestamp()"
+      description: "When this record was processed into Silver. Used by latest-wins dedup."
+
+  load_strategy:
+    mode: overwrite
+    target_format: iceberg
+    partitioning: none

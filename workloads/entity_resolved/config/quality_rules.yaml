@@ -1,0 +1,63 @@
+# Quality rules — feeds Quality Agent
+# Phase 1: Discovery — thresholds confirmed by user
+#
+# Silver gate: >= 0.80, no critical failures.
+# No PII (public reference data) — pii_rules section omitted.
+
+quality:
+  silver_threshold: 0.80
+  # No Gold zone in this onboarding (user-confirmed Bronze + Silver scope)
+  gold_threshold: null
+  compliance: []
+
+dimensions:
+  completeness:
+    - column: entity_id
+      rule: "Completeness 'entity_id' = 1.0"
+      severity: critical
+    - column: entity_name
+      rule: "Completeness 'entity_name' = 1.0"
+      severity: critical
+    - column: country
+      rule: "Completeness 'country' = 1.0"
+      severity: critical
+    - column: cusip
+      rule: "Completeness 'cusip' > 0.50"
+      severity: warning
+      note: "Non-US/CA entities may lack CUSIP; warn if rate drops below 50%."
+
+  uniqueness:
+    - columns: ["entity_id"]
+      rule: "Uniqueness ['entity_id'] = 1.0"
+      severity: critical
+      note: "entity_id is the primary key — must be unique after dedup."
+
+  validity:
+    # User-confirmed business rule: fiscal_year_end_month must be 1-12 (critical)
+    - column: fiscal_year_end_month
+      rule: "ColumnValues 'fiscal_year_end_month' between 1 and 12"
+      severity: critical
+    # User-confirmed business rule: ISIN format check (warning)
+    - column: isin
+      rule: "ColumnValues 'isin' matches '^[A-Z0-9]{12}$'"
+      severity: warning
+      note: "Some entities legitimately lack a valid ISIN; flag rather than fail."
+    # User-confirmed business rule: country must be ISO 3166-1 alpha-2
+    - column: country
+      rule: "ColumnValues 'country' matches '^[A-Z]{2}$'"
+      severity: critical
+
+  consistency:
+    - rule: "CustomSql 'SELECT COUNT(*) FROM {table} WHERE entity_id NOT LIKE CONCAT(ticker, ''-'', country)' = 0"
+      description: "entity_id must equal CONCAT(ticker, '-', country)."
+      severity: warning
+      note: "Some entities use cleaned ticker (e.g., BRK.A); warn rather than fail."
+
+  anomaly_detection:
+    - metric: row_count
+      threshold: 0.20
+      description: "Flag if row count deviates >20% from previous run baseline."
+    - metric: null_rate
+      column: cusip
+      threshold: 0.10
+      description: "Flag if CUSIP null rate spikes more than 10pp above baseline."

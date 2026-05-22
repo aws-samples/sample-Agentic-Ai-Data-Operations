@@ -1,0 +1,54 @@
+# Transformation rules — Bronze to Silver only (no Gold per approved plan)
+# Phase 1: Discovery — feeds Transformation Agent
+#
+# Idempotent by construction: full-overwrite to Silver, latest-wins dedup keyed
+# on entity_id. Re-running with the same Bronze input produces identical Silver.
+
+bronze_to_silver:
+  # Latest-wins dedup keyed on entity_id (user-confirmed)
+  deduplication:
+    key: ["entity_id"]
+    strategy: keep_latest
+    order_by: ingestion_ts
+
+  null_handling:
+    # cusip ~30% null in source — expected for non-US/CA listings, keep nullable
+    - column: cusip
+      action: keep_nullable
+      note: "Non-US/CA entities legitimately lack CUSIP."
+
+  # Drop columns from source
+  dropped_columns:
+    - column: sedol
+      reason: "100% null in current source sample."
+
+  type_casting:
+    - column: fiscal_year_end_month
+      from: string
+      to: integer
+
+  validation:
+    # Critical: entity_id must be present and unique (handled by dedup + quality gate)
+    - column: entity_id
+      rule: "entity_id IS NOT NULL AND entity_id != ''"
+      action: quarantine
+    # Warning: fiscal_year_end_month must be 1-12 (also enforced as critical quality rule)
+    - column: fiscal_year_end_month
+      rule: "fiscal_year_end_month BETWEEN 1 AND 12"
+      action: quarantine
+
+  derived_columns:
+    # Pipe-delimited aliases → array<string> (user-confirmed)
+    - name: aliases
+      expression: "SPLIT(aliases, '\\\\|')"
+      description: "Explode pipe-delimited source string to array<string>. Replaces source column."
+      replaces_source: true
+    - name: ingestion_ts
+      expression: "current_timestamp()"
+      description: "When this record was processed into Silver. Used by latest-wins dedup."
+
+  # Full overwrite each run (small reference table, ~55 rows; user-confirmed)
+  load_strategy:
+    mode: overwrite
+    target_format: iceberg
+    partitioning: none

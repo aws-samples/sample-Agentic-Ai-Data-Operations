@@ -1,0 +1,37 @@
+# Source configuration for estimates_eps workload
+# Phase 1: Discovery — populated from user answers (manual upload, no PII)
+
+source:
+  name: estimates_eps
+  description: "Sell-side analyst EPS estimates. Grain: one row per (entity_id, estimate_date, period_type). Joins to entity_resolved via entity_id."
+  type: s3
+  format: csv
+  location:
+    bucket: "${var:data_lake_bucket}"
+    prefix: "raw/estimates/eps/"
+  credentials:
+    method: iam_role
+    role_arn: "${secret:glue_service_role_arn}"
+  schema:
+    inferred: true
+    crawler_database: estimates_eps_db
+  frequency: ad_hoc
+  partition_by: ingestion_date
+  owner: estimates-data-team
+  contact: estimates-data@company.com
+
+ingestion:
+  mode: batch
+  schedule: null
+  format_options:
+    delimiter: ","
+    header: true
+    quote_char: '"'
+    escape_char: "\\"
+    null_values: ["", "NULL", "null", "N/A"]
+  dedup_key: ["entity_id", "estimate_date", "period_type"]
+
+  retention:
+    policy: keep_all_versions
+    s3_versioning: true
+    lifecycle_expiration_days: null

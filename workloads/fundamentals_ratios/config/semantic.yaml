@@ -1,0 +1,70 @@
+# Drops roa, debt_to_equity, current_ratio, load_timestamp — 100% null in source sample.
+
+dataset:
+  name: fundamentals_ratios
+  domain: equity-fundamentals
+  business_description: "Annual financial ratios. Source columns roa, debt_to_equity, current_ratio, load_timestamp are 100%-null and dropped from Silver."
+
+columns:
+  - name: entity_id
+    role: identifier
+    description: "Canonical entity ID. FK to entity_resolved.silver_entity_resolved.entity_id."
+    pii: false
+    constraints:
+      - not_null
+    relationship:
+      target_table: silver_entity_resolved
+      target_column: entity_id
+      type: many-to-one
+
+  - name: fiscal_period_id
+    role: identifier
+    description: "Period identifier. Annual today (suffix 'A')."
+    pii: false
+    constraints:
+      - not_null
+
+  - name: fiscal_year
+    role: temporal
+    description: "Fiscal year integer."
+    pii: false
+
+  - name: pe_ratio
+    role: measure
+    description: "Price-to-earnings ratio."
+    pii: false
+    aggregation: avg
+
+  - name: pb_ratio
+    role: measure
+    description: "Price-to-book ratio."
+    pii: false
+    aggregation: avg
+
+  - name: ev_ebitda
+    role: measure
+    description: "Enterprise value to EBITDA."
+    pii: false
+    aggregation: avg
+
+  - name: roe
+    role: measure
+    description: "Return on equity (%)."
+    pii: false
+    aggregation: avg
+
+  - name: ingestion_ts
+    role: temporal
+    description: "When this record was ingested into Silver. Used by latest-wins dedup."
+    pii: false
+    grain: event_time
+
+dropped_columns:
+  - name: roa
+    reason: "100% null in source sample."
+  - name: debt_to_equity
+    reason: "100% null in source sample."
+  - name: current_ratio
+    reason: "100% null in source sample."
+  - name: load_timestamp
+    reason: "100% null in source sample."

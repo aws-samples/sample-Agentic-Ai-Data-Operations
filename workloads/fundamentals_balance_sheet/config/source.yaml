@@ -1,0 +1,37 @@
+# Source configuration for fundamentals_balance_sheet workload
+# Phase 1: Discovery — populated from user answers (manual upload, no PII).
+
+source:
+  name: fundamentals_balance_sheet
+  description: "Annual balance sheet fundamentals (assets, liabilities, equity, cash, debt) by entity and fiscal period."
+  type: s3
+  format: csv
+  location:
+    bucket: "${var:data_lake_bucket}"
+    prefix: "raw/fundamentals/balance_sheet/"
+  credentials:
+    method: iam_role
+    role_arn: "${secret:glue_service_role_arn}"
+  schema:
+    inferred: true
+    crawler_database: fundamentals_balance_sheet_db
+  frequency: ad_hoc
+  partition_by: ingestion_date
+  owner: fundamentals-data-team
+  contact: fundamentals-data@company.com
+
+ingestion:
+  mode: batch
+  schedule: null
+  format_options:
+    delimiter: ","
+    header: true
+    quote_char: '"'
+    escape_char: "\\"
+    null_values: ["", "NULL", "null", "N/A"]
+  dedup_key: ["entity_id", "fiscal_period_id"]
+
+  retention:
+    policy: keep_all_versions
+    s3_versioning: true
+    lifecycle_expiration_days: null

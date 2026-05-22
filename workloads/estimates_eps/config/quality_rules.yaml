@@ -1,0 +1,57 @@
+# Quality rules — feeds Quality Agent
+# Phase 1: Discovery — thresholds confirmed by user
+# Silver gate: >= 0.80, no critical failures.
+
+quality:
+  silver_threshold: 0.80
+  gold_threshold: null
+  compliance: []
+
+dimensions:
+  completeness:
+    - column: entity_id
+      rule: "Completeness 'entity_id' = 1.0"
+      severity: critical
+    - column: estimate_date
+      rule: "Completeness 'estimate_date' = 1.0"
+      severity: critical
+    - column: period_type
+      rule: "Completeness 'period_type' = 1.0"
+      severity: critical
+    - column: eps_mean
+      rule: "Completeness 'eps_mean' = 1.0"
+      severity: critical
+
+  uniqueness:
+    - columns: ["entity_id", "estimate_date", "period_type"]
+      rule: "Uniqueness ['entity_id','estimate_date','period_type'] = 1.0"
+      severity: critical
+      note: "PK after latest-wins dedup."
+
+  validity:
+    # User-confirmed: period_type locked to (NTM, FY1, FY2) — critical
+    - column: period_type
+      rule: "ColumnValues 'period_type' in ['NTM','FY1','FY2']"
+      severity: critical
+    # User-confirmed: num_analysts >= 1 — critical
+    - column: num_analysts
+      rule: "ColumnValues 'num_analysts' >= 1"
+      severity: critical
+    # User-confirmed: eps_low <= eps_mean <= eps_high — warning only
+    - rule: "CustomSql 'SELECT COUNT(*) FROM {table} WHERE eps_low > eps_mean OR eps_mean > eps_high' = 0"
+      description: "EPS range invariant: low <= mean <= high."
+      severity: warning
+    - column: currency
+      rule: "ColumnValues 'currency' matches '^[A-Z]{3}$'"
+      severity: warning
+
+  consistency:
+    # User-confirmed: FK to entity_resolved as warning
+    - rule: "CustomSql 'SELECT COUNT(*) FROM {table} t LEFT JOIN entity_resolved_db.silver_entity_resolved e ON t.entity_id = e.entity_id WHERE e.entity_id IS NULL' = 0"
+      description: "Every entity_id should match a row in entity_resolved.silver_entity_resolved."
+      severity: warning
+
+  anomaly_detection:
+    - metric: row_count
+      threshold: 0.20
+      description: "Flag if row count deviates >20% from previous baseline."

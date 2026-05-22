@@ -1,0 +1,86 @@
+dataset:
+  name: fundamentals_cash_flow
+  domain: equity-fundamentals
+  business_description: "Annual cash flow line items by entity and fiscal period."
+
+columns:
+  - name: entity_id
+    role: identifier
+    description: "Canonical entity ID. FK to entity_resolved.silver_entity_resolved.entity_id."
+    pii: false
+    constraints:
+      - not_null
+    relationship:
+      target_table: silver_entity_resolved
+      target_column: entity_id
+      type: many-to-one
+
+  - name: fiscal_period_id
+    role: identifier
+    description: "Period identifier. Annual today (suffix 'A')."
+    pii: false
+    constraints:
+      - not_null
+
+  - name: fiscal_year
+    role: temporal
+    description: "Fiscal year integer."
+    pii: false
+
+  - name: operating_cash_flow
+    role: measure
+    description: "Cash flow from operations in native currency."
+    pii: false
+    aggregation: sum
+
+  - name: capital_expenditure
+    role: measure
+    description: "Capex in native currency."
+    pii: false
+    aggregation: sum
+
+  - name: free_cash_flow
+    role: measure
+    description: "FCF in native currency."
+    pii: false
+    aggregation: sum
+
+  - name: dividends_paid
+    role: measure
+    description: "Dividends paid in native currency."
+    pii: false
+    aggregation: sum
+
+  - name: share_buybacks
+    role: measure
+    description: "Share buybacks in native currency."
+    pii: false
+    aggregation: sum
+
+  - name: currency
+    role: attribute
+    description: "ISO 4217 native currency."
+    pii: false
+
+  - name: value_usd_fcf
+    role: measure
+    description: "FCF converted to USD (canonical for FX-agnostic analytics)."
+    pii: false
+    aggregation: sum
+
+  - name: load_timestamp
+    role: temporal
+    description: "Source-provided load timestamp."
+    pii: false
+    grain: event_time
+
+  - name: ingestion_ts
+    role: temporal
+    description: "When this record was ingested into Silver. Used by latest-wins dedup."
+    pii: false
+    grain: event_time
+
+business_terms:
+  - term: "Free Cash Flow"
+    definition: "Operating cash flow minus capital expenditure."
+    formula: "free_cash_flow ≈ operating_cash_flow - capital_expenditure"
