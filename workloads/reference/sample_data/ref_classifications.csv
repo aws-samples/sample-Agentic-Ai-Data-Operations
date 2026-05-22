@@ -1,0 +1,56 @@
+entity_id,classification_system,sector_code,sector_name,industry_group_code,industry_group_name,industry_code,industry_name
+AAPL-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+MSFT-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+GOOGL-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+AMZN-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+META-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+NVDA-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+TSM-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+ORCL-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+CRM-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+ADBE-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+JPM-US,GICS,40,Financials,4010,Banks,401010,Diversified Banks
+UNH-US,GICS,35,Health Care,3510,Health Care Equipment & Services,351020,Health Care Providers
+WMT-US,GICS,30,Consumer Staples,3010,"Food, Beverage & Tobacco",301010,Beverages
+XOM-US,GICS,10,Energy,1010,Energy,101020,"Oil, Gas & Consumable Fuels"
+JNJ-US,GICS,35,Health Care,3510,Health Care Equipment & Services,351020,Health Care Providers
+V-US,GICS,40,Financials,4010,Banks,401010,Diversified Banks
+PG-US,GICS,30,Consumer Staples,3010,"Food, Beverage & Tobacco",301010,Beverages
+HD-US,GICS,25,Consumer Discretionary,2510,Automobiles & Components,251020,Automobiles
+BAC-US,GICS,40,Financials,4010,Banks,401010,Diversified Banks
+KO-US,GICS,30,Consumer Staples,3010,"Food, Beverage & Tobacco",301010,Beverages
+APLE-US,GICS,60,Real Estate,6010,Equity Real Estate Investment Trusts,601010,Diversified REITs
+DAL-US,GICS,20,Industrials,2010,Capital Goods,201060,Aerospace & Defense
+DELT-TW,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+GS-US,GICS,40,Financials,4010,Banks,401010,Diversified Banks
+BRK.A-US,GICS,40,Financials,4010,Banks,401010,Diversified Banks
+NKE-US,GICS,25,Consumer Discretionary,2510,Automobiles & Components,251020,Automobiles
+FDX-US,GICS,20,Industrials,2010,Capital Goods,201060,Aerospace & Defense
+COST-US,GICS,30,Consumer Staples,3010,"Food, Beverage & Tobacco",301010,Beverages
+ACN-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+FIS-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+7203-JP,GICS,25,Consumer Discretionary,2510,Automobiles & Components,251020,Automobiles
+SAP-DE,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+HSBA-GB,GICS,40,Financials,4010,Banks,401010,Diversified Banks
+NESN-CH,GICS,30,Consumer Staples,3010,"Food, Beverage & Tobacco",301010,Beverages
+005930-KR,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+AZN-GB,GICS,35,Health Care,3510,Health Care Equipment & Services,351020,Health Care Providers
+SHEL-GB,GICS,10,Energy,1010,Energy,101020,"Oil, Gas & Consumable Fuels"
+TTE-FR,GICS,10,Energy,1010,Energy,101020,"Oil, Gas & Consumable Fuels"
+NOVO-DK,GICS,35,Health Care,3510,Health Care Equipment & Services,351020,Health Care Providers
+RY-CA,GICS,40,Financials,4010,Banks,401010,Diversified Banks
+SNPS-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+CDNS-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+MCHP-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+KEYS-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+IT-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+PAYC-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+DDOG-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+SNOW-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+PLTR-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+COIN-US,GICS,40,Financials,4010,Banks,401010,Diversified Banks
+TGT-US,GICS,25,Consumer Discretionary,2510,Automobiles & Components,251020,Automobiles
+INTU-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+SYK-US,GICS,35,Health Care,3510,Health Care Equipment & Services,351020,Health Care Providers
+PANW-US,GICS,45,Information Technology,4510,Software & Services,451020,IT Services
+FDS-US,GICS,40,Financials,4010,Banks,401010,Diversified Banks

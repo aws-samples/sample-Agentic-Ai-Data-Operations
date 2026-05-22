@@ -1,0 +1,56 @@
+entity_id,entity_name,ticker,aliases,isin,cusip,sedol,exchange,country,sector,industry,fiscal_year_end_month
+AAPL-US,Apple Inc.,AAPL,Apple|AAPL,US0378331005,037833100,,NASDAQ,US,Technology,Consumer Electronics,9
+MSFT-US,Microsoft Corporation,MSFT,Microsoft|MSFT,US5949181045,594918104,,NASDAQ,US,Technology,Software,6
+GOOGL-US,Alphabet Inc.,GOOGL,Google|Alphabet|GOOGL,US02079K3059,02079K305,,NASDAQ,US,Technology,Internet Services,12
+AMZN-US,Amazon.com Inc.,AMZN,Amazon|AMZN,US0231351067,023135106,,NASDAQ,US,Technology,E-Commerce,12
+META-US,Meta Platforms Inc.,META,Meta|Facebook|META,US30303M1027,30303M102,,NASDAQ,US,Technology,Social Media,12
+NVDA-US,NVIDIA Corporation,NVDA,NVIDIA|NVDA,US67066G1040,67066G104,,NASDAQ,US,Technology,Semiconductors,1
+TSM-US,Taiwan Semiconductor (ADR),TSM,TSMC|Taiwan Semi|TSM,US8740391003,874039100,,NYSE,TW,Technology,Semiconductors,12
+ORCL-US,Oracle Corporation,ORCL,Oracle|ORCL,US68389X1054,68389X105,,NYSE,US,Technology,Software,5
+CRM-US,Salesforce Inc.,CRM,Salesforce|CRM,US79466L3024,79466L302,,NYSE,US,Technology,Software,1
+ADBE-US,Adobe Inc.,ADBE,Adobe|ADBE,US00724F1012,00724F101,,NASDAQ,US,Technology,Software,11
+JPM-US,JPMorgan Chase & Co.,JPM,JPMorgan|JP Morgan|Chase|JPM,US46625H1005,46625H100,,NYSE,US,Financials,Banks,12
+UNH-US,UnitedHealth Group Inc.,UNH,UnitedHealth|UNH,US91324P1021,91324P102,,NYSE,US,Healthcare,Managed Care,12
+WMT-US,Walmart Inc.,WMT,Walmart|WMT,US9311421039,931142103,,NYSE,US,Consumer Staples,Retail,1
+XOM-US,Exxon Mobil Corporation,XOM,ExxonMobil|Exxon|XOM,US30231G1022,30231G102,,NYSE,US,Energy,Oil & Gas,12
+JNJ-US,Johnson & Johnson,JNJ,J&J|Johnson Johnson|JNJ,US4781601046,478160104,,NYSE,US,Healthcare,Pharmaceuticals,12
+V-US,Visa Inc.,V,Visa|V,US92826C8394,92826C839,,NYSE,US,Financials,Payments,9
+PG-US,Procter & Gamble Co.,PG,P&G|Procter Gamble|PG,US7427181091,742718109,,NYSE,US,Consumer Staples,Household Products,6
+HD-US,The Home Depot Inc.,HD,Home Depot|HD,US4370761029,437076102,,NYSE,US,Consumer Disc.,Home Improvement,1
+BAC-US,Bank of America Corporation,BAC,Bank of America|BofA|BAC,US0605051046,060505104,,NYSE,US,Financials,Banks,12
+KO-US,The Coca-Cola Company,KO,Coca-Cola|Coke|KO,US1912161007,191216100,,NYSE,US,Consumer Staples,Beverages,12
+APLE-US,Apple Hospitality REIT Inc.,APLE,Apple Hospitality|APLE,US03784Y2000,03784Y200,,NYSE,US,Real Estate,REITs,12
+DAL-US,Delta Air Lines Inc.,DAL,Delta|Delta Air Lines|DAL,US2473617023,247361702,,NYSE,US,Industrials,Airlines,12
+DELT-TW,Delta Electronics Inc.,DELT,Delta Electronics|DELT,TW0002308004,,,TWSE,TW,Technology,Electronics,12
+GS-US,The Goldman Sachs Group Inc.,GS,Goldman Sachs|Goldman|GS,US38141G1040,38141G104,,NYSE,US,Financials,Investment Banking,12
+BRK.A-US,Berkshire Hathaway Inc.,BRK.A,Berkshire|Berkshire Hathaway,US0846701086,084670108,,NYSE,US,Financials,Conglomerate,12
+NKE-US,NIKE Inc.,NKE,Nike|NKE,US6541061031,654106103,,NYSE,US,Consumer Disc.,Footwear,5
+FDX-US,FedEx Corporation,FDX,FedEx|FDX,US31428X1063,31428X106,,NYSE,US,Industrials,Logistics,5
+COST-US,Costco Wholesale Corporation,COST,Costco|COST,US22160K1051,22160K105,,NASDAQ,US,Consumer Staples,Retail,8
+ACN-US,Accenture plc,ACN,Accenture|ACN,IE00B4BNMY34,,,NYSE,IE,Technology,IT Services,8
+FIS-US,Fidelity National Information,FIS,FIS|Fidelity National,US31620M1062,31620M106,,NYSE,US,Technology,Fintech,12
+7203-JP,Toyota Motor Corporation,7203,Toyota|TM,JP3633400001,,,TSE,JP,Consumer Disc.,Automobiles,3
+SAP-DE,SAP SE,SAP,SAP,DE0007164600,,,XETRA,DE,Technology,Software,12
+HSBA-GB,HSBC Holdings plc,HSBA,HSBC|HSBA,GB0005405286,,,LSE,GB,Financials,Banks,12
+NESN-CH,Nestle S.A.,NESN,Nestle|NESN,CH0038863350,,,SIX,CH,Consumer Staples,Food,12
+005930-KR,Samsung Electronics Co.,005930,Samsung|Samsung Electronics,KR7005930003,,,KRX,KR,Technology,Electronics,12
+AZN-GB,AstraZeneca plc,AZN,AstraZeneca|AZN,GB0009895292,,,LSE,GB,Healthcare,Pharmaceuticals,12
+SHEL-GB,Shell plc,SHEL,Shell|SHEL,GB00BP6MXD84,,,LSE,GB,Energy,Oil & Gas,12
+TTE-FR,TotalEnergies SE,TTE,Total|TotalEnergies|TTE,FR0000120271,,,EPA,FR,Energy,Oil & Gas,12
+NOVO-DK,Novo Nordisk A/S,NOVO,Novo Nordisk|NOVO,DK0062498333,,,CPH,DK,Healthcare,Pharmaceuticals,12
+RY-CA,Royal Bank of Canada,RY,RBC|Royal Bank|RY,CA7800871021,,,TSX,CA,Financials,Banks,10
+SNPS-US,Synopsys Inc.,SNPS,Synopsys|SNPS,US8716071076,871607107,,NASDAQ,US,Technology,EDA Software,10
+CDNS-US,Cadence Design Systems,CDNS,Cadence|CDNS,US1273871087,127387108,,NASDAQ,US,Technology,EDA Software,12
+MCHP-US,Microchip Technology Inc.,MCHP,Microchip|MCHP,US5950171042,595017104,,NASDAQ,US,Technology,Semiconductors,3
+KEYS-US,Keysight Technologies,KEYS,Keysight|KEYS,US49338L1035,49338L103,,NYSE,US,Technology,Test & Measurement,10
+IT-US,Gartner Inc.,IT,Gartner|IT,US3666511072,366651107,,NYSE,US,Technology,Research & Advisory,12
+PAYC-US,Paycom Software Inc.,PAYC,Paycom|PAYC,US70432V1026,70432V102,,NYSE,US,Technology,HCM Software,12
+DDOG-US,Datadog Inc.,DDOG,Datadog|DDOG,US23804L1035,23804L103,,NASDAQ,US,Technology,Observability,12
+SNOW-US,Snowflake Inc.,SNOW,Snowflake|SNOW,US8334451098,833445109,,NYSE,US,Technology,Data Cloud,1
+PLTR-US,Palantir Technologies Inc.,PLTR,Palantir|PLTR,US69608A1088,69608A108,,NYSE,US,Technology,Data Analytics,12
+COIN-US,Coinbase Global Inc.,COIN,Coinbase|COIN,US19260Q1076,19260Q107,,NASDAQ,US,Financials,Crypto Exchange,12
+TGT-US,Target Corporation,TGT,Target|TGT,US87612E1064,87612E106,,NYSE,US,Consumer Disc.,Retail,1
+INTU-US,Intuit Inc.,INTU,Intuit|INTU,US4612021034,461202103,,NASDAQ,US,Technology,Financial Software,7
+SYK-US,Stryker Corporation,SYK,Stryker|SYK,US8636671013,863667101,,NYSE,US,Healthcare,Medical Devices,12
+PANW-US,Palo Alto Networks Inc.,PANW,Palo Alto|PANW,US6974351057,697435105,,NASDAQ,US,Technology,Cybersecurity,7
+FDS-US,FactSet Research Systems Inc.,FDS,FactSet|FDS,US3030751057,303075105,,NYSE,US,Financials,Financial Data,8
