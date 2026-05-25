@@ -1,0 +1,22 @@
+{
+  "name": "adop-semantic-layer-infra",
+  "version": "0.1.0",
+  "bin": { "app": "bin/app.js" },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy --all --require-approval never"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.180.0",
+    "constructs": "^10.0.0",
+    "source-map-support": "^0.5.21"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "aws-cdk": "2.1108.0",
+    "typescript": "~5.5.0",
+    "ts-node": "^10.9.2"
+  }
+}

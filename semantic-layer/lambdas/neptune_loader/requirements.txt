@@ -1,0 +1,4 @@
+# botocore is included in the Lambda Python 3.12 runtime but listed
+# explicitly so CDK bundling and local testing pick it up.
+boto3>=1.26.0
+botocore>=1.29.0

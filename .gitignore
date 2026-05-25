@@ -290,6 +290,12 @@ semantic-layer/infra/cdk.context.json
 semantic-layer/infra/*.js
 semantic-layer/infra/*.d.ts
 
+# Un-ignore CDK source lib/ (the broader `lib/` rule above is for Python venvs).
+# Without this re-include, semantic-layer/infra/lib/*.ts gets caught by the
+# Python build-artifact ignore rule.
+!semantic-layer/infra/lib/
+!semantic-layer/infra/lib/**
+
 # Bedrock AgentCore generated artifacts (per-machine; toolkit regenerates)
 semantic-layer/agent/**/.bedrock_agentcore/
 semantic-layer/agent/**/.bedrock_agentcore.yaml

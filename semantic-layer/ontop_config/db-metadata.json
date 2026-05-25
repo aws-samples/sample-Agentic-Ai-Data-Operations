@@ -1,0 +1,12 @@
+{
+  "_comment": "Ontop typically discovers schema from JDBC at startup. This file is only needed when the JDBC driver does not expose constraints (e.g. some Athena driver versions). If you hit Ontop 'cannot extract metadata' errors, populate `relations` with the workload tables Ontop should pre-load metadata for.",
+  "relations": [],
+  "metadata": {
+    "dbmsProductName": "Amazon Athena",
+    "dbmsVersion": "3",
+    "driverName": "Simba Amazon Athena JDBC Driver",
+    "driverVersion": "2.1.5.1001",
+    "quotationString": "\"",
+    "idFactoryType": "TRINO"
+  }
+}
