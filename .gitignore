@@ -278,3 +278,32 @@ cleanup_*.sh
 
 # Local Phase 5 deployment orchestrator (not part of the workload artifacts)
 .deploy/
+
+# ============================================================================
+# Semantic Layer (Phase 7)
+# ============================================================================
+
+# CDK app artifacts (regenerated on every cdk synth/deploy)
+semantic-layer/infra/node_modules/
+semantic-layer/infra/cdk.out/
+semantic-layer/infra/cdk.context.json
+semantic-layer/infra/*.js
+semantic-layer/infra/*.d.ts
+
+# Bedrock AgentCore generated artifacts (per-machine; toolkit regenerates)
+semantic-layer/agent/**/.bedrock_agentcore/
+semantic-layer/agent/**/.bedrock_agentcore.yaml
+semantic-layer/agent/**/.dockerignore
+semantic-layer/agent/**/Dockerfile
+
+# Cumulative ontology-slice embedding cache (rebuilt per onboarding)
+semantic-layer/.embedding_cache/
+
+# Local SPARQL agent staging copy from reference impl (superseded by adop_sparql_agent)
+semantic-layer/agent/sparql_agent/
+
+# Reference-impl ontop_proxy lambda (not used by deployed stack — agent uses smoke Lambda)
+semantic-layer/lambdas/ontop_proxy/
+
+# Resumed-deploy helper (one-off, can be deleted; deploy_semantic_layer.py is canonical)
+semantic-layer/scripts/deploy_step2_onward.py
