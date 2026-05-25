@@ -1,0 +1,420 @@
+@prefix adop:    <http://adop.example.org/ontology#> .
+@prefix owl:     <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos:    <http://www.w3.org/2004/02/skos/core#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+# =============================================================================
+# ADOP Consolidated Semantic Layer Ontology — v1.0.0
+#
+# OWL VKG ontology backing the Ontop virtual knowledge graph for ADOP.
+# Built incrementally by Phase 6 (semantic-layer onboarding skill).
+# Each onboarded workload contributes one or more entity classes plus
+# datatype/object properties. Relationships across workloads are added
+# only after Athena join verification confirms a match rate >= 5%.
+#
+# Bootstrap workload: entity_resolved (Silver) -- 2026-05-24
+# =============================================================================
+
+<http://adop.example.org/ontology> a owl:Ontology ;
+    rdfs:label "ADOP Consolidated Semantic Layer Ontology" ;
+    dcterms:description "VKG-oriented OWL ontology consolidating onboarded ADOP workloads. Models entities, record classes, dimensions, and cross-workload relationships for SPARQL generation and OBQC validation against Ontop + Athena." ;
+    owl:versionInfo "1.0.0" .
+
+
+# =============================================================================
+# DOMAIN
+# =============================================================================
+
+adop:Domain a owl:Class ;
+    rdfs:label "Domain" ;
+    rdfs:comment "A logical data domain grouping (Reference, Pricing, Fundamentals, Estimates, ...). Used by the agent to scope ontology slices retrieved from OpenSearch." .
+
+adop:domainName a owl:DatatypeProperty ;
+    rdfs:domain adop:Domain ;
+    rdfs:range xsd:string ;
+    rdfs:label "domain name" .
+
+adop:reference_data a adop:Domain ;
+    adop:domainName "reference-data" ;
+    rdfs:label "Reference Data" .
+
+
+# =============================================================================
+# ENTITY (bootstrap class — entity_resolved Silver)
+# =============================================================================
+
+adop:Entity a owl:Class ;
+    rdfs:label "Entity" ;
+    rdfs:comment "A publicly traded company or financial entity. Canonical identity record for cross-workload joins (pricing, fundamentals, estimates, ownership). Sourced from entity_resolved Silver." .
+
+adop:Sector a owl:Class ;
+    rdfs:label "Sector" ;
+    rdfs:comment "GICS-style top-level sector classification (Technology, Healthcare, Financials, Energy, Consumer Disc., Consumer Staples, Industrials, Real Estate). 8 distinct values observed. IMPORTANT: Always query sectors by sectorName string value, e.g., ?entity adop:belongsToSector ?sector . ?sector adop:sectorName 'Technology' . Do NOT use ontology individual IRIs." .
+
+adop:Industry a owl:Class ;
+    rdfs:label "Industry" ;
+    rdfs:comment "GICS-style industry classification, more specific than Sector (Software, Banking, Automobiles, ...). 38 distinct values observed in entity_resolved. IMPORTANT: Always query industries by industryName string value." .
+
+adop:Exchange a owl:Class ;
+    rdfs:label "Exchange" ;
+    rdfs:comment "Stock exchange / listing venue. Observed: NASDAQ, NYSE, LSE, XETRA, TSE, KRX, TSX, TWSE, SIX, CPH, EPA. 11 distinct values. Query by exchangeCode string." .
+
+adop:Country a owl:Class ;
+    rdfs:label "Country" ;
+    rdfs:comment "ISO 3166-1 alpha-2 country code of the entity's primary listing. Observed: US, GB, DE, JP, KR, CA, TW, CH, DK, FR, IE. 11 distinct values." .
+
+
+# =============================================================================
+# DATATYPE PROPERTIES — Entity
+# =============================================================================
+
+adop:entityId a owl:DatatypeProperty ;
+    rdfs:domain adop:Entity ;
+    rdfs:range xsd:string ;
+    rdfs:label "entity id" ;
+    rdfs:comment "Canonical entity ID, format {TICKER}-{COUNTRY} (e.g., AAPL-US). Primary key for Entity. Unique, not null." .
+
+adop:entityName a owl:DatatypeProperty ;
+    rdfs:domain adop:Entity ;
+    rdfs:range xsd:string ;
+    rdfs:label "entity name" ;
+    rdfs:comment "Legal entity name." .
+
+adop:ticker a owl:DatatypeProperty ;
+    rdfs:domain adop:Entity ;
+    rdfs:range xsd:string ;
+    rdfs:label "ticker" ;
+    rdfs:comment "Exchange ticker symbol (without country suffix)." .
+
+adop:aliases a owl:DatatypeProperty ;
+    rdfs:domain adop:Entity ;
+    rdfs:range xsd:string ;
+    rdfs:label "aliases" ;
+    rdfs:comment "Common name variants. Multi-valued (one triple per alias in the VKG)." .
+
+adop:isin a owl:DatatypeProperty ;
+    rdfs:domain adop:Entity ;
+    rdfs:range xsd:string ;
+    rdfs:label "ISIN" ;
+    rdfs:comment "ISO 6166 International Securities Identification Number (12 chars)." .
+
+adop:cusip a owl:DatatypeProperty ;
+    rdfs:domain adop:Entity ;
+    rdfs:range xsd:string ;
+    rdfs:label "CUSIP" ;
+    rdfs:comment "Committee on Uniform Securities Identification Procedures number (US/CA listings). Nullable — non-US entities may omit." .
+
+adop:fiscalYearEndMonth a owl:DatatypeProperty ;
+    rdfs:domain adop:Entity ;
+    rdfs:range xsd:integer ;
+    rdfs:label "fiscal year end month" ;
+    rdfs:comment "Calendar month (1-12) of the entity's fiscal year end." .
+
+adop:ingestionTimestamp a owl:DatatypeProperty ;
+    rdfs:domain adop:Entity ;
+    rdfs:range xsd:dateTime ;
+    rdfs:label "ingestion timestamp" ;
+    rdfs:comment "When this record was ingested into Silver. Used by latest-wins dedup. Internal lineage attribute." .
+
+
+# =============================================================================
+# DATATYPE PROPERTIES — Sector / Industry / Exchange / Country
+# =============================================================================
+
+adop:sectorName a owl:DatatypeProperty ;
+    rdfs:domain adop:Sector ;
+    rdfs:range xsd:string ;
+    rdfs:label "sector name" .
+
+adop:industryName a owl:DatatypeProperty ;
+    rdfs:domain adop:Industry ;
+    rdfs:range xsd:string ;
+    rdfs:label "industry name" .
+
+adop:exchangeCode a owl:DatatypeProperty ;
+    rdfs:domain adop:Exchange ;
+    rdfs:range xsd:string ;
+    rdfs:label "exchange code" .
+
+adop:countryCode a owl:DatatypeProperty ;
+    rdfs:domain adop:Country ;
+    rdfs:range xsd:string ;
+    rdfs:label "country code" ;
+    rdfs:comment "ISO 3166-1 alpha-2." .
+
+
+# =============================================================================
+# OBJECT PROPERTIES — Entity dimension links (intra-workload, no Athena
+# verification required since they are derived from the same row)
+# =============================================================================
+
+adop:belongsToSector a owl:ObjectProperty ;
+    rdfs:domain adop:Entity ;
+    rdfs:range adop:Sector ;
+    rdfs:label "belongs to sector" .
+
+adop:belongsToIndustry a owl:ObjectProperty ;
+    rdfs:domain adop:Entity ;
+    rdfs:range adop:Industry ;
+    rdfs:label "belongs to industry" .
+
+adop:listedOn a owl:ObjectProperty ;
+    rdfs:domain adop:Entity ;
+    rdfs:range adop:Exchange ;
+    rdfs:label "listed on" ;
+    rdfs:comment "The primary listing venue." .
+
+adop:registeredIn a owl:ObjectProperty ;
+    rdfs:domain adop:Entity ;
+    rdfs:range adop:Country ;
+    rdfs:label "registered in" ;
+    rdfs:comment "Country of primary listing (ISO alpha-2)." .
+
+adop:industryUnderSector a owl:ObjectProperty ;
+    rdfs:domain adop:Industry ;
+    rdfs:range adop:Sector ;
+    rdfs:label "industry under sector" ;
+    rdfs:comment "Industry-to-Sector hierarchy (GICS)." .
+
+
+# =============================================================================
+# FUNDAMENTALS - added 2026-05-24
+# 4 record classes (BalanceSheetRecord, CashFlowRecord, RatioRecord,
+# SalesRecord) + shared FiscalPeriod class. Each record N:1 to Entity
+# (verified at 100 percent match rate against entity_resolved). All record
+# classes link to FiscalPeriod via forFiscalPeriod.
+# =============================================================================
+
+adop:FiscalPeriod a owl:Class ;
+    rdfs:label "Fiscal Period" ;
+    rdfs:comment "A fiscal reporting period for an entity. Annual (FY) or quarterly (Q1-Q4). Identified by fiscalPeriodId in the format {entity_id}_FY{year}_{period}. Periods are entity-scoped because fiscal year-end varies by entity." .
+
+adop:fiscalPeriodId a owl:DatatypeProperty ;
+    rdfs:domain adop:FiscalPeriod ;
+    rdfs:range xsd:string ;
+    rdfs:label "fiscal period id" ;
+    rdfs:comment "Period identifier: {entity_id}_FY{year}_{period_code} where period_code is A (annual), FY, or Q1-Q4." .
+
+adop:fiscalYear a owl:DatatypeProperty ;
+    rdfs:domain adop:FiscalPeriod ;
+    rdfs:range xsd:integer ;
+    rdfs:label "fiscal year" ;
+    rdfs:comment "4-digit fiscal year integer." .
+
+adop:fiscalPeriod a owl:DatatypeProperty ;
+    rdfs:domain adop:FiscalPeriod ;
+    rdfs:range xsd:string ;
+    rdfs:label "fiscal period" ;
+    rdfs:comment "Period code. Values: FY (annual aggregate), Q1, Q2, Q3, Q4 (quarterly), A (legacy annual). Use this string to filter quarterly vs annual." .
+
+adop:periodEndDate a owl:DatatypeProperty ;
+    rdfs:domain adop:FiscalPeriod ;
+    rdfs:range xsd:date ;
+    rdfs:label "period end date" ;
+    rdfs:comment "Last calendar date of the fiscal period (e.g., 2024-09-30 for AAPL FY2024). Available on quarterly sales periods; null on annual-only fundamentals periods." .
+
+
+# -----------------------------------------------------------------------------
+# BalanceSheetRecord - annual balance sheet (entity_id x fiscal_year)
+# -----------------------------------------------------------------------------
+
+adop:BalanceSheetRecord a owl:Class ;
+    rdfs:label "Balance Sheet Record" ;
+    rdfs:comment "One annual balance sheet snapshot for an entity. Grain: (entity_id, fiscal_year). Annual only - quarterly balance sheets not in scope. Sourced from fundamentals_db.silver_fundamentals_balance_sheet." .
+
+adop:totalAssets a owl:DatatypeProperty ;
+    rdfs:domain adop:BalanceSheetRecord ;
+    rdfs:range xsd:double ;
+    rdfs:label "total assets" ;
+    rdfs:comment "Total assets in native reporting currency. See currency property for unit; use totalAssetsUsd for FX-agnostic comparison." .
+
+adop:totalLiabilities a owl:DatatypeProperty ;
+    rdfs:domain adop:BalanceSheetRecord ;
+    rdfs:range xsd:double ;
+    rdfs:label "total liabilities" ;
+    rdfs:comment "Total liabilities in native currency." .
+
+adop:totalEquity a owl:DatatypeProperty ;
+    rdfs:domain adop:BalanceSheetRecord ;
+    rdfs:range xsd:double ;
+    rdfs:label "total equity" ;
+    rdfs:comment "Total shareholders equity in native currency. Accounting identity: total_assets ~= total_liabilities + total_equity." .
+
+adop:cashAndEquivalents a owl:DatatypeProperty ;
+    rdfs:domain adop:BalanceSheetRecord ;
+    rdfs:range xsd:double ;
+    rdfs:label "cash and equivalents" ;
+    rdfs:comment "Cash and cash equivalents in native currency." .
+
+adop:totalDebt a owl:DatatypeProperty ;
+    rdfs:domain adop:BalanceSheetRecord ;
+    rdfs:range xsd:double ;
+    rdfs:label "total debt" ;
+    rdfs:comment "Total debt (long-term + short-term borrowings) in native currency." .
+
+adop:totalAssetsUsd a owl:DatatypeProperty ;
+    rdfs:domain adop:BalanceSheetRecord ;
+    rdfs:range xsd:double ;
+    rdfs:label "total assets (USD)" ;
+    rdfs:comment "Total assets converted to USD using period FX. Use this for cross-entity comparison." .
+
+adop:reportingCurrency a owl:DatatypeProperty ;
+    rdfs:domain adop:BalanceSheetRecord ;
+    rdfs:range xsd:string ;
+    rdfs:label "reporting currency" ;
+    rdfs:comment "ISO 4217 currency code of the native-currency figures (USD, KRW, JPY, GBP, EUR, CHF, CAD, TWD, DKK observed)." .
+
+
+# -----------------------------------------------------------------------------
+# CashFlowRecord - annual cash flow (entity_id x fiscal_year)
+# -----------------------------------------------------------------------------
+
+adop:CashFlowRecord a owl:Class ;
+    rdfs:label "Cash Flow Record" ;
+    rdfs:comment "One annual cash flow statement for an entity. Grain: (entity_id, fiscal_year). Sourced from fundamentals_db.silver_fundamentals_cash_flow." .
+
+adop:operatingCashFlow a owl:DatatypeProperty ;
+    rdfs:domain adop:CashFlowRecord ;
+    rdfs:range xsd:double ;
+    rdfs:label "operating cash flow" ;
+    rdfs:comment "Cash generated from operating activities in native currency." .
+
+adop:capitalExpenditure a owl:DatatypeProperty ;
+    rdfs:domain adop:CashFlowRecord ;
+    rdfs:range xsd:double ;
+    rdfs:label "capital expenditure" ;
+    rdfs:comment "Capex (investments in property, plant, and equipment) in native currency." .
+
+adop:freeCashFlow a owl:DatatypeProperty ;
+    rdfs:domain adop:CashFlowRecord ;
+    rdfs:range xsd:double ;
+    rdfs:label "free cash flow" ;
+    rdfs:comment "Free cash flow in native currency. Identity: free_cash_flow ~= operating_cash_flow - capital_expenditure." .
+
+adop:dividendsPaid a owl:DatatypeProperty ;
+    rdfs:domain adop:CashFlowRecord ;
+    rdfs:range xsd:double ;
+    rdfs:label "dividends paid" ;
+    rdfs:comment "Cash dividends paid to shareholders in native currency." .
+
+adop:shareBuybacks a owl:DatatypeProperty ;
+    rdfs:domain adop:CashFlowRecord ;
+    rdfs:range xsd:double ;
+    rdfs:label "share buybacks" ;
+    rdfs:comment "Treasury share repurchases in native currency." .
+
+adop:freeCashFlowUsd a owl:DatatypeProperty ;
+    rdfs:domain adop:CashFlowRecord ;
+    rdfs:range xsd:double ;
+    rdfs:label "free cash flow (USD)" ;
+    rdfs:comment "Free cash flow converted to USD." .
+
+adop:cashFlowReportingCurrency a owl:DatatypeProperty ;
+    rdfs:domain adop:CashFlowRecord ;
+    rdfs:range xsd:string ;
+    rdfs:label "cash flow reporting currency" ;
+    rdfs:comment "ISO 4217 currency code of native-currency figures." .
+
+
+# -----------------------------------------------------------------------------
+# RatioRecord - annual financial ratios (entity_id x fiscal_year)
+# -----------------------------------------------------------------------------
+
+adop:RatioRecord a owl:Class ;
+    rdfs:label "Ratio Record" ;
+    rdfs:comment "Annual financial ratios for an entity. Grain: (entity_id, fiscal_year). Dimensionless metrics computed from balance sheet + income data. Sourced from fundamentals_db.silver_fundamentals_ratios." .
+
+adop:peRatio a owl:DatatypeProperty ;
+    rdfs:domain adop:RatioRecord ;
+    rdfs:range xsd:double ;
+    rdfs:label "P/E ratio" ;
+    rdfs:comment "Price-to-earnings ratio. Dimensionless." .
+
+adop:pbRatio a owl:DatatypeProperty ;
+    rdfs:domain adop:RatioRecord ;
+    rdfs:range xsd:double ;
+    rdfs:label "P/B ratio" ;
+    rdfs:comment "Price-to-book ratio. Dimensionless." .
+
+adop:evEbitda a owl:DatatypeProperty ;
+    rdfs:domain adop:RatioRecord ;
+    rdfs:range xsd:double ;
+    rdfs:label "EV / EBITDA" ;
+    rdfs:comment "Enterprise value to EBITDA. Dimensionless." .
+
+adop:roe a owl:DatatypeProperty ;
+    rdfs:domain adop:RatioRecord ;
+    rdfs:range xsd:double ;
+    rdfs:label "ROE" ;
+    rdfs:comment "Return on equity, expressed as a percent (e.g., 38.41 means 38.41 percent)." .
+
+
+# -----------------------------------------------------------------------------
+# SalesRecord - sales/revenue, annual + quarterly grain
+# -----------------------------------------------------------------------------
+
+adop:SalesRecord a owl:Class ;
+    rdfs:label "Sales Record" ;
+    rdfs:comment "Reported sales/revenue for an entity in a fiscal period. Grain: (entity_id, fiscal_year, fiscal_period, metric). Includes annual (FY) and quarterly (Q1-Q4) periods. Schema is multi-metric ready (currently only FF_SALES). Sourced from fundamentals_db.silver_fundamentals_sales." .
+
+adop:salesValue a owl:DatatypeProperty ;
+    rdfs:domain adop:SalesRecord ;
+    rdfs:range xsd:double ;
+    rdfs:label "sales value" ;
+    rdfs:comment "Reported sales value in native reporting currency." .
+
+adop:salesValueUsd a owl:DatatypeProperty ;
+    rdfs:domain adop:SalesRecord ;
+    rdfs:range xsd:double ;
+    rdfs:label "sales value (USD)" ;
+    rdfs:comment "Reported sales value converted to USD using period FX. Use this for cross-entity revenue comparison." .
+
+adop:salesMetric a owl:DatatypeProperty ;
+    rdfs:domain adop:SalesRecord ;
+    rdfs:range xsd:string ;
+    rdfs:label "sales metric" ;
+    rdfs:comment "Metric identifier (e.g., FF_SALES = FactSet/Final-Filed sales). Multi-metric extensibility key; currently only FF_SALES populated." .
+
+adop:salesReportingCurrency a owl:DatatypeProperty ;
+    rdfs:domain adop:SalesRecord ;
+    rdfs:range xsd:string ;
+    rdfs:label "sales reporting currency" ;
+    rdfs:comment "ISO 4217 currency code of native-currency value (USD, GBP, TWD, EUR, JPY, KRW, CHF, CAD, DKK observed)." .
+
+adop:salesSourceProvider a owl:DatatypeProperty ;
+    rdfs:domain adop:SalesRecord ;
+    rdfs:range xsd:string ;
+    rdfs:label "sales source provider" ;
+    rdfs:comment "Source provider identifier (e.g., FDB_FF for FactSet Filed)." .
+
+
+# -----------------------------------------------------------------------------
+# OBJECT PROPERTIES - fundamentals relationships
+# All forEntity / forFiscalPeriod links verified at 100 percent Athena match rate
+# -----------------------------------------------------------------------------
+
+adop:forEntity a owl:ObjectProperty ;
+    rdfs:domain adop:BalanceSheetRecord ;
+    rdfs:domain adop:CashFlowRecord ;
+    rdfs:domain adop:RatioRecord ;
+    rdfs:domain adop:SalesRecord ;
+    rdfs:range adop:Entity ;
+    rdfs:label "for entity" ;
+    rdfs:comment "Many-to-one link from a record to its Entity." .
+
+adop:forFiscalPeriod a owl:ObjectProperty ;
+    rdfs:domain adop:BalanceSheetRecord ;
+    rdfs:domain adop:CashFlowRecord ;
+    rdfs:domain adop:RatioRecord ;
+    rdfs:domain adop:SalesRecord ;
+    rdfs:range adop:FiscalPeriod ;
+    rdfs:label "for fiscal period" ;
+    rdfs:comment "Many-to-one link from a record to its FiscalPeriod." .
+
+# Note: reverse predicates (e.g. hasBalanceSheet) intentionally omitted.
+# Ontop only materializes triples it has explicit R2RML mappings for, so any
+# query starting at Entity should traverse via forEntity in the opposite
+# direction: `?bs adop:forEntity ?e . ?e adop:ticker "AAPL"`.

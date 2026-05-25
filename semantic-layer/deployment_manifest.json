@@ -1,0 +1,106 @@
+{
+  "stack_names": [
+    "AdopSemanticLayerStorage",
+    "AdopSemanticLayerOpenSearch",
+    "AdopSemanticLayerSparql"
+  ],
+  "environment": "dev",
+  "region": "us-west-2",
+  "account": "<ACCOUNT_ID>",
+  "deployed_at": "2026-05-24T21:30:00Z",
+  "ontology_version": "1.0.0",
+  "endpoints": {
+    "neptune_sparql": "https://adop-semantic-ontology.cluster-cvmk20cmmwmz.us-west-2.neptune.amazonaws.com:8182/sparql",
+    "ontop_sparql": "http://internal-AdopSe-Ontop-psTITetNGmdl-895220445.us-west-2.elb.amazonaws.com:8080/sparql",
+    "opensearch_collection": "https://l2o86r5o6vh8ps70rdx7.us-west-2.aoss.amazonaws.com",
+    "obqc_lambda_arn": "arn:aws:lambda:us-west-2:<ACCOUNT_ID>:function:adop-semantic-obqc",
+    "neptune_loader_arn": "arn:aws:lambda:us-west-2:<ACCOUNT_ID>:function:adop-semantic-neptune-loader",
+    "smoke_lambda_arn": "arn:aws:lambda:us-west-2:<ACCOUNT_ID>:function:adop-semantic-smoke",
+    "config_bucket": "adop-semantic-<ACCOUNT_ID>-us-west-2",
+    "ontop_ecr_repo": "<ACCOUNT_ID>.dkr.ecr.us-west-2.amazonaws.com/adop-semantic-ontop",
+    "agent_runtime_arn": "arn:aws:bedrock-agentcore:us-west-2:<ACCOUNT_ID>:runtime/adop_sparql_agent-uc0VJ08R51",
+    "agent_runtime_id": "adop_sparql_agent-uc0VJ08R51",
+    "agent_ecr_repo": "<ACCOUNT_ID>.dkr.ecr.us-west-2.amazonaws.com/bedrock-agentcore-adop_sparql_agent",
+    "agent_execution_role": "arn:aws:iam::<ACCOUNT_ID>:role/AmazonBedrockAgentCoreSDKRuntime-us-west-2-9275580576",
+    "agent_codebuild_project": "bedrock-agentcore-adop_sparql_agent-builder"
+  },
+  "agent": {
+    "name": "adop_sparql_agent",
+    "version": 3,
+    "tools": ["extract_terms", "get_ontology_slice", "validate_sparql", "execute_sparql", "repair_sparql"],
+    "llm_model": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    "embedding_model": "amazon.titan-embed-text-v2:0",
+    "verified_questions": [
+      {
+        "q": "How many entities are in the Technology sector?",
+        "sparql": "SELECT (COUNT(?entity) AS ?count) WHERE { ?entity a adop:Entity ; adop:belongsToSector ?sector . ?sector adop:sectorName \"Technology\" }",
+        "answer": "26",
+        "status": "success"
+      },
+      {
+        "q": "List 5 entities listed on NASDAQ with their tickers",
+        "sparql": "SELECT ?entityName ?ticker WHERE { ?entity a adop:Entity ; adop:entityName ?entityName ; adop:ticker ?ticker ; adop:listedOn ?ex . ?ex adop:exchangeCode \"NASDAQ\" } LIMIT 5",
+        "answer": "Apple, Adobe, Amazon, Cadence, Coinbase",
+        "status": "success"
+      }
+    ]
+  },
+  "ontology": {
+    "neptune_triples": 109,
+    "owl_classes": ["Entity", "Sector", "Industry", "Exchange", "Country", "Domain"],
+    "datatype_properties": 13,
+    "object_properties": 5
+  },
+  "opensearch": {
+    "index": "ontology-slices",
+    "embedding_model": "amazon.titan-embed-text-v2:0",
+    "embedding_dim": 1024,
+    "indexed_slices": 6
+  },
+  "smoke_tests": [
+    {
+      "name": "ontop-ask",
+      "description": "VKG accepts SPARQL ASK query",
+      "passed": true,
+      "result": "boolean: true"
+    },
+    {
+      "name": "ontop-count-entities",
+      "description": "Count adop:Entity instances via R2RML → Athena → Iceberg",
+      "passed": true,
+      "result": "55 entities (matches Athena ground truth)"
+    },
+    {
+      "name": "ontop-cross-class-join",
+      "description": "Entity → Sector join via belongsToSector predicate, filter Technology",
+      "passed": true,
+      "result": "Returns Apple, Samsung, Accenture, etc."
+    },
+    {
+      "name": "obqc-valid-sparql",
+      "description": "OBQC accepts well-formed SPARQL with declared properties",
+      "passed": true,
+      "result": "pass: true, errors: []"
+    },
+    {
+      "name": "obqc-invalid-property",
+      "description": "OBQC rejects undeclared adop:bogusProp",
+      "passed": true,
+      "result": "rule=property_existence"
+    },
+    {
+      "name": "opensearch-knn-retrieval",
+      "description": "NL phrase 'company stock entity master record' → top match via Titan embedding cosine similarity",
+      "passed": true,
+      "result": "Entity (0.663), Exchange (0.596), Domain (0.560)"
+    }
+  ],
+  "known_followups": [
+    "Smoke Lambda (adop-semantic-smoke) is used by the agent's execute_sparql tool — keep it (do not delete). It is the in-VPC SPARQL forwarder for the AgentCore runtime which lives outside the VPC.",
+    "DataLake KMS access was patched inline on the OntopTaskRole post-deploy. CDK has been updated to match — next cdk deploy will preserve the policy.",
+    "The agent execution role IAM policy AdopSemanticAgentAccess and the OpenSearch data-access policy adop-semantic-access were both updated post-deploy. Next iteration of CDK should encode these so a fresh deploy gets them automatically.",
+    "OBQC's _extract_select_variables was patched to skip variables inside aggregate functions (COUNT/SUM/MIN/MAX/AVG/SAMPLE/GROUP_CONCAT). Update lambdas/obqc/handler.py is the canonical source going forward."
+  ],
+  "estimated_monthly_cost_dev_usd": 590,
+  "tear_down": "cdk destroy AdopSemanticLayerSparql AdopSemanticLayerOpenSearch AdopSemanticLayerStorage"
+}

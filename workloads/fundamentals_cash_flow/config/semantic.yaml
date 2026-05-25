@@ -59,8 +59,9 @@ columns:
 
   - name: currency
     role: attribute
-    description: "ISO 4217 native currency."
+    description: "ISO 4217 native currency code of the reported cash-flow figures. Mixed across entities. Use value_usd_fcf for FX-agnostic comparison."
     pii: false
+    sample_values: [USD, KRW, JPY, GBP, EUR, CHF, CAD, TWD, DKK]
 
   - name: value_usd_fcf
     role: measure

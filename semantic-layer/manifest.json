@@ -1,0 +1,170 @@
+{
+  "ontology_version": "1.1.0",
+  "last_updated": "2026-05-24T22:45:00Z",
+  "namespace": "http://adop.example.org/ontology#",
+  "namespace_prefix": "adop",
+  "workloads": [
+    {
+      "name": "entity_resolved",
+      "domain": "reference-data",
+      "zones_mapped": ["silver"],
+      "glue_database": "entity_resolved_db",
+      "glue_tables": {
+        "silver": "silver_entity_resolved"
+      },
+      "row_count_at_onboarding": 55,
+      "classes_added": [
+        "Entity",
+        "Sector",
+        "Industry",
+        "Exchange",
+        "Country",
+        "Domain"
+      ],
+      "datatype_properties_added": [
+        "entityId",
+        "entityName",
+        "ticker",
+        "aliases",
+        "isin",
+        "cusip",
+        "fiscalYearEndMonth",
+        "ingestionTimestamp",
+        "sectorName",
+        "industryName",
+        "exchangeCode",
+        "countryCode",
+        "domainName"
+      ],
+      "object_properties_added": [
+        "belongsToSector",
+        "belongsToIndustry",
+        "listedOn",
+        "registeredIn",
+        "industryUnderSector"
+      ],
+      "cross_workload_relationships": [],
+      "onboarded_at": "2026-05-24T00:00:00Z",
+      "notes": "Bootstrap workload. No prior corpus, so Steps 4-6 (link discovery + Athena verification + relationship confirmation) were no-ops. Future workloads will discover candidate links against this Entity class."
+    },
+    {
+      "name": "fundamentals",
+      "domain": "equity-fundamentals",
+      "zones_mapped": ["silver"],
+      "glue_database": "fundamentals_db",
+      "glue_tables": {
+        "silver_balance_sheet": "silver_fundamentals_balance_sheet",
+        "silver_cash_flow": "silver_fundamentals_cash_flow",
+        "silver_ratios": "silver_fundamentals_ratios",
+        "silver_sales": "silver_fundamentals_sales"
+      },
+      "sub_workloads": [
+        "fundamentals_balance_sheet",
+        "fundamentals_cash_flow",
+        "fundamentals_ratios",
+        "fundamentals_sales"
+      ],
+      "row_counts_at_onboarding": {
+        "balance_sheet": 165,
+        "cash_flow": 165,
+        "ratios": 165,
+        "sales": 1375
+      },
+      "classes_added": [
+        "FiscalPeriod",
+        "BalanceSheetRecord",
+        "CashFlowRecord",
+        "RatioRecord",
+        "SalesRecord"
+      ],
+      "datatype_properties_added": [
+        "fiscalPeriodId",
+        "fiscalYear",
+        "fiscalPeriod",
+        "periodEndDate",
+        "totalAssets",
+        "totalLiabilities",
+        "totalEquity",
+        "cashAndEquivalents",
+        "totalDebt",
+        "totalAssetsUsd",
+        "reportingCurrency",
+        "operatingCashFlow",
+        "capitalExpenditure",
+        "freeCashFlow",
+        "dividendsPaid",
+        "shareBuybacks",
+        "freeCashFlowUsd",
+        "cashFlowReportingCurrency",
+        "peRatio",
+        "pbRatio",
+        "evEbitda",
+        "roe",
+        "salesValue",
+        "salesValueUsd",
+        "salesMetric",
+        "salesReportingCurrency",
+        "salesSourceProvider"
+      ],
+      "object_properties_added": [
+        "forEntity",
+        "forFiscalPeriod",
+        "hasBalanceSheet",
+        "hasCashFlow",
+        "hasRatios",
+        "hasSalesRecord"
+      ],
+      "cross_workload_relationships": [
+        {
+          "predicate": "forEntity",
+          "source_class": "BalanceSheetRecord",
+          "target_class": "Entity",
+          "source_table": "fundamentals_db.silver_fundamentals_balance_sheet",
+          "target_table": "entity_resolved_db.silver_entity_resolved",
+          "match_rate": 1.0,
+          "cardinality": "many-to-one",
+          "verified_at": "2026-05-24T22:30:00Z"
+        },
+        {
+          "predicate": "forEntity",
+          "source_class": "CashFlowRecord",
+          "target_class": "Entity",
+          "source_table": "fundamentals_db.silver_fundamentals_cash_flow",
+          "target_table": "entity_resolved_db.silver_entity_resolved",
+          "match_rate": 1.0,
+          "cardinality": "many-to-one",
+          "verified_at": "2026-05-24T22:30:00Z"
+        },
+        {
+          "predicate": "forEntity",
+          "source_class": "RatioRecord",
+          "target_class": "Entity",
+          "source_table": "fundamentals_db.silver_fundamentals_ratios",
+          "target_table": "entity_resolved_db.silver_entity_resolved",
+          "match_rate": 1.0,
+          "cardinality": "many-to-one",
+          "verified_at": "2026-05-24T22:30:00Z"
+        },
+        {
+          "predicate": "forEntity",
+          "source_class": "SalesRecord",
+          "target_class": "Entity",
+          "source_table": "fundamentals_db.silver_fundamentals_sales",
+          "target_table": "entity_resolved_db.silver_entity_resolved",
+          "match_rate": 1.0,
+          "cardinality": "many-to-one",
+          "verified_at": "2026-05-24T22:30:00Z"
+        }
+      ],
+      "onboarded_at": "2026-05-24T22:45:00Z",
+      "notes": "4 sub-workloads under fundamentals domain. balance_sheet/cash_flow/ratios share identical (entity, fiscal_year) grain (165 rows each); sales has both annual and quarterly grain (1375 rows). FiscalPeriod class materialized via SELECT DISTINCT from sales (most complete period coverage). All forEntity links verified at 100 percent Athena match rate."
+    }
+  ],
+  "embedding_config": {
+    "model": "amazon.titan-embed-text-v2:0",
+    "dimensions": 1024,
+    "cache_dir": "semantic-layer/.embedding_cache",
+    "similarity_threshold": 0.82,
+    "match_rate_threshold": 0.05
+  }
+}

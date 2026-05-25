@@ -47,27 +47,30 @@ columns:
 
   - name: exchange
     role: dimension
-    description: "Listing exchange code (NASDAQ, NYSE, LSE, XETRA, TSE, ...)."
+    description: "Listing exchange code identifying the primary trading venue. Observed values: NASDAQ, NYSE (US); LSE (UK); XETRA (DE); TSE (JP); KRX (KR); TSX (CA); TWSE (TW); SIX (CH); CPH (DK); EPA (FR). 11 distinct values across 55 entities."
     pii: false
     hierarchy:
       level: 1
       parent: null
+    sample_values: [NASDAQ, NYSE, LSE, XETRA, TSE, KRX, TSX, TWSE, SIX, CPH, EPA]
 
   - name: country
     role: dimension
-    description: "ISO 3166-1 alpha-2 country code of primary listing."
+    description: "ISO 3166-1 alpha-2 country code of primary listing (jurisdiction of the entity's lead exchange). Observed values: US, GB, DE, JP, KR, CA, TW, CH, DK, FR, IE. 11 distinct values."
     pii: false
     hierarchy:
       level: 2
       parent: exchange
+    sample_values: [US, GB, DE, JP, KR, CA, TW, CH, DK, FR, IE]
 
   - name: sector
     role: dimension
-    description: "GICS-style sector classification."
+    description: "GICS-style sector classification — top-level industry grouping. Observed values: Technology, Healthcare, Financials, Energy, Consumer Disc., Consumer Staples, Industrials, Real Estate. 8 distinct values."
     pii: false
     hierarchy:
       level: 1
       parent: null
+    sample_values: [Technology, Healthcare, Financials, Energy, "Consumer Disc.", "Consumer Staples", Industrials, "Real Estate"]
 
   - name: industry
     role: dimension

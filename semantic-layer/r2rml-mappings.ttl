@@ -1,0 +1,428 @@
+@prefix rr:    <http://www.w3.org/ns/r2rml#> .
+@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
+@prefix adop:  <http://adop.example.org/ontology#> .
+
+# =============================================================================
+# ADOP Consolidated R2RML Mappings — v1.0.0
+#
+# Connects the consolidated VKG ontology classes (semantic-layer/ontology.ttl)
+# to the physical Iceberg tables in the per-workload Glue databases. Ontop
+# reads these at startup and translates incoming SPARQL to SQL against Athena.
+#
+# Bootstrap workload: entity_resolved (Silver) -- 2026-05-24
+# =============================================================================
+
+
+# =============================================================================
+# EntityMap — entity_resolved_db.silver_entity_resolved -> adop:Entity
+# =============================================================================
+
+<#EntityMap> a rr:TriplesMap ;
+    rr:logicalTable [ rr:tableName "entity_resolved_db.silver_entity_resolved" ] ;
+    rr:subjectMap [
+        rr:template "http://adop.example.org/entity/{entity_id}" ;
+        rr:class adop:Entity
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:entityId ;
+        rr:objectMap [ rr:column "entity_id" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:entityName ;
+        rr:objectMap [ rr:column "entity_name" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:ticker ;
+        rr:objectMap [ rr:column "ticker" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:isin ;
+        rr:objectMap [ rr:column "isin" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:cusip ;
+        rr:objectMap [ rr:column "cusip" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:fiscalYearEndMonth ;
+        rr:objectMap [ rr:column "fiscal_year_end_month" ; rr:datatype xsd:integer ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:ingestionTimestamp ;
+        rr:objectMap [ rr:column "ingestion_ts" ; rr:datatype xsd:dateTime ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:belongsToSector ;
+        rr:objectMap [
+            rr:parentTriplesMap <#SectorMap> ;
+            rr:joinCondition [ rr:child "sector" ; rr:parent "sector_name" ]
+        ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:belongsToIndustry ;
+        rr:objectMap [
+            rr:parentTriplesMap <#IndustryMap> ;
+            rr:joinCondition [ rr:child "industry" ; rr:parent "industry_name" ]
+        ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:listedOn ;
+        rr:objectMap [
+            rr:parentTriplesMap <#ExchangeMap> ;
+            rr:joinCondition [ rr:child "exchange" ; rr:parent "exchange_code" ]
+        ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:registeredIn ;
+        rr:objectMap [
+            rr:parentTriplesMap <#CountryMap> ;
+            rr:joinCondition [ rr:child "country" ; rr:parent "country_code" ]
+        ]
+    ] .
+
+
+# =============================================================================
+# SectorMap — derived from entity_resolved.sector (distinct values)
+# =============================================================================
+
+<#SectorMap> a rr:TriplesMap ;
+    rr:logicalTable [
+        rr:sqlQuery """
+            SELECT DISTINCT sector AS sector_name
+            FROM entity_resolved_db.silver_entity_resolved
+            WHERE sector IS NOT NULL
+        """
+    ] ;
+    rr:subjectMap [
+        rr:template "http://adop.example.org/sector/{sector_name}" ;
+        rr:class adop:Sector
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:sectorName ;
+        rr:objectMap [ rr:column "sector_name" ; rr:datatype xsd:string ]
+    ] .
+
+
+# =============================================================================
+# IndustryMap — derived from entity_resolved.industry (distinct values)
+# =============================================================================
+
+<#IndustryMap> a rr:TriplesMap ;
+    rr:logicalTable [
+        rr:sqlQuery """
+            SELECT DISTINCT industry AS industry_name, sector AS sector_name
+            FROM entity_resolved_db.silver_entity_resolved
+            WHERE industry IS NOT NULL
+        """
+    ] ;
+    rr:subjectMap [
+        rr:template "http://adop.example.org/industry/{industry_name}" ;
+        rr:class adop:Industry
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:industryName ;
+        rr:objectMap [ rr:column "industry_name" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:industryUnderSector ;
+        rr:objectMap [
+            rr:parentTriplesMap <#SectorMap> ;
+            rr:joinCondition [ rr:child "sector_name" ; rr:parent "sector_name" ]
+        ]
+    ] .
+
+
+# =============================================================================
+# ExchangeMap — derived from entity_resolved.exchange
+# =============================================================================
+
+<#ExchangeMap> a rr:TriplesMap ;
+    rr:logicalTable [
+        rr:sqlQuery """
+            SELECT DISTINCT exchange AS exchange_code
+            FROM entity_resolved_db.silver_entity_resolved
+            WHERE exchange IS NOT NULL
+        """
+    ] ;
+    rr:subjectMap [
+        rr:template "http://adop.example.org/exchange/{exchange_code}" ;
+        rr:class adop:Exchange
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:exchangeCode ;
+        rr:objectMap [ rr:column "exchange_code" ; rr:datatype xsd:string ]
+    ] .
+
+
+# =============================================================================
+# CountryMap — derived from entity_resolved.country
+# =============================================================================
+
+<#CountryMap> a rr:TriplesMap ;
+    rr:logicalTable [
+        rr:sqlQuery """
+            SELECT DISTINCT country AS country_code
+            FROM entity_resolved_db.silver_entity_resolved
+            WHERE country IS NOT NULL
+        """
+    ] ;
+    rr:subjectMap [
+        rr:template "http://adop.example.org/country/{country_code}" ;
+        rr:class adop:Country
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:countryCode ;
+        rr:objectMap [ rr:column "country_code" ; rr:datatype xsd:string ]
+    ] .
+
+
+# =============================================================================
+# FUNDAMENTALS - added 2026-05-24
+# 4 record TriplesMaps + FiscalPeriod (materialized via SELECT DISTINCT
+# from sales since it has the most complete period coverage).
+# =============================================================================
+
+
+# =============================================================================
+# FiscalPeriodMap - distinct fiscal_period_id values from sales
+# (sales has both annual + quarterly with period_end_date).
+# Annual-only periods from balance_sheet/cash_flow/ratios will appear here too
+# because their fiscal_period_id values overlap with sales FY periods when
+# the entity has been onboarded into both. Where a period is annual-only and
+# missing from sales, it would not have a FiscalPeriod node - in this dataset
+# all 165 annual periods overlap with sales coverage.
+# =============================================================================
+
+<#FiscalPeriodMap> a rr:TriplesMap ;
+    rr:logicalTable [
+        rr:sqlQuery """
+            SELECT DISTINCT
+                fiscal_period_id,
+                fiscal_year,
+                fiscal_period,
+                period_end_date
+            FROM fundamentals_db.silver_fundamentals_sales
+            WHERE fiscal_period_id IS NOT NULL
+        """
+    ] ;
+    rr:subjectMap [
+        rr:template "http://adop.example.org/fiscalperiod/{fiscal_period_id}" ;
+        rr:class adop:FiscalPeriod
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:fiscalPeriodId ;
+        rr:objectMap [ rr:column "fiscal_period_id" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:fiscalYear ;
+        rr:objectMap [ rr:column "fiscal_year" ; rr:datatype xsd:integer ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:fiscalPeriod ;
+        rr:objectMap [ rr:column "fiscal_period" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:periodEndDate ;
+        rr:objectMap [ rr:column "period_end_date" ; rr:datatype xsd:date ]
+    ] .
+
+
+# =============================================================================
+# BalanceSheetMap - fundamentals_db.silver_fundamentals_balance_sheet
+# =============================================================================
+
+<#BalanceSheetMap> a rr:TriplesMap ;
+    rr:logicalTable [ rr:tableName "fundamentals_db.silver_fundamentals_balance_sheet" ] ;
+    rr:subjectMap [
+        rr:template "http://adop.example.org/balancesheet/{fiscal_period_id}" ;
+        rr:class adop:BalanceSheetRecord
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:totalAssets ;
+        rr:objectMap [ rr:column "total_assets" ; rr:datatype xsd:double ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:totalLiabilities ;
+        rr:objectMap [ rr:column "total_liabilities" ; rr:datatype xsd:double ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:totalEquity ;
+        rr:objectMap [ rr:column "total_equity" ; rr:datatype xsd:double ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:cashAndEquivalents ;
+        rr:objectMap [ rr:column "cash_and_equivalents" ; rr:datatype xsd:double ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:totalDebt ;
+        rr:objectMap [ rr:column "total_debt" ; rr:datatype xsd:double ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:totalAssetsUsd ;
+        rr:objectMap [ rr:column "value_usd_total_assets" ; rr:datatype xsd:double ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:reportingCurrency ;
+        rr:objectMap [ rr:column "currency" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:forEntity ;
+        rr:objectMap [
+            rr:parentTriplesMap <#EntityMap> ;
+            rr:joinCondition [ rr:child "entity_id" ; rr:parent "entity_id" ]
+        ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:forFiscalPeriod ;
+        rr:objectMap [
+            rr:parentTriplesMap <#FiscalPeriodMap> ;
+            rr:joinCondition [ rr:child "fiscal_period_id" ; rr:parent "fiscal_period_id" ]
+        ]
+    ] .
+
+
+# =============================================================================
+# CashFlowMap - fundamentals_db.silver_fundamentals_cash_flow
+# =============================================================================
+
+<#CashFlowMap> a rr:TriplesMap ;
+    rr:logicalTable [ rr:tableName "fundamentals_db.silver_fundamentals_cash_flow" ] ;
+    rr:subjectMap [
+        rr:template "http://adop.example.org/cashflow/{fiscal_period_id}" ;
+        rr:class adop:CashFlowRecord
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:operatingCashFlow ;
+        rr:objectMap [ rr:column "operating_cash_flow" ; rr:datatype xsd:double ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:capitalExpenditure ;
+        rr:objectMap [ rr:column "capital_expenditure" ; rr:datatype xsd:double ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:freeCashFlow ;
+        rr:objectMap [ rr:column "free_cash_flow" ; rr:datatype xsd:double ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:dividendsPaid ;
+        rr:objectMap [ rr:column "dividends_paid" ; rr:datatype xsd:double ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:shareBuybacks ;
+        rr:objectMap [ rr:column "share_buybacks" ; rr:datatype xsd:double ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:freeCashFlowUsd ;
+        rr:objectMap [ rr:column "value_usd_fcf" ; rr:datatype xsd:double ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:cashFlowReportingCurrency ;
+        rr:objectMap [ rr:column "currency" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:forEntity ;
+        rr:objectMap [
+            rr:parentTriplesMap <#EntityMap> ;
+            rr:joinCondition [ rr:child "entity_id" ; rr:parent "entity_id" ]
+        ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:forFiscalPeriod ;
+        rr:objectMap [
+            rr:parentTriplesMap <#FiscalPeriodMap> ;
+            rr:joinCondition [ rr:child "fiscal_period_id" ; rr:parent "fiscal_period_id" ]
+        ]
+    ] .
+
+
+# =============================================================================
+# RatiosMap - fundamentals_db.silver_fundamentals_ratios
+# =============================================================================
+
+<#RatiosMap> a rr:TriplesMap ;
+    rr:logicalTable [ rr:tableName "fundamentals_db.silver_fundamentals_ratios" ] ;
+    rr:subjectMap [
+        rr:template "http://adop.example.org/ratios/{fiscal_period_id}" ;
+        rr:class adop:RatioRecord
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:peRatio ;
+        rr:objectMap [ rr:column "pe_ratio" ; rr:datatype xsd:double ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:pbRatio ;
+        rr:objectMap [ rr:column "pb_ratio" ; rr:datatype xsd:double ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:evEbitda ;
+        rr:objectMap [ rr:column "ev_ebitda" ; rr:datatype xsd:double ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:roe ;
+        rr:objectMap [ rr:column "roe" ; rr:datatype xsd:double ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:forEntity ;
+        rr:objectMap [
+            rr:parentTriplesMap <#EntityMap> ;
+            rr:joinCondition [ rr:child "entity_id" ; rr:parent "entity_id" ]
+        ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:forFiscalPeriod ;
+        rr:objectMap [
+            rr:parentTriplesMap <#FiscalPeriodMap> ;
+            rr:joinCondition [ rr:child "fiscal_period_id" ; rr:parent "fiscal_period_id" ]
+        ]
+    ] .
+
+
+# =============================================================================
+# SalesMap - fundamentals_db.silver_fundamentals_sales
+# Subject template includes metric to handle the multi-metric case (one
+# row per (period, metric)). Currently only FF_SALES; future metrics
+# will get distinct subject IRIs automatically.
+# =============================================================================
+
+<#SalesMap> a rr:TriplesMap ;
+    rr:logicalTable [ rr:tableName "fundamentals_db.silver_fundamentals_sales" ] ;
+    rr:subjectMap [
+        rr:template "http://adop.example.org/sales/{fiscal_period_id}/{metric}" ;
+        rr:class adop:SalesRecord
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:salesValue ;
+        rr:objectMap [ rr:column "value" ; rr:datatype xsd:double ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:salesValueUsd ;
+        rr:objectMap [ rr:column "value_usd" ; rr:datatype xsd:double ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:salesMetric ;
+        rr:objectMap [ rr:column "metric" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:salesReportingCurrency ;
+        rr:objectMap [ rr:column "currency" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:salesSourceProvider ;
+        rr:objectMap [ rr:column "source" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:forEntity ;
+        rr:objectMap [
+            rr:parentTriplesMap <#EntityMap> ;
+            rr:joinCondition [ rr:child "entity_id" ; rr:parent "entity_id" ]
+        ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:forFiscalPeriod ;
+        rr:objectMap [
+            rr:parentTriplesMap <#FiscalPeriodMap> ;
+            rr:joinCondition [ rr:child "fiscal_period_id" ; rr:parent "fiscal_period_id" ]
+        ]
+    ] .

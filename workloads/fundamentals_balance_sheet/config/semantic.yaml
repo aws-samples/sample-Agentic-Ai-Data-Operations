@@ -59,8 +59,9 @@ columns:
 
   - name: currency
     role: attribute
-    description: "ISO 4217 native currency."
+    description: "ISO 4217 native currency code of the reported balance-sheet figures. Mixed across entities (USD for US listings, KRW for Korean, etc.). Use value_usd_total_assets for FX-agnostic comparison."
     pii: false
+    sample_values: [USD, KRW, JPY, GBP, EUR, CHF, CAD, TWD, DKK]
 
   - name: value_usd_total_assets
     role: measure

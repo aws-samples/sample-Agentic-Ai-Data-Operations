@@ -29,8 +29,9 @@ columns:
 
   - name: fiscal_period
     role: dimension
-    description: "Fiscal period: FY (annual) or Q1, Q2, Q3, Q4 (quarterly)."
+    description: "Fiscal period type: FY (annual aggregate) or Q1, Q2, Q3, Q4 (quarterly). 5 distinct values."
     pii: false
+    sample_values: [FY, Q1, Q2, Q3, Q4]
 
   - name: period_end_date
     role: temporal
@@ -51,8 +52,9 @@ columns:
 
   - name: currency
     role: attribute
-    description: "ISO 4217 native currency."
+    description: "ISO 4217 native currency code of the reported value. 9 distinct values observed: USD (most common), GBP, TWD, EUR, JPY, KRW, CHF, CAD, DKK."
     pii: false
+    sample_values: [USD, GBP, TWD, EUR, JPY, KRW, CHF, CAD, DKK]
 
   - name: value_usd
     role: measure
