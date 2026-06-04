@@ -1,0 +1,134 @@
+dataset_name: customer_master
+schema_version: v1
+source_table: glue_catalog.customer_master_db.bronze_customer_master
+primary_key:
+  - customer_id
+dedup_strategy: keep_latest
+dedup_order_by: account_open_date
+null_handling:
+  strategy: quarantine
+  critical_columns:
+    - customer_id
+    - email
+    - last_name
+  fill_values: {}
+quality_threshold: 0.80
+iceberg_database: customer_master_db
+iceberg_table: silver_customer_master
+iceberg_partition_spec: []
+
+type_casts:
+  - column: date_of_birth
+    from_type: STRING
+    to_type: DATE
+    format: "yyyy-MM-dd"
+  - column: account_open_date
+    from_type: STRING
+    to_type: DATE
+    format: "yyyy-MM-dd"
+  - column: annual_income
+    from_type: STRING
+    to_type: INTEGER
+  - column: credit_score
+    from_type: STRING
+    to_type: INTEGER
+
+# Extract email domain BEFORE email is pseudonymized
+pre_pii_derived_columns:
+  - name: email_domain
+    expression: "substring_index(email, '@', -1)"
+    description: "Domain extracted from raw email before pseudonymization"
+
+pii_masking:
+  enabled: true
+  columns:
+    # CRITICAL: SSN irreversible SHA-256 hash (CCPA + GDPR)
+    - name: ssn
+      method: hash
+    # HIGH: email pseudonymized (reversible with key — supports right-to-delete)
+    - name: email
+      method: hash
+    # HIGH: phone pseudonymized
+    - name: phone
+      method: hash
+    # HIGH: date_of_birth encrypted (KMS)
+    - name: date_of_birth
+      method: encrypt
+    # HIGH: address encrypted (KMS) — full street suppressed in Gold
+    - name: address
+      method: encrypt
+
+# Columns derived AFTER type casts and PII masking
+derived_columns:
+  - name: age_years
+    expression: "floor(datediff(current_date(), date_of_birth) / 365.25)"
+    description: "Customer age in years"
+  - name: customer_tenure_months
+    expression: "floor(months_between(current_date(), account_open_date))"
+    description: "Months since account opened"
+  - name: income_bucket
+    expression: >
+      CASE
+        WHEN annual_income < 75000 THEN 'Low'
+        WHEN annual_income < 150000 THEN 'Mid'
+        WHEN annual_income < 300000 THEN 'High'
+        ELSE 'Ultra'
+      END
+    description: "Income tier: Low (<75K), Mid (75-150K), High (150-300K), Ultra (300K+)"
+  - name: geographic_region
+    expression: >
+      CASE
+        WHEN state IN ('CT','ME','MA','NH','RI','VT','NJ','NY','PA') THEN 'Northeast'
+        WHEN state IN ('IL','IN','IA','KS','MI','MN','MO','NE','ND','OH','SD','WI') THEN 'Midwest'
+        WHEN state IN ('AL','AR','DE','FL','GA','KY','LA','MD','MS','NC','OK','SC','TN','TX','VA','WV','DC') THEN 'Southeast'
+        WHEN state IN ('AZ','CO','ID','MT','NV','NM','UT','WY') THEN 'Southwest'
+        WHEN state IN ('AK','CA','HI','OR','WA') THEN 'West'
+        ELSE 'Unknown'
+      END
+    description: "US Census region derived from state"
+  - name: employment_category
+    expression: >
+      CASE
+        WHEN employment_status = 'Employed' THEN 'W2'
+        WHEN employment_status = 'Self-Employed' THEN '1099'
+        WHEN employment_status = 'Retired' THEN 'Retired'
+        ELSE 'Other'
+      END
+    description: "Simplified employment category"
+  - name: wealth_tier
+    expression: >
+      CASE
+        WHEN annual_income >= 300000 AND credit_score >= 750 THEN 'Ultra High Net Worth'
+        WHEN annual_income >= 150000 AND credit_score >= 720 THEN 'High Net Worth'
+        WHEN annual_income >= 75000 AND credit_score >= 680 THEN 'Mass Affluent'
+        ELSE 'Mass Market'
+      END
+    description: "Composite tier from income + credit score"
+  - name: lifecycle_stage
+    expression: >
+      CASE
+        WHEN floor(months_between(current_date(), account_open_date)) < 6 THEN 'New'
+        WHEN floor(months_between(current_date(), account_open_date)) < 24 THEN 'Growing'
+        WHEN floor(months_between(current_date(), account_open_date)) < 60 THEN 'Mature'
+        ELSE 'Loyal'
+      END
+    description: "Customer lifecycle: New (<6mo), Growing (6-24mo), Mature (2-5yr), Loyal (5yr+)"
+  - name: lawful_basis
+    expression: "'contract'"
+    description: "GDPR lawful basis for account management"
+  - name: consent_status
+    expression: "'active'"
+    description: "Default consent — updated via consent management system"
+  - name: retention_expiry_date
+    expression: "date_add(current_date(), 365)"
+    description: "GDPR 365-day retention (stricter than CCPA 730-day for PII fields)"
+  - name: ssn_duplicate_flag
+    expression: "CASE WHEN count(1) OVER (PARTITION BY ssn) > 1 THEN true ELSE false END"
+    description: "Flags rows with duplicate SSNs for quarantine review"
+
+drop_columns: []
+
+quarantine:
+  enabled: true
+  location: s3://data-lake/customer_master/quarantine/
+  retention_days: 90

@@ -130,6 +130,36 @@
       "type": "integer",
       "minimum": 1,
       "description": "Maximum acceptable data staleness in hours"
+    },
+    "derived_silver_columns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "expression"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "expression": { "type": "string", "minLength": 1, "description": "Spark SQL expression (passed to F.expr) added to the Silver dataframe BEFORE aggregation. Used as input to measures or as additional grouping dimensions." },
+          "description": { "type": "string" }
+        }
+      },
+      "default": [],
+      "description": "Pre-aggregation derived columns computed from Silver before groupBy (e.g., late_arrival_int, attendance_score, overtime_calc)."
+    },
+    "post_aggregation_columns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "expression"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "expression": { "type": "string", "minLength": 1, "description": "Spark SQL expression evaluated AFTER groupBy/agg (e.g., late_arrival_flag = late_count > 0)." },
+          "description": { "type": "string" }
+        }
+      },
+      "default": [],
+      "description": "Columns derived from aggregated measures (booleans, ratios, masking expressions over Gold dimensions)."
     }
   }
 }

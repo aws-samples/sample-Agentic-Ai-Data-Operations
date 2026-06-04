@@ -60,11 +60,38 @@ This agent moves data through 3 zones:
 
 ## Quick Start
 
-```bash
-# Start from prompt 01
-# Claude Code will guide you through 01 → 02 → 03 → 04
+Two execution modes are available:
 
-# Typical flow:
+### Mode 1: Sequential (standard)
+```bash
+# Paste your onboarding prompt directly. Claude runs phases sequentially.
+User: "Onboard product catalog from S3"
+  ↓ Claude runs phases 0-5, one sub-agent at a time
+  ↓ ~30 min wall clock
+Output: workloads/product_catalog/
+```
+
+### Mode 2: Dynamic Workflow (parallel, faster)
+```bash
+# Prefix with /onboard-workflow [REGULATION]
+User: "/onboard-workflow HIPAA"
+User: "Onboard patient records from S3..."
+  ↓ Phase 1 discovery runs interactively (same questions)
+  ↓ Phases 2-5 run as a Dynamic Workflow with parallel sub-agents
+  ↓ ~15-20 min wall clock, progress tracked in /workflows
+Output: workloads/patient_records/
+```
+
+The workflow mode is defined in `.claude/commands/onboard-workflow.md` and supports:
+- Parallel Phase 4 agents (Metadata + Quality run concurrently)
+- Model routing (HIPAA/SOX/PCI → Opus for build agents, else Sonnet)
+- Multi-workload batch (multiple datasets in one invocation)
+- Resumable progress (completed phases are not re-run on disconnect)
+
+See `demo/sample_prompt/customer_master_workflow.md` for a full example.
+
+### Standard flow detail
+```
 User: "Onboard product catalog from S3"
   ↓
 Claude: Runs 01-route (checks workloads/)
@@ -78,8 +105,6 @@ Claude: Runs 02-onboard (master prompt: phases 0-5)
   └─ Phase 5: Deployment (deploy to AWS via MCP tools)
   ↓
 User: Answers questions during Phases 1-2
-  ↓
-Claude: Runs 05-06-07-08 (profile → generate → deploy)
   ↓
 Output: workloads/product_catalog/ with pipeline + DAG
 ```

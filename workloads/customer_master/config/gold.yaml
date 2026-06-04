@@ -1,0 +1,101 @@
+dataset_name: customer_master
+schema_version: v1
+source_table: glue_catalog.customer_master_db.silver_customer_master
+schema_type: star_schema
+grain:
+  dimensions:
+    - customer_id
+  temporal: none
+measures:
+  - name: customer_count
+    source_column: customer_id
+    aggregation: count
+  - name: avg_credit_score
+    source_column: credit_score
+    aggregation: avg
+  - name: avg_annual_income
+    source_column: annual_income
+    aggregation: avg
+  - name: avg_tenure_months
+    source_column: customer_tenure_months
+    aggregation: avg
+
+dimensions:
+  - name: customer_id
+    source_column: customer_id
+    scd_type: 1
+  - name: gender
+    source_column: gender
+    scd_type: 1
+  - name: account_type
+    source_column: account_type
+    scd_type: 1
+  - name: risk_profile
+    source_column: risk_profile
+    scd_type: 2
+  - name: employment_status
+    source_column: employment_status
+    scd_type: 2
+  - name: geographic_region
+    source_column: geographic_region
+    scd_type: 2
+  - name: income_bucket
+    source_column: income_bucket
+    scd_type: 1
+  - name: wealth_tier
+    source_column: wealth_tier
+    scd_type: 1
+  - name: lifecycle_stage
+    source_column: lifecycle_stage
+    scd_type: 1
+  - name: employment_category
+    source_column: employment_category
+    scd_type: 1
+
+quality_threshold: 0.95
+iceberg_database: customer_master_db
+iceberg_table: dim_customer
+iceberg_partition_spec: []
+
+output_tables:
+  - name: dim_customer
+    type: dimension
+    columns:
+      - customer_id
+      - gender
+      - city
+      - state
+      - zip_code
+      - country
+      - account_type
+      - risk_profile
+      - employment_status
+      - employment_category
+      - geographic_region
+      - income_bucket
+      - wealth_tier
+      - lifecycle_stage
+      - age_years
+      - customer_tenure_months
+      - credit_score
+      - annual_income
+      - account_open_date
+      - email_masked
+      - email_domain
+
+freshness_sla_hours: 24
+
+# Gold PII suppression for external data product:
+# - SSN: entirely suppressed (not in output columns)
+# - email: domain-only via email_masked (***@domain.com)
+# - phone: entirely suppressed
+# - address (street): entirely suppressed
+# - date_of_birth: suppressed (age_years retained)
+# - first_name, last_name: suppressed for external consumers
+
+derived_silver_columns:
+  - name: email_masked
+    expression: "concat('***@', email_domain)"
+    description: "Domain-only email for Gold: ***@domain.com"
+
+post_aggregation_columns: []

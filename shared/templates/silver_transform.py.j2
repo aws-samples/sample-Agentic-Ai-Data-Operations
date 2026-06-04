@@ -1,5 +1,5 @@
 {# template_id: silver_transform #}
-{# template_version: 1.0.0 #}
+{# template_version: 1.1.0 #}
 {# required_slots: dataset_name, source_table, primary_key, dedup_strategy, quality_threshold, iceberg_database, iceberg_table #}
 {# schema_version: v1 #}
 import sys
@@ -96,9 +96,22 @@ def transform(glue_context, args):
     typed_df = deduped_df
 {% endif %}
 
+{% if pre_pii_derived_columns is defined and pre_pii_derived_columns %}
+    # Pre-PII derived columns (computed before masking, e.g. extract domain from raw email)
+    pre_pii_df = typed_df
+{% for col_def in pre_pii_derived_columns %}
+    pre_pii_df = pre_pii_df.withColumn(
+        "{{ col_def.name }}",
+        F.expr({{ col_def.expression | tojson }})
+    )
+{% endfor %}
+{% else %}
+    pre_pii_df = typed_df
+{% endif %}
+
 {% if pii_masking is defined and pii_masking.enabled %}
     # PII masking
-    masked_df = typed_df
+    masked_df = pre_pii_df
 {% for col_mask in pii_masking.columns %}
 {% if col_mask.method == "hash" %}
     masked_df = masked_df.withColumn(
@@ -118,23 +131,43 @@ def transform(glue_context, args):
 {% endif %}
 {% endfor %}
 {% else %}
-    masked_df = typed_df
+    masked_df = pre_pii_df
+{% endif %}
+
+{% if derived_columns is defined and derived_columns %}
+    # Derived columns (computed AFTER PII masking — sentinel cleanup, literals, partition keys)
+    derived_df = masked_df
+{% for col_def in derived_columns %}
+    derived_df = derived_df.withColumn(
+        "{{ col_def.name }}",
+        F.expr({{ col_def.expression | tojson }})
+    )
+{% endfor %}
+{% else %}
+    derived_df = masked_df
+{% endif %}
+
+{% if drop_columns is defined and drop_columns %}
+    # Drop original columns superseded by hashes / derived columns
+    final_df = derived_df.drop({% for c in drop_columns %}"{{ c }}"{% if not loop.last %}, {% endif %}{% endfor %})
+{% else %}
+    final_df = derived_df
 {% endif %}
 
     # Write to Iceberg Silver table
     table_name = "glue_catalog.{{ iceberg_database }}.{{ iceberg_table }}"
 {% if iceberg_partition_spec is defined and iceberg_partition_spec %}
-    masked_df.writeTo(table_name) \
+    final_df.writeTo(table_name) \
         .using("iceberg") \
         .partitionedBy({{ iceberg_partition_spec | tojson }}) \
         .createOrReplace()
 {% else %}
-    masked_df.writeTo(table_name) \
+    final_df.writeTo(table_name) \
         .using("iceberg") \
         .createOrReplace()
 {% endif %}
 
-    output_rows = masked_df.count()
+    output_rows = final_df.count()
     logger.log("info", "transform_complete",
         input_rows=input_rows,
         pk_null_dropped=input_rows - after_pk_filter,

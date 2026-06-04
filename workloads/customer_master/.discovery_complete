@@ -1,0 +1,17 @@
+# Phase 1 Discovery Complete — customer_master
+# All mandatory questions answered by user on 2026-06-03
+#
+# [x] Zone identified: Bronze -> Silver -> Gold (full pipeline)
+# [x] Source: s3://adop-workshop-landing-<ACCOUNT_ID>/demo_landing/customer_master.csv
+# [x] PK: customer_id | Dedup: keep_latest by account_open_date
+# [x] PII: ssn (CRITICAL), email/phone/dob/address (HIGH), name/employer (MEDIUM)
+# [x] Null handling: not-null on customer_id, email, last_name — quarantine violators
+# [x] Transformations: age_years, tenure, income_bucket, geo_region, wealth_tier,
+#     lifecycle_stage, employment_category, SCD Type 2 on risk_profile/employment_status/address
+# [x] Quality: defaults (Silver >= 0.80, Gold >= 0.95)
+# [x] Schedule: daily at 02:00 UTC
+# [x] Compliance: CCPA + GDPR dual (730-day CCPA, 365-day GDPR, 7-year audit logs)
+# [x] SSN duplicates: flag + quarantine
+# [x] Ontology: YES — Customer (1:N Address) entities, end-user download data product,
+#     all suggested business terms accepted
+# [x] Gold schema: Star Schema — dim_customer dimension table

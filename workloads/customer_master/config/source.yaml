@@ -1,0 +1,179 @@
+dataset_name: customer_master
+version: "1.0.0"
+created_date: "2026-06-03"
+compliance:
+  - CCPA
+  - GDPR
+
+source:
+  type: csv
+  location:
+    production: s3://adop-workshop-landing-<ACCOUNT_ID>/demo_landing/customer_master.csv
+    local_simulation: /tmp/data-lake/landing/customer_master/
+    fixture: demo/sample_data/customer_master.csv
+  format: csv
+  frequency: daily
+  credentials:
+    type: airflow_connection
+    connection_id: landing_s3_conn
+  estimated_size:
+    rows: 50
+    size_gb: 0.001
+    test_rows: 50
+
+schema:
+  columns:
+    - name: customer_id
+      type: STRING
+      role: identifier
+      primary_key: true
+      nullable: false
+      pii: false
+      sensitivity: LOW
+
+    - name: first_name
+      type: STRING
+      role: dimension
+      nullable: false
+      pii: true
+      pii_type: NAME
+      sensitivity: MEDIUM
+
+    - name: last_name
+      type: STRING
+      role: dimension
+      nullable: false
+      pii: true
+      pii_type: NAME
+      sensitivity: MEDIUM
+
+    - name: email
+      type: STRING
+      role: dimension
+      nullable: false
+      pii: true
+      pii_type: EMAIL
+      sensitivity: HIGH
+
+    - name: phone
+      type: STRING
+      role: dimension
+      nullable: false
+      pii: true
+      pii_type: PHONE
+      sensitivity: HIGH
+
+    - name: date_of_birth
+      type: DATE
+      role: temporal
+      nullable: false
+      pii: true
+      pii_type: DOB
+      sensitivity: HIGH
+
+    - name: gender
+      type: STRING
+      role: dimension
+      nullable: false
+      pii: false
+      sensitivity: LOW
+      valid_values: ["M", "F"]
+
+    - name: address
+      type: STRING
+      role: dimension
+      nullable: false
+      pii: true
+      pii_type: ADDRESS
+      sensitivity: HIGH
+
+    - name: city
+      type: STRING
+      role: dimension
+      nullable: false
+      pii: true
+      pii_type: ADDRESS
+      sensitivity: MEDIUM
+
+    - name: state
+      type: STRING
+      role: dimension
+      nullable: false
+      pii: true
+      pii_type: ADDRESS
+      sensitivity: MEDIUM
+
+    - name: zip_code
+      type: STRING
+      role: dimension
+      nullable: false
+      pii: true
+      pii_type: ADDRESS
+      sensitivity: MEDIUM
+
+    - name: country
+      type: STRING
+      role: dimension
+      nullable: false
+      pii: false
+      sensitivity: LOW
+
+    - name: account_open_date
+      type: DATE
+      role: temporal
+      nullable: false
+      pii: false
+      sensitivity: LOW
+
+    - name: account_type
+      type: STRING
+      role: dimension
+      nullable: false
+      pii: false
+      sensitivity: LOW
+      valid_values: ["Individual", "Joint", "Trust"]
+
+    - name: risk_profile
+      type: STRING
+      role: dimension
+      nullable: false
+      pii: false
+      sensitivity: LOW
+      valid_values: ["Conservative", "Moderate", "Aggressive"]
+
+    - name: annual_income
+      type: INTEGER
+      role: measure
+      nullable: false
+      pii: false
+      sensitivity: MEDIUM
+
+    - name: employment_status
+      type: STRING
+      role: dimension
+      nullable: false
+      pii: false
+      sensitivity: LOW
+      valid_values: ["Employed", "Self-Employed", "Retired"]
+
+    - name: employer
+      type: STRING
+      role: dimension
+      nullable: true
+      pii: false
+      sensitivity: LOW
+
+    - name: ssn
+      type: STRING
+      role: identifier
+      nullable: false
+      pii: true
+      pii_type: SSN
+      sensitivity: CRITICAL
+
+    - name: credit_score
+      type: INTEGER
+      role: measure
+      nullable: false
+      pii: false
+      sensitivity: MEDIUM

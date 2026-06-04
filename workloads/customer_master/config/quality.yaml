@@ -1,0 +1,156 @@
+dataset_name: customer_master
+schema_version: v1
+rules:
+  completeness:
+    - rule_id: comp_customer_id
+      column: customer_id
+      check_type: not_null
+      threshold: 1.0
+      severity: critical
+    - rule_id: comp_email
+      column: email
+      check_type: not_null
+      threshold: 1.0
+      severity: critical
+    - rule_id: comp_last_name
+      column: last_name
+      check_type: not_null
+      threshold: 1.0
+      severity: critical
+    - rule_id: comp_ssn
+      column: ssn
+      check_type: not_null
+      threshold: 1.0
+      severity: critical
+    - rule_id: comp_credit_score
+      column: credit_score
+      check_type: not_null
+      threshold: 0.99
+      severity: warning
+    - rule_id: comp_annual_income
+      column: annual_income
+      check_type: not_null
+      threshold: 0.99
+      severity: warning
+
+  uniqueness:
+    - rule_id: uniq_customer_id
+      column: customer_id
+      check_type: unique
+      threshold: 1.0
+      severity: critical
+    - rule_id: uniq_email
+      column: email
+      check_type: unique
+      threshold: 0.99
+      severity: warning
+
+  validity:
+    - rule_id: valid_gender
+      column: gender
+      check_type: enum
+      threshold: 1.0
+      severity: critical
+      params:
+        values: ["M", "F"]
+    - rule_id: valid_account_type
+      column: account_type
+      check_type: enum
+      threshold: 1.0
+      severity: critical
+      params:
+        values: ["Individual", "Joint", "Trust"]
+    - rule_id: valid_risk_profile
+      column: risk_profile
+      check_type: enum
+      threshold: 1.0
+      severity: critical
+      params:
+        values: ["Conservative", "Moderate", "Aggressive"]
+    - rule_id: valid_employment_status
+      column: employment_status
+      check_type: enum
+      threshold: 1.0
+      severity: critical
+      params:
+        values: ["Employed", "Self-Employed", "Retired"]
+    - rule_id: valid_credit_score_range
+      column: credit_score
+      check_type: range
+      threshold: 1.0
+      severity: critical
+      params:
+        min: 300
+        max: 850
+    - rule_id: valid_annual_income_positive
+      column: annual_income
+      check_type: range
+      threshold: 1.0
+      severity: critical
+      params:
+        min: 1
+        max: 100000000
+    - rule_id: valid_email_format
+      column: email
+      check_type: regex
+      threshold: 0.99
+      severity: warning
+      params:
+        pattern: "^[^@]+@[^@]+\\.[^@]+$"
+    - rule_id: valid_ssn_format
+      column: ssn
+      check_type: regex
+      threshold: 1.0
+      severity: critical
+      params:
+        pattern: "^\\d{3}-\\d{2}-\\d{4}$"
+    - rule_id: valid_zip_code_format
+      column: zip_code
+      check_type: regex
+      threshold: 1.0
+      severity: critical
+      params:
+        pattern: "^\\d{5}(-\\d{4})?$"
+    - rule_id: valid_account_open_date
+      column: account_open_date
+      check_type: date_range
+      threshold: 1.0
+      severity: critical
+      params:
+        min: "2000-01-01"
+        max: "today"
+    - rule_id: valid_date_of_birth
+      column: date_of_birth
+      check_type: date_range
+      threshold: 1.0
+      severity: critical
+      params:
+        min: "1920-01-01"
+        max: "2008-01-01"
+
+  consistency:
+    - rule_id: consist_employer_employment
+      check_type: conditional
+      threshold: 0.95
+      severity: warning
+      params:
+        condition: "employment_status IN ('Self-Employed', 'Retired')"
+        expected: "employer IS NULL"
+        description: "Self-employed/retired customers should have null employer"
+
+quality_gates:
+  bronze_to_silver:
+    overall_score: 0.80
+    critical_failures: 0
+    action_on_failure: block
+  silver_to_gold:
+    overall_score: 0.95
+    critical_failures: 0
+    action_on_failure: block
+
+anomaly_detection:
+  enabled: true
+  methods:
+    - z_score
+    - volume_change
+  volume_threshold_pct: 20

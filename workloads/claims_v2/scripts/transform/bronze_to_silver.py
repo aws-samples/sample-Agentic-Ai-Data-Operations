@@ -1,6 +1,6 @@
 # spec_hash: 567a3af743016510400d1485d651649670991023857a83daf0edd87ba9c45e5f
 # template_id: silver_transform
-# template_hash: 7729bb9af4a66a2cbd36206fc2f5e026cfe290d4dbb5921a5481153297e71284
+# template_hash: 270b6c620017cf1f7d46bc7032e845e1775a1a43f588767631c3df9bd48f2f6c
 # schema_version: v1
 # rendered_at: 2026-05-21T06:00:00Z
 import sys
@@ -81,8 +81,10 @@ def transform(glue_context, args):
         F.to_date(F.col("member_dob"), "yyyy-MM-dd")
     )
 
+    pre_pii_df = typed_df
+
     # PII masking
-    masked_df = typed_df
+    masked_df = pre_pii_df
     masked_df = masked_df.withColumn(
         "member_ssn",
         F.sha2(F.col("member_ssn").cast("string"), 256)
@@ -96,13 +98,17 @@ def transform(glue_context, args):
         F.sha2(F.col("member_email").cast("string"), 256)
     )
 
+    derived_df = masked_df
+
+    final_df = derived_df
+
     # Write to Iceberg Silver table
     table_name = "glue_catalog.claims_v2_db.silver_claims_v2"
-    masked_df.writeTo(table_name) \
+    final_df.writeTo(table_name) \
         .using("iceberg") \
         .createOrReplace()
 
-    output_rows = masked_df.count()
+    output_rows = final_df.count()
     logger.log("info", "transform_complete",
         input_rows=input_rows,
         pk_null_dropped=input_rows - after_pk_filter,

@@ -1,0 +1,188 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix adop: <https://adop.internal/ontology/customer/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+# Ontology metadata
+adop: a owl:Ontology ;
+    rdfs:label "Customer Master Data Product Ontology" ;
+    rdfs:comment "OWL ontology for customer_master workload — data product for end-user download" ;
+    owl:versionInfo "1.0.0" .
+
+# --- Classes ---
+
+adop:Customer a owl:Class ;
+    rdfs:label "Customer" ;
+    rdfs:comment "Core customer identity and financial profile" ;
+    skos:definition "A financial services customer with account, demographic, and risk attributes" .
+
+adop:Address a owl:Class ;
+    rdfs:label "Address" ;
+    rdfs:comment "Customer geographic location (1:N over time via SCD Type 2)" ;
+    skos:definition "Physical location associated with a customer, tracked with historical changes" .
+
+# --- Object Properties (relationships) ---
+
+adop:hasAddress a owl:ObjectProperty ;
+    rdfs:label "hasAddress" ;
+    rdfs:domain adop:Customer ;
+    rdfs:range adop:Address ;
+    rdfs:comment "Customer has one or more addresses over time (SCD Type 2)" .
+
+# --- Customer Data Properties ---
+
+adop:customerId a owl:DatatypeProperty ;
+    rdfs:label "customer_id" ;
+    rdfs:domain adop:Customer ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Unique customer identifier" .
+
+adop:gender a owl:DatatypeProperty ;
+    rdfs:label "gender" ;
+    rdfs:domain adop:Customer ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Customer gender (M/F)" .
+
+adop:accountType a owl:DatatypeProperty ;
+    rdfs:label "account_type" ;
+    rdfs:domain adop:Customer ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Account type: Individual, Joint, or Trust" .
+
+adop:riskProfile a owl:DatatypeProperty ;
+    rdfs:label "risk_profile" ;
+    rdfs:domain adop:Customer ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Investment risk tolerance: Conservative, Moderate, Aggressive" .
+
+adop:employmentStatus a owl:DatatypeProperty ;
+    rdfs:label "employment_status" ;
+    rdfs:domain adop:Customer ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Employment classification: Employed, Self-Employed, Retired" .
+
+adop:employmentCategory a owl:DatatypeProperty ;
+    rdfs:label "employment_category" ;
+    rdfs:domain adop:Customer ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Simplified employment: W2, 1099, Retired" .
+
+adop:annualIncome a owl:DatatypeProperty ;
+    rdfs:label "annual_income" ;
+    rdfs:domain adop:Customer ;
+    rdfs:range xsd:integer ;
+    rdfs:comment "Annual income in USD" .
+
+adop:creditScore a owl:DatatypeProperty ;
+    rdfs:label "credit_score" ;
+    rdfs:domain adop:Customer ;
+    rdfs:range xsd:integer ;
+    rdfs:comment "Credit score (300-850 range)" .
+
+adop:ageYears a owl:DatatypeProperty ;
+    rdfs:label "age_years" ;
+    rdfs:domain adop:Customer ;
+    rdfs:range xsd:integer ;
+    rdfs:comment "Customer age derived from date of birth" .
+
+adop:customerTenureMonths a owl:DatatypeProperty ;
+    rdfs:label "customer_tenure_months" ;
+    rdfs:domain adop:Customer ;
+    rdfs:range xsd:integer ;
+    rdfs:comment "Months since account opened" .
+
+adop:incomeBucket a owl:DatatypeProperty ;
+    rdfs:label "income_bucket" ;
+    rdfs:domain adop:Customer ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Income tier: Low (<75K), Mid (75-150K), High (150-300K), Ultra (300K+)" .
+
+adop:wealthTier a owl:DatatypeProperty ;
+    rdfs:label "wealth_tier" ;
+    rdfs:domain adop:Customer ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Composite tier from income + credit score" .
+
+adop:lifecycleStage a owl:DatatypeProperty ;
+    rdfs:label "lifecycle_stage" ;
+    rdfs:domain adop:Customer ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Customer lifecycle: New, Growing, Mature, Loyal" .
+
+adop:emailDomain a owl:DatatypeProperty ;
+    rdfs:label "email_domain" ;
+    rdfs:domain adop:Customer ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Email domain only (PII-safe)" .
+
+adop:accountOpenDate a owl:DatatypeProperty ;
+    rdfs:label "account_open_date" ;
+    rdfs:domain adop:Customer ;
+    rdfs:range xsd:date ;
+    rdfs:comment "Date the customer account was opened" .
+
+# --- Address Data Properties ---
+
+adop:city a owl:DatatypeProperty ;
+    rdfs:label "city" ;
+    rdfs:domain adop:Address ;
+    rdfs:range xsd:string ;
+    rdfs:comment "City name" .
+
+adop:state a owl:DatatypeProperty ;
+    rdfs:label "state" ;
+    rdfs:domain adop:Address ;
+    rdfs:range xsd:string ;
+    rdfs:comment "US state code" .
+
+adop:zipCode a owl:DatatypeProperty ;
+    rdfs:label "zip_code" ;
+    rdfs:domain adop:Address ;
+    rdfs:range xsd:string ;
+    rdfs:comment "5-digit ZIP code" .
+
+adop:country a owl:DatatypeProperty ;
+    rdfs:label "country" ;
+    rdfs:domain adop:Address ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Country code" .
+
+adop:geographicRegion a owl:DatatypeProperty ;
+    rdfs:label "geographic_region" ;
+    rdfs:domain adop:Address ;
+    rdfs:range xsd:string ;
+    rdfs:comment "US Census region: Northeast, Midwest, Southeast, Southwest, West" .
+
+# --- Business Term Annotations ---
+
+adop:WealthTier a skos:Concept ;
+    skos:prefLabel "Wealth Tier" ;
+    skos:definition "Composite classification from annual_income + credit_score: Ultra High Net Worth (income>=300K AND score>=750), High Net Worth (>=150K AND >=720), Mass Affluent (>=75K AND >=680), Mass Market (below)" ;
+    skos:related adop:annualIncome, adop:creditScore .
+
+adop:CustomerTenure a skos:Concept ;
+    skos:prefLabel "Customer Tenure" ;
+    skos:definition "Number of months since account_open_date to current date" ;
+    skos:related adop:accountOpenDate, adop:customerTenureMonths .
+
+adop:LifecycleStage a skos:Concept ;
+    skos:prefLabel "Lifecycle Stage" ;
+    skos:definition "Customer lifecycle based on tenure: New (<6 months), Growing (6-24 months), Mature (2-5 years), Loyal (5+ years)" ;
+    skos:related adop:customerTenureMonths, adop:lifecycleStage .
+
+adop:RiskProfile a skos:Concept ;
+    skos:prefLabel "Risk Profile" ;
+    skos:definition "Self-declared investment risk tolerance: Conservative (capital preservation), Moderate (balanced growth), Aggressive (maximum growth)" ;
+    skos:related adop:riskProfile .
+
+adop:CleanCustomerRate a skos:Concept ;
+    skos:prefLabel "Clean Customer Rate" ;
+    skos:definition "Percentage of customer records passing all quality rules (completeness + validity + uniqueness)" ;
+    skos:related adop:customerId .
+
+adop:GeographicRegion a skos:Concept ;
+    skos:prefLabel "Geographic Region" ;
+    skos:definition "US Census region mapped from state: Northeast (9 states), Midwest (12), Southeast (17+DC), Southwest (8), West (5)" ;
+    skos:related adop:state, adop:geographicRegion .

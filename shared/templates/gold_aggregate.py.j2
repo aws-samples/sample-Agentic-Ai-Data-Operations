@@ -1,5 +1,5 @@
 {# template_id: gold_aggregate #}
-{# template_version: 1.0.0 #}
+{# template_version: 1.1.0 #}
 {# required_slots: dataset_name, source_table, schema_type, grain, measures #}
 {# schema_version: v1 #}
 import sys
@@ -32,9 +32,22 @@ def aggregate(glue_context, args):
     silver_df = spark.table("{{ source_table }}")
     input_rows = silver_df.count()
 
+{% if derived_silver_columns is defined and derived_silver_columns %}
+    # Pre-aggregation derived columns (computed on Silver before groupBy)
+    pre_agg_df = silver_df
+{% for col_def in derived_silver_columns %}
+    pre_agg_df = pre_agg_df.withColumn(
+        "{{ col_def.name }}",
+        F.expr({{ col_def.expression | tojson }})
+    )
+{% endfor %}
+{% else %}
+    pre_agg_df = silver_df
+{% endif %}
+
 {% if schema_type == "star_schema" %}
     # Star schema: build fact table with aggregated measures
-    fact_df = silver_df.groupBy(
+    fact_df = pre_agg_df.groupBy(
 {% for dim in grain.dimensions %}
         "{{ dim }}",
 {% endfor %}
@@ -56,17 +69,31 @@ def aggregate(glue_context, args):
 {% endfor %}
     )
 
+{% if post_aggregation_columns is defined and post_aggregation_columns %}
+    # Post-aggregation derived columns (booleans, ratios, masked dimensions)
+{% for col_def in post_aggregation_columns %}
+    fact_df = fact_df.withColumn(
+        "{{ col_def.name }}",
+        F.expr({{ col_def.expression | tojson }})
+    )
+{% endfor %}
+{% endif %}
+
 {% if iceberg_database is defined and iceberg_table is defined %}
     table_name = "glue_catalog.{{ iceberg_database }}.{{ iceberg_table }}"
 {% else %}
     table_name = "glue_catalog.{{ dataset_name }}_db.gold_{{ dataset_name }}"
 {% endif %}
+{% if iceberg_partition_spec is defined and iceberg_partition_spec %}
+    fact_df.writeTo(table_name).using("iceberg").partitionedBy({{ iceberg_partition_spec | tojson }}).createOrReplace()
+{% else %}
     fact_df.writeTo(table_name).using("iceberg").createOrReplace()
+{% endif %}
     output_rows = fact_df.count()
 
 {% elif schema_type == "flat_iceberg" %}
     # Flat Iceberg: denormalized table with all measures
-    gold_df = silver_df.groupBy(
+    gold_df = pre_agg_df.groupBy(
 {% for dim in grain.dimensions %}
         "{{ dim }}",
 {% endfor %}
@@ -88,12 +115,26 @@ def aggregate(glue_context, args):
 {% endfor %}
     )
 
+{% if post_aggregation_columns is defined and post_aggregation_columns %}
+    # Post-aggregation derived columns (booleans, ratios, masked dimensions)
+{% for col_def in post_aggregation_columns %}
+    gold_df = gold_df.withColumn(
+        "{{ col_def.name }}",
+        F.expr({{ col_def.expression | tojson }})
+    )
+{% endfor %}
+{% endif %}
+
 {% if iceberg_database is defined and iceberg_table is defined %}
     table_name = "glue_catalog.{{ iceberg_database }}.{{ iceberg_table }}"
 {% else %}
     table_name = "glue_catalog.{{ dataset_name }}_db.gold_{{ dataset_name }}"
 {% endif %}
+{% if iceberg_partition_spec is defined and iceberg_partition_spec %}
+    gold_df.writeTo(table_name).using("iceberg").partitionedBy({{ iceberg_partition_spec | tojson }}).createOrReplace()
+{% else %}
     gold_df.writeTo(table_name).using("iceberg").createOrReplace()
+{% endif %}
     output_rows = gold_df.count()
 {% endif %}
 

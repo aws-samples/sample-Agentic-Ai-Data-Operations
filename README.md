@@ -2,6 +2,19 @@
 
 **Automate your entire data operations pipeline** — ETL, data quality, semantic layer population, and data analysis — **reducing development time from weeks to hours.** Built-in compliance with **GDPR, CCPA, HIPAA, SOX, and PCI DSS** through regulation-specific prompts that automatically apply required controls.
 
+### Dynamic Workflows
+
+This project uses **Claude Code Dynamic Workflows** for parallel multi-agent orchestration. Two workflow commands are available:
+
+| Command | Purpose | What it does |
+|---|---|---|
+| `/onboard-workflow [REGULATION]` | Build a data pipeline | Parallel sub-agents generate specs for Bronze→Silver→Gold pipeline (~15 agents, 10-20 min) |
+| `/devops-workflow [WORKLOAD] [FRAMEWORK]` | Production readiness | Parallel IaC + monitoring + cost tags + runbook generation (~8 agents, 5-10 min) |
+
+Both commands ask discovery questions first (human-in-the-loop), then fan out parallel agents with model routing (haiku for checks, sonnet for generation, opus for adversarial review). Progress is tracked via `/workflows` and survives disconnects.
+
+Skill definitions: `.claude/commands/onboard-workflow.md`, `.claude/commands/devops-workflow.md`
+
 ---
 
 ## Starting the Agent
@@ -14,16 +27,23 @@ Open Claude Code in this repo and paste a prompt describing **where the data liv
 - **Target zones** (Silver quality rules, Gold transformations)
 - **Compliance** (GDPR, CCPA, HIPAA, SOX, PCI DSS — or none)
 
-### Example 1 — Batch from S3 (CSV, daily)
+### Example 1 — Batch from S3 (CSV, daily) with Dynamic Workflow
 ```
+/onboard-workflow HIPAA
+
 Onboard claims data from s3://data-lake-<account>-us-east-1/bronze/claims/ingestion_date=YYYY-MM-DD/claims.csv
 into Silver with dedup on claim_id and not-null policy_number, and into a flat denormalized
 Gold Iceberg table with derived measures (net_paid_ratio, days_to_submission, denial_category).
 Run daily at 03:00 UTC. Apply HIPAA controls with PHI masking in Silver and PHI suppression in Gold.
 ```
 
+> The `/onboard-workflow HIPAA` prefix triggers parallel execution via Dynamic Workflow.
+> Phase 4 build agents use Opus (HIPAA = compliance-critical). Omit the prefix for sequential mode.
+
 ### Example 2 — Streaming from Kafka (Glue Streaming ETL)
 ```
+/onboard-workflow PCI
+
 Onboard transaction events from Kafka topic `payments.auth.v1` (bootstrap:
 b-1.msk-prod.kafka.us-east-1.amazonaws.com:9098, IAM auth) using AWS Glue Streaming ETL.
 Land micro-batches every 60s into Bronze Iceberg on S3, dedup on event_id in Silver
@@ -33,6 +53,8 @@ auth_rate). Apply PCI DSS — tokenize PAN, drop CVV, Luhn check as a quality ru
 
 ### Example 3 — Streaming from Kinesis (Glue Streaming ETL)
 ```
+/onboard-workflow GDPR
+
 Onboard clickstream events from Kinesis Data Stream `web-events-prod` (shard count 8,
 PutRecord enhanced fan-out consumer) using AWS Glue Streaming ETL with a checkpoint on S3.
 Write Bronze Iceberg on 1-minute triggers, Silver with session stitching on user_id + 30-min
@@ -152,10 +174,24 @@ A user describes their data source in natural language. The **Data Onboarding Ag
 6. **Orchestration/Scheduling DAG Agent** — Creates the end-to-end orchestration DAG in Airflow or Step Functions
 7. **DevOps Agent** — Creates CloudFormation, Terraform, and AWS CDK to promote the generated artifacts to higher environments
 
-**Workflow:**
+**Workflow (two execution modes):**
+
+| Mode | Invocation | Phase 4 | Wall Clock | Token Cost |
+|------|-----------|---------|------------|------------|
+| **Sequential** (standard) | Paste prompt directly | Sub-agents run one at a time | ~30 min | 1x |
+| **Dynamic Workflow** (parallel) | `/onboard-workflow [REGULATION]` | Sub-agents run in parallel | ~15-20 min | 3-5x |
+
 ```
+# Standard mode:
 User: "Onboard customer data from PostgreSQL, daily refresh, PII masking required"
 
+# Workflow mode (parallel, faster, resumable):
+User: "/onboard-workflow HIPAA"
+User: "Onboard patient records from S3..."
+```
+
+**Phases (both modes):**
+```
 Phase 0: Health Check ─ verify AWS resources + 13 MCP servers (REQUIRED/WARN/OPTIONAL)
 Phase 1: Discovery ─── asks source, schema, cleaning rules, quality thresholds, schedule
 Phase 2: Dedup ─────── checks existing workloads for overlaps, reuses shared assets
@@ -166,6 +202,15 @@ Phase 5: Deploy ────── uploads to S3, creates Glue catalog, applies 
 
 Output: workloads/{dataset_name}/ with config/, scripts/, dags/, sql/, tests/
 ```
+
+**Dynamic Workflow advantages** (via `/onboard-workflow`):
+- Metadata + Quality agents run in parallel (Phase 4 Stage 1)
+- Model routing: HIPAA/SOX/PCI → Opus for build agents; GDPR/CCPA/none → Sonnet
+- Opus adversarial reviewer + verifier at quality chokepoints regardless of regulation
+- Multi-workload batch: onboard multiple datasets in one invocation
+- Resumable: completed phases survive disconnects
+
+See `.claude/commands/onboard-workflow.md` for the skill definition and `demo/sample_prompt/customer_master_workflow.md` for a full example.
 
 ### Workload Memory (Persistent Learning)
 
@@ -388,23 +433,36 @@ See [shared/prompt_intelligence/QUICKSTART.md](shared/prompt_intelligence/QUICKS
 
 ---
 
-## 7. DevOps Agent (Coming Q2 2026)
+## 7. DevOps Agent
 
-**Purpose:** Automates CI/CD, monitoring, cost optimization, and self-healing for deployed pipelines.
+**Purpose:** Automates IaC generation, monitoring, cost optimization, and operational runbooks for deployed pipelines.
 
-**Runs in:** Development environment (for CI/CD setup) AND Production (for monitoring/alerts)
-**Output:** CI/CD pipelines, CloudWatch alarms, cost optimization recommendations, auto-remediation scripts
+**Runs in:** Development environment (generates IaC, monitoring configs, runbooks — human applies)
+**Output:** Terraform/CDK/CFN, CloudWatch dashboards, SNS alerts, cost tags, budget alerts, RUNBOOK.md
 
-### Planned Features
+### Available Now: `/devops-workflow`
+
+```bash
+/devops-workflow customer_master terraform
+```
+
+Triggers a Dynamic Workflow that generates everything in parallel:
+
+| Phase | Agents | Output |
+|---|---|---|
+| IaC Generate | 1 sonnet | `iac/terraform/main.tf` + variables + outputs + APPLY_GUIDE.md |
+| Monitoring | 1 sonnet | CloudWatch alarms + SNS topic + EventBridge rules + dashboard |
+| Cost & Tags | 1 sonnet | Cost allocation tags + budget alerts + lifecycle policies |
+| Runbook | 1 sonnet | RUNBOOK.md (failure recovery, escalation, maintenance) |
+| Security Review | 1 opus | Adversarial IaC review (no wildcards, no public access) |
+| Validate | 2 haiku | Syntax checks (terraform fmt, cfn-lint) |
+
+### Planned Features (Q3 2026)
 
 - **CI/CD Pipelines** — Git push → auto-deploy to QA/Staging/Prod
-- **Monitoring & Alerts** — Slack/email notifications for pipeline failures, quality degradation
-- **Cost Optimization** — Identifies unused Glue crawlers, over-provisioned clusters, suggests S3 lifecycle policies
 - **Self-Healing** — Auto-retries transient failures, scales resources based on data volume
 - **Quality Drift Detection** — Alerts when data quality scores drop below historical baseline
 - **Resource Scaling** — Right-sizes Glue jobs, Athena query concurrency based on usage patterns
-
-**Status:** Design phase — implementation targeted for Q2 2026
 
 ---
 

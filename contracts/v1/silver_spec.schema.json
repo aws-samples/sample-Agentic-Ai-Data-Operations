@@ -152,6 +152,42 @@
         "location": { "type": "string" },
         "retention_days": { "type": "integer", "minimum": 1 }
       }
+    },
+    "pre_pii_derived_columns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "expression"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "expression": { "type": "string", "minLength": 1, "description": "Spark SQL expression (passed to F.expr) computed BEFORE pii_masking." },
+          "description": { "type": "string" }
+        }
+      },
+      "default": [],
+      "description": "Columns derived from raw inputs before PII masking (e.g., extract email_domain before email is hashed)."
+    },
+    "derived_columns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "expression"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "expression": { "type": "string", "minLength": 1, "description": "Spark SQL expression (passed to F.expr) computed AFTER type casts and PII masking." },
+          "description": { "type": "string" }
+        }
+      },
+      "default": [],
+      "description": "Columns derived from cleansed/masked data (e.g., hours_worked_clean, lawful_basis literals, partition keys)."
+    },
+    "drop_columns": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+      "default": [],
+      "description": "Columns to drop from the Silver output (e.g., raw email/full_name after they have been hashed)."
     }
   }
 }

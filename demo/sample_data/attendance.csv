@@ -1,0 +1,21 @@
+employee_id,full_name,email,department,check_in,check_out,location,hours_worked,status,manager_id
+EMP001,Sarah Johnson,sarah.johnson@company.com,Engineering,2026-05-01 08:30:00,2026-05-01 17:15:00,NYC-HQ,8.75,present,MGR001
+EMP002,Michael Chen,michael.chen@company.com,Engineering,2026-05-01 09:00:00,2026-05-01 18:00:00,NYC-HQ,9.0,present,MGR001
+EMP003,Priya Patel,priya.patel@company.com,Data Science,2026-05-01 08:45:00,2026-05-01 16:30:00,SF-OFFICE,7.75,present,MGR002
+EMP004,James Wilson,james.wilson@company.com,Finance,2026-05-01 00:00:00,2026-05-01 00:00:00,REMOTE,0.0,absent,MGR003
+EMP005,Ana Martinez,ana.martinez@company.com,HR,2026-05-01 08:00:00,2026-05-01 12:00:00,NYC-HQ,4.0,half-day,MGR004
+EMP006,Robert Taylor,robert.taylor@company.com,Engineering,2026-05-01 10:00:00,2026-05-01 19:30:00,REMOTE,9.5,present,MGR001
+EMP007,Lisa Wang,lisa.wang@company.com,Marketing,2026-05-01 08:15:00,2026-05-01 17:00:00,CHI-OFFICE,8.75,present,MGR005
+EMP008,David Kumar,david.kumar@company.com,Data Science,2026-05-01 09:30:00,2026-05-01 18:15:00,SF-OFFICE,8.75,present,MGR002
+EMP009,Emily Brown,emily.brown@company.com,Finance,2026-05-01 08:00:00,2026-05-01 16:45:00,NYC-HQ,8.75,present,MGR003
+EMP010,Carlos Rivera,carlos.rivera@company.com,Engineering,2026-05-01 00:00:00,2026-05-01 00:00:00,REMOTE,0.0,sick-leave,MGR001
+EMP011,Sarah Johnson,sarah.johnson@company.com,Engineering,2026-05-02 08:35:00,2026-05-02 17:20:00,NYC-HQ,8.75,present,MGR001
+EMP012,Michael Chen,michael.chen@company.com,Engineering,2026-05-02 08:55:00,2026-05-02 17:45:00,NYC-HQ,8.83,present,MGR001
+EMP013,Priya Patel,priya.patel@company.com,Data Science,2026-05-02 09:00:00,2026-05-02 17:30:00,SF-OFFICE,8.5,present,MGR002
+EMP014,James Wilson,james.wilson@company.com,Finance,2026-05-02 08:30:00,2026-05-02 17:00:00,NYC-HQ,8.5,present,MGR003
+EMP015,Ana Martinez,ana.martinez@company.com,HR,2026-05-02 08:00:00,2026-05-02 17:00:00,NYC-HQ,9.0,present,MGR004
+EMP016,Robert Taylor,robert.taylor@company.com,Engineering,2026-05-02 09:45:00,2026-05-02 19:00:00,REMOTE,9.25,present,MGR001
+EMP017,Lisa Wang,lisa.wang@company.com,Marketing,2026-05-02 08:30:00,2026-05-02 17:15:00,CHI-OFFICE,8.75,present,MGR005
+EMP018,David Kumar,david.kumar@company.com,Data Science,2026-05-02 10:00:00,2026-05-02 18:30:00,SF-OFFICE,8.5,present,MGR002
+EMP019,Emily Brown,emily.brown@company.com,Finance,2026-05-02 08:15:00,2026-05-02 16:30:00,NYC-HQ,8.25,present,MGR003
+EMP020,Carlos Rivera,carlos.rivera@company.com,Engineering,2026-05-02 00:00:00,2026-05-02 00:00:00,REMOTE,0.0,sick-leave,MGR001

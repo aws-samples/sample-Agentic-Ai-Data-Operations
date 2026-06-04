@@ -1,0 +1,140 @@
+dataset_name: customer_master
+domain: Customer Data Product
+description: Customer master dimension for end-user download — CCPA/GDPR compliant, PII-suppressed
+
+namespace: https://adop.internal/ontology/customer/
+version: v1
+
+use_cases:
+  - data_product_download
+  - data_discovery
+consumers:
+  - end_users
+  - aws_customers
+
+tables:
+  - name: Customer
+    table_type: dimension
+    description: Core customer identity and financial profile (1:N relationship with Address over time via SCD Type 2)
+    physical_table: dim_customer
+    primary_key: customer_id
+    columns:
+      - name: customer_id
+        type: string
+        description: Unique customer identifier
+        role: identifier
+      - name: gender
+        type: string
+        description: Customer gender (M/F)
+        role: dimension
+      - name: account_type
+        type: string
+        description: Account type (Individual, Joint, Trust)
+        role: dimension
+      - name: risk_profile
+        type: string
+        description: Investment risk tolerance (Conservative, Moderate, Aggressive)
+        role: dimension
+      - name: employment_status
+        type: string
+        description: Employment classification (Employed, Self-Employed, Retired)
+        role: dimension
+      - name: employment_category
+        type: string
+        description: Simplified employment (W2, 1099, Retired)
+        role: dimension
+      - name: annual_income
+        type: integer
+        description: Annual income in USD
+        role: measure
+      - name: credit_score
+        type: integer
+        description: Credit score (300-850 range)
+        role: measure
+      - name: age_years
+        type: integer
+        description: Customer age derived from date of birth
+        role: measure
+      - name: customer_tenure_months
+        type: integer
+        description: Months since account opened
+        role: measure
+      - name: income_bucket
+        type: string
+        description: "Income tier: Low (<75K), Mid (75-150K), High (150-300K), Ultra (300K+)"
+        role: dimension
+      - name: wealth_tier
+        type: string
+        description: Composite wealth tier from income + credit score
+        role: dimension
+      - name: lifecycle_stage
+        type: string
+        description: "Customer lifecycle: New, Growing, Mature, Loyal"
+        role: dimension
+      - name: email_domain
+        type: string
+        description: Email domain only (PII-safe)
+        role: dimension
+      - name: account_open_date
+        type: date
+        description: Date the customer account was opened
+        role: temporal
+
+  - name: Address
+    table_type: dimension
+    description: Customer geographic location (1:N over time — SCD Type 2 on address changes)
+    physical_table: dim_customer
+    primary_key: customer_id
+    columns:
+      - name: customer_id
+        type: string
+        description: Foreign key to Customer
+        role: identifier
+      - name: city
+        type: string
+        description: City name
+        role: dimension
+      - name: state
+        type: string
+        description: US state code
+        role: dimension
+      - name: zip_code
+        type: string
+        description: 5-digit ZIP code
+        role: dimension
+      - name: country
+        type: string
+        description: Country code
+        role: dimension
+      - name: geographic_region
+        type: string
+        description: US Census region (Northeast, Midwest, Southeast, Southwest, West)
+        role: dimension
+
+relationships:
+  - subject: Customer
+    predicate: hasAddress
+    object: Address
+    join_key: customer_id
+    cardinality: "1:N"
+    description: "One customer can have multiple addresses over time (SCD Type 2)"
+
+business_terms:
+  - term: Wealth Tier
+    definition: "Composite classification from annual_income + credit_score: Ultra High Net Worth (income>=300K AND score>=750), High Net Worth (>=150K AND >=720), Mass Affluent (>=75K AND >=680), Mass Market (below)"
+    related_columns: [annual_income, credit_score, wealth_tier]
+  - term: Customer Tenure
+    definition: Number of months since account_open_date to current date
+    related_columns: [account_open_date, customer_tenure_months]
+  - term: Lifecycle Stage
+    definition: "Customer lifecycle based on tenure: New (<6 months), Growing (6-24 months), Mature (2-5 years), Loyal (5+ years)"
+    related_columns: [customer_tenure_months, lifecycle_stage]
+  - term: Risk Profile
+    definition: "Self-declared investment risk tolerance: Conservative (capital preservation), Moderate (balanced growth), Aggressive (maximum growth)"
+    related_columns: [risk_profile]
+  - term: Clean Customer Rate
+    definition: Percentage of customer records passing all quality rules (completeness + validity + uniqueness)
+    related_columns: [customer_id]
+  - term: Geographic Region
+    definition: "US Census region mapped from state: Northeast (9 states), Midwest (12), Southeast (17+DC), Southwest (8), West (5)"
+    related_columns: [state, geographic_region]

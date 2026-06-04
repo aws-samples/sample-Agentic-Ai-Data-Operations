@@ -1,0 +1,36 @@
+dataset_name: customer_master
+schema_version: v1
+
+schedule:
+  cron: "0 2 * * *"
+  timezone: UTC
+  description: "Daily at 02:00 UTC"
+  catchup: false
+  max_active_runs: 1
+
+retry_policy:
+  retries: 3
+  retry_delay_minutes: 5
+  retry_exponential_backoff: true
+  max_retry_delay_minutes: 60
+
+sla:
+  pipeline_completion_minutes: 120
+  freshness_hours: 24
+
+dependencies:
+  upstream: []
+  downstream: []
+
+failure_handling:
+  on_failure: alert
+  alert_channel: sns
+  alert_topic_arn: "arn:aws:sns:us-east-1:ACCOUNT_ID:data-pipeline-alerts"
+  escalation_minutes: 30
+
+# CCPA/GDPR retention enforcement
+retention:
+  personal_data_days: 365
+  audit_log_years: 7
+  ccpa_request_response_days: 45
+  gdpr_request_response_days: 30

@@ -215,9 +215,30 @@ Want to accelerate DevOps Agent development?
 - Cost optimization strategies
 - Monitoring dashboard templates
 
+## Dynamic Workflow Command
+
+The `/devops-workflow` command runs the full production readiness pipeline in parallel:
+
+```bash
+/devops-workflow customer_master terraform    # specific workload + framework
+/devops-workflow                              # interactive (asks which workload)
+```
+
+**What it does** (all in one workflow):
+- Generates IaC (Terraform / CDK / CloudFormation) for all pipeline resources
+- Creates CloudWatch dashboards + SNS alerting + EventBridge rules
+- Applies cost allocation tags + budget alerts + lifecycle policies
+- Generates an operational runbook (failure recovery, escalation, maintenance)
+- Runs Opus security review (no IAM wildcards, no public access, encryption enforced)
+
+**Skill file**: `.claude/commands/devops-workflow.md`
+**Sample prompt**: `demo/sample_prompt/customer_master_devops.md`
+
+---
+
 ## Temporary Workarounds
 
-Until DevOps Agent is available, use these approaches:
+Until the remaining DevOps capabilities (CI/CD, self-healing, predictive) are available, use these approaches:
 
 **CI/CD**:
 - Manual: Run `workloads/{name}/deploy_to_aws.py` after changes

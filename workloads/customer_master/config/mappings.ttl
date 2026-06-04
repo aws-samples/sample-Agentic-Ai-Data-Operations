@@ -1,0 +1,123 @@
+@prefix rr: <http://www.w3.org/ns/r2rml#> .
+@prefix rml: <http://semweb.mmlab.be/ns/rml#> .
+@prefix adop: <https://adop.internal/ontology/customer/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# R2RML Mappings: Glue Catalog tables -> OWL ontology
+# Physical source: glue_catalog.customer_master_db.dim_customer
+
+# --- Customer Triples Map ---
+
+<#CustomerMap> a rr:TriplesMap ;
+    rr:logicalTable [
+        rr:tableName "customer_master_db.dim_customer"
+    ] ;
+    rr:subjectMap [
+        rr:template "https://adop.internal/ontology/customer/Customer/{customer_id}" ;
+        rr:class adop:Customer
+    ] ;
+
+    rr:predicateObjectMap [
+        rr:predicate adop:customerId ;
+        rr:objectMap [ rr:column "customer_id" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:gender ;
+        rr:objectMap [ rr:column "gender" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:accountType ;
+        rr:objectMap [ rr:column "account_type" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:riskProfile ;
+        rr:objectMap [ rr:column "risk_profile" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:employmentStatus ;
+        rr:objectMap [ rr:column "employment_status" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:employmentCategory ;
+        rr:objectMap [ rr:column "employment_category" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:annualIncome ;
+        rr:objectMap [ rr:column "annual_income" ; rr:datatype xsd:integer ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:creditScore ;
+        rr:objectMap [ rr:column "credit_score" ; rr:datatype xsd:integer ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:ageYears ;
+        rr:objectMap [ rr:column "age_years" ; rr:datatype xsd:integer ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:customerTenureMonths ;
+        rr:objectMap [ rr:column "customer_tenure_months" ; rr:datatype xsd:integer ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:incomeBucket ;
+        rr:objectMap [ rr:column "income_bucket" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:wealthTier ;
+        rr:objectMap [ rr:column "wealth_tier" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:lifecycleStage ;
+        rr:objectMap [ rr:column "lifecycle_stage" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:emailDomain ;
+        rr:objectMap [ rr:column "email_domain" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:accountOpenDate ;
+        rr:objectMap [ rr:column "account_open_date" ; rr:datatype xsd:date ]
+    ] ;
+
+    # Relationship: Customer -> Address (self-join on same table)
+    rr:predicateObjectMap [
+        rr:predicate adop:hasAddress ;
+        rr:objectMap [
+            rr:parentTriplesMap <#AddressMap> ;
+            rr:joinCondition [
+                rr:child "customer_id" ;
+                rr:parent "customer_id"
+            ]
+        ]
+    ] .
+
+# --- Address Triples Map ---
+
+<#AddressMap> a rr:TriplesMap ;
+    rr:logicalTable [
+        rr:tableName "customer_master_db.dim_customer"
+    ] ;
+    rr:subjectMap [
+        rr:template "https://adop.internal/ontology/customer/Address/{customer_id}" ;
+        rr:class adop:Address
+    ] ;
+
+    rr:predicateObjectMap [
+        rr:predicate adop:city ;
+        rr:objectMap [ rr:column "city" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:state ;
+        rr:objectMap [ rr:column "state" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:zipCode ;
+        rr:objectMap [ rr:column "zip_code" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:country ;
+        rr:objectMap [ rr:column "country" ; rr:datatype xsd:string ]
+    ] ;
+    rr:predicateObjectMap [
+        rr:predicate adop:geographicRegion ;
+        rr:objectMap [ rr:column "geographic_region" ; rr:datatype xsd:string ]
+    ] .

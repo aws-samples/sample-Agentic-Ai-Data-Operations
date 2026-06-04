@@ -42,7 +42,23 @@ if echo "$FILE" | grep -qE '^workloads/[^/]+/dags/.*\.py$'; then
   fi
 fi
 
-# --- Check 3: Agent tool spawns must include decisions requirement ---
+# --- Check 3: Block post-deploy artifacts until trace_events.jsonl exists ---
+if echo "$FILE" | grep -qE '^workloads/[^/]+/README\.md$'; then
+  WORKLOAD=$(echo "$FILE" | sed 's|workloads/||' | cut -d/ -f1)
+
+  if [ -d "workloads/${WORKLOAD}/logs" ] && [ ! -f "workloads/${WORKLOAD}/logs/trace_events.jsonl" ]; then
+    jq -n --arg wl "$WORKLOAD" '{
+      "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": ("BLOCKED: workloads/" + $wl + "/logs/trace_events.jsonl does not exist. Every workflow run MUST produce a structured trace before post-deployment steps. Write the trace log first.")
+      }
+    }'
+    exit 0
+  fi
+fi
+
+# --- Check 4: Agent tool spawns must include decisions requirement ---
 # Skip config/rules files — they're allowed to mention Agent( without decisions
 if echo "$FILE" | grep -qE '^(SKILLS|CLAUDE)\.md$|^\.claude/'; then
   exit 0

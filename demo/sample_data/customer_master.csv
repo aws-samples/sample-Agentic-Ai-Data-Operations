@@ -1,0 +1,51 @@
+customer_id,first_name,last_name,email,phone,date_of_birth,gender,address,city,state,zip_code,country,account_open_date,account_type,risk_profile,annual_income,employment_status,employer,ssn,credit_score
+CUST001,James,Anderson,james.anderson@email.com,555-0101,1985-03-14,M,123 Oak Lane,New York,NY,10001,US,2020-01-15,Individual,Moderate,125000,Employed,Acme Corp,123-45-6789,742
+CUST002,Maria,Garcia,maria.garcia@email.com,555-0102,1990-07-22,F,456 Elm Street,Los Angeles,CA,90001,US,2019-06-20,Individual,Aggressive,95000,Employed,Tech Solutions,234-56-7890,718
+CUST003,Robert,Johnson,robert.johnson@email.com,555-0103,1978-11-03,M,789 Pine Ave,Chicago,IL,60601,US,2018-03-10,Joint,Conservative,210000,Employed,Global Finance,345-67-8901,785
+CUST004,Sarah,Williams,sarah.williams@email.com,555-0104,1992-05-18,F,321 Maple Dr,Houston,TX,77001,US,2021-02-28,Individual,Moderate,88000,Employed,HealthFirst,456-78-9012,695
+CUST005,David,Brown,david.brown@email.com,555-0105,1983-09-27,M,654 Cedar Blvd,Phoenix,AZ,85001,US,2017-11-05,Individual,Aggressive,175000,Self-Employed,,567-89-0123,760
+CUST006,Jennifer,Martinez,jennifer.martinez@email.com,555-0106,1995-01-30,F,987 Birch Ct,Philadelphia,PA,19101,US,2022-04-12,Individual,Conservative,72000,Employed,City Hospital,678-90-1234,710
+CUST007,Michael,Davis,michael.davis@email.com,555-0107,1975-06-11,M,147 Walnut St,San Antonio,TX,78201,US,2016-08-22,Trust,Moderate,320000,Retired,,789-01-2345,800
+CUST008,Lisa,Rodriguez,lisa.rodriguez@email.com,555-0108,1988-12-05,F,258 Spruce Way,San Diego,CA,92101,US,2020-09-15,Individual,Aggressive,110000,Employed,DataVerse,890-12-3456,735
+CUST009,William,Wilson,william.wilson@email.com,555-0109,1970-04-19,M,369 Ash Rd,Dallas,TX,75201,US,2015-01-30,Joint,Conservative,280000,Employed,Petro Energy,901-23-4567,792
+CUST010,Amanda,Taylor,amanda.taylor@email.com,555-0110,1993-08-25,F,741 Poplar Ln,San Jose,CA,95101,US,2021-07-08,Individual,Moderate,98000,Employed,CloudNet,012-34-5678,705
+CUST011,Christopher,Thomas,christopher.thomas@email.com,555-0111,1982-02-14,M,852 Willow Dr,Austin,TX,73301,US,2019-05-20,Individual,Aggressive,145000,Employed,SpaceX,111-22-3333,755
+CUST012,Jessica,Hernandez,jessica.hernandez@email.com,555-0112,1991-10-08,F,963 Hickory Pl,Jacksonville,FL,32099,US,2020-12-01,Individual,Moderate,82000,Employed,Sun Health,222-33-4444,720
+CUST013,Daniel,Moore,daniel.moore@email.com,555-0113,1976-07-31,M,159 Sycamore Ave,Fort Worth,TX,76101,US,2017-03-15,Trust,Conservative,450000,Self-Employed,,333-44-5555,810
+CUST014,Emily,Jackson,emily.jackson@email.com,555-0114,1997-03-22,F,267 Chestnut Cir,Columbus,OH,43085,US,2023-01-10,Individual,Aggressive,68000,Employed,StartupHub,444-55-6666,680
+CUST015,Matthew,White,matthew.white@email.com,555-0115,1980-11-16,M,378 Magnolia St,Charlotte,NC,28201,US,2018-09-25,Joint,Moderate,195000,Employed,Bank of South,555-66-7777,770
+CUST016,Ashley,Harris,ashley.harris@email.com,555-0116,1994-06-09,F,489 Dogwood Way,Indianapolis,IN,46201,US,2021-11-18,Individual,Conservative,76000,Employed,Midwest Pharma,666-77-8888,698
+CUST017,Andrew,Clark,andrew.clark@email.com,555-0117,1973-01-25,M,591 Redwood Dr,San Francisco,CA,94101,US,2016-02-14,Individual,Aggressive,250000,Employed,VentureCapX,777-88-9999,788
+CUST018,Stephanie,Lewis,stephanie.lewis@email.com,555-0118,1987-09-12,F,602 Cypress Ln,Seattle,WA,98101,US,2019-08-30,Individual,Moderate,105000,Employed,Amazon,888-99-0000,740
+CUST019,Joshua,Robinson,joshua.robinson@email.com,555-0119,1981-04-07,M,713 Palm Ct,Denver,CO,80201,US,2018-06-12,Joint,Conservative,185000,Employed,Mountain Gas,999-00-1111,775
+CUST020,Nicole,Walker,nicole.walker@email.com,555-0120,1996-12-20,F,824 Beech Blvd,Nashville,TN,37201,US,2022-03-05,Individual,Moderate,71000,Employed,Music City Med,100-20-3040,690
+CUST021,Kevin,Hall,kevin.hall@email.com,555-0121,1979-08-03,M,935 Juniper St,Oklahoma City,OK,73101,US,2017-10-20,Individual,Aggressive,160000,Self-Employed,,200-30-4050,762
+CUST022,Rachel,Allen,rachel.allen@email.com,555-0122,1989-05-15,F,146 Ivy Way,Portland,OR,97201,US,2020-02-28,Individual,Conservative,92000,Employed,GreenTech,300-40-5060,725
+CUST023,Brian,Young,brian.young@email.com,555-0123,1974-10-29,M,257 Hazel Rd,Las Vegas,NV,89101,US,2016-12-08,Trust,Moderate,380000,Retired,,400-50-6070,795
+CUST024,Megan,King,megan.king@email.com,555-0124,1992-02-11,F,368 Laurel Dr,Louisville,KY,40201,US,2021-05-15,Individual,Aggressive,85000,Employed,BourbonCo,500-60-7080,715
+CUST025,Ryan,Wright,ryan.wright@email.com,555-0125,1986-07-04,M,479 Olive Pl,Baltimore,MD,21201,US,2019-01-22,Individual,Moderate,130000,Employed,JHU Applied,600-70-8090,748
+CUST026,Lauren,Lopez,lauren.lopez@email.com,555-0126,1998-09-17,F,580 Fern Ave,Milwaukee,WI,53201,US,2023-02-14,Individual,Conservative,62000,Employed,Dairy Fresh,700-80-9010,672
+CUST027,Timothy,Hill,timothy.hill@email.com,555-0127,1977-03-08,M,691 Sage Cir,Albuquerque,NM,87101,US,2017-07-30,Joint,Aggressive,220000,Employed,Sandia Labs,800-90-0120,780
+CUST028,Heather,Scott,heather.scott@email.com,555-0128,1990-11-23,F,702 Clover St,Tucson,AZ,85701,US,2020-06-18,Individual,Moderate,97000,Employed,Raytheon,900-01-2340,730
+CUST029,Jason,Green,jason.green@email.com,555-0129,1984-06-30,M,813 Moss Way,Fresno,CA,93701,US,2018-12-04,Individual,Conservative,115000,Employed,AgriCorp,010-12-3450,752
+CUST030,Amber,Adams,amber.adams@email.com,555-0130,1993-04-14,F,924 Reed Ln,Sacramento,CA,95801,US,2021-09-22,Individual,Moderate,79000,Employed,StateGov,120-23-4560,700
+CUST031,Patrick,Baker,patrick.baker@email.com,555-0131,1971-12-01,M,135 Vine Dr,Kansas City,MO,64101,US,2015-05-10,Trust,Aggressive,500000,Self-Employed,,230-34-5670,815
+CUST032,Christina,Nelson,christina.nelson@email.com,555-0132,1988-08-19,F,246 Fir Ct,Mesa,AZ,85201,US,2019-11-14,Individual,Conservative,88000,Employed,Intel,340-45-6780,722
+CUST033,Gregory,Carter,gregory.carter@email.com,555-0133,1980-05-26,M,357 Larch Blvd,Atlanta,GA,30301,US,2018-04-08,Joint,Moderate,200000,Employed,Coca-Cola,450-56-7890,768
+CUST034,Samantha,Mitchell,samantha.mitchell@email.com,555-0134,1995-10-03,F,468 Aspen Way,Omaha,NE,68101,US,2022-01-20,Individual,Aggressive,73000,Employed,Mutual of Omaha,560-67-8901,688
+CUST035,Brandon,Roberts,brandon.roberts@email.com,555-0135,1983-01-17,M,579 Hemlock Rd,Raleigh,NC,27601,US,2017-09-12,Individual,Moderate,140000,Employed,Red Hat,670-78-9012,758
+CUST036,Kimberly,Turner,kimberly.turner@email.com,555-0136,1991-07-08,F,680 Alder Pl,Miami,FL,33101,US,2020-08-05,Individual,Conservative,95000,Employed,CruiseLine Inc,780-89-0123,728
+CUST037,Jonathan,Phillips,jonathan.phillips@email.com,555-0137,1976-09-21,M,791 Teak Dr,Minneapolis,MN,55401,US,2016-06-28,Individual,Aggressive,270000,Employed,3M Company,890-90-1234,790
+CUST038,Melissa,Campbell,melissa.campbell@email.com,555-0138,1994-03-30,F,802 Mahogany Ln,Tampa,FL,33601,US,2021-04-16,Individual,Moderate,81000,Employed,PharmaLife,901-01-2345,708
+CUST039,Eric,Parker,eric.parker@email.com,555-0139,1978-11-14,M,913 Rosewood Ct,New Orleans,LA,70112,US,2017-12-20,Joint,Conservative,190000,Employed,Shell Oil,012-12-3456,772
+CUST040,Angela,Evans,angela.evans@email.com,555-0140,1986-04-25,F,124 Bamboo St,Cleveland,OH,44101,US,2019-03-08,Individual,Moderate,102000,Employed,Cleveland Clinic,123-23-4567,738
+CUST041,Mark,Edwards,mark.edwards@email.com,555-0141,1972-08-12,M,235 Sequoia Ave,Pittsburgh,PA,15201,US,2016-10-15,Trust,Aggressive,420000,Self-Employed,,234-34-5678,805
+CUST042,Laura,Collins,laura.collins@email.com,555-0142,1997-01-06,F,346 Elm Park Dr,Cincinnati,OH,45201,US,2022-08-30,Individual,Conservative,65000,Employed,P&G,345-45-6789,675
+CUST043,Steven,Stewart,steven.stewart@email.com,555-0143,1981-06-18,M,457 Oak Ridge Rd,St. Louis,MO,63101,US,2018-07-22,Individual,Moderate,155000,Employed,Boeing,456-56-7890,765
+CUST044,Natalie,Sanchez,natalie.sanchez@email.com,555-0144,1993-12-09,F,568 Pine Hill Way,Orlando,FL,32801,US,2021-01-05,Individual,Aggressive,78000,Employed,Disney,567-67-8901,702
+CUST045,Thomas,Morris,thomas.morris@email.com,555-0145,1975-02-28,M,679 Cedar Valley Ct,Memphis,TN,38101,US,2017-04-18,Joint,Conservative,230000,Employed,FedEx,678-78-9012,782
+CUST046,Danielle,Rogers,danielle.rogers@email.com,555-0146,1989-08-07,F,780 Maple Creek Ln,Boston,MA,02101,US,2020-10-12,Individual,Moderate,108000,Employed,MIT Lincoln,789-89-0123,745
+CUST047,Charles,Reed,charles.reed@email.com,555-0147,1982-10-23,M,891 Birch Forest Blvd,Detroit,MI,48201,US,2018-02-06,Individual,Aggressive,165000,Employed,Ford Motor,890-90-1234,760
+CUST048,Vanessa,Cook,vanessa.cook@email.com,555-0148,1996-05-14,F,902 Spruce Garden Pl,Honolulu,HI,96801,US,2022-06-25,Individual,Conservative,70000,Employed,Pacific Health,901-01-2345,685
+CUST049,George,Morgan,george.morgan@email.com,555-0149,1974-07-19,M,113 Walnut Hill Dr,Salt Lake City,UT,84101,US,2016-04-30,Trust,Moderate,350000,Retired,,012-12-3456,798
+CUST050,Michelle,Bell,michelle.bell@email.com,555-0150,1990-02-08,F,224 Ash Creek Way,Virginia Beach,VA,23451,US,2020-05-20,Individual,Aggressive,120000,Employed,Navy Federal,123-23-4567,750
