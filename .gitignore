@@ -246,8 +246,8 @@ QUICKSIGHT_*.md
 grant_access_*.sh
 *_hcherian*.sh
 
-# Demo folder (synthetic data generation - optional, comment out to include in repo)
-# demo/
+# Demo folder (synthetic data generation - excluded from repo)
+demo/
 
 # Generated demo workloads (output of Data Onboarding Agent demo runs)
 workloads/ecommerce_orders/
