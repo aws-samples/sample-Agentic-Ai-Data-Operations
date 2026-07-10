@@ -1,5 +1,7 @@
 # Agentic Data Onboarding Platform
 
+![ADOP – Agentic Data Onboarding Platform](docs/diagrams/adop-overview.png)
+
 **Automate your entire data operations pipeline** — ETL, data quality, semantic layer population, and data analysis — **reducing development time from weeks to hours.** Built-in compliance with **GDPR, CCPA, HIPAA, SOX, and PCI DSS** through regulation-specific prompts that automatically apply required controls.
 
 ### Dynamic Workflows
