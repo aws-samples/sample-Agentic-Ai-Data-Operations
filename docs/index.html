@@ -1,0 +1,2239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ADOP - README Preview</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1f2328;
+    --muted: #59636e;
+    --border: #d0d7de;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #0550ae;
+    --callout: #ddf4ff;
+    --callout-border: #54aeff;
+    --header-grad: linear-gradient(135deg, #0550ae 0%, #218bff 100%);
+    --prompt-bg: #2d3748;
+    --prompt-fg: #f0f4f8;
+    --prompt-accent: #7ee787;
+    --prompt-label-bg: #2f855a;
+    --flow-bg: #f6faff;
+    --flow-border: #b6dcff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117;
+      --fg: #e6edf3;
+      --muted: #9198a1;
+      --border: #30363d;
+      --code-bg: #161b22;
+      --link: #4493f8;
+      --accent: #79c0ff;
+      --callout: #0c2a4a;
+      --callout-border: #1f6feb;
+      --header-grad: linear-gradient(135deg, #010409 0%, #1f6feb 100%);
+      --prompt-bg: #1e2a3a;
+      --prompt-fg: #f0f4f8;
+      --prompt-accent: #7ee787;
+      --prompt-label-bg: #2f855a;
+      --flow-bg: #0c1e33;
+      --flow-border: #1f6feb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+    font-size: 16px;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 0;
+    min-height: 100vh;
+  }
+  aside {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    background: var(--code-bg);
+    border-right: 1px solid var(--border);
+    padding: 24px 18px;
+  }
+  aside h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  aside .toc ul { list-style: none; margin: 0; padding: 0; }
+  aside .toc li { margin: 3px 0; }
+  aside .toc a {
+    display: block;
+    color: var(--fg);
+    text-decoration: none;
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+  aside .toc a:hover { background: var(--callout); color: var(--accent); }
+  aside .toc > ul > li > a { font-weight: 600; }
+  aside .toc ul ul { padding-left: 10px; border-left: 1px solid var(--border); margin-top: 2px; }
+  aside .toc ul ul a { font-weight: normal; color: var(--muted); font-size: 12.5px; }
+  main { max-width: 940px; padding: 32px 48px 100px; }
+  .banner {
+    background: var(--header-grad);
+    color: #fff;
+    padding: 28px 32px;
+    border-radius: 12px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 16px rgba(5,80,174,0.15);
+  }
+  .banner h1 {
+    margin: 0 0 8px;
+    color: #fff;
+    border: none;
+    padding: 0;
+    font-size: 30px;
+  }
+  .banner p { margin: 0; opacity: 0.92; font-size: 15px; }
+
+  /* --- 10-minute quickstart flow --- */
+  .quickstart {
+    background: var(--flow-bg);
+    border: 1px solid var(--flow-border);
+    border-radius: 12px;
+    padding: 24px 24px 28px;
+    margin-bottom: 32px;
+  }
+  .quickstart-heading {
+    margin: 0 0 4px;
+    padding: 0;
+    border: none;
+    font-size: 22px;
+    color: var(--accent);
+  }
+  .quickstart-sub {
+    margin: 0 0 18px;
+    color: var(--muted);
+    font-size: 14.5px;
+  }
+  .flow {
+    display: grid;
+    grid-template-columns: minmax(0,1fr) 20px minmax(0,1fr) 20px minmax(0,1fr) 20px minmax(0,1fr) 20px minmax(0,1fr);
+    align-items: stretch;
+    gap: 8px;
+  }
+  .flow-step {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    min-width: 0;
+  }
+  .flow-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 8px;
+  }
+  .flow-title { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+  .flow-body { font-size: 12.5px; color: var(--fg); flex: 1; line-height: 1.45; overflow-wrap: break-word; }
+  .flow-time { font-size: 11.5px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 8px; }
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  @media (max-width: 900px) {
+    .flow { grid-template-columns: 1fr; }
+    .flow-arrow { transform: rotate(90deg); padding: 4px 0; }
+  }
+
+  /* --- Headings, links, typography --- */
+  h1, h2, h3, h4 { line-height: 1.25; margin-top: 32px; margin-bottom: 12px; color: var(--fg); }
+  h1 { font-size: 28px; padding-bottom: 6px; border-bottom: 2px solid var(--border); }
+  h2 { font-size: 22px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 18px; color: var(--accent); }
+  h4 { font-size: 15.5px; }
+  h1 .headerlink, h2 .headerlink, h3 .headerlink, h4 .headerlink {
+    opacity: 0; margin-left: 8px; text-decoration: none; color: var(--muted); font-weight: normal;
+  }
+  h1:hover .headerlink, h2:hover .headerlink, h3:hover .headerlink, h4:hover .headerlink { opacity: 1; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  p, li { font-size: 15px; }
+  ul, ol { padding-left: 24px; }
+  img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 10px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    margin: 16px 0;
+  }
+  .hero-figure {
+    margin: 0 0 24px;
+    text-align: center;
+  }
+  .hero-figure img {
+    max-width: 620px;
+    width: 100%;
+    margin: 0 auto;
+    display: block;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+  }
+
+  /* --- Split hero (infographic + Why Agentify) --- */
+  .split-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 6fr) minmax(0, 6fr);
+    gap: 32px;
+    align-items: start;
+    margin: 0 0 32px;
+  }
+  .split-hero-left {
+    position: sticky;
+    top: 20px;
+  }
+  .split-hero-img {
+    display: block;
+    width: 100%;
+    max-width: 560px;
+    margin: 0 auto;
+    border-radius: 14px;
+    box-shadow:
+      0 12px 32px -8px rgba(5, 80, 174, 0.20),
+      0 4px 12px -2px rgba(0, 0, 0, 0.08);
+  }
+  .split-hero-right > :first-child { margin-top: 0; }
+  .split-hero-heading {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin: 0 0 8px;
+    font-size: 22px;
+    color: var(--accent);
+  }
+  .split-hero-lede {
+    margin: 0 0 14px;
+    font-size: 15.5px;
+    line-height: 1.55;
+  }
+  .split-hero-list {
+    margin: 0 0 14px;
+    padding-left: 20px;
+  }
+  .split-hero-list li {
+    margin-bottom: 6px;
+    font-size: 14.5px;
+    line-height: 1.5;
+  }
+  .pitch-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin: 4px 0 16px;
+  }
+  .pitch-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 15px 14px;
+    box-shadow:
+      0 2px 6px -2px rgba(0,0,0,0.06),
+      0 8px 20px -8px rgba(5,80,174,0.10);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .pitch-card:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 4px 10px -2px rgba(0,0,0,0.08),
+      0 14px 28px -8px rgba(5,80,174,0.18);
+  }
+  .pitch-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    color: var(--accent);
+    font-size: 17px;
+    margin-bottom: 8px;
+  }
+  @media (prefers-color-scheme: dark) {
+    .pitch-icon {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%);
+      color: #7ec4ff;
+    }
+  }
+  .pitch-title {
+    font-weight: 700;
+    font-size: 14.5px;
+    margin-bottom: 4px;
+    color: var(--fg);
+    line-height: 1.3;
+  }
+  .pitch-body {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  @media (max-width: 700px) {
+    .pitch-grid { grid-template-columns: 1fr; }
+  }
+  .split-hero-cta {
+    margin: 0;
+    font-size: 13.5px;
+    color: var(--muted);
+    font-style: italic;
+  }
+  .split-hero-note {
+    display: inline-block;
+    margin-top: 6px;
+    font-style: normal;
+    font-size: 12.5px;
+    color: var(--muted);
+    opacity: 0.85;
+  }
+  @media (max-width: 1000px) {
+    .split-hero { grid-template-columns: 1fr; }
+    .split-hero-left { position: static; }
+    .split-hero-img { max-width: 520px; }
+  }
+
+  /* --- Start Here callout --- */
+  .start-here {
+    background: var(--flow-bg);
+    border: 1px solid var(--flow-border);
+    border-radius: 12px;
+    padding: 20px 22px 22px;
+    margin: 18px 0 24px;
+  }
+  .start-here-hero {
+    display: grid;
+    grid-template-columns: 90px auto 1fr;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+  .start-icon {
+    width: 90px;
+    height: auto;
+    margin: 0;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.10);
+    background: #fff;
+  }
+  .start-arrow { display: flex; align-items: center; }
+  .start-tag {
+    font-size: 12.5px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .start-steps {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 12px;
+    align-items: stretch;
+  }
+  .start-step {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 14px 12px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .start-step-num {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .start-step-title { font-weight: 700; font-size: 15px; margin-bottom: 6px; }
+  .start-step-code {
+    background: var(--prompt-bg);
+    color: var(--prompt-fg);
+    border: 1px solid #4a5568;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .start-connector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  @media (max-width: 900px) {
+    .start-here-hero { grid-template-columns: 70px auto 1fr; }
+    .start-icon { width: 70px; }
+    .start-steps { grid-template-columns: 1fr; }
+    .start-connector { transform: rotate(90deg); padding: 2px 0; }
+  }
+  hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+  blockquote {
+    margin: 16px 0;
+    padding: 12px 18px;
+    border-left: 4px solid var(--callout-border);
+    background: var(--callout);
+    color: var(--fg);
+    border-radius: 0 8px 8px 0;
+  }
+  blockquote p { margin: 0; }
+
+  /* --- Inline code --- */
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 13px;
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    color: var(--fg);
+  }
+
+  /* --- Generic code blocks (from ``` in Markdown) --- */
+  pre {
+    background: #2d3748;
+    color: #f0f4f8;
+    padding: 16px 18px;
+    border-radius: 8px;
+    border: 1px solid #4a5568;
+    overflow-x: auto;
+    line-height: 1.55;
+  }
+  pre code {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: #f0f4f8;
+    font-size: 13.5px;
+  }
+  .highlight { border-radius: 8px; margin: 12px 0; }
+  .highlight pre { margin: 0; background: #2d3748; color: #f0f4f8; border: 1px solid #4a5568; }
+  .highlight pre code { color: #f0f4f8; }
+  /* Force high-contrast on any residual pygments-styled tokens */
+  .highlight .n, .highlight .p, .highlight .k, .highlight .kn, .highlight .nb,
+  .highlight .nn, .highlight .s, .highlight .s1, .highlight .s2, .highlight .mi,
+  .highlight .o, .highlight .nc, .highlight .nf, .highlight .nx { color: #f0f4f8; }
+
+  /* --- Prompt input blocks (highlighted, labeled) --- */
+  .prompt-block {
+    position: relative;
+    margin: 16px 0;
+    border-radius: 10px;
+    border: 1px solid var(--prompt-label-bg);
+    box-shadow: 0 2px 8px rgba(35,134,54,0.15);
+    overflow: hidden;
+  }
+  .prompt-block .prompt-label {
+    background: var(--prompt-label-bg);
+    color: #fff;
+    padding: 6px 14px;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    font-weight: 700;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .prompt-block .prompt-label::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #7ee787;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(126,231,135,0.25);
+  }
+  .prompt-block pre,
+  .prompt-block .highlight pre {
+    margin: 0;
+    background: var(--prompt-bg);
+    color: var(--prompt-fg);
+    border: none;
+    border-radius: 0;
+    padding: 16px 18px;
+    font-size: 13.5px;
+    line-height: 1.6;
+  }
+  .prompt-block code { color: var(--prompt-fg); background: transparent; border: none; }
+
+  /* --- Tables --- */
+  table {
+    border-collapse: collapse;
+    margin: 16px 0;
+    width: 100%;
+    display: block;
+    overflow-x: auto;
+  }
+  table thead { background: var(--code-bg); }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 14px;
+  }
+  th { font-weight: 600; }
+  tr:nth-child(even) td { background: rgba(175, 184, 193, 0.06); }
+
+  pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    aside { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+    main { padding: 20px 18px 60px; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <h2>Contents</h2>
+    <div class="toc"><div class="toc">
+<ul>
+
+<li><a href="#starting-the-agent">Starting the Agent</a><ul>
+<li><a href="#example-1-batch-from-s3-csv-daily-with-dynamic-workflow">Example 1 — Batch from S3 (CSV, daily) with Dynamic Workflow</a></li>
+<li><a href="#example-2-streaming-from-kafka-glue-streaming-etl">Example 2 — Streaming from Kafka (Glue Streaming ETL)</a></li>
+<li><a href="#example-3-streaming-from-kinesis-glue-streaming-etl">Example 3 — Streaming from Kinesis (Glue Streaming ETL)</a></li>
+<li><a href="#prompt-depth-brief-vs-detailed">Prompt Depth: Brief vs. Detailed</a></li>
+</ul>
+</li>
+
+<li><a href="#how-it-works">How It Works</a></li>
+<li><a href="#1-data-onboarding-agent">1. Data Onboarding Agent</a><ul>
+<li><a href="#agent-coordination-workflow">Agent Coordination Workflow</a></li>
+<li><a href="#workload-memory-persistent-learning">Workload Memory (Persistent Learning)</a></li>
+</ul>
+</li>
+<li><a href="#2-ontology-staging-agent-aws-semantic-layer-handoff">2. Ontology Staging Agent (AWS Semantic Layer Handoff)</a></li>
+<li><a href="#3-environment-setup-agent">3. Environment Setup Agent</a></li>
+<li><a href="#4-semantic-layer-business-context-ontology-handoff">4. Semantic Layer (Business Context + Ontology Handoff)</a></li>
+<li><a href="#5-ai-clone-decision-engine">5. AI Clone Decision Engine</a><ul>
+<li><a href="#how-the-decision-engine-works">How the Decision Engine Works</a></li>
+<li><a href="#step-1-context-gate-sub-agent-vs-main-conversation">Step 1 — Context Gate (Sub-Agent vs Main Conversation)</a></li>
+<li><a href="#step-2-server-health-3-tier-classification">Step 2 — Server Health (3-Tier Classification)</a></li>
+<li><a href="#step-3-intent-matching">Step 3 — Intent Matching</a></li>
+<li><a href="#step-4-fallback-chain">Step 4 — Fallback Chain</a></li>
+<li><a href="#step-5-invariant-enforcement-11-rules-always-active">Step 5 — Invariant Enforcement (11 Rules, Always Active)</a></li>
+<li><a href="#validation-ci-enforced">Validation (CI-Enforced)</a></li>
+</ul>
+</li>
+<li><a href="#6-prompt-intelligence-agent-self-healing">6. Prompt Intelligence Agent (Self-Healing)</a><ul>
+<li><a href="#what-it-does">What It Does</a></li>
+<li><a href="#when-it-runs">When It Runs</a></li>
+</ul>
+</li>
+<li><a href="#7-devops-agent">7. DevOps Agent</a><ul>
+<li><a href="#available-now-devops-workflow">Available Now: /devops-workflow</a></li>
+<li><a href="#planned-features-q3-2026">Planned Features (Q3 2026)</a></li>
+</ul>
+</li>
+<li><a href="#environment-model-dev-only-agent-execution">Environment Model: Dev-Only Agent Execution</a></li>
+<li><a href="#architecture">Architecture</a><ul>
+<li><a href="#system-overview">System Overview</a></li>
+<li><a href="#pipeline-flow-phase-0-phase-5">Pipeline Flow (Phase 0 → Phase 5)</a></li>
+<li><a href="#data-zones-medallion-pattern">Data Zones (Medallion Pattern)</a></li>
+<li><a href="#aws-services">AWS Services</a></li>
+<li><a href="#semantic-layer">Semantic Layer</a></li>
+<li><a href="#deployment-topology">Deployment Topology</a></li>
+<li><a href="#mcp-servers-model-context-protocol">MCP Servers (Model Context Protocol)</a></li>
+<li><a href="#agentcore-optional-cloud-deployment">Agentcore (Optional Cloud Deployment)</a></li>
+</ul>
+</li>
+<li><a href="#project-structure">Project Structure</a><ul>
+<li><a href="#workload-structure-generated-per-dataset">Workload Structure (generated per dataset)</a></li>
+</ul>
+</li>
+<li><a href="#getting-started">Getting Started</a><ul>
+<li><a href="#prerequisites">Prerequisites</a></li>
+<li><a href="#run-tests-locally">Run Tests Locally</a></li>
+<li><a href="#onboard-a-new-dataset">Onboard a New Dataset</a></li>
+<li><a href="#deploy-to-aws">Deploy to AWS</a></li>
+<li><a href="#post-deployment-verification-mandatory">Post-Deployment Verification (Mandatory)</a></li>
+</ul>
+</li>
+<li><a href="#key-features">Key Features</a><ul>
+<li><a href="#pii-detection-and-governance">PII Detection and Governance</a></li>
+<li><a href="#quality-gates">Quality Gates</a></li>
+<li><a href="#cedar-policy-guardrails">Cedar Policy Guardrails</a></li>
+<li><a href="#reic-rag-enhanced-intent-classification">REIC: RAG-Enhanced Intent Classification</a></li>
+<li><a href="#deep-agent-tracing-three-layer-observability">Deep Agent Tracing (Three-Layer Observability)</a></li>
+<li><a href="#typed-sub-agent-outputs-structured-tool-calls">Typed Sub-Agent Outputs (Structured Tool Calls)</a></li>
+<li><a href="#workload-memory-per-dataset-persistent-learning">Workload Memory (Per-Dataset Persistent Learning)</a></li>
+<li><a href="#adaptive-prompt-evolution-self-healing-loop">Adaptive Prompt Evolution (Self-Healing Loop)</a></li>
+<li><a href="#deterministic-agent-output">Deterministic Agent Output</a></li>
+<li><a href="#agent-exchange-display">Agent Exchange Display</a></li>
+<li><a href="#cedar-policy-guardrails_1">Cedar Policy Guardrails</a></li>
+<li><a href="#test-driven-pipeline-generation">Test-Driven Pipeline Generation</a></li>
+<li><a href="#pre-deployment-code-validation-step-451">Pre-Deployment Code Validation (Step 4.5.1)</a></li>
+</ul>
+</li>
+<li><a href="#example-workloads">Example Workloads</a></li>
+<li><a href="#documentation">Documentation</a></li>
+<li><a href="#technology-stack">Technology Stack</a></li>
+<li><a href="#data-security">Data Security</a></li>
+<li><a href="#cost-estimation-llm-token-usage">Cost Estimation (LLM Token Usage)</a><ul>
+<li><a href="#per-workload-onboarding-end-to-end">Per-Workload Onboarding (End-to-End)</a></li>
+<li><a href="#estimated-cost-per-workload">Estimated Cost Per Workload</a></li>
+<li><a href="#platform-wide-estimate-all-workloads">Platform-Wide Estimate (All Workloads)</a></li>
+<li><a href="#cost-optimization-tips">Cost Optimization Tips</a></li>
+</ul>
+</li>
+<li><a href="#license">License</a></li>
+</ul>
+</div>
+</div>
+  </aside>
+  <main>
+    <div class="banner">
+      <h1>Agentic Data Onboarding Platform</h1>
+      <p>Bronze &rarr; Silver &rarr; Gold pipelines from a natural-language prompt &middot; README preview</p>
+    </div>
+    
+<section class="split-hero">
+  <div class="split-hero-left">
+    <img class="split-hero-img" alt="ADOP - Agentic Data Onboarding Platform" src="docs/diagrams/adop-overview.png" />
+  </div>
+  <div class="split-hero-right">
+    <h2 class="split-hero-heading">Prompt in, production pipeline out</h2>
+    <p class="split-hero-lede">
+      The shape of data engineering is changing. The specialist headcount problem &mdash; a Spark
+      engineer here, a dbt engineer there, a separate person for orchestration and another for
+      quality &mdash; is giving way to a smaller team of <strong>full-stack, agent-augmented
+      engineers</strong> who ship end-to-end pipelines.
+    </p>
+    <div class="pitch-grid">
+      <div class="pitch-card">
+        <div class="pitch-icon">&#9881;</div>
+        <div class="pitch-title">One engineer, full stack</div>
+        <div class="pitch-body">Ingestion, transformation, quality, orchestration, IaC &mdash; described in English, generated as tested code. Your team stops assembling roles and starts shipping outcomes.</div>
+      </div>
+      <div class="pitch-card">
+        <div class="pitch-icon">&#128640;</div>
+        <div class="pitch-title">Time-to-production shrinks</div>
+        <div class="pitch-body">A new dataset moves from intake to a governed, deployed pipeline in a working session &mdash; not a quarter. Backlog burn-down becomes an operational metric, not an aspiration.</div>
+      </div>
+      <div class="pitch-card">
+        <div class="pitch-icon">&#128273;</div>
+        <div class="pitch-title">Governance travels with the code</div>
+        <div class="pitch-body">GDPR, HIPAA, PCI, SOX controls apply themselves. Every generated artifact is deterministic, versioned, and signed &mdash; the auditors get a manifest, not a slide deck.</div>
+      </div>
+      <div class="pitch-card">
+        <div class="pitch-icon">&#128257;</div>
+        <div class="pitch-title">Migration &amp; deployment, rethought</div>
+        <div class="pitch-body">Because pipelines are generated from specs, they can be regenerated for a new region, warehouse, or format without rewrites. Modernization stops being a multi-year program.</div>
+      </div>
+    </div>
+    <p class="split-hero-cta">See the infographic for the full picture, and the flow below for the timeline of a single run.<br/>
+    <span class="split-hero-note">Built on <a href="https://docs.claude.com/en/docs/claude-code/overview" target="_blank" rel="noopener">Claude Code</a> workflows for parallel multi-agent orchestration.</span></p>
+  </div>
+</section>
+
+    
+<section class="quickstart">
+  <h2 class="quickstart-heading">The Five-Step Flow</h2>
+  <p class="quickstart-sub">What actually happens when you invoke the agent &mdash; timings below are typical wall-clock, not aspirational.</p>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-num">1</div>
+      <div class="flow-title">Describe</div>
+      <div class="flow-body">Paste a prompt with source, schedule, and compliance.</div>
+      <div class="flow-time">~5 min</div>
+    </div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step">
+      <div class="flow-num">2</div>
+      <div class="flow-title">Clarify</div>
+      <div class="flow-body">Agent profiles data + asks gap questions (dedup, thresholds, PII, schedule).</div>
+      <div class="flow-time">~15 min</div>
+    </div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step">
+      <div class="flow-num">3</div>
+      <div class="flow-title">Generate</div>
+      <div class="flow-body">Sub-agents build Bronze&rarr;Silver&rarr;Gold scripts, DAG, tests, ontology.</div>
+      <div class="flow-time">~30 min</div>
+    </div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step">
+      <div class="flow-num">4</div>
+      <div class="flow-title">Review &amp; Approve</div>
+      <div class="flow-body">Inspect plan, run tests, validate quality gates, merge PR.</div>
+      <div class="flow-time">~20 min</div>
+    </div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step">
+      <div class="flow-num">5</div>
+      <div class="flow-title">Deploy</div>
+      <div class="flow-body">CI/CD promotes artifacts. Post-deploy verifier checks 7 controls.</div>
+      <div class="flow-time">~15 min</div>
+    </div>
+  </div>
+</section>
+
+    
+<p><img alt="ADOP – Agentic Data Onboarding Platform" src="diagrams/adop-overview.png" /></p>
+<p><strong>Automate your entire data operations pipeline</strong> — ETL, data quality, semantic layer population, and data analysis — <strong>reducing development time from weeks to hours.</strong> Built-in compliance with <strong>GDPR, CCPA, HIPAA, SOX, and PCI DSS</strong> through regulation-specific prompts that automatically apply required controls.</p>
+<hr />
+<h2 id="starting-the-agent">Starting the Agent<a class="headerlink" href="#starting-the-agent" title="Permanent link">&para;</a></h2>
+<div class="start-here">
+  <div class="start-here-hero">
+    <img class="start-icon" alt="Get started" src="diagrams/icons/start-runner.png" />
+    <div class="start-arrow" aria-hidden="true">
+      <svg viewBox="0 0 120 40" width="120" height="40" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#0550ae"/>
+          </marker>
+        </defs>
+        <path d="M4,20 C40,4 80,36 116,20" fill="none" stroke="#0550ae" stroke-width="3" marker-end="url(#ah)"/>
+      </svg>
+    </div>
+    <div class="start-tag">HERE&rsquo;S HOW YOU START THE AGENT</div>
+  </div>
+  <div class="start-steps">
+    <div class="start-step">
+      <div class="start-step-num">1</div>
+      <div>
+        <div class="start-step-title">Clone the Repo</div>
+        <pre class="start-step-code">git clone https://github.com/aws-samples/sample-Agentic-Ai-Data-Operations
+cd sample-Agentic-Ai-Data-Operations
+claude</pre>
+      </div>
+    </div>
+    <div class="start-connector" aria-hidden="true">&rarr;</div>
+    <div class="start-step">
+      <div class="start-step-num">2</div>
+      <div>
+        <div class="start-step-title">Initiate Workflow</div>
+        <pre class="start-step-code">/onboard-workflow HIPAA
+
+Onboard claims data from s3://...</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p>Open Claude Code in this repo and paste a prompt describing <strong>where the data lives, where it's going, the cadence, and any compliance requirements.</strong> The Data Onboarding Agent asks clarifying questions, then spawns sub-agents to generate a fully tested workload under <code>workloads/&lt;name&gt;/</code>.</p>
+<p><strong>A good prompt includes:</strong>
+- <strong>Source</strong> (S3 path / Kafka topic / Kinesis stream / JDBC)
+- <strong>Sink cadence</strong> (batch daily / micro-batch / streaming)
+- <strong>Target zones</strong> (Silver quality rules, Gold transformations)
+- <strong>Compliance</strong> (GDPR, CCPA, HIPAA, SOX, PCI DSS — or none)</p>
+<h3 id="example-1-batch-from-s3-csv-daily-with-dynamic-workflow">Example 1 — Batch from S3 (CSV, daily) with Dynamic Workflow<a class="headerlink" href="#example-1-batch-from-s3-csv-daily-with-dynamic-workflow" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>/onboard-workflow HIPAA
+
+Onboard claims data from s3://data-lake-&lt;account&gt;-us-east-1/bronze/claims/ingestion_date=YYYY-MM-DD/claims.csv
+into Silver with dedup on claim_id and not-null policy_number, and into a flat denormalized
+Gold Iceberg table with derived measures (net_paid_ratio, days_to_submission, denial_category).
+Run daily at 03:00 UTC. Apply HIPAA controls with PHI masking in Silver and PHI suppression in Gold.
+</code></pre></div>
+
+<blockquote>
+<p>The <code>/onboard-workflow HIPAA</code> prefix triggers parallel execution via Dynamic Workflow.
+Phase 4 build agents use Opus (HIPAA = compliance-critical). Omit the prefix for sequential mode.</p>
+</blockquote>
+<h3 id="example-2-streaming-from-kafka-glue-streaming-etl">Example 2 — Streaming from Kafka (Glue Streaming ETL)<a class="headerlink" href="#example-2-streaming-from-kafka-glue-streaming-etl" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>/onboard-workflow PCI
+
+Onboard transaction events from Kafka topic `payments.auth.v1` (bootstrap:
+b-1.msk-prod.kafka.us-east-1.amazonaws.com:9098, IAM auth) using AWS Glue Streaming ETL.
+Land micro-batches every 60s into Bronze Iceberg on S3, dedup on event_id in Silver
+with schema validation, and aggregate to 5-minute windows in Gold (fraud_score by merchant, rolling
+auth_rate). Apply PCI DSS — tokenize PAN, drop CVV, Luhn check as a quality rule.
+</code></pre></div>
+
+<h3 id="example-3-streaming-from-kinesis-glue-streaming-etl">Example 3 — Streaming from Kinesis (Glue Streaming ETL)<a class="headerlink" href="#example-3-streaming-from-kinesis-glue-streaming-etl" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>/onboard-workflow GDPR
+
+Onboard clickstream events from Kinesis Data Stream `web-events-prod` (shard count 8,
+PutRecord enhanced fan-out consumer) using AWS Glue Streaming ETL with a checkpoint on S3.
+Write Bronze Iceberg on 1-minute triggers, Silver with session stitching on user_id + 30-min
+inactivity gap, Gold hourly rollups (page_views, unique_users, bounce_rate by traffic_source).
+Apply GDPR — consent-based filter on user_id, 365-day retention, right-to-erasure hook.
+</code></pre></div>
+
+<h3 id="prompt-depth-brief-vs-detailed">Prompt Depth: Brief vs. Detailed<a class="headerlink" href="#prompt-depth-brief-vs-detailed" title="Permanent link">&para;</a></h3>
+<p>You can be brief or detailed — the agent asks clarifying questions either way. Here's the same dataset at two levels of detail:</p>
+<p><strong>High-level</strong> (agent fills in defaults, keeps moving):</p>
+<div class="highlight"><pre><span></span><code>Onboard e-commerce orders from s3://your-landing-bucket/ecommerce_orders/
+
+- CSV, 50 rows, GDPR, daily 09:30 UTC batch
+- Gold: flat denormalized table for ad-hoc queries (no star schema)
+- DQ: completeness &gt; 85%, validate dates/emails/phones, quarantine bad rows
+- Transforms: mask credit cards, standardize phones, cast dates, derive order_month + days_to_ship
+
+Print a status box after each phase. Don&#39;t ask questions — use defaults and keep moving.
+</code></pre></div>
+
+<p><strong>Deep-dive</strong> (fully specified, no questions needed):</p>
+<div class="highlight"><pre><span></span><code>Onboard a new e-commerce orders dataset.
+
+Source:
+- Location: s3://your-landing-bucket/ecommerce_orders/
+- Format: CSV, 50 rows, batch ingestion
+- Refresh: Daily at 09:30 UTC
+
+Compliance: GDPR
+- PII columns: customer_email, customer_phone, credit_card_number, customer_name, shipping_address
+- Require consent tracking, right-to-erasure support, 365-day retention
+
+Gold Zone: Flat denormalized table for ad-hoc analytics (NO star schema)
+
+Data Quality Rules:
+- Completeness threshold: 85% (block promotion if below)
+- Validate order_date format (reject invalid dates like month &gt; 12)
+- Validate customer_email format (must contain @)
+- Validate customer_phone format (reject non-numeric junk)
+- Flag invalid credit_card_number values
+- Flag rows missing city/state/zip as incomplete
+- Anomaly: flag orders where total_amount != quantity × unit_price × (1 - discount_pct)
+
+Transformations (Bronze → Silver):
+- Standardize phone to E.164 format
+- Mask credit_card_number (show last 4 only: ****-****-****-1234)
+- Cast order_date and ship_date to DATE type
+- Trim whitespace on all string columns
+- Quarantine rows with invalid dates (don&#39;t drop silently)
+
+Transformations (Silver → Gold):
+- Flatten all columns into single wide table
+- Add derived columns: order_month, days_to_ship, is_returned, is_high_value (total &gt; $100)
+- Keep only delivered + returned orders (exclude processing/cancelled)
+
+Schedule: Daily batch at 09:30 UTC, retries=3, exponential backoff, alert on failure
+</code></pre></div>
+
+<p>Watch the agent run, approve the plan it presents, and the artifacts land under <code>workloads/&lt;name&gt;/</code> (config, scripts, DAG, tests, ontology).</p>
+<h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
+<p><strong>Built for Claude Code, adaptable to other AI assistants.</strong> While this platform is designed for <strong>Claude Code</strong> (CLI, Desktop, Web), the prompt architecture and agent workflows can be adapted with slight modifications to work with <strong>Kiro</strong>, <strong>GitHub Copilot</strong>, <strong>Cursor</strong>, or other AI coding assistants that support context-aware code generation.</p>
+<p><strong>All agents run in the Development environment only.</strong> Generated scripts and configurations are version-controlled and promoted to higher environments (QA, Staging, Production) through standard CI/CD pipelines. Agents do not run in production — only the artifacts they generate.</p>
+<hr />
+<h2 id="1-data-onboarding-agent">1. Data Onboarding Agent<a class="headerlink" href="#1-data-onboarding-agent" title="Permanent link">&para;</a></h2>
+<p><strong>Purpose:</strong> Automates the entire Bronze→Silver→Gold pipeline creation process from a natural language description.</p>
+<p><strong>Runs in:</strong> Development environment only
+<strong>Output:</strong> Version-controlled scripts, configs, DAGs, and tests → promoted to higher environments via CI/CD</p>
+<p>A user describes their data source in natural language. The <strong>Data Onboarding Agent</strong> coordinates specialized sub-agents to generate a complete, tested pipeline — config files, transformation scripts, quality checks, and an Airflow DAG — without writing any code manually.</p>
+<h3 id="agent-coordination-workflow">Agent Coordination Workflow<a class="headerlink" href="#agent-coordination-workflow" title="Permanent link">&para;</a></h3>
+<p><img alt="Data Onboarding Agent Workflow" src="diagrams/data-onboarding-workflow.png" /></p>
+<p><strong>The Data Onboarding Agent (center) orchestrates specialized sub-agents. The Router Agent gates entry on the left; Glue Catalog, Semantic Layer (OWL/SHACL), Decision Engine, Memory, and Agentrace logs are shared services on the right.</strong></p>
+<ol>
+<li><strong>Router Agent</strong> — Checks if the data or workload already exists in <code>workloads/</code></li>
+<li><strong>Metadata Agent</strong> — Analyzes raw dataset, extracts metadata (data types, column datatypes, distinct values, quality issues), stores business context in <strong>Semantic Layer</strong></li>
+<li><strong>Ontology Agent</strong> — Induces the OWL ontology for the Semantic Layer from Glue/SageMaker Catalog metadata (data types, column datatypes, distinct values, quality issues)</li>
+<li><strong>Data Quality Agent</strong> — Creates quality scripts for each column based on metadata agent inputs (column-level checks, parent-child relationships, quality thresholds, pass/fail gates)</li>
+<li><strong>Data Transformation Agent</strong> — Creates AWS Glue scripts to run transformations (Bronze→Silver→Gold) based on user input and metadata agent analysis</li>
+<li><strong>Orchestration/Scheduling DAG Agent</strong> — Creates the end-to-end orchestration DAG in Airflow or Step Functions</li>
+<li><strong>DevOps Agent</strong> — Creates CloudFormation, Terraform, and AWS CDK to promote the generated artifacts to higher environments</li>
+</ol>
+<p><strong>Workflow (two execution modes):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Invocation</th>
+<th>Phase 4</th>
+<th>Wall Clock</th>
+<th>Token Cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Sequential</strong> (standard)</td>
+<td>Paste prompt directly</td>
+<td>Sub-agents run one at a time</td>
+<td>~30 min</td>
+<td>1x</td>
+</tr>
+<tr>
+<td><strong>Dynamic Workflow</strong> (parallel)</td>
+<td><code>/onboard-workflow [REGULATION]</code></td>
+<td>Sub-agents run in parallel</td>
+<td>~15-20 min</td>
+<td>3-5x</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code># Standard mode:
+User: &quot;Onboard customer data from PostgreSQL, daily refresh, PII masking required&quot;
+
+# Workflow mode (parallel, faster, resumable):
+User: &quot;/onboard-workflow HIPAA&quot;
+User: &quot;Onboard patient records from S3...&quot;
+</code></pre></div>
+
+<p><strong>Phases (both modes):</strong></p>
+<div class="highlight"><pre><span></span><code>Phase 0: Health Check ─ verify AWS resources + 13 MCP servers (REQUIRED/WARN/OPTIONAL)
+Phase 1: Discovery ─── asks source, schema, cleaning rules, quality thresholds, schedule
+Phase 2: Dedup ─────── checks existing workloads for overlaps, reuses shared assets
+Phase 3: Profile ───── samples 5% of data, detects PII, presents metadata for approval
+Phase 4: Build ─────── spawns 4 sub-agents → each writes artifacts + tests → TEST GATE
+Phase 4.5: Validate ── checks Python syntax, DAG parsing, imports, Airflow best practices
+Phase 5: Deploy ────── uploads to S3, creates Glue catalog, applies LF-Tags, verifies
+
+Output: workloads/{dataset_name}/ with config/, scripts/, dags/, sql/, tests/
+</code></pre></div>
+
+<p><strong>Dynamic Workflow advantages</strong> (via <code>/onboard-workflow</code>):
+- Metadata + Quality agents run in parallel (Phase 4 Stage 1)
+- Model routing: HIPAA/SOX/PCI → Opus for build agents; GDPR/CCPA/none → Sonnet
+- Opus adversarial reviewer + verifier at quality chokepoints regardless of regulation
+- Multi-workload batch: onboard multiple datasets in one invocation
+- Resumable: completed phases survive disconnects</p>
+<p>See <code>.claude/commands/onboard-workflow.md</code> for the skill definition and <code>demo/sample_prompt/customer_master_workflow.md</code> for a full example.</p>
+<h3 id="workload-memory-persistent-learning">Workload Memory (Persistent Learning)<a class="headerlink" href="#workload-memory-persistent-learning" title="Permanent link">&para;</a></h3>
+<p>Each workload maintains its own memory system in <code>workloads/{name}/memory/</code> that accumulates knowledge across pipeline runs — schema quirks, quality thresholds, operator preferences, and successful patterns — enabling future runs to start with context instead of cold discovery. When the same workload is re-processed, the agent loads this memory first, pre-filling known answers and avoiding repetitive questions, while continuously learning from new failures and successes to prevent recurring issues.</p>
+<hr />
+<h2 id="2-ontology-staging-agent-aws-semantic-layer-handoff">2. Ontology Staging Agent (AWS Semantic Layer Handoff)<a class="headerlink" href="#2-ontology-staging-agent-aws-semantic-layer-handoff" title="Permanent link">&para;</a></h2>
+<p><strong>Purpose:</strong> Induces an OWL ontology + R2RML mappings from each workload's <code>semantic.yaml</code> + Glue Catalog schema, staged locally for handoff to <strong>AWS Semantic Layer</strong> (upcoming AWS Semantic Layer platform, currently in development).</p>
+<p><strong>Runs in:</strong> Development environment only (emits files to <code>workloads/{name}/config/</code>)
+<strong>Output:</strong> <code>ontology.ttl</code> (OWL2 classes/properties/hierarchy), <code>mappings.ttl</code> (R2RML linking classes to Glue tables), <code>ontology_manifest.json</code> (version, checksums, steward checklist)</p>
+<p><strong>Scope boundary:</strong> ADOP generates and validates Turtle locally. ADOP does <strong>NOT</strong> run T-Box reasoning, author SHACL constraints, or publish to a VKG — those are the Data Steward's responsibilities inside the AWS Semantic Layer platform when the AWS Semantic Layer platform deploys.</p>
+<p><strong>How it works:</strong></p>
+<ol>
+<li><strong>OWL induction</strong> — <code>semantic.yaml</code> entities → owl:Class, dimension/measure/temporal columns → owl:DatatypeProperty with xsd ranges, relationships → owl:ObjectProperty (+ owl:FunctionalProperty for many-to-one), hierarchies → rdfs:subClassOf chain, PII flags → ex:piiClassification annotations, Glue-only columns → ex:autoInduced annotation.</li>
+<li><strong>R2RML mapping</strong> — one TriplesMap per entity, logical table = Athena SQL against the Gold zone, subject URI template = <code>http://semantic.aws/{namespace}/data/{ClassName}/{pk}</code>, FK columns emit <code>rr:parentTriplesMap</code> references.</li>
+<li><strong>Turtle validation</strong> — parse with <code>rdflib</code>, auto-fix common issues (unescaped quotes, missing semicolons), retry up to 2 times.</li>
+<li><strong>Staging</strong> — write 3 artifacts to <code>workloads/{name}/config/</code> with SHA-256 checksums and <code>"state": "STAGED_LOCAL"</code>. Data Steward picks these up for AWS Semantic Layer publish.</li>
+</ol>
+<p>When the AWS Semantic Layer platform is deployed, a follow-up <code>ontology-publish-agent</code> (future) will read the committed TTL files and push them to Neptune SPARQL + S3 + DynamoDB + SNS.</p>
+<hr />
+<h2 id="3-environment-setup-agent">3. Environment Setup Agent<a class="headerlink" href="#3-environment-setup-agent" title="Permanent link">&para;</a></h2>
+<p><strong>Purpose:</strong> Automates one-time AWS infrastructure provisioning and MCP server deployment across local and cloud modes.</p>
+<p><strong>Runs in:</strong> Development environment only (one-time setup)
+<strong>Output:</strong> AWS resources (S3, Glue, KMS, IAM), MCP server configurations, Agentcore Gateway/Runtime (optional)</p>
+<p>The Environment Setup Agent handles the foundational infrastructure setup that must happen before any data onboarding can begin. This includes AWS resource provisioning (S3 buckets, KMS keys, Glue databases, Lake Formation settings), MCP server installation and health checks, and optional Agentcore Gateway deployment for shared cloud-hosted tool access.</p>
+<hr />
+<h2 id="4-semantic-layer-business-context-ontology-handoff">4. Semantic Layer (Business Context + Ontology Handoff)<a class="headerlink" href="#4-semantic-layer-business-context-ontology-handoff" title="Permanent link">&para;</a></h2>
+<p><strong>Purpose:</strong> Captures business context (column roles, dimension hierarchies, relationships, PII flags) in <code>semantic.yaml</code> and emits a formal OWL ontology + R2RML mappings for handoff to <strong>AWS Semantic Layer</strong> — the upcoming AWS Semantic Layer platform responsible for NL→SQL, reasoning, SHACL validation, and VKG publish.</p>
+<p><strong>Runs in:</strong> Development (config authoring + ontology induction)
+<strong>Output:</strong> <code>workloads/{name}/config/semantic.yaml</code> (source of truth), <code>ontology.ttl</code> (OWL2), <code>mappings.ttl</code> (R2RML), <code>ontology_manifest.json</code>. All committed to git.</p>
+<p>The semantic layer captures column roles (measures, dimensions, temporal, identifiers), hierarchical relationships (country→state→city), business terms, and PII classifications. <strong>SageMaker Catalog</strong> mirrors this on the Glue Data Catalog as custom metadata properties so downstream consumers see business context alongside technical schemas.</p>
+<p>At Phase 7 Step 8.5 of the deploy flow, the <strong>Ontology Staging Agent</strong> induces an OWL ontology from <code>semantic.yaml</code> + the deployed Glue Gold table schema, generates R2RML mappings wiring each OWL class to its physical table, and validates Turtle syntax with rdflib. The resulting <code>ontology.ttl</code> + <code>mappings.ttl</code> + <code>ontology_manifest.json</code> land in <code>workloads/{name}/config/</code> for AWS Semantic Layer to pick up.</p>
+<p><strong>Hard boundary:</strong> ADOP stops at emission. AWS Semantic Layer (in development) owns SHACL authoring, T-Box reasoning (HermiT/ELK), VKG publish (Ontop), and NL→SQL runtime. When the AWS Semantic Layer platform deploys, a future publish agent will push the committed TTL files from local to Neptune SPARQL + S3 + DynamoDB + SNS — no regeneration needed because the inducer is deterministic.</p>
+<hr />
+<h2 id="5-ai-clone-decision-engine">5. AI Clone Decision Engine<a class="headerlink" href="#5-ai-clone-decision-engine" title="Permanent link">&para;</a></h2>
+<p><strong>Purpose:</strong> An AI clone of you (or your organization) that makes tooling decisions the way you would — dynamically selecting the optimal tool for each operation based on your principles, available infrastructure, and real-time health status.</p>
+<p><strong>Runs in:</strong> All phases (continuous tool selection)
+<strong>Output:</strong> Tool routing decisions, fallback strategies, organizational compliance reports</p>
+<p>The AI Clone learns how you pick tools — your preferences, security posture, cost sensitivity, and fallback habits — then makes those decisions autonomously at runtime. It maintains a live inventory of available MCP servers, CLI tools, and cloud services, routing each operation the way you would based on performance requirements, security policies, cost optimization, and organizational preferences (e.g., "always use MCP over CLI when available" or "prefer Athena over Redshift for ad-hoc queries").</p>
+<p>You encode your decision-making into policy files: tool preferences, security constraints (e.g., "PII operations must use designated KMS keys"), cost thresholds, and failover strategies. The clone evaluates these rules in real-time during pipeline execution, automatically falling back to alternative tools when primary choices are unavailable or violate your policies — exactly as you would if you were making the call yourself.</p>
+<p>This means the same pipeline code runs across different environments without you being present. Your clone carries your judgment: startups might default to cost-optimized tools while enterprises enforce security-first tool selection — the clone adapts to whichever context it's deployed in, applying your encoded principles consistently.</p>
+<h3 id="how-the-decision-engine-works">How the Decision Engine Works<a class="headerlink" href="#how-the-decision-engine-works" title="Permanent link">&para;</a></h3>
+<p>The tool selection process follows a 5-step hierarchy, defined across three configuration layers:</p>
+<div class="highlight"><pre><span></span><code>User Intent → Step 1: Context Check → Step 2: Server Health → Step 3: Intent Match
+           → Step 4: Fallback Strategy → Step 5: Invariant Enforcement
+</code></pre></div>
+
+<p><strong>Configuration Sources:</strong></p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="TOOL_ROUTING.md"><code>TOOL_ROUTING.md</code></a></td>
+<td>Intent-to-tool mapping — matches natural language intent to specific MCP tools with <code>not_when</code> disqualifiers</td>
+</tr>
+<tr>
+<td><a href="tool-registry/servers.yaml"><code>tool-registry/servers.yaml</code></a></td>
+<td>Single source of truth for 13 MCP servers — category, tools, fallbacks</td>
+</tr>
+<tr>
+<td><a href="tool-registry/invariants.yaml"><code>tool-registry/invariants.yaml</code></a></td>
+<td>11 mandatory rules (BLOCK/WARN severity) enforced regardless of phase</td>
+</tr>
+<tr>
+<td><a href="MCP_GUARDRAILS.md"><code>MCP_GUARDRAILS.md</code></a></td>
+<td>Per-phase guardrails — exact tool names allowed per deploy step</td>
+</tr>
+<tr>
+<td><a href="CLAUDE.md"><code>CLAUDE.md</code></a></td>
+<td>Architecture constraints — sub-agent limitations, MCP-first rule</td>
+</tr>
+</tbody>
+</table>
+<h3 id="step-1-context-gate-sub-agent-vs-main-conversation">Step 1 — Context Gate (Sub-Agent vs Main Conversation)<a class="headerlink" href="#step-1-context-gate-sub-agent-vs-main-conversation" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>Am I a sub-agent?
+├── YES → STOP. Generate files only. No MCP, no AWS, no CLI.
+└── NO  → Proceed to Step 2
+</code></pre></div>
+
+<p>Sub-agents (Metadata, Transformation, Quality, DAG) have zero tool access by design — enforced by Cedar policy (<code>shared/policies/agent_authorization/</code>) and the <code>sub-agent-no-mcp</code> invariant.</p>
+<h3 id="step-2-server-health-3-tier-classification">Step 2 — Server Health (3-Tier Classification)<a class="headerlink" href="#step-2-server-health-3-tier-classification" title="Permanent link">&para;</a></h3>
+<p>Before selecting a tool, the engine checks server availability from Phase 0 health check:</p>
+<table>
+<thead>
+<tr>
+<th>Tier</th>
+<th>Servers</th>
+<th>On Failure</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>REQUIRED</strong></td>
+<td><code>glue-athena</code>, <code>lakeformation</code>, <code>iam</code></td>
+<td><strong>Block</strong> — cannot proceed</td>
+</tr>
+<tr>
+<td><strong>WARN</strong></td>
+<td><code>cloudtrail</code>, <code>redshift</code>, <code>core</code>, <code>s3-tables</code>, <code>pii-detection</code></td>
+<td><strong>CLI fallback</strong> + log warning</td>
+</tr>
+<tr>
+<td><strong>OPTIONAL</strong></td>
+<td><code>sagemaker-catalog</code>, <code>lambda</code>, <code>cloudwatch</code>, <code>cost-explorer</code>, <code>dynamodb</code></td>
+<td><strong>Defer</strong> — skip gracefully</td>
+</tr>
+</tbody>
+</table>
+<h3 id="step-3-intent-matching">Step 3 — Intent Matching<a class="headerlink" href="#step-3-intent-matching" title="Permanent link">&para;</a></h3>
+<p>Each user operation is matched against intent phrases in <code>TOOL_ROUTING.md</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Example: User says &quot;check data quality in Silver&quot;</span>
+<span class="nt">tool</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">glue-data-quality</span>
+<span class="nt">intent</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;run</span><span class="nv"> </span><span class="s">quality</span><span class="nv"> </span><span class="s">rules&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;check</span><span class="nv"> </span><span class="s">completeness&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;validate</span><span class="nv"> </span><span class="s">Silver</span><span class="nv"> </span><span class="s">data&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;quality</span><span class="nv"> </span><span class="s">gate&quot;</span><span class="p p-Indicator">]</span>
+<span class="nt">use</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aws glue start-data-quality-ruleset-evaluation-run CLI (DQDL syntax)</span>
+<span class="nt">not_when</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Quick one-off check — Athena SQL is faster</span>
+<span class="nt">mcp_server</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">glue-athena (REQUIRED)</span>
+</code></pre></div>
+
+<p>The <code>not_when</code> field acts as a negative filter — if the disqualifier condition is true, skip this tool and try the next match.</p>
+<h3 id="step-4-fallback-chain">Step 4 — Fallback Chain<a class="headerlink" href="#step-4-fallback-chain" title="Permanent link">&para;</a></h3>
+<p>When the primary tool is unavailable:</p>
+<div class="highlight"><pre><span></span><code>MCP tool available?
+├── YES → Use MCP (preferred, always first)
+└── NO  → Is it REQUIRED tier?
+    ├── YES → BLOCK operation, escalate to human
+    └── NO  → Use CLI fallback + log: &quot;Warning: MCP fallback — {server} not loaded&quot;
+</code></pre></div>
+
+<h3 id="step-5-invariant-enforcement-11-rules-always-active">Step 5 — Invariant Enforcement (11 Rules, Always Active)<a class="headerlink" href="#step-5-invariant-enforcement-11-rules-always-active" title="Permanent link">&para;</a></h3>
+<p>Regardless of which tool is selected, these rules are enforced on every operation:</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Rule</th>
+<th>Severity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>lineage-always</code></td>
+<td><code>--enable-data-lineage: true</code> on every Glue ETL job</td>
+<td>BLOCK</td>
+</tr>
+<tr>
+<td><code>no-credentials-in-code</code></td>
+<td>Credentials via Secrets Manager or Airflow Connections only</td>
+<td>BLOCK</td>
+</tr>
+<tr>
+<td><code>bronze-immutable</code></td>
+<td>Bronze zone data never modified after ingestion</td>
+<td>BLOCK</td>
+</tr>
+<tr>
+<td><code>quality-gates</code></td>
+<td>Silver &gt;= 80%, Gold &gt;= 95%; critical failures block promotion</td>
+<td>BLOCK</td>
+</tr>
+<tr>
+<td><code>sub-agent-no-mcp</code></td>
+<td>Sub-agents generate artifacts only; no MCP, no AWS execution</td>
+<td>BLOCK</td>
+</tr>
+<tr>
+<td><code>iam-simulate-first</code></td>
+<td><code>simulate_principal_policy</code> must return allowed before source access</td>
+<td>BLOCK</td>
+</tr>
+<tr>
+<td><code>verify-deployment</code></td>
+<td>Confirm tables queryable after deploy (Redshift or Athena)</td>
+<td>BLOCK</td>
+</tr>
+<tr>
+<td><code>audit-after-deploy</code></td>
+<td>Run CloudTrail lookup after deploy to confirm logging</td>
+<td>BLOCK</td>
+</tr>
+<tr>
+<td><code>log-cli-fallback</code></td>
+<td>Print warning message on every CLI fallback</td>
+<td>WARN</td>
+</tr>
+<tr>
+<td><code>zone-scoped-kms</code></td>
+<td>Separate CMK for Bronze, Silver, Gold per workload</td>
+<td>BLOCK</td>
+</tr>
+<tr>
+<td><code>mcp-first</code></td>
+<td>Use MCP tools FIRST; CLI only when unavailable or errored</td>
+<td>BLOCK</td>
+</tr>
+</tbody>
+</table>
+<h3 id="validation-ci-enforced">Validation (CI-Enforced)<a class="headerlink" href="#validation-ci-enforced" title="Permanent link">&para;</a></h3>
+<p>The tool registry is validated by <code>scripts/validate_tool_registry.py</code> (18 tests):
+- <code>servers.yaml</code> ↔ <code>.mcp.json</code> — every server in YAML must exist in MCP config
+- <code>servers.yaml</code> ↔ <code>TOOL_ROUTING.md</code> — every server referenced in routing docs must exist in registry
+- <code>invariants.yaml</code> ↔ <code>TOOL_ROUTING.md</code> — mandatory rules in YAML match what's documented
+- No stale references — tools referenced in docs that no longer exist are caught</p>
+<hr />
+<h2 id="6-prompt-intelligence-agent-self-healing">6. Prompt Intelligence Agent (Self-Healing)<a class="headerlink" href="#6-prompt-intelligence-agent-self-healing" title="Permanent link">&para;</a></h2>
+<p><strong>Purpose:</strong> Learns from pipeline failures across all workloads and generates recommendations to prevent recurring issues.</p>
+<p><strong>Runs in:</strong> Development environment only
+<strong>Output:</strong> Analysis reports with prompt patches, best practices, estimated time savings</p>
+<p>The system <strong>learns from mistakes</strong> by analyzing trace logs from failed and successful pipeline runs across all workloads, then generates actionable recommendations to prevent recurring failures.</p>
+<h3 id="what-it-does">What It Does<a class="headerlink" href="#what-it-does" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Pattern Detection</strong>: Scans <code>trace_events.jsonl</code> across all workloads to find recurring errors</li>
+<li><strong>Cross-Workload Learning</strong>: Groups identical failures (e.g., "KeyError: 'primary_key'" in 3+ workloads)</li>
+<li><strong>Root Cause Analysis</strong>: Explains why the pattern occurs (e.g., "CSV sources lack explicit PK column")</li>
+<li><strong>Actionable Recommendations</strong>: Generates ready-to-paste prompt patches to prevent recurrence</li>
+<li><strong>Best Practice Extraction</strong>: Identifies high-confidence decisions from successful runs</li>
+</ol>
+<h3 id="when-it-runs">When It Runs<a class="headerlink" href="#when-it-runs" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Nightly (automated)</strong>: <code>evolve</code> command analyzes traces, generates patches, and auto-grafts high-confidence fixes to SKILLS.md</li>
+<li><strong>Weekly (human review)</strong>: Review pending patches (confidence 0.60-0.79) and approve or reject</li>
+<li><strong>On-demand</strong>: After major failures or before deployments</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="c1"># Self-healing loop: analyze → generate patches → auto-apply to SKILLS.md</span>
+python3<span class="w"> </span>-m<span class="w"> </span>shared.prompt_intelligence.cli<span class="w"> </span>evolve<span class="w"> </span>--auto-graft<span class="w"> </span>--min-confidence<span class="w"> </span><span class="m">0</span>.80
+
+<span class="c1"># Review pending patches</span>
+python3<span class="w"> </span>-m<span class="w"> </span>shared.prompt_intelligence.cli<span class="w"> </span>patches<span class="w"> </span>--status<span class="w"> </span>pending
+
+<span class="c1"># Revert a bad patch</span>
+python3<span class="w"> </span>-m<span class="w"> </span>shared.prompt_intelligence.cli<span class="w"> </span>prune<span class="w"> </span>--patch-id<span class="w"> </span>abc123
+
+<span class="c1"># Legacy: analysis-only (generates report, does not apply patches)</span>
+python3<span class="w"> </span>-m<span class="w"> </span>shared.prompt_intelligence.cli<span class="w"> </span>analyze<span class="w"> </span>--all
+</code></pre></div>
+
+<p><strong>Example output:</strong></p>
+<div class="highlight"><pre><span></span><code>✓ Found 2 cross-workload failure patterns
+
+Top Failure Patterns:
+  1. KeyError: &#39;primary_key&#39;
+     Frequency: 3, Workloads: 3, Confidence: 0.78
+     Impact: BLOCKING
+
+Recommendation: For CSV sources, ALWAYS ask &#39;What is the primary key?&#39;
+                before profiling. Add to discovery checklist.
+
+Estimated Time Saved: 10-15 hours across future onboardings
+</code></pre></div>
+
+<p><strong>Report includes:</strong>
+- <strong>Executive Summary</strong>: Impact distribution (BLOCKING/DEGRADED/MINOR), top blockers, estimated time savings
+- <strong>Failure Patterns</strong>: Grouped by impact with root cause analysis and prompt patches (ready to copy-paste into prompt files)
+- <strong>Best Practices</strong>: High-confidence successful decisions to adopt across workloads
+- <strong>Implementation Guide</strong>: Step-by-step instructions for applying fixes</p>
+<p>See <a href="shared/prompt_intelligence/QUICKSTART.md">shared/prompt_intelligence/QUICKSTART.md</a> for 3-minute start guide.</p>
+<hr />
+<h2 id="7-devops-agent">7. DevOps Agent<a class="headerlink" href="#7-devops-agent" title="Permanent link">&para;</a></h2>
+<p><strong>Purpose:</strong> Automates IaC generation, monitoring, cost optimization, and operational runbooks for deployed pipelines.</p>
+<p><strong>Runs in:</strong> Development environment (generates IaC, monitoring configs, runbooks — human applies)
+<strong>Output:</strong> Terraform/CDK/CFN, CloudWatch dashboards, SNS alerts, cost tags, budget alerts, RUNBOOK.md</p>
+<h3 id="available-now-devops-workflow">Available Now: <code>/devops-workflow</code><a class="headerlink" href="#available-now-devops-workflow" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>/devops-workflow<span class="w"> </span>customer_master<span class="w"> </span>terraform
+</code></pre></div>
+
+<p>Triggers a Dynamic Workflow that generates everything in parallel:</p>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Agents</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IaC Generate</td>
+<td>1 sonnet</td>
+<td><code>iac/terraform/main.tf</code> + variables + outputs + APPLY_GUIDE.md</td>
+</tr>
+<tr>
+<td>Monitoring</td>
+<td>1 sonnet</td>
+<td>CloudWatch alarms + SNS topic + EventBridge rules + dashboard</td>
+</tr>
+<tr>
+<td>Cost &amp; Tags</td>
+<td>1 sonnet</td>
+<td>Cost allocation tags + budget alerts + lifecycle policies</td>
+</tr>
+<tr>
+<td>Runbook</td>
+<td>1 sonnet</td>
+<td>RUNBOOK.md (failure recovery, escalation, maintenance)</td>
+</tr>
+<tr>
+<td>Security Review</td>
+<td>1 opus</td>
+<td>Adversarial IaC review (no wildcards, no public access)</td>
+</tr>
+<tr>
+<td>Validate</td>
+<td>2 haiku</td>
+<td>Syntax checks (terraform fmt, cfn-lint)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="planned-features-q3-2026">Planned Features (Q3 2026)<a class="headerlink" href="#planned-features-q3-2026" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>CI/CD Pipelines</strong> — Git push → auto-deploy to QA/Staging/Prod</li>
+<li><strong>Self-Healing</strong> — Auto-retries transient failures, scales resources based on data volume</li>
+<li><strong>Quality Drift Detection</strong> — Alerts when data quality scores drop below historical baseline</li>
+<li><strong>Resource Scaling</strong> — Right-sizes Glue jobs, Athena query concurrency based on usage patterns</li>
+</ul>
+<hr />
+<h2 id="environment-model-dev-only-agent-execution">Environment Model: Dev-Only Agent Execution<a class="headerlink" href="#environment-model-dev-only-agent-execution" title="Permanent link">&para;</a></h2>
+<p><strong>Critical principle:</strong> All agents run <strong>only in the Development environment</strong>. Higher environments (QA, Staging, Production) execute only the generated scripts and configurations.</p>
+<table>
+<thead>
+<tr>
+<th>Environment</th>
+<th>What Runs</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Development</strong></td>
+<td>Active agents: Data Onboarding, Ontology Staging, Environment Setup, Prompt Intelligence. DevOps Agent planned for Q2 2026.</td>
+<td>Interactive via Claude Code CLI</td>
+</tr>
+<tr>
+<td><strong>QA/Staging</strong></td>
+<td>Generated scripts/DAGs/configs only</td>
+<td>Deployed via CI/CD (GitHub Actions, MWAA)</td>
+</tr>
+<tr>
+<td><strong>Production</strong></td>
+<td>Generated scripts/DAGs/configs only</td>
+<td>Promoted via CI/CD after QA approval</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Artifact Promotion Flow:</strong></p>
+<div class="highlight"><pre><span></span><code>Dev Agent → Generate scripts/tests → Commit to Git → CI/CD pipeline → QA → Staging → Prod
+          ↓
+      Run tests locally
+      Validate syntax/best practices
+      Human approval
+</code></pre></div>
+
+<p><strong>Why this matters:</strong>
+- <strong>Security</strong>: Agents don't need production AWS credentials
+- <strong>Auditability</strong>: All changes are version-controlled, peer-reviewed
+- <strong>Reproducibility</strong>: Same scripts run identically across all environments
+- <strong>Rollback</strong>: Git history enables instant rollback to previous working version</p>
+<hr />
+<h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
+<h3 id="system-overview">System Overview<a class="headerlink" href="#system-overview" title="Permanent link">&para;</a></h3>
+<p><img alt="Architecture Diagram" src="diagrams/Architecture-Diagram.png" /></p>
+<h3 id="pipeline-flow-phase-0-phase-5">Pipeline Flow (Phase 0 → Phase 5)<a class="headerlink" href="#pipeline-flow-phase-0-phase-5" title="Permanent link">&para;</a></h3>
+<p><img alt="Pipeline Flow" src="diagrams/Prompt-flow.png" /></p>
+<h3 id="data-zones-medallion-pattern">Data Zones (Medallion Pattern)<a class="headerlink" href="#data-zones-medallion-pattern" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Zone</th>
+<th>Purpose</th>
+<th>Format</th>
+<th>Quality Gate</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Bronze</strong></td>
+<td>Raw, immutable ingestion</td>
+<td>Source format (CSV, JSON, Parquet)</td>
+<td>None</td>
+</tr>
+<tr>
+<td><strong>Silver</strong></td>
+<td>Cleaned, validated, schema-enforced</td>
+<td>Apache Iceberg on S3 Tables</td>
+<td>Score &gt;= 80%</td>
+</tr>
+<tr>
+<td><strong>Gold</strong></td>
+<td>Curated, business-ready</td>
+<td>Iceberg (star schema or flat)</td>
+<td>Score &gt;= 95%</td>
+</tr>
+</tbody>
+</table>
+<h3 id="aws-services">AWS Services<a class="headerlink" href="#aws-services" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S3 + S3 Tables</td>
+<td>Data lake storage (Bronze/Silver/Gold zones)</td>
+</tr>
+<tr>
+<td>AWS Glue</td>
+<td>ETL jobs, crawlers, Data Catalog</td>
+</tr>
+<tr>
+<td>Amazon Athena</td>
+<td>SQL queries on Iceberg tables</td>
+</tr>
+<tr>
+<td>Apache Iceberg</td>
+<td>Table format (ACID, time-travel, schema evolution)</td>
+</tr>
+<tr>
+<td>AWS KMS</td>
+<td>Encryption at rest (zone-specific keys)</td>
+</tr>
+<tr>
+<td>Lake Formation</td>
+<td>Column-level security via LF-Tags</td>
+</tr>
+<tr>
+<td>Amazon MWAA</td>
+<td>Airflow orchestration</td>
+</tr>
+<tr>
+<td>SageMaker Catalog</td>
+<td>Business metadata (custom columns on Glue Catalog entries)</td>
+</tr>
+<tr>
+<td>Ontology artifacts (local)</td>
+<td><code>workloads/{name}/config/ontology.ttl</code> + <code>mappings.ttl</code> for AWS Semantic Layer handoff</td>
+</tr>
+</tbody>
+</table>
+<h3 id="semantic-layer">Semantic Layer<a class="headerlink" href="#semantic-layer" title="Permanent link">&para;</a></h3>
+<p>The semantic layer in ADOP has two responsibilities: (1) capture business context in <code>semantic.yaml</code> and mirror it to SageMaker Catalog, (2) emit OWL + R2RML artifacts for handoff to the AWS Semantic Layer (upcoming).</p>
+<h3 id="deployment-topology">Deployment Topology<a class="headerlink" href="#deployment-topology" title="Permanent link">&para;</a></h3>
+<p>By default the platform deploys to a single AWS account: Glue Data Catalog, Lake Formation, Glue jobs, MWAA, and S3 all live together. An opt-in multi-account topology is supported where the Glue catalog + Lake Formation live in one account ("Account A") and Glue jobs + MWAA + S3 live in a consumer account ("Account B"). The setup and onboarding prompts ask a single-vs-multi question up front; when multi is chosen, the generated IaC, PySpark, DAG, and deploy scripts all parameterize <code>catalog_account_id</code> and emit <code>sts:AssumeRole</code> wiring. See <a href="multi-account-deployment.md"><code>docs/multi-account-deployment.md</code></a> for AWS pre-requisites and known limits (read-only from A to B today; write-back requires RAM).</p>
+<p><strong>How it works:</strong>
+1. <strong>Input</strong>: Define business context in <code>workloads/{name}/config/semantic.yaml</code> (column roles, aggregations, relationships, business terms, hierarchies, PII flags). Source of truth.
+2. <strong>Mirror to SageMaker Catalog</strong>: Column roles, PII flags, and business terms are written as custom metadata on Glue Data Catalog entries so downstream tools see business context alongside technical schemas.
+3. <strong>Induce OWL + R2RML</strong> (Phase 7 Step 8.5): The Ontology Staging Agent converts <code>semantic.yaml</code> + Glue schema into <code>ontology.ttl</code> (OWL2) + <code>mappings.ttl</code> (R2RML) + <code>ontology_manifest.json</code>. Validated with rdflib, committed to git.
+4. <strong>AWS Semantic Layer handoff</strong>: Data Steward picks up the committed TTL files in AWS Semantic Layer (when deployed) for SHACL authoring, T-Box reasoning, and VKG publish.</p>
+<p><strong>What ADOP does NOT do:</strong>
+- NL→SQL query generation (AWS Semantic Layer's VKG)
+- SHACL constraint authoring (Data Steward in the AWS Semantic Layer)
+- T-Box reasoning (AWS Semantic Layer, at publish time)
+- Any SPARQL/Neptune writes (future, when the AWS Semantic Layer platform deploys)</p>
+<h3 id="mcp-servers-model-context-protocol">MCP Servers (Model Context Protocol)<a class="headerlink" href="#mcp-servers-model-context-protocol" title="Permanent link">&para;</a></h3>
+<p>13 MCP servers provide Claude Code with direct AWS access — no CLI needed for most operations. Pre-configured in <code>.mcp.json</code>, auto-install via <code>uvx</code> on first use.</p>
+<p><strong>PyPI Servers (9)</strong> — installed automatically via <code>uvx</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Server</th>
+<th>Package</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>core</code></td>
+<td>awslabs-core-mcp-server</td>
+<td>S3 operations, KMS key management, Secrets Manager</td>
+</tr>
+<tr>
+<td><code>iam</code></td>
+<td>awslabs-iam-mcp-server</td>
+<td>Role lookup, permission simulation, policy management</td>
+</tr>
+<tr>
+<td><code>lambda</code></td>
+<td>awslabs-lambda-mcp-server</td>
+<td>Lambda invocation, Lake Formation grants via Lambda</td>
+</tr>
+<tr>
+<td><code>s3-tables</code></td>
+<td>awslabs-s3-tables-mcp-server</td>
+<td>S3 Tables (Iceberg) management</td>
+</tr>
+<tr>
+<td><code>cloudtrail</code></td>
+<td>awslabs-cloudtrail-mcp-server</td>
+<td>Audit trail verification, compliance checks</td>
+</tr>
+<tr>
+<td><code>redshift</code></td>
+<td>awslabs-redshift-mcp-server</td>
+<td>Schema verification, Gold zone queries via Spectrum</td>
+</tr>
+<tr>
+<td><code>cloudwatch</code></td>
+<td>awslabs-cloudwatch-mcp-server</td>
+<td>Logs, metrics, alarms</td>
+</tr>
+<tr>
+<td><code>cost-explorer</code></td>
+<td>awslabs-cost-explorer-mcp-server</td>
+<td>Cost tracking, budget analysis</td>
+</tr>
+<tr>
+<td><code>dynamodb</code></td>
+<td>awslabs-dynamodb-mcp-server</td>
+<td>DynamoDB operations (operational state, API cache)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Custom Servers (4)</strong> — built in-house using FastMCP, in <code>mcp-servers/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Server</th>
+<th>Tools</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>glue-athena</code></td>
+<td>13</td>
+<td>Glue catalog CRUD, crawler management, ETL job execution, synchronous Athena queries</td>
+</tr>
+<tr>
+<td><code>lakeformation</code></td>
+<td>9</td>
+<td>LF-Tag create/apply/remove, TBAC grant/revoke, column-level security</td>
+</tr>
+<tr>
+<td><code>sagemaker-catalog</code></td>
+<td>5</td>
+<td>Business metadata (column roles, PII flags, hierarchies) on Glue tables</td>
+</tr>
+<tr>
+<td><code>pii-detection</code></td>
+<td>6</td>
+<td>AI-driven PII detection + automatic LF-Tag application</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Quick start</strong> (after cloning):</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Prerequisites: uv installed, AWS credentials configured</span>
+claude<span class="w"> </span>mcp<span class="w"> </span>list<span class="w">   </span><span class="c1"># All 13 servers auto-connect</span>
+</code></pre></div>
+
+<p><strong>Health check before deployment</strong>: 3 servers are REQUIRED (<code>glue-athena</code>, <code>lakeformation</code>, <code>iam</code>) -- deployment blocks if any fail. See <a href="mcp-setup.md">MCP Setup Guide</a> for full setup guide.</p>
+<h3 id="agentcore-optional-cloud-deployment">Agentcore (Optional Cloud Deployment)<a class="headerlink" href="#agentcore-optional-cloud-deployment" title="Permanent link">&para;</a></h3>
+<p>All 13 MCP servers can be deployed to <strong>Agentcore Gateway</strong> for shared, cloud-hosted tool access -- no local Python, uv, or stdio transport needed per user. The <strong>Data Onboarding Agent</strong> can be deployed to <strong>Agentcore Runtime</strong> for API-accessible invocation, with all 13 tools connected from Gateway.</p>
+<div class="highlight"><pre><span></span><code>Local Mode (default)           Agentcore Mode
+────────────────────           ────────────────────────
+Claude Code → stdio → 13      Claude Code / API Client
+  local servers                    → Runtime (agent)
+                                       → Gateway (all 13 servers)
+</code></pre></div>
+
+<ul>
+<li>Deploy Gateway (all 13 servers): <code>prompts/environment-setup-agent/02-deploy-agentcore-gateway.md</code></li>
+<li>Deploy Runtime (agent + Gateway tools): <code>prompts/environment-setup-agent/03-deploy-agentcore-runtime.md</code></li>
+<li>Config + 13 IAM policies: <code>prompts/environment-setup-agent/agentcore/</code></li>
+</ul>
+<p>See <a href="prompts/environment-setup-agent/agentcore/README.md">prompts/environment-setup-agent/agentcore/README.md</a> for details.</p>
+<hr />
+<h2 id="project-structure">Project Structure<a class="headerlink" href="#project-structure" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>.
+├── workloads/                        # Onboarded datasets (one folder per dataset)
+│   ├── sales_transactions/           # Example: e-commerce sales
+│   ├── customer_master/              # Example: customer data with KMS + PII
+│   ├── order_transactions/           # Example: orders with star schema + FK
+│   ├── product_inventory/            # Example: inventory with quality checks
+│   ├── us_mutual_funds_etf/          # Example: mutual funds (most complete)
+│   ├── healthcare_patients/          # Example: HIPAA compliance (deployed to MWAA)
+│   ├── financial_portfolios/         # Example: SOX compliance (deployed to MWAA)
+│   ├── employee_attendance/          # Example: HR data, PII, star schema, tool-routing test
+│   ├── stocks/                       # Example: stocks pipeline
+│   └── daily_sales/                  # Example: daily sales aggregation
+│
+├── shared/                           # Reusable code across workloads
+│   ├── memory/                       # Per-workload persistent memory system
+│   ├── reic/                         # REIC intent classification (vector search + agent selection)
+│   ├── utils/                        # pii_detection, quality_checks, encryption, post_deployment_verifier
+│   ├── policies/                     # Cedar policies (guardrails + authorization)
+│   ├── prompt_intelligence/          # Self-healing: failure analysis + adaptive patch registry
+│   ├── mcp/                          # MCP orchestrator + custom servers
+│   ├── fixtures/                     # Shared test fixtures (CSV stubs)
+│   └── templates/                    # Templates for new workloads
+│
+├── demo/                             # Demo/testing resources (not production)
+│   ├── data_generators/              # Synthetic data scripts
+│   ├── sample_data/                  # Pre-generated CSV files
+│   ├── orchestrator_examples/        # Multi-workload DAG examples
+│   └── workflows/                    # Demo governance workflows
+│
+├── mcp-servers/                      # Custom MCP servers (4 FastMCP servers with SSE support)
+├── docs/                             # Reference documentation
+│   ├── prompt_intelligence/          # Generated analysis reports
+│   ├── mcp-setup.md                  # MCP server configuration guide
+│   ├── workflow-diagrams.md          # Visual workflow diagrams (Mermaid)
+│   ├── running-tests.md             # Test execution guide
+│   ├── security.md                   # Security practices and sanitization
+│   ├── aws-account-setup.md          # AWS account prerequisites
+│   └── getting-started.md            # Quickstart guide
+│
+├── prompts/                          # Agent-based prompt organization
+│   ├── environment-setup-agent/      # One-time AWS infrastructure setup (includes agentcore/)
+│   ├── data-onboarding-agent/        # Bronze→Silver→Gold pipeline creation (main workflow)
+│   ├── devops-agent/                 # CI/CD, monitoring (coming soon)
+│   └── examples/                     # Demo data generation helpers
+│
+├── tool-registry/                    # Canonical YAML registry (validated by CI)
+│   ├── servers.yaml                  # 13 MCP servers — single source of truth
+│   └── invariants.yaml               # 11 mandatory rules with testable IDs
+│
+├── scripts/                          # Utility scripts
+│   ├── validate_tool_registry.py     # Linter: YAML ↔ .mcp.json ↔ Markdown consistency
+│   └── wire_tracing.py               # Wire tracing utility
+│
+├── tests/unit/                       # Shared unit tests
+│   └── test_tool_registry.py         # 18 tests: server sync, stale refs, invariants
+│
+├── CLAUDE.md                         # Agent configuration and conventions
+├── SKILLS.md                         # Agent skill definitions and prompts
+├── TOOL_ROUTING.md                   # Tool selection (intent routing + code examples)
+├── MCP_GUARDRAILS.md                 # Per-phase runtime guardrails
+├── conftest.py                       # Pytest configuration
+└── pyproject.toml                    # Python project config
+</code></pre></div>
+
+<h3 id="workload-structure-generated-per-dataset">Workload Structure (generated per dataset)<a class="headerlink" href="#workload-structure-generated-per-dataset" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>workloads/{dataset_name}/
+├── config/
+│   ├── source.yaml                   # Connection details, format, frequency
+│   ├── semantic.yaml                 # Column roles, business context, PII flags
+│   ├── transformations.yaml          # Cleaning rules, Gold zone schema
+│   ├── quality_rules.yaml            # Thresholds, critical rules
+│   └── schedule.yaml                 # Cron, dependencies, failure handling
+├── scripts/
+│   ├── extract/                      # Ingestion from source to Bronze
+│   ├── transform/                    # Bronze→Silver→Gold (PySpark + local mode)
+│   ├── quality/                      # Quality check execution
+│   └── load/                         # Catalog registration
+├── dags/
+│   └── {dataset_name}_dag.py         # Airflow DAG (independent per workload)
+├── sql/
+│   ├── bronze/                       # DDL for raw tables
+│   ├── silver/                       # DDL for cleaned tables
+│   └── gold/                         # DDL for curated tables
+├── memory/                           # Persistent workload memory (accumulated learnings)
+│   ├── MEMORY.md                     # Ledger index (auto-rebuilt, 200-line cap)
+│   └── *.md                          # Memory files with YAML frontmatter
+├── tests/
+│   ├── unit/                         # Self-contained tests (no dependencies)
+│   └── integration/                  # Tests requiring pipeline output
+└── README.md
+</code></pre></div>
+
+<hr />
+<h2 id="getting-started">Getting Started<a class="headerlink" href="#getting-started" title="Permanent link">&para;</a></h2>
+<h3 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Python 3.9+</li>
+<li>AWS account with Glue, Athena, S3, MWAA configured</li>
+<li>Claude Code CLI</li>
+</ul>
+<h3 id="run-tests-locally">Run Tests Locally<a class="headerlink" href="#run-tests-locally" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Install dependencies</span>
+pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
+
+<span class="c1"># Run all tests (no AWS required)</span>
+pytest<span class="w"> </span>workloads/<span class="w"> </span>-v
+
+<span class="c1"># Run specific workload</span>
+pytest<span class="w"> </span>workloads/sales_transactions/tests/<span class="w"> </span>-v
+
+<span class="c1"># Unit tests only (no prerequisites)</span>
+pytest<span class="w"> </span>workloads/*/tests/unit/<span class="w"> </span>-v
+</code></pre></div>
+
+<p>See <a href="running-tests.md">Running Tests</a> for complete test guide including data generation.</p>
+<h3 id="onboard-a-new-dataset">Onboard a New Dataset<a class="headerlink" href="#onboard-a-new-dataset" title="Permanent link">&para;</a></h3>
+<p>Using Claude Code, describe your data source:</p>
+<div class="highlight"><pre><span></span><code>&quot;Onboard customer_orders from our PostgreSQL database.
+ Daily refresh at 6 AM UTC. Contains PII (email, phone).
+ Need star schema in Gold zone for reporting dashboards.&quot;
+</code></pre></div>
+
+<p>The agent will:
+1. Ask clarifying questions (schema, cleaning rules, quality thresholds)
+2. Check for duplicate sources in existing workloads
+3. Profile a sample of your data
+4. Generate all pipeline artifacts with tests
+5. Present artifacts for your approval before writing</p>
+<h3 id="deploy-to-aws">Deploy to AWS<a class="headerlink" href="#deploy-to-aws" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Upload workload to MWAA S3 bucket</span>
+aws<span class="w"> </span>s3<span class="w"> </span>sync<span class="w"> </span>workloads/<span class="o">{</span>dataset<span class="o">}</span>/<span class="w"> </span>s3://<span class="o">{</span>mwaa-bucket<span class="o">}</span>/dags/workloads/<span class="o">{</span>dataset<span class="o">}</span>/
+aws<span class="w"> </span>s3<span class="w"> </span>sync<span class="w"> </span>shared/<span class="w"> </span>s3://<span class="o">{</span>mwaa-bucket<span class="o">}</span>/dags/shared/
+
+<span class="c1"># The workload&#39;s DAG will appear in MWAA Airflow UI</span>
+</code></pre></div>
+
+<h3 id="post-deployment-verification-mandatory">Post-Deployment Verification (Mandatory)<a class="headerlink" href="#post-deployment-verification-mandatory" title="Permanent link">&para;</a></h3>
+<p>After deploying, run the end-to-end verification to confirm everything works:</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>--no-project<span class="w"> </span>--with<span class="w"> </span>boto3<span class="w"> </span>python3<span class="w"> </span>shared/utils/post_deployment_verifier.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--workload<span class="w"> </span><span class="o">{</span>dataset<span class="o">}</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--database<span class="w"> </span><span class="o">{</span>dataset<span class="o">}</span>_db<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--tables<span class="w"> </span>silver_<span class="o">{</span>dataset<span class="o">}</span><span class="w"> </span>gold_<span class="o">{</span>dataset<span class="o">}</span>_analytical<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--kms-key<span class="w"> </span>alias/hipaa-phi-key<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--mwaa-env<span class="w"> </span><span class="o">{</span>your-mwaa-environment<span class="o">}</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dag-id<span class="w"> </span><span class="o">{</span>dataset<span class="o">}</span>_pipeline
+</code></pre></div>
+
+<p><strong>7 automated checks</strong> (all must PASS):
+1. Glue tables exist in catalog
+2. Athena queries return data (not empty)
+3. LF-Tags applied on all PHI columns
+4. TBAC access control restricts CRITICAL columns
+5. KMS key exists with rotation enabled
+6. MWAA DAG loaded without import errors
+7. CloudTrail audit events logged</p>
+<p>Deployment is NOT complete until all checks pass. See <code>shared/utils/post_deployment_verifier.py</code>.</p>
+<p>See <a href="aws-account-setup.md">docs/aws-account-setup.md</a> for AWS configuration details.</p>
+<hr />
+<h2 id="key-features">Key Features<a class="headerlink" href="#key-features" title="Permanent link">&para;</a></h2>
+<h3 id="pii-detection-and-governance">PII Detection and Governance<a class="headerlink" href="#pii-detection-and-governance" title="Permanent link">&para;</a></h3>
+<ul>
+<li>AI-driven detection of 12 PII types (EMAIL, PHONE, SSN, CREDIT_CARD, etc.)</li>
+<li>Lake Formation LF-Tags for column-level access control</li>
+<li>4 sensitivity levels: CRITICAL, HIGH, MEDIUM, LOW</li>
+<li>Integrated into profiling phase — runs automatically on every dataset</li>
+<li><strong>Regulation-specific prompts</strong> for GDPR, CCPA, HIPAA, SOX, PCI DSS — see <a href="prompts/data-onboarding-agent/regulation/">prompts/data-onboarding-agent/regulation/</a>. Each prompt contains self-contained controls (retention, masking, LF-Tags, TBAC grants, audit, quality rules) applied only when a regulation is selected during discovery</li>
+</ul>
+<h3 id="quality-gates">Quality Gates<a class="headerlink" href="#quality-gates" title="Permanent link">&para;</a></h3>
+<ul>
+<li>5 dimensions: Completeness, Accuracy, Consistency, Validity, Uniqueness</li>
+<li>Critical rule failures block zone promotion regardless of overall score</li>
+<li>Anomaly detection for outliers, distribution shifts, volume changes</li>
+<li>Historical comparison against baseline</li>
+</ul>
+<h3 id="cedar-policy-guardrails">Cedar Policy Guardrails<a class="headerlink" href="#cedar-policy-guardrails" title="Permanent link">&para;</a></h3>
+<ul>
+<li>16 forbid policies preventing unsafe operations (e.g., Bronze mutation, quality bypass)</li>
+<li>7 agent authorization policies controlling which agent can do what</li>
+<li>Dual-mode: local evaluation (cedarpy) or AWS Verified Permissions</li>
+</ul>
+<h3 id="reic-rag-enhanced-intent-classification">REIC: RAG-Enhanced Intent Classification<a class="headerlink" href="#reic-rag-enhanced-intent-classification" title="Permanent link">&para;</a></h3>
+<p>Inspired by the REIC research paper on improving intent routing for multi-agent systems:</p>
+<ul>
+<li><strong>Problem</strong>: The Router Agent used exact string matching — "CRM data" wouldn't find <code>customer_master</code> because the words don't literally match</li>
+<li><strong>Solution</strong>: Vector similarity search (TF-IDF with FAISS upgrade path) over workload metadata — compares <em>meaning</em>, not exact strings</li>
+<li><strong>How it works</strong>: Reads every workload's <code>source.yaml</code> + <code>semantic.yaml</code>, extracts keywords (column names, descriptions, tags, business terms), and builds a searchable index. Incoming intents are scored against all workloads using cosine similarity.</li>
+<li><strong>3-level hierarchical routing</strong>: Phase (discovery/build/deploy) → Agent (constrained by phase) → Action (specific operation) — each level uses softmax probabilities for deterministic, ranked selection</li>
+<li><strong>No heavy dependencies</strong>: Real ML embeddings (sentence-transformers + FAISS) are optional. Falls back to TF-IDF (stdlib only, no installs). Set <code>REIC_ENABLED=false</code> to disable entirely — existing routing still works.</li>
+<li><strong>74 tests</strong> validating determinism, confidence bounds, phase constraints, and end-to-end intent classification</li>
+</ul>
+<div class="highlight"><pre><span></span><code># Before REIC                          # After REIC
+User: &quot;CRM data&quot;                       User: &quot;CRM data&quot;
+→ grep for &quot;CRM data&quot;                  → TF-IDF similarity search
+→ no match                             → customer_master (score: 0.82)
+→ &quot;not onboarded&quot; (wrong)              → &quot;Found customer_master&quot; (correct)
+</code></pre></div>
+
+<h3 id="deep-agent-tracing-three-layer-observability">Deep Agent Tracing (Three-Layer Observability)<a class="headerlink" href="#deep-agent-tracing-three-layer-observability" title="Permanent link">&para;</a></h3>
+<p>Inspired by the <strong>AgentTrace</strong> research paper (Gao et al., 2025) on debugging and understanding multi-agent systems, adapted for our LLM sub-agent architecture where you cannot instrument agent reasoning externally.</p>
+<p><strong>Problem</strong>: Traditional agent tracing assumes Python classes you can wrap with decorators. Our agents are Claude Code LLM sub-agents (prompt templates in SKILLS.md) — their reasoning is a black box.</p>
+<p><strong>Solution</strong>: Three instrumentable layers, linked by <code>run_id</code> + <code>parent_span_id</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>What It Captures</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>1. Orchestrator</strong></td>
+<td>Phase transitions, test gates, retries, span hierarchy</td>
+<td><code>OrchestratorLogger</code> + <code>AgentTracer</code> (Python, fully instrumentable)</td>
+</tr>
+<tr>
+<td><strong>2. Generated Scripts</strong></td>
+<td>Row counts, transforms applied, quality scores, errors</td>
+<td><code>StructuredLogger</code> wired into Glue ETL scripts</td>
+</tr>
+<tr>
+<td><strong>3. LLM Self-Reporting</strong></td>
+<td>Reasoning, alternatives considered, rejection reasons, confidence</td>
+<td><code>AgentOutput.decisions[]</code> array (prompt engineering, not instrumentation)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Three-surface event model</strong> (from AgentTrace): Every trace event is classified as <strong>operational</strong> (what happened), <strong>cognitive</strong> (why it happened), or <strong>contextual</strong> (what surrounded it). This lets you filter traces by concern — debugging failed pipelines vs. understanding agent decisions vs. correlating across workloads.</p>
+<p><strong>OTel-compatible fields</strong>: ~15 fields per event (slimmed from AgentTrace's 30+ to only fields we can actually populate — no token counts from Claude Code sub-agents). Output is JSONL, parseable by jq, CloudWatch, Splunk.</p>
+<p><strong>CLI viewer</strong> (<code>shared/logging/trace_viewer.py</code>): <code>--summary</code>, <code>--decisions</code>, <code>--timeline</code>, <code>--failures</code>, <code>--export-md</code> (narrative), <code>--export-map</code> (decision tree).</p>
+<div class="highlight"><pre><span></span><code># View agent reasoning for a pipeline run
+python3 -m shared.logging.trace_viewer trace_events.jsonl --decisions
+
+  [1] schema_inference — Metadata Agent (phase 4)
+      Reasoning: CSV headers suggest financial data. ticker is PK, current_price is decimal.
+      Choice:    12 columns: 2 identifiers, 6 measures, 3 dimensions, 1 temporal
+      Confidence: high
+
+  [2] transformation_choice — Transformation Agent (phase 4)
+      Reasoning: Dedup by ticker, type-cast to decimal, validate positive prices.
+      Alternatives: dedup by composite key (rejected: no date column for freshness)
+      Confidence: high
+</code></pre></div>
+
+<h3 id="typed-sub-agent-outputs-structured-tool-calls">Typed Sub-Agent Outputs (Structured Tool Calls)<a class="headerlink" href="#typed-sub-agent-outputs-structured-tool-calls" title="Permanent link">&para;</a></h3>
+<p>Sub-agents no longer return free-form markdown that requires brittle regex parsing. Instead, every sub-agent is forced to return structured JSON via Bedrock's <code>tool_choice</code> mechanism.</p>
+<ul>
+<li><strong><code>SUBMIT_OUTPUT_TOOL</code></strong>: A Bedrock <code>toolSpec</code> schema in <code>shared/templates/agent_output_schema.py</code> that defines every <code>AgentOutput</code> field. Sub-agents must call this tool to finish — plain text responses are treated as failures.</li>
+<li><strong><code>from_bedrock_tool_call()</code></strong>: Parses a Bedrock <code>toolUse</code> response block directly into a typed <code>AgentOutput</code> dataclass. No regex, no markdown splitting.</li>
+<li><strong>Forward-compatible <code>from_dict()</code></strong>: Filters unknown keys, so old serialized data works with new fields and new data works with old code.</li>
+<li><strong><code>memory_hints</code></strong>: New optional field where sub-agents flag durable facts worth remembering (e.g., "pe_ratio has expected 5% nulls — do not quarantine"). These feed directly into the workload memory system.</li>
+</ul>
+<h3 id="workload-memory-per-dataset-persistent-learning">Workload Memory (Per-Dataset Persistent Learning)<a class="headerlink" href="#workload-memory-per-dataset-persistent-learning" title="Permanent link">&para;</a></h3>
+<p>Each workload accumulates knowledge across pipeline runs — schema quirks, quality thresholds, operator preferences — stored as structured <code>.md</code> files with YAML frontmatter in a <code>memory/</code> directory. Future runs start with context instead of cold.</p>
+<ul>
+<li><strong>Storage</strong>: <code>workloads/{name}/memory/</code> directory with a <code>MEMORY.md</code> ledger (200-line cap, 25KB cap) and individual memory files</li>
+<li><strong>Four memory types</strong>: <code>user</code> (operator preferences), <code>feedback</code> (corrections), <code>project</code> (schema facts), <code>reference</code> (S3 paths, Glue DB names)</li>
+<li><strong>Memory-aware discovery</strong>: Phase 1 loads the workload ledger before asking questions. Known answers are pre-filled and confirmed, not re-asked.</li>
+<li><strong>Memory selection</strong>: A cheap Haiku side-call (<code>find_relevant_memories()</code>) selects up to 5 relevant memory files from the manifest before each phase — keeps sub-agent context lean.</li>
+<li><strong>Post-run extraction</strong>: After each test gate passes, <code>extract_memories_from_run()</code> harvests durable learnings from the agent's decisions and memory hints. Runs asynchronously — never blocks the pipeline.</li>
+</ul>
+<div class="highlight"><pre><span></span><code>Run 1: Pipeline fails on pe_ratio nulls → agent learns &quot;pe_ratio has expected 5% nulls&quot;
+Run 2: Memory loaded → Quality Agent reads the hint → test gate passes without human intervention
+</code></pre></div>
+
+<h3 id="adaptive-prompt-evolution-self-healing-loop">Adaptive Prompt Evolution (Self-Healing Loop)<a class="headerlink" href="#adaptive-prompt-evolution-self-healing-loop" title="Permanent link">&para;</a></h3>
+<p>Closes the gap in prompt intelligence: patches were generated in reports but <strong>never applied</strong>. The new <code>PromptEvolver</code> stores, tracks, and auto-applies learned prompt patches to SKILLS.md.</p>
+<ul>
+<li><strong>Patch registry</strong>: <code>shared/prompt_intelligence/patches/</code> stores <code>.patch</code> files with YAML frontmatter (confidence, status, section). <code>PATCH_INDEX.md</code> tracks all patches.</li>
+<li><strong>Confidence gate</strong>: Patches with confidence &gt;= 0.80 are auto-grafted to SKILLS.md. Below 0.80, they're stored as "pending" for human review.</li>
+<li><strong>Reversible</strong>: Every grafted patch is wrapped in <code>&lt;!-- GRAFT: {id} --&gt;</code> markers. <code>prune_patch()</code> removes it cleanly.</li>
+<li><strong>CLI</strong>: <code>evolve</code> (full self-healing cycle), <code>patches</code> (list registry), <code>prune</code> (revert a bad patch)</li>
+</ul>
+<div class="highlight"><pre><span></span><code>Before: Pipeline fails → report suggests fix → human reads report (never) → same failure repeats
+After:  Pipeline fails → nightly evolve runs → patch auto-grafted → next run succeeds
+</code></pre></div>
+
+<h3 id="deterministic-agent-output">Deterministic Agent Output<a class="headerlink" href="#deterministic-agent-output" title="Permanent link">&para;</a></h3>
+<p>Inspired by the <strong>GCC (Guardrails, Cognitive traces, Checksums)</strong> pattern for making LLM-based multi-agent systems reproducible and auditable:</p>
+<ul>
+<li><strong>Input/Output Hashing</strong>: SHA-256 checksums on all inputs and generated artifacts. Same inputs must produce identical outputs — verified by comparing hashes across runs.</li>
+<li><strong>Ordered Outputs</strong>: Dictionary keys sorted alphabetically, lists sorted by stable keys (column name, rule_id). Deterministic YAML serialization via <code>shared/utils/deterministic_yaml.py</code>.</li>
+<li><strong>Fixed Timestamps</strong>: Generated artifacts use run start time (<code>started_at</code>), not <code>datetime.now()</code>, preventing timestamp drift between identical runs.</li>
+<li><strong>Seeded Randomness</strong>: Any randomness uses <code>random_seed</code> from run context. Never <code>random()</code> without a seed.</li>
+<li><strong>Idempotency Checks</strong>: Before writing any file — same checksum skips, different checksum overwrites + logs diff, missing file creates.</li>
+<li><strong>Template Versioning</strong>: Every generated file includes a header with agent name, template version, and input hash for traceability.</li>
+<li><strong>Cognitive Traces</strong>: Every sub-agent must include a <code>decisions[]</code> array documenting every significant choice, alternatives considered, and rejection reasons — making LLM "thinking" auditable.</li>
+<li><strong>Template-Driven Codegen</strong>: All pipeline scripts and DAGs are generated from Jinja2 templates (<code>shared/templates/*.j2</code>) driven by spec contracts (<code>contracts/v1/*.schema.json</code>). The <code>shared/codegen/</code> module loads config, validates against schemas, extracts typed slots, renders templates, and validates drift. A PreToolUse hook blocks any direct write to artifact directories without the renderer token. See <a href="determinism.md">docs/determinism.md</a> for architecture details.</li>
+</ul>
+<h3 id="agent-exchange-display">Agent Exchange Display<a class="headerlink" href="#agent-exchange-display" title="Permanent link">&para;</a></h3>
+<p>Every agent interaction is rendered in a structured ASCII format for traceability. Example:</p>
+<div class="highlight"><pre><span></span><code>+--------------------------------------------------------------------+
+|  QUERY                                                             |
++--------------------------------------------------------------------+
+|  &quot;Profile customer churn dataset and propose onboarding DAG&quot;       |
+|  source: data_onboarding | user: claims_v2 | ts: 2026-05-21T06:00 |
++--------------------------------------------------------------------+
+                              |
+                              v
++--------------------------------------------------------------------+
+|  AGENT RESPONSE                                                    |
++--------------------------------------------------------------------+
+|  &gt;&gt; Generated profiling plan and DAG skeleton                      |
+|  STATUS: OK                                                        |
+|  tokens: 3.2k | latency: 4.1s | cost: n/a                         |
++--------------------------------------------------------------------+
+</code></pre></div>
+
+<p>Discovery findings are presented in visual blocks before asking questions:</p>
+<div class="highlight"><pre><span></span><code>+--------------------------------------------------------------------+
+|  DISCOVERED: Source Profile                                        |
++--------------------------------------------------------------------+
+|  * Format: CSV, 31 columns, 50 rows                               |
+|  * Likely PK: claim_id (unique, 0% nulls)                         |
+|  * PHI detected: member_ssn, member_dob, member_email              |
+|  * Measures: billed_amount, allowed_amount, paid_amount            |
+|  * Temporal: service_date, submission_date                         |
++--------------------------------------------------------------------+
+</code></pre></div>
+
+<p>The <code>shared/utils/ascii_display.py</code> module provides reusable builders: <code>query_block()</code>, <code>response_block()</code>, <code>exchange_block()</code>, <code>discovery_block()</code>, <code>entity_block()</code>, <code>checklist_block()</code>.</p>
+<h3 id="cedar-policy-guardrails_1">Cedar Policy Guardrails<a class="headerlink" href="#cedar-policy-guardrails_1" title="Permanent link">&para;</a></h3>
+<p>Uses <strong>Amazon Cedar</strong> (the policy language behind Amazon Verified Permissions) to enforce safety invariants across the pipeline — 23 policies total:</p>
+<p><strong>16 Forbid Policies</strong> (guardrails — things that must NEVER happen):
+| Category | Policies | Examples |
+|----------|----------|---------|
+| <strong>Data Quality</strong> (4) | Quality gate thresholds, no critical failures, no silent row drops, row count range checks | <code>dq_001</code>: Silver requires score &gt;= 0.80, Gold &gt;= 0.95 |
+| <strong>Security</strong> (4) | KMS key validation, PII masking, TLS enforcement, credential protection | <code>sec_003</code>: PII columns must be masked in logs and query results |
+| <strong>Integrity</strong> (4) | Landing/Bronze immutability, FK integrity, derived column formulas, schema enforcement | <code>int_001</code>: Bronze zone data is NEVER modified after ingestion |
+| <strong>Operations</strong> (4) | Idempotency, encryption re-keying at zone boundaries, audit log immutability, Iceberg metadata | <code>ops_001</code>: Running a transform twice must produce identical output |</p>
+<p><strong>7 Agent Authorization Policies</strong> (who can do what):
+Each agent (Router, Onboarding, Metadata, Transformation, Quality, DAG, Analysis) has a Cedar permit policy defining exactly which actions it can perform on which resources — enforcing least-privilege at the agent level.</p>
+<p><strong>Dual-mode evaluation</strong>: <code>shared/utils/cedar_client.py</code> evaluates policies locally (cedarpy) for testing or via AWS Verified Permissions (boto3) for production. Setup script at <code>prompts/environment-setup-agent/scripts/setup_avp.py</code> syncs all policies to AVP.</p>
+<h3 id="test-driven-pipeline-generation">Test-Driven Pipeline Generation<a class="headerlink" href="#test-driven-pipeline-generation" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Every sub-agent writes unit + integration tests alongside artifacts</li>
+<li>Tests must pass before the orchestrator proceeds (max 2 retries)</li>
+<li>780+ passing tests across 11 workloads, all runnable locally without AWS</li>
+<li>Tool-registry validation tests (18) ensure routing docs never drift from <code>.mcp.json</code></li>
+</ul>
+<h3 id="pre-deployment-code-validation-step-451">Pre-Deployment Code Validation (Step 4.5.1)<a class="headerlink" href="#pre-deployment-code-validation-step-451" title="Permanent link">&para;</a></h3>
+<p>Automatically validates all generated code BEFORE deployment to catch 95% of issues in seconds vs. minutes of MWAA debugging:</p>
+<p><strong>5 validation checks</strong> (fail-fast):
+1. <strong>Python syntax</strong>: All scripts compile without errors (<code>py_compile</code>)
+2. <strong>DAG parsing</strong>: Airflow can import the DAG file without exceptions
+3. <strong>Import resolution</strong>: All <code>from X import Y</code> statements resolve
+4. <strong>Airflow best practices</strong>: 8 patterns enforced (context manager, retries, no hardcoded paths, etc.)
+5. <strong>YAML syntax</strong>: All config files parse correctly</p>
+<p><strong>Auto-fix policy</strong>: Errors are fixed inline (max 2 attempts), no human intervention for syntax errors</p>
+<p><strong>Why it matters</strong>: MWAA takes 1-2 minutes to refresh DAGs after S3 upload. A parsing error blocks ALL DAGs from loading. This step prevents wasted deployment cycles.</p>
+<h2 id="example-workloads">Example Workloads<a class="headerlink" href="#example-workloads" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Workload</th>
+<th>Tests</th>
+<th>Status</th>
+<th>Key Features</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sales_transactions</code></td>
+<td>196</td>
+<td>Local</td>
+<td>Basic Bronze→Silver→Gold, quality checks</td>
+</tr>
+<tr>
+<td><code>customer_master</code></td>
+<td>118</td>
+<td>Local</td>
+<td>KMS encryption, PII masking, Iceberg tables</td>
+</tr>
+<tr>
+<td><code>order_transactions</code></td>
+<td>70</td>
+<td>Local</td>
+<td>FK validation, star schema, aggregate calculations</td>
+</tr>
+<tr>
+<td><code>product_inventory</code></td>
+<td>23 + 18*</td>
+<td>Local</td>
+<td>Advanced quality rules, quarantine handling</td>
+</tr>
+<tr>
+<td><code>us_mutual_funds_etf</code></td>
+<td>321 + 44*</td>
+<td>Deployed</td>
+<td>PII detection, QuickSight dashboards, MWAA DAG</td>
+</tr>
+<tr>
+<td><code>financial_portfolios</code></td>
+<td>200+</td>
+<td>Deployed</td>
+<td>SOX compliance, 7 Iceberg tables, MWAA DAG</td>
+</tr>
+<tr>
+<td><code>healthcare_patients</code></td>
+<td>Generated</td>
+<td>Deployed</td>
+<td>HIPAA compliance, PHI masking, TBAC, MWAA DAG</td>
+</tr>
+<tr>
+<td><code>employee_attendance</code></td>
+<td>40</td>
+<td>Local</td>
+<td>PII (NAME, EMAIL), star schema, SCD2, GDPR, tool-routing validation</td>
+</tr>
+<tr>
+<td><code>stocks</code></td>
+<td>Generated</td>
+<td>Local</td>
+<td>Stocks pipeline</td>
+</tr>
+<tr>
+<td><code>daily_sales</code></td>
+<td>Generated</td>
+<td>Local</td>
+<td>Daily sales aggregation</td>
+</tr>
+<tr>
+<td><code>claims</code></td>
+<td>Generated</td>
+<td>Local</td>
+<td>HIPAA compliance, PHI masking, flat denormalized Gold, daily 9AM AEST</td>
+</tr>
+</tbody>
+</table>
+<p>*Some tests require PySpark (Java) or pipeline output to be generated first. See <a href="running-tests.md">Running Tests</a>.</p>
+<hr />
+<h2 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Document</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="CLAUDE.md">CLAUDE.md</a></td>
+<td>Agent configuration, security rules, data zone rules</td>
+</tr>
+<tr>
+<td><a href="SKILLS.md">SKILLS.md</a></td>
+<td>Agent skill definitions, spawn prompts, workflows</td>
+</tr>
+<tr>
+<td><a href="TOOL_ROUTING.md">TOOL_ROUTING.md</a></td>
+<td><strong>Read first</strong> — tool selection (intent routing, server status, code examples, mandatory rules)</td>
+</tr>
+<tr>
+<td><a href="MCP_GUARDRAILS.md">MCP_GUARDRAILS.md</a></td>
+<td>Per-phase runtime guardrails (exact MCP tool names per deploy step)</td>
+</tr>
+<tr>
+<td><a href="tool-registry/">tool-registry/</a></td>
+<td>Canonical YAML registry (servers.yaml + invariants.yaml), validated by CI</td>
+</tr>
+<tr>
+<td><a href="workflow-diagrams.md">Workflow Diagrams</a></td>
+<td>Visual workflow and data flow diagrams</td>
+</tr>
+<tr>
+<td><a href="mcp-setup.md">MCP Setup</a></td>
+<td>MCP server configuration</td>
+</tr>
+<tr>
+<td><a href="security.md">Security</a></td>
+<td>Security practices</td>
+</tr>
+<tr>
+<td><a href="running-tests.md">Running Tests</a></td>
+<td>Test execution guide</td>
+</tr>
+<tr>
+<td><a href="aws-account-setup.md">docs/aws-account-setup.md</a></td>
+<td>AWS prerequisites</td>
+</tr>
+<tr>
+<td><a href="prompts/environment-setup-agent/agentcore/README.md">prompts/environment-setup-agent/agentcore/README.md</a></td>
+<td>Agentcore Gateway + Runtime (optional)</td>
+</tr>
+<tr>
+<td><a href="getting-started.md">docs/getting-started.md</a></td>
+<td>Quick start guide</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="technology-stack">Technology Stack<a class="headerlink" href="#technology-stack" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Language</strong>: Python (Glue PySpark + Airflow DAGs)</li>
+<li><strong>Table Format</strong>: Apache Iceberg (ACID, time-travel, schema evolution)</li>
+<li><strong>Orchestration</strong>: Apache Airflow (MWAA)</li>
+<li><strong>Cloud</strong>: AWS (S3, Glue, Athena, Lake Formation, KMS, MWAA)</li>
+<li><strong>Testing</strong>: pytest (unit + integration, property-based with fast-check)</li>
+<li><strong>Tool Routing</strong>: YAML registry (<code>tool-registry/</code>) + intent-based decision tree, validated by pre-commit</li>
+<li><strong>Intent Routing</strong>: REIC (TF-IDF / FAISS vector similarity + hierarchical classification)</li>
+<li><strong>Policy Engine</strong>: Cedar (23 policies via Amazon Verified Permissions)</li>
+<li><strong>Agent Tracing</strong>: AgentTrace-inspired three-layer observability (OTel-compatible JSONL)</li>
+<li><strong>Determinism</strong>: GCC pattern (guardrails + cognitive traces + checksums)</li>
+<li><strong>AI Integration</strong>: MCP (Model Context Protocol) for standardized AWS access</li>
+</ul>
+<hr />
+<h2 id="data-security">Data Security<a class="headerlink" href="#data-security" title="Permanent link">&para;</a></h2>
+<p>The platform enforces security at every layer:</p>
+<ul>
+<li><strong>Encryption</strong>: AES-256 at rest (zone-specific KMS keys), TLS 1.3 in transit, re-encryption at zone boundaries</li>
+<li><strong>PII Detection</strong>: Automatic AI-driven scanning of all columns (name-based + content-based patterns) — see <code>shared/utils/pii_detection_and_tagging.py</code></li>
+<li><strong>Column-Level Access</strong>: Lake Formation LF-Tags (<code>PII_Classification</code>, <code>PII_Type</code>, <code>Data_Sensitivity</code>) enable tag-based access control (TBAC) — analysts see only what their role permits</li>
+<li><strong>Regulatory Compliance</strong>: Self-contained prompt per regulation in <a href="prompts/data-onboarding-agent/regulation/">prompts/data-onboarding-agent/regulation/</a>:</li>
+<li><strong>GDPR</strong> — right to erasure, consent tracking, 365-day retention, data minimization</li>
+<li><strong>CCPA</strong> — right to know/delete, opt-out tracking, 730-day retention, data lineage</li>
+<li><strong>HIPAA</strong> — PHI encryption, minimum necessary access, BAA, 7-year audit trail</li>
+<li><strong>SOX</strong> — financial integrity, 0.95+ quality gates, immutable Bronze, 7-year retention</li>
+<li><strong>PCI DSS</strong> — cardholder data tokenization, CVV drop, restricted <code>pci_admin_role</code> access</li>
+<li><strong>Cedar Policies</strong>: 16 forbid policies + 7 agent authorization policies enforcing safety invariants (no Bronze mutation, no quality bypass, PII masking in logs)</li>
+<li><strong>Audit Logging</strong>: CloudTrail for all Lake Formation operations — who accessed what column, when tags changed, all permission grants</li>
+<li><strong>Bronze Immutability</strong>: Source data is never modified after ingestion</li>
+</ul>
+<p>See <a href="security.md">Security</a> and <a href="CONTRIBUTING.md#security-issue-notifications">CONTRIBUTING</a> for more information.</p>
+<hr />
+<h2 id="cost-estimation-llm-token-usage">Cost Estimation (LLM Token Usage)<a class="headerlink" href="#cost-estimation-llm-token-usage" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>Disclaimer:</strong> The following are estimates based on observed trace durations and agent complexity for the <code>financial_portfolios</code> workload (the only fully-traced end-to-end run). Actual token usage varies by dataset complexity, number of columns, cleaning rules, and human interaction. These figures do not include AWS infrastructure costs (Glue jobs, S3, Athena queries, etc.).</p>
+</blockquote>
+<h3 id="per-workload-onboarding-end-to-end">Per-Workload Onboarding (End-to-End)<a class="headerlink" href="#per-workload-onboarding-end-to-end" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Agent</th>
+<th>Est. Tokens</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>Health Check &amp; Auto-Detect</td>
+<td>~2K</td>
+<td>Mostly API calls, minimal LLM</td>
+</tr>
+<tr>
+<td>1-2</td>
+<td>Discovery + Dedup</td>
+<td>~5K</td>
+<td>Questions, validation, source scanning</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Profiling</td>
+<td>~8K</td>
+<td>Schema inference, PII detection, cognitive decisions</td>
+</tr>
+<tr>
+<td>4a</td>
+<td>Metadata Agent</td>
+<td>~25K</td>
+<td>Schema design, semantic.yaml, source.yaml + tests</td>
+</tr>
+<tr>
+<td>4b</td>
+<td>Transformation Agent</td>
+<td>~45K</td>
+<td>Bronze→Silver→Gold scripts + tests (largest agent)</td>
+</tr>
+<tr>
+<td>4c</td>
+<td>Quality Agent</td>
+<td>~20K</td>
+<td>Quality rules, threshold selection + tests</td>
+</tr>
+<tr>
+<td>4d</td>
+<td>DAG Agent</td>
+<td>~20K</td>
+<td>Airflow DAG, schedule config + tests</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Deploy to AWS</td>
+<td>~10K</td>
+<td>MCP tool calls (API-heavy, not LLM-heavy)</td>
+</tr>
+<tr>
+<td></td>
+<td><strong>Total per workload</strong></td>
+<td><strong>~135K</strong></td>
+<td>Input + output tokens combined</td>
+</tr>
+</tbody>
+</table>
+<h3 id="estimated-cost-per-workload">Estimated Cost Per Workload<a class="headerlink" href="#estimated-cost-per-workload" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Input Price</th>
+<th>Output Price</th>
+<th>Est. Cost/Workload</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Claude Opus</strong></td>
+<td>$15 / 1M tokens</td>
+<td>$75 / 1M tokens</td>
+<td>~$3.65</td>
+</tr>
+<tr>
+<td><strong>Claude Sonnet</strong></td>
+<td>$3 / 1M tokens</td>
+<td>$15 / 1M tokens</td>
+<td>~$0.73</td>
+</tr>
+</tbody>
+</table>
+<p><em>Assumes 80/20 input/output token split. Opus is used for orchestration and complex reasoning; Sonnet is a viable alternative for sub-agents (Metadata, Quality, DAG) where tasks are more structured.</em></p>
+<h3 id="platform-wide-estimate-all-workloads">Platform-Wide Estimate (All Workloads)<a class="headerlink" href="#platform-wide-estimate-all-workloads" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Workloads onboarded</td>
+<td>9</td>
+</tr>
+<tr>
+<td>Avg tokens per workload</td>
+<td>~135K</td>
+</tr>
+<tr>
+<td>Total estimated tokens</td>
+<td>~1.2M</td>
+</tr>
+<tr>
+<td><strong>Total cost (all Opus)</strong></td>
+<td><strong>~$33</strong></td>
+</tr>
+<tr>
+<td><strong>Total cost (Opus orchestrator + Sonnet sub-agents)</strong></td>
+<td><strong>~$12</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="cost-optimization-tips">Cost Optimization Tips<a class="headerlink" href="#cost-optimization-tips" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Use <strong>Sonnet for sub-agents</strong> (Metadata, Transformation, Quality, DAG) — tasks are well-defined with structured outputs</li>
+<li>Use <strong>Opus for orchestration</strong> (Phase 0-2, Phase 5) — requires judgment, multi-step reasoning</li>
+<li><strong>Workload memory</strong> reduces re-runs — learned facts carry forward, fewer retry cycles</li>
+<li><strong>REIC routing</strong> prevents mis-classification — correct agent on first try saves wasted tokens</li>
+<li><strong>Prompt caching</strong> (automatic with Anthropic API) — repeated system prompts are cached, reducing input tokens on retries</li>
+</ul>
+<h2 id="license">License<a class="headerlink" href="#license" title="Permanent link">&para;</a></h2>
+<p>This project is licensed under the MIT-0 License. See the <a href="LICENSE">LICENSE</a> file for details.</p>
+  </main>
+</div>
+</body>
+</html>

@@ -1,5 +1,13 @@
 # Agentic Data Onboarding Platform
 
+<p align="center">
+  <a href="https://aws-samples.github.io/sample-Agentic-Ai-Data-Operations/">
+    <strong>&#128194; View the styled documentation site &rarr;</strong>
+  </a>
+  <br/>
+  <sub>Full-page layout with sidebar navigation, side-by-side hero, and step-by-step flow diagrams.</sub>
+</p>
+
 ![ADOP – Agentic Data Onboarding Platform](docs/diagrams/adop-overview.png)
 
 **Automate your entire data operations pipeline** — ETL, data quality, semantic layer population, and data analysis — **reducing development time from weeks to hours.** Built-in compliance with **GDPR, CCPA, HIPAA, SOX, and PCI DSS** through regulation-specific prompts that automatically apply required controls.
