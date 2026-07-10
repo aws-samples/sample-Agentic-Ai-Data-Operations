@@ -216,7 +216,7 @@ grep -r "aws_secret" . --exclude-dir=.git
 grep -r "123456789012" . --exclude-dir=.git
 
 # 4. Check for local paths (should return 0)
-grep -r "/Users/hcherian" . --exclude-dir=.git --exclude="*.md"
+grep -rE "/Users/[^/]+/|/home/[^/]+/" . --exclude-dir=.git --exclude="*.md"
 
 # 5. Verify .gitignore is working
 git status --ignored
