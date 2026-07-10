@@ -127,7 +127,7 @@ echo "✓ Gateway IAM role created"
 {
   "Role": {
     "RoleName": "data-onboarding-agentcore-gateway-role",
-    "Arn": "arn:aws:iam::133661573128:role/data-onboarding-agentcore-gateway-role",
+    "Arn": "arn:aws:iam::123456789012:role/data-onboarding-agentcore-gateway-role",
     "CreateDate": "2026-03-24T19:03:38Z"
   }
 }
@@ -155,7 +155,7 @@ aws bedrock-agentcore-control create-gateway \
 **Expected output**:
 ```json
 {
-  "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:133661573128:gateway/data-onboarding-mcp-gateway-zqqrahrcm2",
+  "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:123456789012:gateway/data-onboarding-mcp-gateway-zqqrahrcm2",
   "gatewayId": "data-onboarding-mcp-gateway-zqqrahrcm2",
   "gatewayUrl": "https://data-onboarding-mcp-gateway-zqqrahrcm2.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp",
   "status": "CREATING",

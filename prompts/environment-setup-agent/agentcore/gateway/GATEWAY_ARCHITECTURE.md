@@ -171,14 +171,14 @@ Protocol: MCP (version 2025-11-25)
 Auth: AWS_IAM (SigV4)
 Search: SEMANTIC
 Region: us-east-1
-Account: 133661573128
+Account: 123456789012
 ```
 
 ### 2. Gateway IAM Role
 
 ```yaml
 Role Name: data-onboarding-agentcore-gateway-role
-Role ARN: arn:aws:iam::133661573128:role/data-onboarding-agentcore-gateway-role
+Role ARN: arn:aws:iam::123456789012:role/data-onboarding-agentcore-gateway-role
 
 Trust Policy:
   Principal: bedrock-agentcore.amazonaws.com
@@ -204,7 +204,7 @@ Description: AWS Glue Data Catalog and Athena query operations
 
 Lambda Function:
   Name: data-onboarding-mcp-glue-athena
-  ARN: arn:aws:lambda:us-east-1:133661573128:function:data-onboarding-mcp-glue-athena
+  ARN: arn:aws:lambda:us-east-1:123456789012:function:data-onboarding-mcp-glue-athena
   Runtime: python3.12
   Handler: lambda_handler.handler
   Timeout: 300s
@@ -363,7 +363,7 @@ Each Lambda target has a tool schema (JSON) describing its tools.
     "bedrock-agentcore:ListGatewayTargets",
     "bedrock-agentcore:GetGateway"
   ],
-  "Resource": "arn:aws:bedrock-agentcore:us-east-1:133661573128:gateway/*"
+  "Resource": "arn:aws:bedrock-agentcore:us-east-1:123456789012:gateway/*"
 }
 ```
 
@@ -373,7 +373,7 @@ Each Lambda target has a tool schema (JSON) describing its tools.
   "Effect": "Allow",
   "Action": "lambda:InvokeFunction",
   "Resource": [
-    "arn:aws:lambda:us-east-1:133661573128:function:data-onboarding-mcp-*"
+    "arn:aws:lambda:us-east-1:123456789012:function:data-onboarding-mcp-*"
   ]
 }
 ```

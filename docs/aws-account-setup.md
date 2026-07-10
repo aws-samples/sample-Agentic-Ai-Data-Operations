@@ -609,7 +609,7 @@ Set these variables in your Airflow environment (MWAA, Composer, or self-hosted)
 | `glue_service_role` | `${PROJECT}-glue-service-role` | IAM role for Glue jobs/crawlers |
 | `glue_script_s3_path` | `s3://data-lake-ACCOUNT-REGION/scripts/financial_portfolios` | S3 path to Glue ETL scripts (used in Glue job definitions) |
 | `glue_iam_role` | `AWSGlueServiceRole-FinancialPortfolios` | IAM role name for Glue jobs (without ARN prefix) |
-| `aws_account_id` | `133661573128` | AWS account ID (used for constructing ARNs and QuickSight calls) |
+| `aws_account_id` | `123456789012` | AWS account ID (used for constructing ARNs and QuickSight calls) |
 | `glue_landing_db` | `landing_db` | Glue Catalog database for Landing |
 | `glue_staging_db` | `staging_db` | Glue Catalog database for Staging |
 | `glue_publish_db` | `publish_db` | Glue Catalog database for Publish |

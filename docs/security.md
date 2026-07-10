@@ -21,7 +21,7 @@ This repository has been sanitized for public GitHub release.
 
 | Sensitive Data | Replaced With | Occurrences |
 |----------------|---------------|-------------|
-| AWS Account ID `133661573128` | `123456789012` | 130 |
+| AWS Account ID `123456789012` | `123456789012` | 130 |
 | S3 bucket `finsights-datalake` | `your-datalake-bucket` | 128 |
 | Local paths `/Users/{username}/...` | `/path/to/user/...` | 11 |
 | AWS ARNs with real account | Example ARNs | ~50 |
@@ -213,7 +213,7 @@ grep -r "AKIA" . --exclude-dir=.git
 grep -r "aws_secret" . --exclude-dir=.git
 
 # 3. Check for real account IDs (should return 0)
-grep -r "133661573128" . --exclude-dir=.git
+grep -r "123456789012" . --exclude-dir=.git
 
 # 4. Check for local paths (should return 0)
 grep -r "/Users/hcherian" . --exclude-dir=.git --exclude="*.md"
