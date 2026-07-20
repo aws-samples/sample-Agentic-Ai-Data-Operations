@@ -32,6 +32,49 @@ Store the regulation(s) — they control model routing in Phase 4.
 
 ---
 
+## Step 1.5: Diagram Interpretation (OPTIONAL — only if an image is pasted)
+
+If — and only if — the user pastes an image/diagram (PNG/JPG) or provides a `.drawio`/
+`.xml` file with their invocation, read it BEFORE Step 2 to PRE-FILL discovery answers.
+If no image is present, skip this step entirely and go to Step 2 as normal.
+
+1. **Read the diagram.** For PNG/JPG use vision (Read tool). For `.drawio`/`.xml`,
+   parse the `<mxCell>` nodes/edges deterministically.
+
+2. **Extract ONLY topology — never data rules:**
+   - Nodes → AWS services + their role (S3-source, Glue-transform, S3-target, etc.)
+   - Edges → data flow direction
+   - Node/caption labels → zone hints (Bronze/Silver/Gold) and transform intent
+     (e.g. "mask PII", "dedup by X")
+
+3. **Present findings in a discovery box, then treat every value as UNCONFIRMED:**
+   ```
+   +--------------------------------------------------------------------+
+   |  DISCOVERED FROM DIAGRAM (vision read — confirm before use)        |
+   +--------------------------------------------------------------------+
+   |  Topology:  [S3 source] --> [AWS Glue] --> [S3 target]            |
+   |  Roles:     source / transform / target                           |
+   |  Zone guess: Bronze -> Silver (target = Iceberg)  [UNCONFIRMED]   |
+   |  Transform intent (from label): "flag/mask PII"   [AMBIGUOUS]     |
+   +--------------------------------------------------------------------+
+   ```
+
+4. **Feed these as PRE-FILLED answers into Step 2**, so Group 1 (Source) and the
+   zone mapping arrive already drafted. The user confirms or corrects them via
+   `AskUserQuestion` instead of answering from blank.
+
+### HARD LIMITS (the diagram does NOT bypass the human gate)
+
+- A diagram supplies TOPOLOGY and ZONE hints ONLY. It can NEVER supply:
+  PII columns, primary key, dedup rule, null handling, quality thresholds,
+  schedule, retention, or compliance regime.
+- You MUST still ask Groups 2–6 (Schema/Keys, Transforms, PII, Quality, Schedule).
+- If a label is ambiguous (e.g. "keep only / flag PII"), ASK — do not pick a reading.
+- Everything extracted is a PROPOSAL for the human to confirm. Never write a
+  `source.yaml` or spec straight from a diagram.
+
+---
+
 ## Step 2: Phase 1 Discovery (MANDATORY — runs in THIS conversation)
 
 You MUST ask ALL six question groups below. Ask one group at a time using `AskUserQuestion`.
@@ -40,6 +83,9 @@ Wait for answers before proceeding to the next group. Do NOT skip any group.
 If the user's initial prompt already contains answers (e.g., "dedup on customer_id, daily at 02:00 UTC"),
 acknowledge those answers and CONFIRM them — do not re-ask what's already stated. But still ask
 anything NOT covered in the prompt.
+
+If Step 1.5 ran, the Source group and zone mapping are already pre-filled from the diagram —
+CONFIRM those with the user rather than asking from scratch, then ask the rest.
 
 ### Group 1 — Source
 ```
@@ -107,6 +153,10 @@ If the user cannot answer a question:
 ---
 
 ## Step 3: Auto-Profile Source Data
+
+Note: a diagram provides no data to profile. Auto-profiling still requires a concrete
+S3 path / table / fixture from Group 1 — if the user only gave a diagram, ask for the
+locator before profiling.
 
 Before asking Groups 2-6, profile the source data:
 1. Read a sample (CSV: first 50 rows, S3: head object, DB: LIMIT 50 query)
