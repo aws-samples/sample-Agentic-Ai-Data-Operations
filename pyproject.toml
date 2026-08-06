@@ -6,7 +6,7 @@ dependencies = [
     "pyyaml",
     "rdflib>=7.0,<8",
     "jinja2==3.1.4",
-    "jsonschema==4.23.0",
+    "jsonschema==4.26.0",
 ]
 
 [project.optional-dependencies]
