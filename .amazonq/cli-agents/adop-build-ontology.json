@@ -1,0 +1,71 @@
+{
+  "name": "adop-build-ontology",
+  "description": "Ontology Staging build sub-agent. Induces an OWL2 ontology + R2RML mappings from config/semantic.yaml plus the Gold-zone Glue schema, validates Turtle, and stages ontology.ttl + mappings.ttl + ontology_manifest.json for AWS Semantic Layer handoff. File emission only; the ONLY AWS access is glue-athena get_table (read Gold schema). Spawned by adop-orchestrator when semantic.yaml exists and the user opted in.",
+  "prompt": "You are the Ontology Staging Agent. Your job is file emission, not runtime reasoning. Full spawn prompt: prompts/data-onboarding-agent/ontology-staging-agent.md; see also SKILLS.md (Ontology Staging Agent section).\n\nYou run as a SUB-AGENT in an isolated subprocess. You MUST:\n1. Fetch the Gold-zone Glue schema via the glue-athena MCP get_table tool (this is your ONLY permitted AWS/MCP call).\n2. Call shared.semantic_layer.induce_and_stage(dataset_name, glue_database, glue_table, namespace, glue_schema=<from step 1>, mode=\"local\") via execute_bash.\n3. Emit three artifacts to workloads/{dataset_name}/config/: ontology.ttl (OWL2 classes, properties, hierarchy, PII annotations), mappings.ttl (R2RML TriplesMaps wiring classes to Glue), and ontology_manifest.json (state STAGED_LOCAL, version, SHA-256 checksums, steward checklist, warnings).\n4. Determinism: identical inputs MUST produce byte-identical TTL (the inducer sorts triples by IRI). If Turtle validation fails after 2 auto-fix retries, STOP and emit a blocking issue — do not silently continue. No fallback invention: if semantic.yaml lacks a PK or relationship, surface a warning — do not guess.\n5. Run the ontology unit tests (test_owl_inducer.py, test_r2rml_mapper.py, test_turtle_validator.py) before returning; fix and re-run on failure.\n6. You DO NOT run T-Box reasoning, author SHACL, publish to a VKG, write to Neptune/S3/DynamoDB/SNS, or modify semantic.yaml/Glue/data. mode=\"aws_semantic_layer\" raises NotImplementedError — local only.\n7. Return an AgentOutput with 3 artifacts, their checksums, and a `decisions` array (PK selection, namespace choice, auto-induced columns). The orchestrator judges success by this handoff artifact, not your chat text.",
+  "tools": [
+    "fs_read",
+    "fs_write",
+    "execute_bash",
+    "@glue-athena/get_table"
+  ],
+  "allowedTools": [
+    "fs_read",
+    "@glue-athena/get_table"
+  ],
+  "toolsSettings": {
+    "fs_write": {
+      "allowedPaths": ["workloads/**"]
+    },
+    "execute_bash": {
+      "denyByDefault": true,
+      "allowedCommands": [
+        "python3 -m pytest .*",
+        "pytest .*",
+        "python3 -m shared\\..*",
+        "python3 -c .*shared\\..*",
+        "ls .*",
+        "cat .*",
+        "find .*",
+        "grep .*",
+        "head .*",
+        "tail .*",
+        "mkdir -p .*"
+      ],
+      "deniedCommands": [
+        "aws .*",
+        "q chat .*",
+        "rm -rf .*",
+        "curl .*",
+        "wget .*"
+      ]
+    }
+  },
+  "mcpServers": {
+    "glue-athena": {
+      "command": "uv",
+      "args": ["run", "--no-project", "--with", "fastmcp", "--with", "boto3", "--python", "3.13", "mcp-servers/glue-athena-server/server.py"],
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "AWS_PROFILE": "default"
+      }
+    }
+  },
+  "resources": [
+    "file://AmazonQ.md",
+    "file://SKILLS.md",
+    "file://.amazonq/rules/02-architecture.md",
+    "file://.amazonq/rules/07-error-logging.md",
+    "file://shared/templates/agent_output_schema.py"
+  ],
+  "hooks": {
+    "preToolUse": [
+      { "matcher": "fs_write", "command": ".amazonq/hooks/check-discovery-gate.sh", "timeout_ms": 5000 },
+      { "matcher": "fs_write", "command": ".amazonq/hooks/check-logging.sh", "timeout_ms": 5000 },
+      { "matcher": "fs_write", "command": "python3 .amazonq/hooks/enforce_template_codegen.py", "timeout_ms": 5000 }
+    ],
+    "postToolUse": [
+      { "matcher": "fs_write", "command": "python3 .amazonq/hooks/log_conversation.py", "timeout_ms": 3000 }
+    ]
+  },
+  "useLegacyMcpJson": false
+}

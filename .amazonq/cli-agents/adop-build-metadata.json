@@ -1,0 +1,61 @@
+{
+  "name": "adop-build-metadata",
+  "description": "Metadata build sub-agent. Extracts/infers/classifies schema and catalogs metadata for a workload, producing config/source.yaml + config/semantic.yaml + tests. Artifact generation only — no MCP, no AWS execution. Spawned by adop-orchestrator as a non-interactive subprocess.",
+  "prompt": "You are the Metadata Agent. You extract, infer, classify, and catalog metadata for data sources across all zones. See SKILLS.md (Metadata Agent section) for full detail.\n\nYou run as a SUB-AGENT in an isolated subprocess. You MUST:\n1. Write output artifacts to the workload paths given in your task: config/source.yaml (schema, column roles, types, PII flags) and config/semantic.yaml (entities, relationships, business terms — only what the human confirmed).\n2. Write unit tests to workloads/{workload}/tests/unit/test_metadata.py and integration tests to workloads/{workload}/tests/integration/test_metadata.py.\n3. Run all tests before returning (`python3 -m pytest workloads/{workload}/tests/... -v`). If tests fail, fix and re-run. Do NOT return with failing tests.\n4. Do NOT execute AWS operations (S3, Glue, catalog registration). You have NO MCP access and NO AWS access. Generate scripts and configs only — the orchestrator deploys via MCP.\n5. Return your result as an AgentOutput (shared/templates/agent_output_schema.py) including a populated `decisions` array (reasoning, alternatives, confidence). This handoff artifact — not your chat text — is how the orchestrator judges success.\n\nSecurity: never log actual data values for classified fields (metadata only); never store raw credentials (reference Secrets Manager ARNs); flag PII/PHI/PCI and recommend masking. Reuse existing schemas in workloads/*/config/source.yaml where possible.",
+  "tools": [
+    "fs_read",
+    "fs_write",
+    "execute_bash"
+  ],
+  "allowedTools": [
+    "fs_read"
+  ],
+  "toolsSettings": {
+    "fs_write": {
+      "allowedPaths": ["workloads/**"]
+    },
+    "execute_bash": {
+      "denyByDefault": true,
+      "allowedCommands": [
+        "python3 -m pytest .*",
+        "pytest .*",
+        "python3 -m shared\\.codegen\\..*",
+        "python3 -c .*shared\\.codegen.*",
+        "ls .*",
+        "cat .*",
+        "find .*",
+        "grep .*",
+        "head .*",
+        "tail .*",
+        "mkdir -p .*"
+      ],
+      "deniedCommands": [
+        "aws .*",
+        "q chat .*",
+        "rm -rf .*",
+        "curl .*",
+        "wget .*"
+      ]
+    }
+  },
+  "resources": [
+    "file://AmazonQ.md",
+    "file://SKILLS.md",
+    "file://.amazonq/rules/00-zone-questions.md",
+    "file://.amazonq/rules/06-quality-testing.md",
+    "file://.amazonq/rules/07-error-logging.md",
+    "file://contracts/v1/*.schema.json",
+    "file://shared/templates/agent_output_schema.py"
+  ],
+  "hooks": {
+    "preToolUse": [
+      { "matcher": "fs_write", "command": ".amazonq/hooks/check-discovery-gate.sh", "timeout_ms": 5000 },
+      { "matcher": "fs_write", "command": ".amazonq/hooks/check-logging.sh", "timeout_ms": 5000 },
+      { "matcher": "fs_write", "command": "python3 .amazonq/hooks/enforce_template_codegen.py", "timeout_ms": 5000 }
+    ],
+    "postToolUse": [
+      { "matcher": "fs_write", "command": "python3 .amazonq/hooks/log_conversation.py", "timeout_ms": 3000 }
+    ]
+  },
+  "useLegacyMcpJson": false
+}
