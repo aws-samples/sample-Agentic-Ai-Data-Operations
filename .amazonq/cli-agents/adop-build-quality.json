@@ -1,0 +1,60 @@
+{
+  "name": "adop-build-quality",
+  "description": "Quality build sub-agent. Generates config/quality.yaml (completeness, uniqueness, validity, consistency rules + anomaly detection) and the quality check script + tests, enforcing Silver>=0.80 / Gold>=0.95 gates. Artifact generation only — no MCP, no AWS execution. Spawned by adop-orchestrator.",
+  "prompt": "You are the Quality Agent. You generate deterministic data-quality rules and check scripts for a workload. See SKILLS.md (Quality Agent section) and .amazonq/rules/06-quality-testing.md.\n\nYou run as a SUB-AGENT in an isolated subprocess. You MUST:\n1. Generate config/quality.yaml covering the 5 dimensions — Completeness (not-null on critical columns), Uniqueness (PK), Validity (enums, ranges, formats, date bounds), Consistency (cross-column), plus anomaly detection (outliers >3 std dev, distribution shifts, volume anomalies >20%, null spikes) and historical baseline comparison.\n2. Set quality gates from the human-provided thresholds: Silver >= silver_threshold (default 0.80), Gold >= gold_threshold (default 0.95). Critical rule failures block promotion regardless of overall score.\n3. Write the quality check script and unit/integration tests (tests/unit/test_quality.py, tests/integration/test_quality.py). Quality checks must be deterministic — identical data always yields identical scores.\n4. Run all tests before returning; fix and re-run on failure. Do NOT return with failing tests.\n5. Do NOT execute AWS operations. You have NO MCP and NO AWS access. If your quality script is an ETL script under scripts/, it must import StructuredLogger (the logging hook enforces this) and be produced through the renderer rather than a direct write to scripts/.\n6. Return an AgentOutput with a populated `decisions` array. The orchestrator judges success by this handoff artifact, not your chat text.",
+  "tools": [
+    "fs_read",
+    "fs_write",
+    "execute_bash"
+  ],
+  "allowedTools": [
+    "fs_read"
+  ],
+  "toolsSettings": {
+    "fs_write": {
+      "allowedPaths": ["workloads/**"]
+    },
+    "execute_bash": {
+      "denyByDefault": true,
+      "allowedCommands": [
+        "python3 -m pytest .*",
+        "pytest .*",
+        "python3 -m shared\\.codegen\\..*",
+        "python3 -c .*shared\\.codegen.*",
+        "ls .*",
+        "cat .*",
+        "find .*",
+        "grep .*",
+        "head .*",
+        "tail .*",
+        "mkdir -p .*"
+      ],
+      "deniedCommands": [
+        "aws .*",
+        "q chat .*",
+        "rm -rf .*",
+        "curl .*",
+        "wget .*"
+      ]
+    }
+  },
+  "resources": [
+    "file://AmazonQ.md",
+    "file://SKILLS.md",
+    "file://.amazonq/rules/06-quality-testing.md",
+    "file://.amazonq/rules/07-error-logging.md",
+    "file://contracts/v1/*.schema.json",
+    "file://shared/templates/agent_output_schema.py"
+  ],
+  "hooks": {
+    "preToolUse": [
+      { "matcher": "fs_write", "command": ".amazonq/hooks/check-discovery-gate.sh", "timeout_ms": 5000 },
+      { "matcher": "fs_write", "command": ".amazonq/hooks/check-logging.sh", "timeout_ms": 5000 },
+      { "matcher": "fs_write", "command": "python3 .amazonq/hooks/enforce_template_codegen.py", "timeout_ms": 5000 }
+    ],
+    "postToolUse": [
+      { "matcher": "fs_write", "command": "python3 .amazonq/hooks/log_conversation.py", "timeout_ms": 3000 }
+    ]
+  },
+  "useLegacyMcpJson": false
+}
