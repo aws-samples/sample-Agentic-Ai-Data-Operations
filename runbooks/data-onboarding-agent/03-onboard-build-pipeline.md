@@ -115,7 +115,7 @@ Pre-requisites for multi-account (STOP and refuse onboarding if any is missing):
      reader role ARN (see §3).
   4. Airflow Variables `glue_catalog_account_id`,
      `glue_catalog_assume_role_arn`, and `glue_catalog_external_id` are
-     already set by `prompts/environment-setup-agent/01-setup-aws-infrastructure.md`
+     already set by `runbooks/environment-setup-agent/01-setup-aws-infrastructure.md`
      Step 1b.
 
 Schema:
@@ -254,7 +254,7 @@ Compliance & Governance:
 - Regulatory requirements: [GDPR/CCPA/HIPAA/SOX/PCI DSS/None]
 
 **How regulation loading works**:
-If you select a regulation (e.g., HIPAA), the system automatically loads controls from `prompts/data-onboarding-agent/regulation/hipaa.md`. These controls include default encryption keys, retention periods, LF-Tag requirements, access roles, and masking methods. You don't need to specify these manually — they're auto-applied during Phase 1 discovery. See `prompts/data-onboarding-agent/regulation/README.md` for what each regulation provides.
+If you select a regulation (e.g., HIPAA), the system automatically loads controls from `runbooks/data-onboarding-agent/regulation/hipaa.md`. These controls include default encryption keys, retention periods, LF-Tag requirements, access roles, and masking methods. You don't need to specify these manually — they're auto-applied during Phase 1 discovery. See `runbooks/data-onboarding-agent/regulation/README.md` for what each regulation provides.
 
 **What you MUST still specify** (even with regulation selected):
 - Data steward owner and domain
@@ -396,7 +396,7 @@ Staging, IaC Generator). Each sub-agent reads it and:
   `Variable.get("glue_catalog_account_id")` and pass it as
   `--catalog_account_id` to every GlueJobOperator default_args.
 - **IaC Generator** reads the block in its Phase 0 (see
-  `prompts/devops-agent/iac-generator.md`) and emits provider aliases
+  `runbooks/devops-agent/iac-generator.md`) and emits provider aliases
   + CatalogId references accordingly.
 - See `docs/multi-account-deployment.md` for the full generation
   contract.
@@ -670,7 +670,7 @@ Present results to human. Do NOT proceed if any REQUIRED server fails.
    these committed local TTL files and push them to AWS. No regeneration
    is needed — the inducer is deterministic.
 
-   Full spawn prompt: `prompts/data-onboarding-agent/ontology-staging-agent.md`.
+   Full spawn prompt: `runbooks/data-onboarding-agent/ontology-staging-agent.md`.
    Skill definition: SKILLS.md → "Skill: Ontology Staging Agent".
 
 9. **Deploy DAG + shared utils to MWAA** (if MWAA is configured):
@@ -846,4 +846,4 @@ Present results to human. Do NOT proceed if any REQUIRED server fails.
 - Only require `JOB_NAME` in `getResolvedOptions` for catalog-based jobs
 - Use catalog table names in lineage sections, not `args['path']`
 
-See `prompts/07-fix-iceberg-glue.md` for the full troubleshooting guide.
+See `runbooks/data-onboarding-agent/troubleshooting/01-fix-iceberg-glue.md` for the full troubleshooting guide.

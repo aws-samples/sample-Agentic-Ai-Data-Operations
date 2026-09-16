@@ -1034,6 +1034,6 @@ repo" is a valid rejection reason; absence of one is not.
 - `shared/policies/guardrails/` — existing 19 guardrail policies
   (`int_001`, `dq_001`, `ops_001`, …) referenced by §Phase 5.3 coverage
   check.
-- `prompts/data-onboarding-agent/ontology-staging-agent.md` — sibling
+- `runbooks/data-onboarding-agent/ontology-staging-agent.md` — sibling
   sub-agent that follows the same spawn-prompt template and `AgentOutput`
   contract.

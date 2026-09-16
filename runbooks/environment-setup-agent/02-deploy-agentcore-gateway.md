@@ -191,9 +191,9 @@ Each Lambda target needs a tool schema describing its tools.
 
 **Create schema for glue-athena**:
 ```bash
-mkdir -p prompts/environment-setup-agent/agentcore/gateway/schemas
+mkdir -p runbooks/environment-setup-agent/agentcore/gateway/schemas
 
-cat > prompts/environment-setup-agent/agentcore/gateway/schemas/glue-athena-tools.json <<'EOF'
+cat > runbooks/environment-setup-agent/agentcore/gateway/schemas/glue-athena-tools.json <<'EOF'
 [
   {
     "name": "get_databases",
@@ -272,7 +272,7 @@ cat > /tmp/glue-athena-target.json <<EOF
     "lambda": {
       "lambdaArn": "arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:${PROJECT}-mcp-glue-athena",
       "toolSchema": {
-        "inlinePayload": $(cat prompts/environment-setup-agent/agentcore/gateway/schemas/glue-athena-tools.json)
+        "inlinePayload": $(cat runbooks/environment-setup-agent/agentcore/gateway/schemas/glue-athena-tools.json)
       }
     }
   }
@@ -426,7 +426,7 @@ echo "✓ Generated .mcp.gateway.json"
 
 **Run health check script**:
 ```bash
-python3 prompts/environment-setup-agent/agentcore/gateway/test_gateway.py
+python3 runbooks/environment-setup-agent/agentcore/gateway/test_gateway.py
 ```
 
 **Expected output**:
@@ -610,7 +610,7 @@ After successful deployment, you have:
    - Test each tool
 
 3. **Deploy Agentcore Runtime** (optional):
-   - See `prompts/10-deploy-agentcore-runtime.md`
+   - See `runbooks/environment-setup-agent/03-deploy-agentcore-runtime.md`
    - Hosts Data Onboarding Agent in cloud
    - API-driven, fully serverless
 
@@ -638,15 +638,15 @@ After successful deployment, you have:
 
 - `/tmp/gateway-trust-policy.json` - Gateway IAM trust policy
 - `/tmp/gateway-lambda-policy.json` - Lambda invoke permissions
-- `prompts/environment-setup-agent/agentcore/gateway/schemas/glue-athena-tools.json` - Tool schema
+- `runbooks/environment-setup-agent/agentcore/gateway/schemas/glue-athena-tools.json` - Tool schema
 - `/tmp/glue-athena-target.json` - Target configuration
 - `.mcp.gateway.json` - MCP config for Claude Code
-- `prompts/environment-setup-agent/agentcore/gateway/DEPLOYMENT_STATUS.md` - Deployment documentation
-- `prompts/environment-setup-agent/agentcore/gateway/test_gateway.py` - Health check script
+- `agentcore/gateway/DEPLOYMENT_STATUS.md` - Deployment documentation (written by this runbook; not in the repo until you run it)
+- `runbooks/environment-setup-agent/agentcore/gateway/test_gateway.py` - Health check script
 
 ## Resources
 
 - **AWS Documentation**: [Amazon Bedrock AgentCore Gateway](https://docs.aws.amazon.com/bedrock/latest/userguide/agentcore-gateway.html)
 - **MCP Specification**: [Model Context Protocol](https://modelcontextprotocol.io/)
 - **Local Setup**: See `docs/mcp-setup.md` for local stdio mode
-- **Runtime Agent**: See `prompts/10-deploy-agentcore-runtime.md`
+- **Runtime Agent**: See `runbooks/environment-setup-agent/03-deploy-agentcore-runtime.md`

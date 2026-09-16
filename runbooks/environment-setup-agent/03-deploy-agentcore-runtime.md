@@ -10,33 +10,33 @@ Hosts the Data Onboarding Agent on Agentcore Runtime so it can be invoked via AP
 
 Runtime deployment is **optional**. If you only need to demo or develop locally, you can skip this prompt entirely:
 
-1. Deploy Gateway only (`prompts/09-deploy-agentcore-gateway.md`)
+1. Deploy Gateway only (`runbooks/environment-setup-agent/02-deploy-agentcore-gateway.md`)
 2. Replace `.mcp.json` with `.mcp.gateway.json`
 3. Run Claude Code normally -- all 13 MCP tools are served from Gateway
 
-This gives you cloud-hosted tools without deploying the agent to Runtime. The agent runs in Claude Code on your laptop with full human-in-the-loop control. See `prompts/environment-setup-agent/agentcore/README.md` for details on both execution modes.
+This gives you cloud-hosted tools without deploying the agent to Runtime. The agent runs in Claude Code on your laptop with full human-in-the-loop control. See `runbooks/environment-setup-agent/agentcore/README.md` for details on both execution modes.
 
 ## When to Use
 
 Use this prompt (Runtime deployment) when you need **production mode**:
 
-- After `prompts/09-deploy-agentcore-gateway.md` (Gateway with all 13 servers deployed)
+- After `runbooks/environment-setup-agent/02-deploy-agentcore-gateway.md` (Gateway with all 13 servers deployed)
 - Want the Data Onboarding Agent accessible via REST API
 - Building integrations that invoke the agent programmatically
 - Team wants a shared agent instance with persistent memory
 
 ## Prerequisites
 
-1. Gateway deployed via `prompts/09-deploy-agentcore-gateway.md` (all 13 servers healthy)
+1. Gateway deployed via `runbooks/environment-setup-agent/02-deploy-agentcore-gateway.md` (all 13 servers healthy)
 2. AWS credentials with Bedrock Agentcore permissions
-3. Agent config at `prompts/environment-setup-agent/agentcore/runtime/agent.yaml`
+3. Agent config at `runbooks/environment-setup-agent/agentcore/runtime/agent.yaml`
 
 ## Prompt Template
 
 ```
 Deploy Data Onboarding Agent to Agentcore Runtime.
 
-Agent config: prompts/environment-setup-agent/agentcore/runtime/agent.yaml
+Agent config: runbooks/environment-setup-agent/agentcore/runtime/agent.yaml
 Gateway: [GATEWAY_ID from prompt 09]
 Memory: [agentcore / local]
 AWS Region: [us-east-1]
@@ -76,7 +76,7 @@ Permissions:
 
 ```
 Action: Create Agentcore Runtime agent from agent.yaml
-Read:   prompts/environment-setup-agent/agentcore/runtime/agent.yaml
+Read:   runbooks/environment-setup-agent/agentcore/runtime/agent.yaml
 CLI:    aws bedrock-agent create-agent \
           --agent-name {agent.name} \
           --instruction (from system_prompt_files: CLAUDE.md + SKILLS.md + MCP_GUARDRAILS.md) \
@@ -155,7 +155,7 @@ Invoke via API:
 - **Invoke via CLI**: `aws bedrock-agent-runtime invoke-agent --agent-id {ID} --input-text "..."`
 - **Invoke via SDK**: Use `boto3.client('bedrock-agent-runtime').invoke_agent()`
 - **Monitor**: CloudWatch logs under `/aws/bedrock/agent/{AGENT_ID}`
-- **Update agent**: Modify `prompts/environment-setup-agent/agentcore/runtime/agent.yaml`, re-run this prompt
+- **Update agent**: Modify `runbooks/environment-setup-agent/agentcore/runtime/agent.yaml`, re-run this prompt
 
 ## Teardown
 
@@ -167,5 +167,5 @@ aws bedrock-agent delete-agent --agent-id {AGENT_ID}
 aws iam delete-role-policy --role-name {PROJECT}-agentcore-runtime-role --policy-name runtime-policy
 aws iam delete-role --role-name {PROJECT}-agentcore-runtime-role
 
-# Gateway teardown: see prompts/09-deploy-agentcore-gateway.md
+# Gateway teardown: see runbooks/environment-setup-agent/02-deploy-agentcore-gateway.md
 ```

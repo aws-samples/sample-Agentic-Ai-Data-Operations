@@ -16,13 +16,13 @@ Before applying HIPAA controls, verify these AWS resources exist:
 
 | Resource | Check Command | What If Missing? |
 |----------|---------------|------------------|
-| **KMS key** `alias/hipaa-phi-key` | `aws kms describe-key --key-id alias/hipaa-phi-key --region us-east-1` | Run `prompts/environment-setup-agent/01-setup-aws-infrastructure.md` Step 4, or create manually: `aws kms create-key --description "HIPAA PHI encryption key"` then `aws kms create-alias --alias-name alias/hipaa-phi-key --target-key-id {KEY_ID}` |
+| **KMS key** `alias/hipaa-phi-key` | `aws kms describe-key --key-id alias/hipaa-phi-key --region us-east-1` | Run `runbooks/environment-setup-agent/01-setup-aws-infrastructure.md` Step 4, or create manually: `aws kms create-key --description "HIPAA PHI encryption key"` then `aws kms create-alias --alias-name alias/hipaa-phi-key --target-key-id {KEY_ID}` |
 | **IAM role** `HIPAAAdminRole` | `aws iam get-role --role-name HIPAAAdminRole` | Create with trust policy for Lake Formation and Glue: `aws iam create-role --role-name HIPAAAdminRole --assume-role-policy-document file://trust-policy.json` |
 | **IAM role** `ProviderRole` | `aws iam get-role --role-name ProviderRole` | Create with trust policy for Lake Formation |
 | **IAM role** `BillingRole` | `aws iam get-role --role-name BillingRole` | Create with trust policy for Lake Formation |
 | **IAM role** `AnalystRole` | `aws iam get-role --role-name AnalystRole` | Create with trust policy for Lake Formation |
 | **IAM role** `DashboardUserRole` | `aws iam get-role --role-name DashboardUserRole` | Create with trust policy for QuickSight and Athena |
-| **LF-Tag** `PII_Classification` | `aws lakeformation list-lf-tags --region us-east-1 \| grep PII_Classification` | Run `prompts/environment-setup-agent/01-setup-aws-infrastructure.md` Step 6, or create manually: `aws lakeformation create-lf-tag --tag-key PII_Classification --tag-values CRITICAL,HIGH,MEDIUM,LOW,NONE` |
+| **LF-Tag** `PII_Classification` | `aws lakeformation list-lf-tags --region us-east-1 \| grep PII_Classification` | Run `runbooks/environment-setup-agent/01-setup-aws-infrastructure.md` Step 6, or create manually: `aws lakeformation create-lf-tag --tag-key PII_Classification --tag-values CRITICAL,HIGH,MEDIUM,LOW,NONE` |
 | **LF-Tag** `PII_Type` | `aws lakeformation list-lf-tags --region us-east-1 \| grep PII_Type` | Create: `aws lakeformation create-lf-tag --tag-key PII_Type --tag-values SSN,EMAIL,PHONE,ADDRESS,DOB,NATIONAL_ID,NAME,FINANCIAL_ACCOUNT` |
 | **LF-Tag** `Data_Sensitivity` | `aws lakeformation list-lf-tags --region us-east-1 \| grep Data_Sensitivity` | Create: `aws lakeformation create-lf-tag --tag-key Data_Sensitivity --tag-values CRITICAL,HIGH,MEDIUM,LOW` |
 | **CloudTrail** enabled | `aws cloudtrail get-trail-status --name {TRAIL} --region us-east-1` | Enable CloudTrail in AWS Console or via CLI. HIPAA requires audit trail for all PHI access. |
@@ -42,7 +42,7 @@ done
 aws lakeformation list-lf-tags --region us-east-1 --query 'LFTags[].TagKey' --output text | grep -E 'PII_Classification|PII_Type|Data_Sensitivity' && echo "✓ LF-Tags exist" || echo "✗ LF-Tags missing"
 ```
 
-**If prerequisites are missing**: Run the environment setup first (`prompts/environment-setup-agent/01-setup-aws-infrastructure.md`) or create resources manually using the commands above. Do NOT proceed with HIPAA onboarding until all prerequisites pass.
+**If prerequisites are missing**: Run the environment setup first (`runbooks/environment-setup-agent/01-setup-aws-infrastructure.md`) or create resources manually using the commands above. Do NOT proceed with HIPAA onboarding until all prerequisites pass.
 
 ## Controls Applied
 

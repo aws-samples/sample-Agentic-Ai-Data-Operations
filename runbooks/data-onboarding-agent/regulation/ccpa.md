@@ -16,12 +16,12 @@ Before applying CCPA controls, verify these AWS resources exist:
 
 | Resource | Check Command | What If Missing? |
 |----------|---------------|------------------|
-| **KMS key** `alias/{workload}-ccpa-key` | `aws kms describe-key --key-id alias/{workload}-ccpa-key --region us-east-1` | Run `prompts/environment-setup-agent/01-setup-aws-infrastructure.md` Step 4, or create manually: `aws kms create-key --description "CCPA personal information encryption key for {workload}"` then `aws kms create-alias --alias-name alias/{workload}-ccpa-key --target-key-id {KEY_ID}` |
+| **KMS key** `alias/{workload}-ccpa-key` | `aws kms describe-key --key-id alias/{workload}-ccpa-key --region us-east-1` | Run `runbooks/environment-setup-agent/01-setup-aws-infrastructure.md` Step 4, or create manually: `aws kms create-key --description "CCPA personal information encryption key for {workload}"` then `aws kms create-alias --alias-name alias/{workload}-ccpa-key --target-key-id {KEY_ID}` |
 | **IAM role** `PrivacyTeamRole` | `aws iam get-role --role-name PrivacyTeamRole` | Create with trust policy for Lake Formation and Glue: `aws iam create-role --role-name PrivacyTeamRole --assume-role-policy-document file://trust-policy.json` |
 | **IAM role** `MarketingRole` | `aws iam get-role --role-name MarketingRole` | Create with trust policy for Lake Formation |
 | **IAM role** `ConsumerRequestRole` | `aws iam get-role --role-name ConsumerRequestRole` | Create with trust policy for handling consumer data requests (access, deletion) |
 | **IAM role** `DashboardUserRole` | `aws iam get-role --role-name DashboardUserRole` | Create with trust policy for QuickSight and Athena |
-| **LF-Tag** `PII_Classification` | `aws lakeformation list-lf-tags --region us-east-1 \| grep PII_Classification` | Run `prompts/environment-setup-agent/01-setup-aws-infrastructure.md` Step 6, or create manually: `aws lakeformation create-lf-tag --tag-key PII_Classification --tag-values CRITICAL,HIGH,MEDIUM,LOW,NONE` |
+| **LF-Tag** `PII_Classification` | `aws lakeformation list-lf-tags --region us-east-1 \| grep PII_Classification` | Run `runbooks/environment-setup-agent/01-setup-aws-infrastructure.md` Step 6, or create manually: `aws lakeformation create-lf-tag --tag-key PII_Classification --tag-values CRITICAL,HIGH,MEDIUM,LOW,NONE` |
 | **LF-Tag** `PII_Type` | `aws lakeformation list-lf-tags --region us-east-1 \| grep PII_Type` | Create: `aws lakeformation create-lf-tag --tag-key PII_Type --tag-values SSN,EMAIL,PHONE,ADDRESS,DOB,NATIONAL_ID,NAME,FINANCIAL_ACCOUNT,DRIVER_LICENSE` |
 | **LF-Tag** `Data_Sensitivity` | `aws lakeformation list-lf-tags --region us-east-1 \| grep Data_Sensitivity` | Create: `aws lakeformation create-lf-tag --tag-key Data_Sensitivity --tag-values CRITICAL,HIGH,MEDIUM,LOW` |
 | **CloudTrail** enabled | `aws cloudtrail get-trail-status --name {TRAIL} --region us-east-1` | Enable CloudTrail in AWS Console or via CLI. CCPA requires audit trail for all personal information access. |
@@ -41,7 +41,7 @@ done
 aws lakeformation list-lf-tags --region us-east-1 --query 'LFTags[].TagKey' --output text | grep -E 'PII_Classification|PII_Type|Data_Sensitivity' && echo "✓ LF-Tags exist" || echo "✗ LF-Tags missing"
 ```
 
-**If prerequisites are missing**: Run the environment setup first (`prompts/environment-setup-agent/01-setup-aws-infrastructure.md`) or create resources manually using the commands above. Do NOT proceed with CCPA onboarding until all prerequisites pass.
+**If prerequisites are missing**: Run the environment setup first (`runbooks/environment-setup-agent/01-setup-aws-infrastructure.md`) or create resources manually using the commands above. Do NOT proceed with CCPA onboarding until all prerequisites pass.
 
 ## Controls Applied
 

@@ -59,7 +59,7 @@ All regulation prompts build on the same shared utilities:
 
 **What to do if prerequisites are missing:**
 
-1. Run the environment setup: `prompts/environment-setup-agent/01-setup-aws-infrastructure.md`
+1. Run the environment setup: `runbooks/environment-setup-agent/01-setup-aws-infrastructure.md`
 2. Or create resources manually using the commands in each regulation prompt's Prerequisites section
 3. **Do NOT proceed with onboarding until all prerequisites pass** — deployments will fail at Phase 5 without them
 

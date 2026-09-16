@@ -463,7 +463,7 @@ done
 
 ## 4. Glue Catalog
 
-Create zone databases via Athena. The SQL file `prompts/environment-setup-agent/sql/create_zone_databases.sql` should contain:
+Create zone databases via Athena. The SQL file `runbooks/environment-setup-agent/sql/create_zone_databases.sql` should contain:
 
 ```sql
 CREATE DATABASE IF NOT EXISTS landing_db

@@ -16,7 +16,7 @@
 
 ## Why Separate from Core Workflow?
 
-The core data onboarding workflow (`data-onboarding-agent/`) assumes you have a **real data source** (S3, database, API). Synthetic data generation is only needed when:
+The core data onboarding workflow (`../data-onboarding-agent/`) assumes you have a **real data source** (S3, database, API). Synthetic data generation is only needed when:
 
 1. You don't have access to real data yet
 2. You're building a demo for a conference/presentation
@@ -24,8 +24,8 @@ The core data onboarding workflow (`data-onboarding-agent/`) assumes you have a 
 
 ## Real-World Examples
 
-For complete real-world onboarding examples (not synthetic data), see:
-- [`../examples.md`](../examples.md) - Full prompts with semantic layer examples
+For a complete onboarding walkthrough against a real source (not synthetic data), see
+[`docs/getting-started.md`](../../docs/getting-started.md).
 
 ## Quick Example
 
@@ -50,9 +50,9 @@ Output:
 - Seed: 12345 (reproducible)
 ```
 
-Then onboard using the core workflow (`data-onboarding-agent/03-onboard-build-pipeline.md`).
+Then onboard using the core workflow (`../data-onboarding-agent/03-onboard-build-pipeline.md`).
 
 ## See Also
 
-- [`examples.md`](../examples.md) - Real-world onboarding examples with full semantic layer
-- [`data-onboarding-agent/README.md`](../data-onboarding-agent/README.md) - Core workflow prompts
+- [`docs/getting-started.md`](../../docs/getting-started.md) - End-to-end walkthrough on a real source
+- [`data-onboarding-agent/README.md`](../data-onboarding-agent/README.md) - Core onboarding runbooks

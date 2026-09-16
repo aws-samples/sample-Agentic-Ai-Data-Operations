@@ -90,7 +90,7 @@ aws lakeformation list-lf-tags
 claude mcp list
 
 # Check MCP Gateway (if deployed)
-python3 prompts/environment-setup-agent/agentcore/gateway/test_gateway.py
+python3 runbooks/environment-setup-agent/agentcore/gateway/test_gateway.py
 
 # Check Runtime Agent (if deployed)
 aws bedrock-agent list-agents | grep data-onboarding

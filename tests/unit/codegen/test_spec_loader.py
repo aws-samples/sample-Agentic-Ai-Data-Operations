@@ -94,3 +94,80 @@ class TestLoadSpec:
         spec_file.write_text(yaml.dump(silver_spec_dict))
         with pytest.raises(SpecValidationError):
             load_spec(spec_file, "silver")
+
+
+def _run_context(**overrides) -> dict:
+    """Minimal valid run/context.json payload."""
+    ctx = {
+        "schema_version": "v1",
+        "run_id": "run-abc123",
+        "workload_name": "claims",
+        "started_at": "2026-09-16T10:00:00Z",
+        "template_version": "1.0.0",
+        "timestamp_mode": "fixed",
+        "human_answers": {
+            "zones": ["bronze", "silver", "gold"],
+            "recorded_at": "2026-09-16T09:55:00Z",
+        },
+    }
+    ctx.update(overrides)
+    return ctx
+
+
+class TestRunContextSpec:
+    def test_minimal_run_context_validates(self):
+        assert validate_spec(_run_context(), "run_context") == []
+
+    def test_load_run_context_from_json_file(self, tmp_path):
+        import json
+        path = tmp_path / "context.json"
+        path.write_text(json.dumps(_run_context()))
+        ctx, ctx_hash = load_spec(path, "run_context")
+        assert ctx["workload_name"] == "claims"
+        assert len(ctx_hash) == 64
+
+    def test_carries_parallel_agent_answers_verbatim(self):
+        """4.3 and 4.4 can run in parallel — both read these two strings."""
+        ctx = _run_context()
+        ctx["human_answers"]["dedup_strategy"] = "keep latest by ingest_ts, drop the rest"
+        ctx["human_answers"]["null_handling"] = "quarantine rows with null claim_id"
+        assert validate_spec(ctx, "run_context") == []
+
+    def test_rejects_wall_clock_timestamp_mode(self):
+        errors = validate_spec(_run_context(timestamp_mode="now"), "run_context")
+        assert errors
+
+    def test_rejects_unknown_top_level_field(self):
+        errors = validate_spec(_run_context(surprise="x"), "run_context")
+        assert errors
+
+    def test_rejects_human_answers_without_zones(self):
+        ctx = _run_context(human_answers={"recorded_at": "2026-09-16T09:55:00Z"})
+        assert validate_spec(ctx, "run_context")
+
+    def test_rejects_quality_threshold_above_one(self):
+        ctx = _run_context()
+        ctx["human_answers"]["quality_thresholds"] = {"silver": 1.5}
+        assert validate_spec(ctx, "run_context")
+
+    def test_previous_phases_accepts_completed_phase_record(self):
+        ctx = _run_context(previous_phases=[{
+            "phase": 4.3,
+            "agent": "transformation",
+            "output_hash": "a" * 64,
+            "status": "success",
+            "completed_at": "2026-09-16T10:20:00Z",
+        }])
+        assert validate_spec(ctx, "run_context") == []
+
+    def test_previous_phases_rejects_unknown_agent(self):
+        ctx = _run_context(previous_phases=[
+            {"phase": 4, "agent": "mystery", "status": "success"}
+        ])
+        assert validate_spec(ctx, "run_context")
+
+    def test_hash_is_stable_under_key_reordering(self):
+        ctx = _run_context()
+        assert compute_spec_hash(ctx) == compute_spec_hash(
+            dict(reversed(list(ctx.items())))
+        )

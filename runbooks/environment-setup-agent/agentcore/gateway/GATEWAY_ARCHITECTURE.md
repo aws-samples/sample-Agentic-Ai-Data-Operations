@@ -473,7 +473,7 @@ Each Lambda target has a tool schema (JSON) describing its tools.
 
 | File | Purpose |
 |------|---------|
-| `prompts/admin/deploy-agentcore-gateway.md` | Full deployment guide |
+| `runbooks/environment-setup-agent/02-deploy-agentcore-gateway.md` | Full deployment guide |
 | `agentcore/gateway/DEPLOYMENT_STATUS.md` | Current deployment state |
 | `agentcore/gateway/GATEWAY_ARCHITECTURE.md` | This file |
 | `agentcore/gateway/test_gateway.py` | Health check script |

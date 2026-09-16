@@ -92,8 +92,8 @@ The AWS Semantic Layer is deployed, a follow-up will:
    - Upload TTL + manifest to `s3://{knowledge-layer-bucket}/ontologies/{namespace}/{version}/staged/`.
    - Write DynamoDB record to `aws-semantic-layer-ontology-versions` with `state=STAGED`.
    - Publish SNS notification to the steward topic.
-2. Add a new prompt `prompts/data-onboarding-agent/ontology-publish-agent.md`
-   that reads the already-committed local TTL files and pushes them to
+2. Add an `ontology-publish-agent` runbook under `runbooks/data-onboarding-agent/`
+   (not yet written) that reads the already-committed local TTL files and pushes them to
    AWS. No regeneration — deterministic inducer means identical inputs
    give identical outputs.
 

@@ -16,12 +16,12 @@ Before applying SOX controls, verify these AWS resources exist:
 
 | Resource | Check Command | What If Missing? |
 |----------|---------------|------------------|
-| **KMS key** `alias/{workload}-sox-key` | `aws kms describe-key --key-id alias/{workload}-sox-key --region us-east-1` | Run `prompts/environment-setup-agent/01-setup-aws-infrastructure.md` Step 4, or create manually: `aws kms create-key --description "SOX financial data encryption key for {workload}"` then `aws kms create-alias --alias-name alias/{workload}-sox-key --target-key-id {KEY_ID}` |
+| **KMS key** `alias/{workload}-sox-key` | `aws kms describe-key --key-id alias/{workload}-sox-key --region us-east-1` | Run `runbooks/environment-setup-agent/01-setup-aws-infrastructure.md` Step 4, or create manually: `aws kms create-key --description "SOX financial data encryption key for {workload}"` then `aws kms create-alias --alias-name alias/{workload}-sox-key --target-key-id {KEY_ID}` |
 | **IAM role** `AuditorRole` | `aws iam get-role --role-name AuditorRole` | Create with trust policy for Lake Formation (read-only): `aws iam create-role --role-name AuditorRole --assume-role-policy-document file://trust-policy.json` |
 | **IAM role** `FinanceRole` | `aws iam get-role --role-name FinanceRole` | Create with trust policy for Lake Formation and Glue |
 | **IAM role** `ExternalReviewerRole` | `aws iam get-role --role-name ExternalReviewerRole` | Create with trust policy for Lake Formation (read-only, LOW sensitivity only) |
 | **IAM role** `DashboardUserRole` | `aws iam get-role --role-name DashboardUserRole` | Create with trust policy for QuickSight and Athena |
-| **LF-Tag** `PII_Classification` | `aws lakeformation list-lf-tags --region us-east-1 \| grep PII_Classification` | Run `prompts/environment-setup-agent/01-setup-aws-infrastructure.md` Step 6, or create manually: `aws lakeformation create-lf-tag --tag-key PII_Classification --tag-values CRITICAL,HIGH,MEDIUM,LOW,NONE` |
+| **LF-Tag** `PII_Classification` | `aws lakeformation list-lf-tags --region us-east-1 \| grep PII_Classification` | Run `runbooks/environment-setup-agent/01-setup-aws-infrastructure.md` Step 6, or create manually: `aws lakeformation create-lf-tag --tag-key PII_Classification --tag-values CRITICAL,HIGH,MEDIUM,LOW,NONE` |
 | **LF-Tag** `PII_Type` | `aws lakeformation list-lf-tags --region us-east-1 \| grep PII_Type` | Create: `aws lakeformation create-lf-tag --tag-key PII_Type --tag-values SSN,EMAIL,PHONE,ADDRESS,DOB,NATIONAL_ID,NAME,FINANCIAL_ACCOUNT` |
 | **LF-Tag** `Data_Sensitivity` | `aws lakeformation list-lf-tags --region us-east-1 \| grep Data_Sensitivity` | Create: `aws lakeformation create-lf-tag --tag-key Data_Sensitivity --tag-values CRITICAL,HIGH,MEDIUM,LOW` |
 | **CloudTrail** enabled | `aws cloudtrail get-trail-status --name {TRAIL} --region us-east-1` | Enable CloudTrail in AWS Console or via CLI. SOX requires audit trail for all financial data access and modifications. |
@@ -41,7 +41,7 @@ done
 aws lakeformation list-lf-tags --region us-east-1 --query 'LFTags[].TagKey' --output text | grep -E 'PII_Classification|PII_Type|Data_Sensitivity' && echo "✓ LF-Tags exist" || echo "✗ LF-Tags missing"
 ```
 
-**If prerequisites are missing**: Run the environment setup first (`prompts/environment-setup-agent/01-setup-aws-infrastructure.md`) or create resources manually using the commands above. Do NOT proceed with SOX onboarding until all prerequisites pass.
+**If prerequisites are missing**: Run the environment setup first (`runbooks/environment-setup-agent/01-setup-aws-infrastructure.md`) or create resources manually using the commands above. Do NOT proceed with SOX onboarding until all prerequisites pass.
 
 ## Controls Applied
 

@@ -602,11 +602,11 @@ Claude Code → stdio → 13      Claude Code / API Client
                                        → Gateway (all 13 servers)
 ```
 
-- Deploy Gateway (all 13 servers): `prompts/environment-setup-agent/02-deploy-agentcore-gateway.md`
-- Deploy Runtime (agent + Gateway tools): `prompts/environment-setup-agent/03-deploy-agentcore-runtime.md`
-- Config + 13 IAM policies: `prompts/environment-setup-agent/agentcore/`
+- Deploy Gateway (all 13 servers): `runbooks/environment-setup-agent/02-deploy-agentcore-gateway.md`
+- Deploy Runtime (agent + Gateway tools): `runbooks/environment-setup-agent/03-deploy-agentcore-runtime.md`
+- Config + 13 IAM policies: `runbooks/environment-setup-agent/agentcore/`
 
-See [prompts/environment-setup-agent/agentcore/README.md](prompts/environment-setup-agent/agentcore/README.md) for details.
+See [runbooks/environment-setup-agent/agentcore/README.md](runbooks/environment-setup-agent/agentcore/README.md) for details.
 
 ---
 
@@ -652,10 +652,10 @@ See [prompts/environment-setup-agent/agentcore/README.md](prompts/environment-se
 │   ├── aws-account-setup.md          # AWS account prerequisites
 │   └── getting-started.md            # Quickstart guide
 │
-├── prompts/                          # Agent-based prompt organization
+├── runbooks/                         # Human-invoked playbooks, by agent persona
 │   ├── environment-setup-agent/      # One-time AWS infrastructure setup (includes agentcore/)
 │   ├── data-onboarding-agent/        # Bronze→Silver→Gold pipeline creation (main workflow)
-│   ├── devops-agent/                 # CI/CD, monitoring (coming soon)
+│   ├── devops-agent/                 # IaC generator; CI/CD + monitoring planned
 │   └── examples/                     # Demo data generation helpers
 │
 ├── tool-registry/                    # Canonical YAML registry (validated by CI)
@@ -663,11 +663,20 @@ See [prompts/environment-setup-agent/agentcore/README.md](prompts/environment-se
 │   └── invariants.yaml               # 11 mandatory rules with testable IDs
 │
 ├── scripts/                          # Utility scripts
+│   ├── validate_contracts.py         # Linter: contracts/ are valid Draft 2020-12 schemas
+│   ├── validate_docs_links.py        # Linter: every referenced path resolves
 │   ├── validate_tool_registry.py     # Linter: YAML ↔ .mcp.json ↔ Markdown consistency
 │   └── wire_tracing.py               # Wire tracing utility
 │
 ├── tests/unit/                       # Shared unit tests
 │   └── test_tool_registry.py         # 18 tests: server sync, stale refs, invariants
+│
+├── .claude/
+│   ├── agents/                       # Sub-agent definitions (scoped tools, no MCP)
+│   ├── rules/                        # Auto-loaded conventions (path-scoped)
+│   └── hooks/                        # PreToolUse guardrails + SessionStart run-state
+│
+├── contracts/v1/                     # JSON Schemas for every agent spec (validated by CI)
 │
 ├── CLAUDE.md                         # Agent configuration and conventions
 ├── SKILLS.md                         # Agent skill definitions and prompts
@@ -687,9 +696,12 @@ workloads/{dataset_name}/
 │   ├── transformations.yaml          # Cleaning rules, Gold zone schema
 │   ├── quality_rules.yaml            # Thresholds, critical rules
 │   └── schedule.yaml                 # Cron, dependencies, failure handling
+├── run/                              # Per-run shared state (written end of Phase 2)
+│   ├── context.json                  # human_answers + progress — authoritative, read-only
+│   └── decisions.jsonl               # Append-only sub-agent decisions
 ├── scripts/
 │   ├── extract/                      # Ingestion from source to Bronze
-│   ├── transform/                    # Bronze→Silver→Gold (PySpark + local mode)
+│   ├── transform/                    # Bronze→Silver→Gold (Glue PySpark)
 │   ├── quality/                      # Quality check execution
 │   └── load/                         # Catalog registration
 ├── dags/
@@ -701,6 +713,7 @@ workloads/{dataset_name}/
 ├── memory/                           # Persistent workload memory (accumulated learnings)
 │   ├── MEMORY.md                     # Ledger index (auto-rebuilt, 200-line cap)
 │   └── *.md                          # Memory files with YAML frontmatter
+├── logs/                             # Execution traces (trace_events.jsonl, run_*/)
 ├── tests/
 │   ├── unit/                         # Self-contained tests (no dependencies)
 │   └── integration/                  # Tests requiring pipeline output
@@ -798,7 +811,7 @@ See [docs/aws-account-setup.md](docs/aws-account-setup.md) for AWS configuration
 - Lake Formation LF-Tags for column-level access control
 - 4 sensitivity levels: CRITICAL, HIGH, MEDIUM, LOW
 - Integrated into profiling phase — runs automatically on every dataset
-- **Regulation-specific prompts** for GDPR, CCPA, HIPAA, SOX, PCI DSS — see [prompts/data-onboarding-agent/regulation/](prompts/data-onboarding-agent/regulation/). Each prompt contains self-contained controls (retention, masking, LF-Tags, TBAC grants, audit, quality rules) applied only when a regulation is selected during discovery
+- **Regulation-specific prompts** for GDPR, CCPA, HIPAA, SOX, PCI DSS — see [runbooks/data-onboarding-agent/regulation/](runbooks/data-onboarding-agent/regulation/). Each prompt contains self-contained controls (retention, masking, LF-Tags, TBAC grants, audit, quality rules) applied only when a regulation is selected during discovery
 
 ### Quality Gates
 - 5 dimensions: Completeness, Accuracy, Consistency, Validity, Uniqueness
@@ -863,11 +876,12 @@ python3 -m shared.logging.trace_viewer trace_events.jsonl --decisions
       Confidence: high
 ```
 
-### Typed Sub-Agent Outputs (Structured Tool Calls)
-Sub-agents no longer return free-form markdown that requires brittle regex parsing. Instead, every sub-agent is forced to return structured JSON via Bedrock's `tool_choice` mechanism.
+### Typed Sub-Agent Outputs
+Sub-agents do not return free-form markdown. Every sub-agent returns a structured `AgentOutput` payload, validated on arrival. Two transports, one schema:
 
-- **`SUBMIT_OUTPUT_TOOL`**: A Bedrock `toolSpec` schema in `shared/templates/agent_output_schema.py` that defines every `AgentOutput` field. Sub-agents must call this tool to finish — plain text responses are treated as failures.
-- **`from_bedrock_tool_call()`**: Parses a Bedrock `toolUse` response block directly into a typed `AgentOutput` dataclass. No regex, no markdown splitting.
+- **`from_agent_message()`**: Claude Code sub-agents (spawned via the `Agent` tool) have no tool-call channel, so they end their final message with a fenced ```json block. This extracts it — last block wins — and rejects payloads missing required fields.
+- **`SUBMIT_OUTPUT_TOOL`** + **`from_bedrock_tool_call()`**: For Bedrock `converse()` callers, a `toolSpec` in `shared/templates/agent_output_schema.py` forces the same JSON via `tool_choice`.
+- **`REQUIRED_OUTPUT_FIELDS`**: Derived from `SUBMIT_OUTPUT_TOOL`, so the two transports cannot drift apart.
 - **Forward-compatible `from_dict()`**: Filters unknown keys, so old serialized data works with new fields and new data works with old code.
 - **`memory_hints`**: New optional field where sub-agents flag durable facts worth remembering (e.g., "pe_ratio has expected 5% nulls — do not quarantine"). These feed directly into the workload memory system.
 
@@ -962,7 +976,7 @@ Uses **Amazon Cedar** (the policy language behind Amazon Verified Permissions) t
 **7 Agent Authorization Policies** (who can do what):
 Each agent (Router, Onboarding, Metadata, Transformation, Quality, DAG, Analysis) has a Cedar permit policy defining exactly which actions it can perform on which resources — enforcing least-privilege at the agent level.
 
-**Dual-mode evaluation**: `shared/utils/cedar_client.py` evaluates policies locally (cedarpy) for testing or via AWS Verified Permissions (boto3) for production. Setup script at `prompts/environment-setup-agent/scripts/setup_avp.py` syncs all policies to AVP.
+**Dual-mode evaluation**: `shared/utils/cedar_client.py` evaluates policies locally (cedarpy) for testing or via AWS Verified Permissions (boto3) for production. Setup script at `runbooks/environment-setup-agent/scripts/setup_avp.py` syncs all policies to AVP.
 
 ### Test-Driven Pipeline Generation
 - Every sub-agent writes unit + integration tests alongside artifacts
@@ -1019,7 +1033,7 @@ Automatically validates all generated code BEFORE deployment to catch 95% of iss
 | [Security](docs/security.md) | Security practices |
 | [Running Tests](docs/running-tests.md) | Test execution guide |
 | [docs/aws-account-setup.md](docs/aws-account-setup.md) | AWS prerequisites |
-| [prompts/environment-setup-agent/agentcore/README.md](prompts/environment-setup-agent/agentcore/README.md) | Agentcore Gateway + Runtime (optional) |
+| [runbooks/environment-setup-agent/agentcore/README.md](runbooks/environment-setup-agent/agentcore/README.md) | Agentcore Gateway + Runtime (optional) |
 | [docs/getting-started.md](docs/getting-started.md) | Quick start guide |
 
 ---
@@ -1047,7 +1061,7 @@ The platform enforces security at every layer:
 - **Encryption**: AES-256 at rest (zone-specific KMS keys), TLS 1.3 in transit, re-encryption at zone boundaries
 - **PII Detection**: Automatic AI-driven scanning of all columns (name-based + content-based patterns) — see `shared/utils/pii_detection_and_tagging.py`
 - **Column-Level Access**: Lake Formation LF-Tags (`PII_Classification`, `PII_Type`, `Data_Sensitivity`) enable tag-based access control (TBAC) — analysts see only what their role permits
-- **Regulatory Compliance**: Self-contained prompt per regulation in [prompts/data-onboarding-agent/regulation/](prompts/data-onboarding-agent/regulation/):
+- **Regulatory Compliance**: Self-contained prompt per regulation in [runbooks/data-onboarding-agent/regulation/](runbooks/data-onboarding-agent/regulation/):
   - **GDPR** — right to erasure, consent tracking, 365-day retention, data minimization
   - **CCPA** — right to know/delete, opt-out tracking, 730-day retention, data lineage
   - **HIPAA** — PHI encryption, minimum necessary access, BAA, 7-year audit trail

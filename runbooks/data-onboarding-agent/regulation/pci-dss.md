@@ -16,13 +16,13 @@ Before applying PCI DSS controls, verify these AWS resources exist:
 
 | Resource | Check Command | What If Missing? |
 |----------|---------------|------------------|
-| **KMS key** `alias/pci-cardholder-key` | `aws kms describe-key --key-id alias/pci-cardholder-key --region us-east-1` | Run `prompts/environment-setup-agent/01-setup-aws-infrastructure.md` Step 4, or create manually: `aws kms create-key --description "PCI DSS cardholder data encryption key"` then `aws kms create-alias --alias-name alias/pci-cardholder-key --target-key-id {KEY_ID}`. **This key MUST be dedicated to cardholder data only (PCI DSS Req 3.5).** |
+| **KMS key** `alias/pci-cardholder-key` | `aws kms describe-key --key-id alias/pci-cardholder-key --region us-east-1` | Run `runbooks/environment-setup-agent/01-setup-aws-infrastructure.md` Step 4, or create manually: `aws kms create-key --description "PCI DSS cardholder data encryption key"` then `aws kms create-alias --alias-name alias/pci-cardholder-key --target-key-id {KEY_ID}`. **This key MUST be dedicated to cardholder data only (PCI DSS Req 3.5).** |
 | **IAM role** `pci_admin_role` | `aws iam get-role --role-name pci_admin_role` | Create with trust policy for Lake Formation and Glue: `aws iam create-role --role-name pci_admin_role --assume-role-policy-document file://trust-policy.json`. **This role is the ONLY role with access to CRITICAL cardholder data.** |
 | **IAM role** `PaymentProcessingRole` | `aws iam get-role --role-name PaymentProcessingRole` | Create with trust policy for Lake Formation (access to HIGH/MEDIUM/LOW, NOT CRITICAL) |
 | **IAM role** `AuditRole` | `aws iam get-role --role-name AuditRole` | Create with trust policy for Lake Formation (read-only audit access) |
 | **IAM role** `AnalystRole` | `aws iam get-role --role-name AnalystRole` | Create with trust policy for Lake Formation (LOW sensitivity only, no cardholder data) |
 | **IAM role** `DashboardUserRole` | `aws iam get-role --role-name DashboardUserRole` | Create with trust policy for QuickSight and Athena (LOW sensitivity only) |
-| **LF-Tag** `PII_Classification` | `aws lakeformation list-lf-tags --region us-east-1 \| grep PII_Classification` | Run `prompts/environment-setup-agent/01-setup-aws-infrastructure.md` Step 6, or create manually: `aws lakeformation create-lf-tag --tag-key PII_Classification --tag-values CRITICAL,HIGH,MEDIUM,LOW,NONE` |
+| **LF-Tag** `PII_Classification` | `aws lakeformation list-lf-tags --region us-east-1 \| grep PII_Classification` | Run `runbooks/environment-setup-agent/01-setup-aws-infrastructure.md` Step 6, or create manually: `aws lakeformation create-lf-tag --tag-key PII_Classification --tag-values CRITICAL,HIGH,MEDIUM,LOW,NONE` |
 | **LF-Tag** `PII_Type` | `aws lakeformation list-lf-tags --region us-east-1 \| grep PII_Type` | Create: `aws lakeformation create-lf-tag --tag-key PII_Type --tag-values SSN,EMAIL,PHONE,ADDRESS,DOB,NATIONAL_ID,NAME,FINANCIAL_ACCOUNT,CREDIT_CARD` |
 | **LF-Tag** `Data_Sensitivity` | `aws lakeformation list-lf-tags --region us-east-1 \| grep Data_Sensitivity` | Create: `aws lakeformation create-lf-tag --tag-key Data_Sensitivity --tag-values CRITICAL,HIGH,MEDIUM,LOW` |
 | **CloudTrail** enabled | `aws cloudtrail get-trail-status --name {TRAIL} --region us-east-1` | Enable CloudTrail in AWS Console or via CLI. PCI DSS Req 10 mandates audit trail for ALL cardholder data access. |
@@ -49,7 +49,7 @@ aws lakeformation list-lf-tags --region us-east-1 --query 'LFTags[].TagKey' --ou
 aws ec2 describe-vpc-endpoints --filters Name=service-name,Values=com.amazonaws.us-east-1.s3 --query 'VpcEndpoints[0].VpcEndpointId' --output text || echo "⚠️  No VPC endpoint for S3 (recommended for CDE isolation)"
 ```
 
-**If prerequisites are missing**: Run the environment setup first (`prompts/environment-setup-agent/01-setup-aws-infrastructure.md`) or create resources manually using the commands above. **Do NOT proceed with PCI DSS onboarding until all prerequisites pass.** PCI DSS violations can result in fines and loss of card processing privileges.
+**If prerequisites are missing**: Run the environment setup first (`runbooks/environment-setup-agent/01-setup-aws-infrastructure.md`) or create resources manually using the commands above. **Do NOT proceed with PCI DSS onboarding until all prerequisites pass.** PCI DSS violations can result in fines and loss of card processing privileges.
 
 ## Controls Applied
 

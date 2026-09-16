@@ -25,8 +25,15 @@ MAIN CONVERSATION
 
 ## Key Rules
 
-- **MCP-First**: All AWS operations use MCP server tools first. Sub-agents do NOT have MCP access.
-- **Agent model**: Data Onboarding Agent = main conversation. Metadata, Transformation, Quality, DAG = sub-agents via `Agent` tool.
+- **MCP-First**: All AWS operations use MCP server tools first. Sub-agents do NOT have MCP
+  access — enforced by the `tools` frontmatter in `.claude/agents/*.md`, not by convention.
+  One exception: `ontology-agent` holds `mcp__glue-athena__get_table` (read-only) to fetch the
+  Gold-zone schema.
+- **Agent model**: Data Onboarding Agent = main conversation. Metadata, Transformation,
+  Quality, DAG, Ontology = sub-agents defined in `.claude/agents/` and spawned by name via the
+  `Agent` tool. Sub-agents cannot spawn peers (no `Agent`/`SendMessage` in their toolset).
+- **Shared state**: sub-agents get a fresh context window; the run's shared state lives on
+  disk in `workloads/{name}/run/`. See `.claude/rules/11-shared-run-context.md`.
 - **Test gates**: Every sub-agent writes + passes tests before proceeding.
 - **Deployment topology**: Default single-account. Multi-account opt-in via `docs/multi-account-deployment.md`.
 

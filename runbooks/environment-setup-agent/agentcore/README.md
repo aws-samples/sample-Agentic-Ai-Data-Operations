@@ -55,9 +55,9 @@ The agent runs in Claude Code on your laptop. MCP tools come from Gateway via SS
 | **Use case** | Demos, development, testing, single-user workflows |
 
 **How to set up:**
-1. Deploy Gateway: run `prompts/09-deploy-agentcore-gateway.md`
+1. Deploy Gateway: run `runbooks/environment-setup-agent/02-deploy-agentcore-gateway.md`
 2. Replace `.mcp.json` with the generated `.mcp.gateway.json`
-3. Run Claude Code normally -- use `prompts/03-onboard-build-pipeline.md` to onboard data
+3. Run Claude Code normally -- use `runbooks/data-onboarding-agent/03-onboard-build-pipeline.md` to onboard data
 
 **How to revert to fully local (no Gateway):**
 ```bash
@@ -77,8 +77,8 @@ The agent runs on Agentcore Runtime in the cloud. MCP tools come from the same G
 | **Use case** | Production pipelines, multi-user, API integrations, scheduled onboarding |
 
 **How to set up:**
-1. Deploy Gateway: run `prompts/09-deploy-agentcore-gateway.md` (if not already deployed)
-2. Deploy Runtime: run `prompts/10-deploy-agentcore-runtime.md`
+1. Deploy Gateway: run `runbooks/environment-setup-agent/02-deploy-agentcore-gateway.md` (if not already deployed)
+2. Deploy Runtime: run `runbooks/environment-setup-agent/03-deploy-agentcore-runtime.md`
 3. Invoke agent via API:
 ```bash
 aws bedrock-agent-runtime invoke-agent \
@@ -123,7 +123,7 @@ agentcore/
 
 ## Prerequisites
 
-1. Base infrastructure from `prompts/00-setup-environment.md` (IAM roles, S3, KMS, Glue DBs, LF-Tags)
+1. Base infrastructure from `runbooks/environment-setup-agent/01-setup-aws-infrastructure.md` (IAM roles, S3, KMS, Glue DBs, LF-Tags)
 2. AWS credentials with Bedrock Agentcore permissions
 3. Custom MCP servers in `mcp-servers/` (already in repo)
 
@@ -131,7 +131,7 @@ agentcore/
 
 ### Step 1: Deploy Gateway (required for both modes)
 
-Run `prompts/09-deploy-agentcore-gateway.md` -- Claude will:
+Run `runbooks/environment-setup-agent/02-deploy-agentcore-gateway.md` -- Claude will:
 1. Create Gateway IAM execution role
 2. Attach 13 per-server policies from `agentcore/gateway/iam/`
 3. Register Gateway with Bedrock Agentcore
@@ -143,7 +143,7 @@ After this step, you can use **Local Demo Mode** immediately (replace `.mcp.json
 
 ### Step 2: Deploy Runtime (production mode only)
 
-Run `prompts/10-deploy-agentcore-runtime.md` -- Claude will:
+Run `runbooks/environment-setup-agent/03-deploy-agentcore-runtime.md` -- Claude will:
 1. Verify Gateway is healthy (all 13 servers)
 2. Create Runtime IAM execution role
 3. Register agent from `agentcore/runtime/agent.yaml`

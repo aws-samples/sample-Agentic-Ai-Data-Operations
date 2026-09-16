@@ -110,9 +110,9 @@ Action: Determine MCP hosting mode, verify connectivity, build endpoint inventor
   GATEWAY MODE (team/production):
     - 13 servers hosted on Agentcore Gateway (SSE transport)
     - Team members connect via .mcp.gateway.json — zero local setup
-    - Requires: Agentcore Gateway deployed (prompts/09 + prompts/10)
-    - Run prompts/09-deploy-agentcore-gateway.md FIRST to deploy Gateway
-    - Run prompts/10-deploy-agentcore-runtime.md for cloud-hosted agent (optional)
+    - Requires: Agentcore Gateway deployed (runbooks/09 + runbooks/10)
+    - Run runbooks/environment-setup-agent/02-deploy-agentcore-gateway.md FIRST to deploy Gateway
+    - Run runbooks/environment-setup-agent/03-deploy-agentcore-runtime.md for cloud-hosted agent (optional)
 
 ── 1b. Choose Account Topology (single vs multi-account) ──────────
 
@@ -163,7 +163,7 @@ Action: Determine MCP hosting mode, verify connectivity, build endpoint inventor
     - These Variables are read by generated DAGs and deploy scripts.
     - The full account_topology block (see
       shared/templates/account_topology.yaml) is stored per-workload when
-      Phase 1 of prompts/data-onboarding-agent/03-onboard-build-pipeline.md
+      Phase 1 of runbooks/data-onboarding-agent/03-onboard-build-pipeline.md
       runs.
 
 ── 1c. Verify AWS Credentials ──────────────────────────────────────
@@ -214,7 +214,7 @@ Gate:   Must have valid credentials.
         WARN servers use CLI fallback if failed.
         OPTIONAL servers are informational only.
         If GATEWAY mode selected but Gateway not deployed → prompt user to
-        run prompts/09 first, or fall back to LOCAL mode.
+        run runbooks/09 first, or fall back to LOCAL mode.
 ```
 
 ### Step 2: Create IAM Roles
@@ -469,7 +469,7 @@ Troubleshooting: 07, 08     ← same as Local
 
 **Key difference**: Gateway mode runs prompts 09 (+ optionally 10) right after 00, before any pipeline work. Local mode skips them entirely. Once MCP servers are running (either way), the pipeline prompts (01-06) are identical.
 
-See `prompts/environment-setup-agent/agentcore/README.md` for Gateway architecture details.
+See `runbooks/environment-setup-agent/agentcore/README.md` for Gateway architecture details.
 
 ## Teardown (Remove All Resources)
 
