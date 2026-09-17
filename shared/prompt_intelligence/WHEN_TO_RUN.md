@@ -223,7 +223,7 @@ echo "No trace logs yet. Run some onboardings first."
 ## Feedback Loop (Manual)
 
 1. **Run analysis** → Get report with recommendations
-2. **Apply fix** → Add prompt patch to prompts/
+2. **Apply fix** → Add prompt patch to runbooks/
 3. **Monitor next runs** → Check if pattern stops appearing
 4. **Re-run analysis** → Verify pattern frequency decreased
 5. **Update confidence** → Document successful fix in CLAUDE.md

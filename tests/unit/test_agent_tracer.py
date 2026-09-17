@@ -294,6 +294,76 @@ class TestTraceLink:
         assert len(t.events) == 0
 
 
+class TestConversationFlow:
+    """discovery_presented() renders ASCII like log_exchange() does."""
+
+    FINDINGS = [
+        "Format: CSV, 31 columns, 50 rows",
+        "Likely PK: claim_id (unique, 0% nulls)",
+    ]
+
+    def _discovery_payload(self, findings=None, **kwargs):
+        t = AgentTracer(run_id="r", workload_name="w", **kwargs)
+        t.discovery_presented(
+            "DISCOVERED: Source Profile",
+            findings if findings is not None else self.FINDINGS,
+            agent_name="Metadata Agent",
+            phase=3,
+            data_source="s3://bucket/claims/",
+        )
+        return t.events[0]
+
+    def test_emits_one_contextual_event(self):
+        event = self._discovery_payload()
+        assert event["surface"] == "contextual"
+        assert event["event_type"] == "discovery_presented"
+        assert event["phase"] == 3
+
+    def test_payload_carries_rendered_ascii_at_width_70(self):
+        lines = self._discovery_payload()["payload"]["ascii_display"].splitlines()
+        assert lines[0].startswith("+") and lines[0].endswith("+")
+        assert {len(line) for line in lines} == {70}
+
+    def test_ascii_contains_title_and_findings(self):
+        art = self._discovery_payload()["payload"]["ascii_display"]
+        assert "DISCOVERED: Source Profile" in art
+        assert "Likely PK: claim_id" in art
+
+    def test_title_prefix_is_not_doubled(self):
+        """The rules show the rendered title, so callers pass it pre-prefixed."""
+        art = self._discovery_payload()["payload"]["ascii_display"]
+        assert "DISCOVERED: DISCOVERED:" not in art
+        assert art.count("DISCOVERED:") == 1
+
+    def test_bare_title_still_gets_the_prefix(self):
+        t = AgentTracer(run_id="r", workload_name="w")
+        t.discovery_presented("Source Profile", self.FINDINGS)
+        assert "DISCOVERED: Source Profile" in t.events[0]["payload"]["ascii_display"]
+
+    def test_findings_stored_untruncated_beside_ascii(self):
+        """A finding too wide for the box is still recorded in full."""
+        long_finding = "Enums: " + ", ".join(f"claim_status_{i}" for i in range(12))
+        payload = self._discovery_payload(findings=[long_finding])["payload"]
+        assert payload["findings"] == [long_finding]
+        assert long_finding not in payload["ascii_display"]
+
+    def test_data_source_preserved(self):
+        payload = self._discovery_payload()["payload"]
+        assert payload["data_source"] == "s3://bucket/claims/"
+        assert payload["title"] == "DISCOVERED: Source Profile"
+
+    def test_prints_ascii_when_stdout_enabled(self, capsys):
+        self._discovery_payload(write_to_stdout=True)
+        out = capsys.readouterr().out
+        assert "DISCOVERED: Source Profile" in out
+        # The JSONL event line is printed too; the box precedes it.
+        assert out.index("+---") < out.index('{"timestamp"')
+
+    def test_silent_when_stdout_disabled(self, capsys):
+        self._discovery_payload()
+        assert capsys.readouterr().out == ""
+
+
 # ── trace_viewer functions ───────────────────────────────────────────
 
 

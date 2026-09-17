@@ -1,0 +1,147 @@
+# Prompt and contract integrity — runs on every PR to main
+#
+# The failure mode this exists to catch: the orchestrator loads a regulation control set, a
+# runbook, or a helper module by `Read`-ing a path written in a markdown file. A wrong path
+# fails at read time and the run *continues without the content* — no exception, no log line.
+# That is how 17 of 35 prompt paths (49%) rotted here undetected. Nothing else in CI looks at
+# markdown.
+
+name: Validate Prompts
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  doc-links:
+    name: Doc & prompt path references
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate referenced paths resolve
+        run: python3 scripts/validate_docs_links.py
+
+  contracts:
+    name: Contract schemas & tool registry
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install pyyaml jsonschema
+
+      - name: Validate contract schemas
+        run: python3 scripts/validate_contracts.py
+
+      - name: Validate MCP tool registry
+        run: python3 scripts/validate_tool_registry.py
+
+  agent-definitions:
+    name: .claude/agents definitions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      # A malformed `tools:` list is the dangerous case: the harness falls back to a broad
+      # toolset, so a sub-agent silently gains MCP access that .claude/rules/02 forbids.
+      - name: Check frontmatter parses and tools are declared
+        run: |
+          python3 - <<'PY'
+          import sys, pathlib, yaml
+
+          errors = []
+          agents = sorted(pathlib.Path(".claude/agents").glob("*.md"))
+          if not agents:
+              sys.exit(".claude/agents/ is empty — every named sub-agent would spawn as general-purpose")
+
+          for path in agents:
+              text = path.read_text()
+              if not text.startswith("---\n"):
+                  errors.append(f"{path}: no YAML frontmatter")
+                  continue
+              raw = text.split("---\n", 2)[1]
+              try:
+                  fm = yaml.safe_load(raw) or {}
+              except yaml.YAMLError as e:
+                  errors.append(f"{path}: frontmatter is not valid YAML: {e}")
+                  continue
+
+              for key in ("name", "description", "tools"):
+                  if key not in fm:
+                      errors.append(f"{path}: missing '{key}' in frontmatter")
+
+              if fm.get("name") and fm["name"] != path.stem:
+                  errors.append(f"{path}: name '{fm['name']}' != filename stem '{path.stem}'")
+
+              tools = fm.get("tools")
+              if isinstance(tools, str):
+                  tools = [t.strip() for t in tools.split(",") if t.strip()]
+              if not tools:
+                  errors.append(f"{path}: 'tools' is empty — the harness would grant a default set")
+                  continue
+
+              # Only ontology-agent may hold an MCP tool, and only the read-only get_table.
+              for tool in tools:
+                  if tool.startswith("mcp__") and not (
+                      path.stem == "ontology-agent" and tool == "mcp__glue-athena__get_table"
+                  ):
+                      errors.append(
+                          f"{path}: MCP tool '{tool}' — sub-agents have no MCP access "
+                          f"(.claude/rules/02-architecture.md)"
+                      )
+                  if tool in ("Agent", "SendMessage"):
+                      errors.append(f"{path}: '{tool}' would let a sub-agent spawn peers")
+
+          if errors:
+              print(f"FAIL: {len(errors)} problem(s) in .claude/agents/\n")
+              for e in errors:
+                  print(f"  {e}")
+              sys.exit(1)
+          print(f"OK: {len(agents)} agent definition(s) valid")
+          PY
+
+  codegen-drift:
+    name: Deterministic codegen drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install pyyaml jsonschema jinja2
+
+      # The validator exits 0 on an empty argument list, so pass the workload dirs explicitly
+      # — a bare invocation is a vacuous pass, not a clean one.
+      - name: Validate no drift between specs and rendered artifacts
+        run: |
+          workloads=$(find workloads -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort)
+          if [ -z "$workloads" ]; then
+            echo "No workloads to check"
+            exit 0
+          fi
+          echo "Checking: $workloads"
+          python3 -m shared.codegen.drift_validator $workloads

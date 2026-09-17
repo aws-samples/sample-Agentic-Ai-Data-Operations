@@ -445,7 +445,7 @@ def _build_next_step_prompt(workload_name: str, phases: Dict[str, PhaseResult], 
 
     if not p1_done:
         return (
-            f"Start onboarding {workload_name}. Run prompts/data-onboarding-agent/"
+            f"Start onboarding {workload_name}. Run runbooks/data-onboarding-agent/"
             f"03-onboard-build-pipeline.md to fill out source.yaml + semantic.yaml "
             f"via the Phase 1 discovery template."
         )

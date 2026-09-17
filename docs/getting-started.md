@@ -10,10 +10,10 @@ Your data onboarding system now has reusable prompt patterns you can use for any
 
 | File | Purpose | When to Use |
 |------|---------|-------------|
-| **prompts/00-setup-environment.md** | 🏗️ First-time AWS setup | Run ONCE after cloning repo into new AWS account |
-| **prompts/** (01-route through 06-govern) | 📋 Copy-paste templates | Quick lookup for prompt structure |
-| **prompts/examples.md** | 📝 Filled-out examples | See real-world usage with details |
-| **prompts/regulation/** | 🔒 Regulation-specific controls | When GDPR, CCPA, HIPAA, SOX, or PCI DSS compliance is required |
+| **runbooks/environment-setup-agent/01-setup-aws-infrastructure.md** | 🏗️ First-time AWS setup | Run ONCE after cloning repo into new AWS account |
+| **runbooks/** (01-route through 05-govern) | 📋 Copy-paste templates | Quick lookup for prompt structure |
+| **runbooks/examples/README.md** | 📝 Filled-out examples | See real-world usage with details |
+| **runbooks/data-onboarding-agent/regulation/** | 🔒 Regulation-specific controls | When GDPR, CCPA, HIPAA, SOX, or PCI DSS compliance is required |
 | **SKILLS.md** (bottom section) | 📖 Full documentation | Deep dive into each pattern |
 | **CLAUDE.md** | 🏗️ Architecture reference | Understand system design |
 | **deploy_to_aws.py** | 🚀 Deployment script | Deploy workload to AWS (Glue, MWAA, QuickSight) |
@@ -43,7 +43,7 @@ What I need created:
 Existing resources: none
 ```
 
-This creates all AWS prerequisites (IAM roles, S3 bucket, KMS keys, Glue databases, LF-Tags) interactively. See `prompts/00-setup-environment.md` for full details.
+This creates all AWS prerequisites (IAM roles, S3 bucket, KMS keys, Glue databases, LF-Tags) interactively. See `runbooks/environment-setup-agent/01-setup-aws-infrastructure.md` for full details.
 
 **Multi-account deployment**: The setup defaults to single-account. If you need the Glue catalog + Lake Formation in one account ("Account A") and Glue jobs + MWAA + S3 in a consumer account ("Account B"), see [`multi-account-deployment.md`](multi-account-deployment.md) — the setup prompt will ask a single-vs-multi question and wire `catalog_account_id` + `sts:AssumeRole` across generated artifacts.
 
@@ -234,13 +234,13 @@ Generate data_product_catalog.yaml and lineage diagram.
 
 ```
 1. Deploy all 13 MCP servers to Agentcore Gateway:
-   → Run prompts/09-deploy-agentcore-gateway.md
+   → Run runbooks/environment-setup-agent/02-deploy-agentcore-gateway.md
 
 2. Switch to Gateway tools:
    → Replace .mcp.json with .mcp.gateway.json
 
 3. Onboard data as usual:
-   → Run prompts/03-onboard-build-pipeline.md
+   → Run runbooks/data-onboarding-agent/03-onboard-build-pipeline.md
 ```
 
 **What happens**:
@@ -257,10 +257,10 @@ To revert to fully local: `git checkout .mcp.json`
 
 ```
 1. Deploy all 13 MCP servers to Agentcore Gateway:
-   → Run prompts/09-deploy-agentcore-gateway.md (if not already deployed)
+   → Run runbooks/environment-setup-agent/02-deploy-agentcore-gateway.md (if not already deployed)
 
 2. Deploy agent to Agentcore Runtime:
-   → Run prompts/10-deploy-agentcore-runtime.md
+   → Run runbooks/environment-setup-agent/03-deploy-agentcore-runtime.md
 
 3. Invoke agent via API:
    → aws bedrock-agent-runtime invoke-agent --agent-id {ID} --input-text "Onboard..."
@@ -271,7 +271,7 @@ To revert to fully local: `git checkout .mcp.json`
 - Runtime: Data Onboarding Agent accessible via API, connected to all 13 Gateway tools, with persistent memory
 - Human-in-the-loop: Optional -- agent can run autonomously or pause for approval via API
 
-See `prompts/environment-setup-agent/agentcore/README.md` for architecture details.
+See `runbooks/environment-setup-agent/agentcore/README.md` for architecture details.
 
 ---
 
@@ -395,12 +395,12 @@ During discovery (Phase 1), if the user mentions compliance requirements:
 Does this data require regulatory compliance? (GDPR, CCPA, HIPAA, SOX, PCI DSS)
 ```
 
-If YES, load the appropriate prompt from `prompts/regulation/`:
-- `prompts/regulation/gdpr.md` — GDPR (EU data protection)
-- `prompts/regulation/ccpa.md` — CCPA (California privacy)
-- `prompts/regulation/hipaa.md` — HIPAA (healthcare data)
-- `prompts/regulation/sox.md` — SOX (financial reporting)
-- `prompts/regulation/pci_dss.md` — PCI DSS (payment card data)
+If YES, load the appropriate prompt from `runbooks/data-onboarding-agent/regulation/`:
+- `runbooks/data-onboarding-agent/regulation/gdpr.md` — GDPR (EU data protection)
+- `runbooks/data-onboarding-agent/regulation/ccpa.md` — CCPA (California privacy)
+- `runbooks/data-onboarding-agent/regulation/hipaa.md` — HIPAA (healthcare data)
+- `runbooks/data-onboarding-agent/regulation/sox.md` — SOX (financial reporting)
+- `runbooks/data-onboarding-agent/regulation/pci-dss.md` — PCI DSS (payment card data)
 
 These prompts add:
 - Mandatory data residency controls
@@ -415,7 +415,7 @@ These prompts add:
 User: "We need to onboard patient records"
 Claude: "Does this data require HIPAA compliance?"
 User: "Yes"
-Claude: [loads prompts/regulation/hipaa.md] → adds PHI encryption, audit logging, access controls
+Claude: [loads runbooks/data-onboarding-agent/regulation/hipaa.md] → adds PHI encryption, audit logging, access controls
 ```
 
 ---
@@ -498,7 +498,7 @@ Claude will edit existing files instead of creating new ones.
 ## 📚 Next Steps
 
 **For your first onboarding:**
-1. Open `prompts/examples.md`
+1. Open `runbooks/examples/README.md`
 2. Find an example similar to your data
 3. Copy the ROUTE prompt, fill in your details, send to Claude
 4. If not found, copy the ONBOARD prompt, fill in, send
@@ -507,15 +507,15 @@ Claude will edit existing files instead of creating new ones.
 7. If tests pass, you're done! Deploy to AWS with `deploy_to_aws.py`
 
 **For ongoing work:**
-- Keep `prompts/` folder open for copy-paste templates
+- Keep `runbooks/` folder open for copy-paste templates
 - Use GENERATE to create demo data for testing
 - Use ENRICH to document relationships between datasets
 - Use CONSUME to create dashboards for stakeholders
 - Use GOVERN to generate lineage docs for governance
-- Load `prompts/regulation/` only when compliance is required
+- Load `runbooks/data-onboarding-agent/regulation/` only when compliance is required
 
 **Need help?**
-- See detailed examples: `prompts/examples.md`
+- See detailed examples: `runbooks/examples/README.md`
 - See full documentation: `SKILLS.md` → Modular Prompt Patterns
 - See architecture: `CLAUDE.md`
 - See deployment guide: `docs/aws-account-setup.md`

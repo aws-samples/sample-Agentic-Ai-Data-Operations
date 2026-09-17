@@ -66,7 +66,7 @@ grep -A 10 "KeyError: 'primary_key'" docs/prompt_intelligence/$(date +%Y-%m-%d)_
 # 2. Copy the suggested prompt patch
 
 # 3. Add to the appropriate prompt file
-code prompts/data-onboarding-agent/03-onboard-build-pipeline.md
+code runbooks/data-onboarding-agent/03-onboard-build-pipeline.md
 ```
 
 ### Step 5: Verify the Fix
