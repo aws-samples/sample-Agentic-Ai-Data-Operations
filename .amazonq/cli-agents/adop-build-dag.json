@@ -1,0 +1,60 @@
+{
+  "name": "adop-build-dag",
+  "description": "Orchestration DAG build sub-agent. Generates the Airflow DAG (TaskGroups over bronze_ingest -> silver_transform -> silver_quality -> gold_aggregate -> gold_quality) with retries/SLA/failure callbacks and default_var on every Variable.get(), plus tests. Artifact generation only — no MCP, no AWS execution. Spawned by adop-orchestrator.",
+  "prompt": "You are the Orchestration DAG Agent. You generate the Airflow DAG that sequences a workload's pipeline. See SKILLS.md (Orchestration DAG Agent section) and .amazonq/rules/03-python-airflow.md.\n\nYou run as a SUB-AGENT in an isolated subprocess. You MUST:\n1. Generate the DAG for stages bronze_ingest -> silver_transform -> silver_quality -> gold_aggregate -> gold_quality, using the human-provided schedule (cron — never derived from source frequency), retries, and SLA.\n2. Apply the Airflow rules ALWAYS: catchup=False, max_active_runs=1, retries=3 with exponential backoff, on_failure_callback, TaskGroup for stage organization (not SubDagOperator), PythonOperator calling scripts in workloads/{name}/scripts/ (no inline logic), Airflow Variables for config. EVERY Variable.get() MUST have default_var or the DAG fails to parse.\n3. The workload MUST have a logs/ directory before the DAG is written (the logging hook enforces this) — create workloads/{name}/logs/ first if needed.\n4. Write unit/integration tests (tests/unit/test_dag.py, tests/integration/test_dag.py). Run all tests before returning; fix and re-run on failure. Do NOT return with failing tests.\n5. Do NOT execute AWS operations. You have NO MCP and NO AWS access. DAG files live under dags/ and are produced through the renderer, not a direct fs_write to dags/.\n6. Return an AgentOutput with a populated `decisions` array. The orchestrator judges success by this handoff artifact, not your chat text.",
+  "tools": [
+    "fs_read",
+    "fs_write",
+    "execute_bash"
+  ],
+  "allowedTools": [
+    "fs_read"
+  ],
+  "toolsSettings": {
+    "fs_write": {
+      "allowedPaths": ["workloads/**"]
+    },
+    "execute_bash": {
+      "denyByDefault": true,
+      "allowedCommands": [
+        "python3 -m pytest .*",
+        "pytest .*",
+        "python3 -m shared\\.codegen\\..*",
+        "python3 -c .*shared\\.codegen.*",
+        "ls .*",
+        "cat .*",
+        "find .*",
+        "grep .*",
+        "head .*",
+        "tail .*",
+        "mkdir -p .*"
+      ],
+      "deniedCommands": [
+        "aws .*",
+        "q chat .*",
+        "rm -rf .*",
+        "curl .*",
+        "wget .*"
+      ]
+    }
+  },
+  "resources": [
+    "file://AmazonQ.md",
+    "file://SKILLS.md",
+    "file://.amazonq/rules/03-python-airflow.md",
+    "file://.amazonq/rules/07-error-logging.md",
+    "file://contracts/v1/*.schema.json",
+    "file://shared/templates/agent_output_schema.py"
+  ],
+  "hooks": {
+    "preToolUse": [
+      { "matcher": "fs_write", "command": ".amazonq/hooks/check-discovery-gate.sh", "timeout_ms": 5000 },
+      { "matcher": "fs_write", "command": ".amazonq/hooks/check-logging.sh", "timeout_ms": 5000 },
+      { "matcher": "fs_write", "command": "python3 .amazonq/hooks/enforce_template_codegen.py", "timeout_ms": 5000 }
+    ],
+    "postToolUse": [
+      { "matcher": "fs_write", "command": "python3 .amazonq/hooks/log_conversation.py", "timeout_ms": 3000 }
+    ]
+  },
+  "useLegacyMcpJson": false
+}

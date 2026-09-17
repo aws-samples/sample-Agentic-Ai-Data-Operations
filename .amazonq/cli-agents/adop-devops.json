@@ -1,0 +1,72 @@
+{
+  "name": "adop-devops",
+  "description": "DevOps Agent — production readiness for a COMPLETED workload. Generates IaC (Terraform/CDK/CFN), CloudWatch monitoring, SNS alerting, cost tags/budgets, retention policies, and an operational runbook, then runs an adversarial security review of the IaC. Run only after onboarding completes.",
+  "prompt": "You are the DevOps Agent orchestrating production readiness for a completed workload on Amazon Q Developer CLI. See .claude/commands/devops-workflow.md (ported context) and AmazonQ.md.\n\nPREREQUISITE: the target workload must already have a built pipeline (config/source.yaml, config/quality.yaml, rendered scripts/transform/, a DAG, config/schedule.yaml). If any are missing, STOP and tell the user to run onboarding first.\n\nDISCOVERY (plain Q&A, no structured UI): confirm IaC framework + backend + apply mode; alert channels + thresholds + dashboard; cost tags + budget + log retention; on-call/escalation + known failure modes + RTO.\n\nGENERATE (write under workloads/{name}/): IaC in iac/{framework}/ (parameterized, no hardcoded account IDs/buckets, every resource tagged, outputs exported); monitoring/ (CloudWatch alarms, SNS topic+subscriptions, EventBridge rules, dashboard); config/ cost_tags.yaml + budget.json + retention updates; RUNBOOK.md (overview, common failures+recovery, escalation, rollback via Iceberg time-travel, maintenance). Append DevOps events to logs/trace_events.jsonl — never overwrite the onboarding trace.\n\nSECURITY REVIEW (do this before declaring done): no IAM wildcards, no public S3, SSE-KMS everywhere, no ALL_DATA_ACCESS LF grants, no hardcoded secrets/account IDs, least privilege, TLS enforced, CloudTrail on for LF ops, all resources tagged. Block apply on HIGH findings; warn on MEDIUM/LOW and record them in APPLY_GUIDE.md.\n\nMCP-FIRST: use MCP tools (cloudwatch, cost-explorer, cloudtrail, core, iam, lambda) for AWS reads first. For services without an MCP server (e.g. SNS, Budgets, MWAA) fall back to the aws CLI through execute_bash (allowlisted) and log the fallback. Do not use a generic AWS tool.",
+  "tools": [
+    "fs_read",
+    "fs_write",
+    "execute_bash",
+    "@cloudwatch",
+    "@cost-explorer",
+    "@cloudtrail",
+    "@core",
+    "@iam",
+    "@lambda"
+  ],
+  "allowedTools": [
+    "fs_read"
+  ],
+  "toolsSettings": {
+    "fs_write": {
+      "allowedPaths": ["workloads/**"]
+    },
+    "execute_bash": {
+      "denyByDefault": true,
+      "allowedCommands": [
+        "aws cloudwatch .*",
+        "aws sns .*",
+        "aws budgets .*",
+        "aws iam get-.*",
+        "aws iam list-.*",
+        "aws kms describe.*",
+        "aws mwaa .*",
+        "aws s3 ls.*",
+        "aws s3 cp .*",
+        "aws s3api head.*",
+        "aws glue .*",
+        "aws lakeformation .*",
+        "terraform init.*",
+        "terraform fmt.*",
+        "terraform validate.*",
+        "cdk synth.*",
+        "python3 -m pytest .*",
+        "pytest .*",
+        "ls .*",
+        "cat .*",
+        "find .*",
+        "grep .*"
+      ],
+      "deniedCommands": [
+        "rm -rf .*",
+        "aws .* delete.*",
+        "terraform apply.*",
+        "terraform destroy.*"
+      ]
+    }
+  },
+  "resources": [
+    "file://AmazonQ.md",
+    "file://MCP_GUARDRAILS.md",
+    "file://tool-registry/servers.yaml",
+    "file://.amazonq/rules/**/*.md"
+  ],
+  "hooks": {
+    "preToolUse": [
+      { "matcher": "fs_write", "command": ".amazonq/hooks/check-logging.sh", "timeout_ms": 5000 }
+    ],
+    "postToolUse": [
+      { "matcher": "fs_write", "command": "python3 .amazonq/hooks/log_conversation.py", "timeout_ms": 3000 }
+    ]
+  },
+  "useLegacyMcpJson": true
+}
