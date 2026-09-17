@@ -10,9 +10,11 @@ The DevOps Agent automates deployment, monitoring, and maintenance of data pipel
 
 ### Current capability
 
-Today, the agent can generate deployable IaC (Terraform / AWS CDK / CloudFormation) from a completed workload's artifacts. It does NOT apply the IaC — a human reviews and applies manually as a deliberate review step. See [`iac-generator.md`](./iac-generator.md).
+Today, the agent can generate deployable IaC (Terraform / AWS CDK / CloudFormation) from a completed workload's artifacts. It does NOT apply the IaC — a human reviews and applies manually as a deliberate review step.
 
-By default the generator assumes **single-account** deployment. If you answer "multi" to the Phase 0 `account_topology` question, the generator emits provider aliases, cross-account `sts:AssumeRole` wiring, and `catalog_id`-aware Glue + Lake Formation resources so jobs in Account B can read from an Account A catalog. See [`../../docs/multi-account-deployment.md`](../../docs/multi-account-deployment.md) for the AWS-side pre-requisites (catalog-reader role in Account A, Lake Formation grants, and B → A assume-role trust) — those are NOT automated by the generator.
+It is spawned as `subagent_type: "iac-agent"`; the enforced prompt is [`.claude/agents/iac-agent.md`](../../.claude/agents/iac-agent.md) and [`iac-generator.md`](./iac-generator.md) is the reference material it reads. Its two uninferrable inputs — target framework and TBAC principals — come from `run/context.json#human_answers`, asked by the orchestrator or by `/devops-workflow`; the agent itself has no `AskUserQuestion` and returns `status: "blocked"` if either is absent.
+
+By default the generator assumes **single-account** deployment. Set `account_topology.mode: multi` in `workloads/{name}/config/deployment.yaml` and the generator emits provider aliases, cross-account `sts:AssumeRole` wiring, and `catalog_id`-aware Glue + Lake Formation resources so jobs in Account B can read from an Account A catalog. See [`../../docs/multi-account-deployment.md`](../../docs/multi-account-deployment.md) for the AWS-side pre-requisites (catalog-reader role in Account A, Lake Formation grants, and B → A assume-role trust) — those are NOT automated by the generator.
 
 ## Planned Capabilities
 
@@ -121,7 +123,7 @@ DevOps Agent (Automated, event-driven)
 
 | Prompt | Purpose | Status |
 |--------|---------|--------|
-| `iac-generator.md` | Generate Terraform / CDK / CFN for a built workload (manual apply) | ✅ Available |
+| `iac-generator.md` | Reference material for `.claude/agents/iac-agent.md` — Terraform / CDK / CFN for a built workload (manual apply) | ✅ Available |
 | `setup-cicd-pipeline.md` | Create CI/CD for workload | 📝 Planned |
 | `configure-monitoring.md` | Set up alerts and dashboards | 📝 Planned |
 | `automate-maintenance.md` | Schedule operational tasks | 📝 Planned |

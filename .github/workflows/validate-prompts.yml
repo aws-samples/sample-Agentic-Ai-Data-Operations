@@ -73,7 +73,7 @@ jobs:
           errors = []
           agents = sorted(pathlib.Path(".claude/agents").glob("*.md"))
           if not agents:
-              sys.exit(".claude/agents/ is empty — the five sub-agents would spawn as general-purpose")
+              sys.exit(".claude/agents/ is empty — every named sub-agent would spawn as general-purpose")
 
           for path in agents:
               text = path.read_text()

@@ -20,13 +20,16 @@ This folder was called `prompts/`, and that name caused real confusion, because
 **Rule of thumb**: to change how a pipeline sub-agent behaves, edit `.claude/agents/`. To change
 an operator procedure — AWS setup, compliance controls, troubleshooting, IaC — edit a runbook.
 
-Two files here blur the line and are worth calling out:
+Two files here blur the line and are worth calling out. Both follow the same split — short
+enforced prompt in `.claude/agents/`, long reference narrative here:
 
-- `data-onboarding-agent/ontology-staging-agent.md` is a **reference narrative**, not the live
-  prompt. The prompt that takes effect is `.claude/agents/ontology-agent.md`.
-- `devops-agent/iac-generator.md` **is** a spawn prompt, for an agent that is deliberately not
-  registered in `.claude/agents/`. The orchestrator passes its text inline; there is no
-  `subagent_type` for it.
+- `data-onboarding-agent/ontology-staging-agent.md` → live prompt is
+  `.claude/agents/ontology-agent.md`.
+- `devops-agent/iac-generator.md` → live prompt is `.claude/agents/iac-agent.md`. The runbook
+  keeps the resource catalog, per-framework file layouts and validator matrix that would bloat
+  every spawn; the agent reads it on demand. Two of its instructions are superseded and
+  labelled as such in place: "ask the user" (sub-agents have no `AskUserQuestion`) and
+  `submit_agent_output` (a Bedrock-only tool spec).
 
 Anything spawned as a sub-agent — registered or inline — must return an `AgentOutput` whose
 `decisions` array has at least one entry. That is enforced in

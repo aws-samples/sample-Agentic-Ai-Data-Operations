@@ -54,6 +54,16 @@ SKIPPED_DIRS = ("docs/prompt_intelligence/",)
 # Substrings that mark a candidate as a template or example rather than a real path.
 TEMPLATE_MARKERS = ("{", "}", "*", "$", "<", ">", "...", "|", "YYYY", "MM-DD")
 
+# Paths that prose deliberately names as *absent* — the point of the sentence is that the file
+# does not exist. Rather than exempt them, the check is inverted below: if one of these ever
+# appears on disk the validator fails, so the prose gets corrected instead of quietly rotting.
+ASSERTED_MISSING = {
+    # Named in CLAUDE.md, README.md and SKILLS.md but never written; the check logic lives in
+    # the rendered output of shared/templates/quality_check.py.j2. Sub-agents are told not to
+    # import it and not to create it as a side effect.
+    "shared/utils/quality_checks.py",
+}
+
 BARE_PATH_RE = re.compile(
     r"(?<![\w./-])((?:" + "|".join(re.escape(p) for p in REPO_PREFIXES) + r")[\w./@-]+)"
 )
@@ -103,7 +113,7 @@ def check_file(path: Path) -> list[str]:
 
         for raw in BARE_PATH_RE.findall(line):
             raw = raw.rstrip(".,;:)`\"'")
-            if not is_candidate(raw):
+            if not is_candidate(raw) or raw in ASSERTED_MISSING:
                 continue
             if not (PROJECT_ROOT / raw).exists():
                 errors.append(f"{rel}:{lineno}: broken repo path -> {raw}")
@@ -146,6 +156,16 @@ def check_regulation_registry() -> list[str]:
     return errors
 
 
+def check_asserted_missing() -> list[str]:
+    """Inverse check: prose claims these do not exist, so fail if one shows up."""
+    return [
+        f"{rel} now exists, but prose in .claude/agents/ and docs asserts it does not — "
+        f"update those references and drop it from ASSERTED_MISSING"
+        for rel in sorted(ASSERTED_MISSING)
+        if (PROJECT_ROOT / rel).exists()
+    ]
+
+
 def main() -> int:
     errors: list[str] = []
     for path in tracked_files():
@@ -156,6 +176,7 @@ def main() -> int:
         errors.extend(check_file(path))
 
     errors.extend(check_regulation_registry())
+    errors.extend(check_asserted_missing())
 
     if errors:
         print(f"FAIL: {len(errors)} broken reference(s)\n")
