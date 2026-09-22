@@ -155,7 +155,9 @@ Traditional data pipeline development is slow, manual, and error-prone:
 
 ## How It Works
 
-**Built for Claude Code, adaptable to other AI assistants.** While this platform is designed for **Claude Code** (CLI, Desktop, Web), the prompt architecture and agent workflows can be adapted with slight modifications to work with **Kiro**, **GitHub Copilot**, **Cursor**, or other AI coding assistants that support context-aware code generation.
+**Built for Claude Code, adaptable to other AI assistants.** While this platform is designed for **Claude Code** (CLI, Desktop, Web), the prompt architecture and agent workflows can be adapted with slight modifications to work with **Kiro**, **GitHub Copilot**, **Cursor**, **Amazon Q Developer CLI** or other AI coding assistants that support context-aware code generation.
+
+> **Amazon Q Developer CLI support** is available on the [`feat/amazon-q-support`](https://github.com/aws-samples/sample-Agentic-Ai-Data-Operations/tree/feat/amazon-q-support) branch. See `docs/getting-started-amazon-q.md` on that branch to get started.
 
 **All agents run in the Development environment only.** Generated scripts and configurations are version-controlled and promoted to higher environments (QA, Staging, Production) through standard CI/CD pipelines. Agents do not run in production — only the artifacts they generate.
 
