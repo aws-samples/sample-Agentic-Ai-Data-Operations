@@ -1,0 +1,16 @@
+# Single source of truth for MCP servers used by the ADOP orchestrator.
+# Tier: REQUIRED (block on failure), WARN (CLI fallback), OPTIONAL (skip gracefully).
+# Edit to match your org's actual MCP inventory.
+servers:
+  glue-athena:      { tier: REQUIRED, category: query,       fallback: "aws athena / aws glue CLI" }
+  lakeformation:    { tier: REQUIRED, category: governance,  fallback: "aws lakeformation CLI" }
+  iam:              { tier: REQUIRED, category: auth,         fallback: "aws iam CLI" }
+  cloudtrail:       { tier: WARN,     category: audit,        fallback: "aws cloudtrail CLI" }
+  redshift:         { tier: WARN,     category: query,        fallback: "aws redshift-data CLI" }
+  pii-detection:    { tier: WARN,     category: compliance,   fallback: "local regex/heuristics" }
+  s3-tables:        { tier: WARN,     category: storage,      fallback: "aws s3api CLI" }
+  sagemaker-catalog:{ tier: OPTIONAL, category: catalog,      fallback: "skip" }
+  lambda:           { tier: OPTIONAL, category: compute,      fallback: "skip" }
+  cloudwatch:       { tier: OPTIONAL, category: monitoring,   fallback: "skip" }
+  cost-explorer:    { tier: OPTIONAL, category: finops,       fallback: "skip" }
+  dynamodb:         { tier: OPTIONAL, category: state,        fallback: "skip" }
