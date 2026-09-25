@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "adop-marketplace",
+  "description": "Marketplace for the Agentic Data Operations Platform (ADOP) Claude Code plugin.",
+  "owner": {
+    "name": "lavrekha",
+    "email": "lavrekha@amazon.com"
+  },
+  "plugins": [
+    {
+      "name": "adop",
+      "source": "./",
+      "description": "Agentic Data Operations Platform plugin \u2014 agents, commands, hooks, and skills for data engineering."
+    }
+  ]
+}
