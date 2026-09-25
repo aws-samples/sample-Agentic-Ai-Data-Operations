@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin.json",
+  "name": "adop",
+  "displayName": "Agentic Data Operations Platform (ADOP)",
+  "version": "0.1.0",
+  "description": "Agentic Data Operations Platform plugin: specialized agents (data-quality, metadata, ontology, devops, transformation, orchestration), onboarding and devops workflow commands, artifact-validation hooks, and data-compliance & decision-engine skills for data engineering.",
+  "author": {
+    "name": "lavrekha",
+    "email": "lavrekha@amazon.com"
+  },
+  "homepage": "https://aws.amazon.com/blogs/machine-learning/agentic-data-operations-platform-adop-data-engineering-into-hours/",
+  "repository": "https://github.com/aws-samples/sample-Agentic-Ai-Data-Operations",
+  "license": "MIT-0",
+  "keywords": [
+    "data-engineering",
+    "data-operations",
+    "agents",
+    "data-quality",
+    "metadata",
+    "ontology",
+    "compliance",
+    "aws"
+  ]
+}
