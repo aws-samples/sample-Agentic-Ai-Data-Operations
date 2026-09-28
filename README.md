@@ -159,6 +159,8 @@ Traditional data pipeline development is slow, manual, and error-prone:
 
 > **Amazon Q Developer CLI support** is available on the [`feat/amazon-q-support`](https://github.com/aws-samples/sample-Agentic-Ai-Data-Operations/tree/feat/amazon-q-support) branch. See `docs/getting-started-amazon-q.md` on that branch to get started.
 
+> **Kiro support** is available on the [`feat/amazon-Kiro-support`](https://github.com/aws-samples/sample-Agentic-Ai-Data-Operations/tree/feat/amazon-Kiro-support) branch. Kiro-specific configuration lives under `.kiro/` — agents, hooks, steering and MCP servers.
+
 **All agents run in the Development environment only.** Generated scripts and configurations are version-controlled and promoted to higher environments (QA, Staging, Production) through standard CI/CD pipelines. Agents do not run in production — only the artifacts they generate.
 
 ---
