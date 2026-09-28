@@ -54,11 +54,59 @@ def _load_schema(spec_type: str, schema_version: str) -> dict:
         return json.load(f)
 
 
+def _normalise_s3_prefix(value: str) -> str:
+    """Trailing slashes are cosmetic in S3; compare prefixes without them."""
+    return value.rstrip("/") if isinstance(value, str) else value
+
+
+def _semantic_errors(spec: dict, spec_type: str) -> list[str]:
+    """Cross-field rules that JSON Schema cannot express.
+
+    JSON Schema validates each field in isolation, so a spec can be structurally perfect
+    and still describe something the architecture forbids. `bronze-immutable` is a
+    BLOCK-severity invariant, and the way to violate it is to write the Bronze output on
+    top of the raw source -- which is two individually valid paths that happen to match.
+    Observed in a real run: the generated bronze.yaml set `landing_zone` to the same prefix
+    as `source_path`, so the job would have appended Parquet over the source CSV.
+    """
+    errors: list[str] = []
+    if spec_type == "bronze":
+        source = _normalise_s3_prefix(spec.get("source_path"))
+        landing = _normalise_s3_prefix(spec.get("landing_zone"))
+        if source and landing:
+            if source == landing:
+                errors.append(
+                    "landing_zone must not equal source_path "
+                    f"(both are {source!r}); writing Bronze output over the raw source "
+                    "violates the bronze-immutable invariant. Give landing_zone its own "
+                    "prefix, e.g. the source under .../raw/ and the landing under "
+                    ".../bronze/<dataset>/."
+                )
+            elif landing.startswith(source + "/"):
+                errors.append(
+                    f"landing_zone ({landing!r}) is nested inside source_path "
+                    f"({source!r}); Bronze output would be written into the raw source "
+                    "prefix, which violates the bronze-immutable invariant."
+                )
+            elif source.startswith(landing + "/"):
+                errors.append(
+                    f"source_path ({source!r}) is nested inside landing_zone "
+                    f"({landing!r}); the job would append output over its own input on "
+                    "re-run, which violates the bronze-immutable invariant."
+                )
+    return errors
+
+
 def validate_spec(spec: dict, spec_type: str, schema_version: str = "v1") -> list[str]:
-    """Validate a spec dict against its JSON Schema. Returns list of error messages."""
+    """Validate a spec dict against its JSON Schema and the cross-field rules.
+
+    Schema errors first, then semantic ones, so a spec that is both malformed and
+    architecturally wrong reports everything in one pass.
+    """
     schema = _load_schema(spec_type, schema_version)
     validator = jsonschema.Draft202012Validator(schema)
-    return [err.message for err in validator.iter_errors(spec)]
+    errors = [err.message for err in validator.iter_errors(spec)]
+    return errors + _semantic_errors(spec, spec_type)
 
 
 def load_spec(path: Path, spec_type: str, schema_version: str = "v1") -> tuple[dict, str]:

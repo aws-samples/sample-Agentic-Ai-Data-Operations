@@ -16,7 +16,60 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from shared.utils.structured_logger import StructuredLogger
+try:
+    from shared.utils.structured_logger import StructuredLogger
+except ModuleNotFoundError:  # pragma: no cover - exercised only on Glue
+    # Glue executes this script standalone from S3, where the ADOP `shared` package is not
+    # on sys.path -- the job would otherwise die at import before doing any work. This
+    # fallback emits byte-identical JSON lines, so the artifact runs unmodified on Glue and
+    # the observability contract still holds. If `shared` IS importable (a repo checkout, or
+    # shipped via --extra-py-files), the real logger is used instead.
+    import json as _json
+    import sys as _sys
+    from datetime import datetime as _dt, timezone as _tz
+
+    class StructuredLogger:  # noqa: F811
+        """Inline equivalent of shared.utils.structured_logger.StructuredLogger."""
+
+        def __init__(self, agent, workload, run_id):
+            self.context = {"agent": agent, "workload": workload, "run_id": run_id}
+
+        def log(self, level, message, **extra):
+            entry = {
+                "timestamp": _dt.now(_tz.utc).isoformat(),
+                "level": level,
+                **self.context,
+                "message": message,
+                **extra,
+            }
+            print(_json.dumps(entry, default=str), file=_sys.stderr)
+
+        def info(self, msg, **extra):
+            self.log("INFO", msg, **extra)
+
+        def warn(self, msg, **extra):
+            self.log("WARN", msg, **extra)
+
+        def error(self, msg, **extra):
+            self.log("ERROR", msg, **extra)
+
+        def debug(self, msg, **extra):
+            self.log("DEBUG", msg, **extra)
+
+        def phase_boundary(self, phase, status):
+            self.log("PHASE", f"Phase {phase}: {status}", phase=phase, status=status)
+
+        def artifact_created(self, path, checksum):
+            self.log("ARTIFACT", f"Created {path}", path=path, checksum=checksum)
+
+        def test_result(self, suite, passed, failed):
+            self.log(
+                "TEST",
+                f"{suite}: {passed} passed, {failed} failed",
+                suite=suite,
+                passed=passed,
+                failed=failed,
+            )
 
 logger = StructuredLogger(
     agent="gold_aggregate",
