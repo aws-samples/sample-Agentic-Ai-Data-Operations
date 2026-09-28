@@ -1,0 +1,64 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "adop-inject-run-context",
+      "description": "Injects in-flight run state at session start so a resumed or compacted orchestrator recovers from disk instead of re-asking the human. Read-only, never blocks. NOTE: SessionStart was not observed firing during testing on Kiro IDE -- verify before relying on it.",
+      "trigger": "SessionStart",
+      "action": {
+        "type": "command",
+        "command": ".kiro/hooks/adop-hook.sh inject_run_context.py"
+      },
+      "timeout": 10,
+      "enabled": true
+    },
+    {
+      "name": "adop-block-credentials",
+      "description": "Denies writes containing hardcoded credentials or infrastructure identifiers.",
+      "trigger": "PreToolUse",
+      "matcher": "fs_write|write",
+      "action": {
+        "type": "command",
+        "command": ".kiro/hooks/adop-hook.sh block_credentials.py"
+      },
+      "timeout": 10,
+      "enabled": true
+    },
+    {
+      "name": "adop-enforce-template-codegen",
+      "description": "Denies hand-written pipeline artifacts under workloads/*/scripts/; those are rendered from schema-validated specs only.",
+      "trigger": "PreToolUse",
+      "matcher": "fs_write|write",
+      "action": {
+        "type": "command",
+        "command": ".kiro/hooks/adop-hook.sh enforce_template_codegen.py"
+      },
+      "timeout": 10,
+      "enabled": true
+    },
+    {
+      "name": "adop-validate-artifacts",
+      "description": "ENFORCING. Syntax errors and credentials in a pending artifact are denied before the write. Every check runs on the payload content, so it does not need the file on disk.",
+      "trigger": "PreToolUse",
+      "matcher": "fs_write|write",
+      "action": {
+        "type": "command",
+        "command": ".kiro/hooks/adop-hook.sh validate_artifacts.py"
+      },
+      "timeout": 15,
+      "enabled": true
+    },
+    {
+      "name": "adop-validate-artifacts-post",
+      "description": "ADVISORY. Second pass on the file as written, covering content that reached disk by a route with no tool_input (a bash heredoc, say). Kiro's PostToolUse cannot block, so findings are reported only.",
+      "trigger": "PostToolUse",
+      "matcher": "fs_write|write",
+      "action": {
+        "type": "command",
+        "command": ".kiro/hooks/adop-hook.sh validate_artifacts.py"
+      },
+      "timeout": 15,
+      "enabled": true
+    }
+  ]
+}
