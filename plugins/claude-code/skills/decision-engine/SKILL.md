@@ -12,12 +12,28 @@ defaults are sane starting points.
 
 ## Configuration layers
 
-| File (in `config/`) | Role |
-|---------------------|------|
-| `TOOL_ROUTING.md` | Intent-to-tool mapping — matches NL intent to a tool, with `not_when` disqualifiers |
-| `servers.yaml` | Single source of truth for MCP servers — category, tools, fallbacks |
-| `invariants.yaml` | Mandatory rules (BLOCK/WARN) enforced regardless of phase |
-| `standards.md` | Architecture constraints — org tech choices, sub-agent limits, MCP-first rule |
+Paths are relative to the plugin root and mirror the ADOP repository, so the first three are
+byte-identical to their sources and `tests/unit/test_plugin_translation.py` fails if one drifts.
+
+| File | Role |
+|------|------|
+| `TOOL_ROUTING.md` | Intent-to-tool mapping — 8 intents, each with `not_when` disqualifiers |
+| `tool-registry/servers.yaml` | The MCP server inventory — 13 servers with tier, category and fallback |
+| `tool-registry/invariants.yaml` | The 11 mandatory rules (BLOCK/WARN), enforced regardless of phase |
+| `config/standards.md` | A template for your organisation's own tech choices — edit this one |
+
+Only `config/standards.md` is meant to be edited in place: it is the deliberately-empty slot for
+your architecture preferences. The other three are vendored copies, so change them upstream in
+the repository and re-vendor. Editing a copy here would be silently reverted by the next
+re-vendoring and would fail the drift check in the meantime.
+
+Earlier versions of this plugin kept hand-maintained versions of all four, and they had drifted:
+`servers.yaml` listed 12 servers instead of 13, omitting `core` and leaving `zone-scoped-kms`
+and `no-credentials-in-code` with no server to route to; `invariants.yaml` listed 10 rules
+instead of 11, omitting `iam-simulate-first` (BLOCK) while `TOOL_ROUTING.md` still routed an
+`iam-simulate` intent and `standards.md` still required `simulate_principal_policy` before
+source access; and `TOOL_ROUTING.md` carried 5 intents of 8, so whole phases — Bronze ingestion,
+Silver and Gold transforms, lineage — had no routing at all and fell back on model priors.
 
 ## 5-step tool selection hierarchy
 

@@ -136,6 +136,20 @@ copy:
     source: shared/utils/script_tracer.py
   - target: lib/shared/utils/structured_logger.py
     source: shared/utils/structured_logger.py
+  - target: mcp-servers/glue-athena-server/lambda_handler.py
+    source: mcp-servers/glue-athena-server/lambda_handler.py
+  - target: mcp-servers/glue-athena-server/server.py
+    source: mcp-servers/glue-athena-server/server.py
+  - target: mcp-servers/lakeformation-server/server.py
+    source: mcp-servers/lakeformation-server/server.py
+  - target: mcp-servers/pii-detection-server/README.md
+    source: mcp-servers/pii-detection-server/README.md
+  - target: mcp-servers/pii-detection-server/server.py
+    source: mcp-servers/pii-detection-server/server.py
+  - target: mcp-servers/pii-detection-server/setup.sh
+    source: mcp-servers/pii-detection-server/setup.sh
+  - target: mcp-servers/sagemaker-catalog-server/server.py
+    source: mcp-servers/sagemaker-catalog-server/server.py
   - target: runbooks/data-onboarding-agent/regulation/README.md
     source: runbooks/data-onboarding-agent/regulation/README.md
   - target: runbooks/data-onboarding-agent/regulation/ccpa.md
@@ -148,6 +162,10 @@ copy:
     source: runbooks/data-onboarding-agent/regulation/pci-dss.md
   - target: runbooks/data-onboarding-agent/regulation/sox.md
     source: runbooks/data-onboarding-agent/regulation/sox.md
+  - target: tool-registry/invariants.yaml
+    source: tool-registry/invariants.yaml
+  - target: tool-registry/servers.yaml
+    source: tool-registry/servers.yaml
 # ---------------------------------------------------------------------------
 # rewrite — derived from repo sources, paths retargeted
 # ---------------------------------------------------------------------------
@@ -208,6 +226,56 @@ rewrite:
       plugin's runbooks directory and found nothing — the first case where a
       vendored file could not stay byte-identical.
 
+  - target: .mcp.json
+    source: .mcp.json
+    anchors: ["${CLAUDE_PLUGIN_ROOT}/mcp-servers/glue-athena-server/server.py",
+              "${CLAUDE_PLUGIN_ROOT}/mcp-servers/lakeformation-server/server.py",
+              "${CLAUDE_PLUGIN_ROOT}/mcp-servers/pii-detection-server/server.py",
+              "${CLAUDE_PLUGIN_ROOT}/mcp-servers/sagemaker-catalog-server/server.py"]
+    note: >-
+      Generated from the repo's .mcp.json rather than hand-written, so the server
+      set cannot drift. Three differences, each deliberate: vendored script paths
+      gain ${CLAUDE_PLUGIN_ROOT}, which Claude Code expands to the install
+      directory; AWS_REGION becomes ${AWS_REGION:-us-east-1} so a user's region
+      wins over the repo's demo default; and AWS_PROFILE: default is dropped from
+      all 13, because a plugin running in someone else's repository must not
+      override their profile selection — omitting it lets the standard credential
+      chain apply.
+
+      Known limitation carried over deliberately: three of the nine uvx packages
+      are yanked from PyPI and cannot start — awslabs-core-mcp-server,
+      awslabs-lambda-mcp-server, awslabs-cost-explorer-mcp-server. Verified against
+      pypi.org, independently reproducing a finding the predecessor plugin made.
+      Live successors exist (awslabs-aws-api-mcp-server 1.5.5,
+      awslabs-lambda-tool-mcp-server 2.1.1,
+      awslabs-billing-cost-management-mcp-server 0.0.38) but are NOT substituted
+      here: their tool surfaces are unverified, and TOOL_ROUTING.md routes intents
+      to specific tool names, so a package that starts but exposes different tools
+      would be a worse failure than one that does not start. Repo-side decision.
+
+  - target: TOOL_ROUTING.md
+    source: TOOL_ROUTING.md
+    anchors: ["Tool Selection for Agentic Data Onboarding", "not_when",
+              "tool-registry/servers.yaml"]
+    note: >-
+      506 lines, 8 intents — replaces a hand-maintained 34-line version that
+      carried 5, leaving Bronze ingestion, the Silver and Gold transforms and
+      lineage with no routing at all.
+
+      Two footer links retargeted to absolute GitHub URLs because the documents
+      they point at are not shipped: ./MCP_GUARDRAILS.md (referenced by no
+      .claude/ file, so no agent reads it at runtime) and ./SKILLS.md (168 KB).
+      Both verified HTTP 200. A plugin user can still reach them; a relative link
+      would silently resolve to nothing, which is the failure mode
+      validate_docs_links.py exists to catch.
+
+      Open for Phase C/D: SKILLS.md IS a runtime dependency —
+      .claude/agents/quality-agent.md and .claude/rules/{03-python-airflow,05-yaml}.md
+      cite it for config schemas and DAG templates. Those references have to be
+      resolved when those files are translated, either by vendoring the relevant
+      sections or by pointing at the vendored templates that now carry the same
+      information.
+
 # ---------------------------------------------------------------------------
 # transform — content carried by a different primitive
 # ---------------------------------------------------------------------------
@@ -257,17 +325,6 @@ transform:
   # rather than hand-maintained summaries. servers.yaml already demonstrates why:
   # it carries 12 servers where tool-registry/servers.yaml has 13, so `core` is
   # missing and two BLOCK invariants have no server to route to.
-  - target: skills/decision-engine/config/servers.yaml
-    sources: [tool-registry/servers.yaml]
-    status: pending
-    note: 12 servers vs 13 in the source; `core` absent
-  - target: skills/decision-engine/config/invariants.yaml
-    sources: [tool-registry/invariants.yaml]
-    status: pending
-    note: 10 invariants vs 11; `iam-simulate-first` absent
-  - target: skills/decision-engine/config/TOOL_ROUTING.md
-    sources: [TOOL_ROUTING.md]
-    status: pending
   - target: skills/decision-engine/config/standards.md
     sources: [.claude/rules/02-architecture.md]
     status: pending

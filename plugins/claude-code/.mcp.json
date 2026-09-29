@@ -11,11 +11,10 @@
         "boto3",
         "--python",
         "3.13",
-        "mcp-servers/glue-athena-server/server.py"
+        "${CLAUDE_PLUGIN_ROOT}/mcp-servers/glue-athena-server/server.py"
       ],
       "env": {
-        "AWS_REGION": "us-east-1",
-        "AWS_PROFILE": "default"
+        "AWS_REGION": "${AWS_REGION:-us-east-1}"
       }
     },
     "lakeformation": {
@@ -29,11 +28,10 @@
         "boto3",
         "--python",
         "3.13",
-        "mcp-servers/lakeformation-server/server.py"
+        "${CLAUDE_PLUGIN_ROOT}/mcp-servers/lakeformation-server/server.py"
       ],
       "env": {
-        "AWS_REGION": "us-east-1",
-        "AWS_PROFILE": "default"
+        "AWS_REGION": "${AWS_REGION:-us-east-1}"
       }
     },
     "sagemaker-catalog": {
@@ -47,11 +45,10 @@
         "boto3",
         "--python",
         "3.13",
-        "mcp-servers/sagemaker-catalog-server/server.py"
+        "${CLAUDE_PLUGIN_ROOT}/mcp-servers/sagemaker-catalog-server/server.py"
       ],
       "env": {
-        "AWS_REGION": "us-east-1",
-        "AWS_PROFILE": "default"
+        "AWS_REGION": "${AWS_REGION:-us-east-1}"
       }
     },
     "core": {
@@ -62,8 +59,7 @@
         "awslabs.core-mcp-server"
       ],
       "env": {
-        "AWS_REGION": "us-east-1",
-        "AWS_PROFILE": "default",
+        "AWS_REGION": "${AWS_REGION:-us-east-1}",
         "FASTMCP_LOG_LEVEL": "ERROR"
       }
     },
@@ -75,8 +71,7 @@
         "awslabs.iam-mcp-server"
       ],
       "env": {
-        "AWS_REGION": "us-east-1",
-        "AWS_PROFILE": "default",
+        "AWS_REGION": "${AWS_REGION:-us-east-1}",
         "FASTMCP_LOG_LEVEL": "ERROR"
       }
     },
@@ -88,8 +83,7 @@
         "awslabs.lambda-mcp-server"
       ],
       "env": {
-        "AWS_REGION": "us-east-1",
-        "AWS_PROFILE": "default",
+        "AWS_REGION": "${AWS_REGION:-us-east-1}",
         "FASTMCP_LOG_LEVEL": "ERROR"
       }
     },
@@ -101,8 +95,7 @@
         "awslabs.s3-tables-mcp-server"
       ],
       "env": {
-        "AWS_REGION": "us-east-1",
-        "AWS_PROFILE": "default",
+        "AWS_REGION": "${AWS_REGION:-us-east-1}",
         "FASTMCP_LOG_LEVEL": "ERROR"
       }
     },
@@ -114,8 +107,7 @@
         "awslabs.cloudtrail-mcp-server"
       ],
       "env": {
-        "AWS_REGION": "us-east-1",
-        "AWS_PROFILE": "default",
+        "AWS_REGION": "${AWS_REGION:-us-east-1}",
         "FASTMCP_LOG_LEVEL": "ERROR"
       }
     },
@@ -127,8 +119,7 @@
         "awslabs.redshift-mcp-server"
       ],
       "env": {
-        "AWS_REGION": "us-east-1",
-        "AWS_PROFILE": "default",
+        "AWS_REGION": "${AWS_REGION:-us-east-1}",
         "FASTMCP_LOG_LEVEL": "ERROR"
       }
     },
@@ -140,8 +131,7 @@
         "awslabs.cloudwatch-mcp-server"
       ],
       "env": {
-        "AWS_REGION": "us-east-1",
-        "AWS_PROFILE": "default",
+        "AWS_REGION": "${AWS_REGION:-us-east-1}",
         "FASTMCP_LOG_LEVEL": "ERROR"
       }
     },
@@ -153,8 +143,7 @@
         "awslabs.cost-explorer-mcp-server"
       ],
       "env": {
-        "AWS_REGION": "us-east-1",
-        "AWS_PROFILE": "default",
+        "AWS_REGION": "${AWS_REGION:-us-east-1}",
         "FASTMCP_LOG_LEVEL": "ERROR"
       }
     },
@@ -166,8 +155,7 @@
         "awslabs.dynamodb-mcp-server"
       ],
       "env": {
-        "AWS_REGION": "us-east-1",
-        "AWS_PROFILE": "default",
+        "AWS_REGION": "${AWS_REGION:-us-east-1}",
         "FASTMCP_LOG_LEVEL": "ERROR"
       }
     },
@@ -182,11 +170,10 @@
         "fastmcp",
         "--python",
         "3.13",
-        "mcp-servers/pii-detection-server/server.py"
+        "${CLAUDE_PLUGIN_ROOT}/mcp-servers/pii-detection-server/server.py"
       ],
       "env": {
-        "AWS_REGION": "us-east-1",
-        "AWS_PROFILE": "default"
+        "AWS_REGION": "${AWS_REGION:-us-east-1}"
       }
     }
   }
