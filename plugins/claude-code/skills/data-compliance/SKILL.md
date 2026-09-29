@@ -31,13 +31,26 @@ transformation, quality, and DAG artifacts.
 quality chokepoint.
 
 ## Available frameworks
-| Token | File |
-|-------|------|
-| GDPR | `regulations/gdpr.md` |
-| CCPA | `regulations/ccpa.md` |
-| HIPAA | `regulations/hipaa.md` |
-| SOX | `regulations/sox.md` |
-| PCI / PCI DSS | `regulations/pci_dss.md` |
 
-Add a new framework by dropping a `regulations/<name>.md` file that follows the same control
-block shape (Silver / Gold / Quality / Retention / Audit). No code change required.
+Read the pack for the active framework in full before generating anything. These are the
+control sets themselves, not summaries of them — each is 230-290 lines and names the specific
+columns, masking methods, retention windows and audit records the framework requires.
+
+| Token | Pack |
+|-------|------|
+| GDPR | `runbooks/data-onboarding-agent/regulation/gdpr.md` |
+| CCPA | `runbooks/data-onboarding-agent/regulation/ccpa.md` |
+| HIPAA | `runbooks/data-onboarding-agent/regulation/hipaa.md` |
+| SOX | `runbooks/data-onboarding-agent/regulation/sox.md` |
+| PCI / PCI DSS | `runbooks/data-onboarding-agent/regulation/pci-dss.md` |
+
+`runbooks/data-onboarding-agent/regulation/README.md` is the picker: it maps a user's stated
+obligation to a token, and states that nothing is applied unless the user selected it.
+
+Paths are relative to the plugin root and mirror the ADOP repository exactly, so the packs are
+byte-identical to their source and the reference in
+`.claude/commands/onboard-workflow.md` — "Reference runbooks/data-onboarding-agent/regulation/
+for details" — resolves the same way inside the plugin as it does in a checkout.
+
+Add a framework by adding a pack upstream in the repository, not here: these files are vendored
+copies and `tests/unit/test_plugin_translation.py` fails if one differs from its source.

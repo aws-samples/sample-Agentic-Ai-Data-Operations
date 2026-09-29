@@ -136,6 +136,18 @@ copy:
     source: shared/utils/script_tracer.py
   - target: lib/shared/utils/structured_logger.py
     source: shared/utils/structured_logger.py
+  - target: runbooks/data-onboarding-agent/regulation/README.md
+    source: runbooks/data-onboarding-agent/regulation/README.md
+  - target: runbooks/data-onboarding-agent/regulation/ccpa.md
+    source: runbooks/data-onboarding-agent/regulation/ccpa.md
+  - target: runbooks/data-onboarding-agent/regulation/gdpr.md
+    source: runbooks/data-onboarding-agent/regulation/gdpr.md
+  - target: runbooks/data-onboarding-agent/regulation/hipaa.md
+    source: runbooks/data-onboarding-agent/regulation/hipaa.md
+  - target: runbooks/data-onboarding-agent/regulation/pci-dss.md
+    source: runbooks/data-onboarding-agent/regulation/pci-dss.md
+  - target: runbooks/data-onboarding-agent/regulation/sox.md
+    source: runbooks/data-onboarding-agent/regulation/sox.md
 # ---------------------------------------------------------------------------
 # rewrite — derived from repo sources, paths retargeted
 # ---------------------------------------------------------------------------
@@ -181,6 +193,20 @@ rewrite:
   - target: commands/devops-workflow.md
     source: .claude/commands/devops-workflow.md
     status: pending
+
+  - target: runbooks/devops-agent/iac-generator.md
+    source: runbooks/devops-agent/iac-generator.md
+    anchors: ["IaC Generator", "reference material, not the live prompt",
+              "agents/devops-agent.md", "adop:devops-agent"]
+    note: >-
+      Not a pure copy. Its header points readers at the live prompt, which in a
+      checkout is .claude/agents/iac-agent.md reached via subagent_type
+      "iac-agent". Inside the plugin the live prompt is agents/devops-agent.md and
+      dispatch is namespaced to adop:devops-agent, so two references are
+      retargeted. The 1,076-line resource catalog below them is untouched.
+      Caught by the doc-links gate, which resolved ../../.claude/agents/ from the
+      plugin's runbooks directory and found nothing — the first case where a
+      vendored file could not stay byte-identical.
 
 # ---------------------------------------------------------------------------
 # transform — content carried by a different primitive
@@ -246,24 +272,6 @@ transform:
     sources: [.claude/rules/02-architecture.md]
     status: pending
 
-  # Phase B3 replaces these five summaries with the real regulation packs.
-  # The repo's HIPAA pack is 267 lines; the plugin's summary is 21.
-  - target: skills/data-compliance/regulations/gdpr.md
-    sources: [runbooks/data-onboarding-agent/regulation/gdpr.md]
-    status: pending
-  - target: skills/data-compliance/regulations/ccpa.md
-    sources: [runbooks/data-onboarding-agent/regulation/ccpa.md]
-    status: pending
-  - target: skills/data-compliance/regulations/hipaa.md
-    sources: [runbooks/data-onboarding-agent/regulation/hipaa.md]
-    status: pending
-    note: 21-line summary of a 267-line source
-  - target: skills/data-compliance/regulations/sox.md
-    sources: [runbooks/data-onboarding-agent/regulation/sox.md]
-    status: pending
-  - target: skills/data-compliance/regulations/pci_dss.md
-    sources: [runbooks/data-onboarding-agent/regulation/pci-dss.md]
-    status: pending
 
 # ---------------------------------------------------------------------------
 # plugin-only — no repo source, and a stated reason
