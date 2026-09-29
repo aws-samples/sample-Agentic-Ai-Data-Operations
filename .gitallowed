@@ -1,4 +1,17 @@
-# Allowed patterns for git-secrets
+# Allowed patterns for git-secrets and shared/utils/hook_validators/pii_code_scanner.py
+# Entries are regular expressions matched against the whole line.
+#
+# Only reserved, never-issued values belong here — the kind a standards body or
+# card network set aside precisely so documentation can use them. Never add a
+# value that could plausibly identify a real person or account.
+
 # Test files with fake AWS account IDs
 123456789012
 aws_account_id="123456789012"
+
+# Reserved documentation examples. These appear in tables that document the PII
+# detection patterns themselves, so the scanner matches its own reference material:
+#   docs/governance-framework.md     the regex table for SSN and CREDIT_CARD
+#   runbooks/data-onboarding-agent/03-onboard-build-pipeline.md  the masking table
+123-45-6789
+4111-1111-1111-1111
