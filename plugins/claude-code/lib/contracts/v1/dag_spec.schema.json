@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://adop.internal/contracts/v1/dag_spec.schema.json",
+  "title": "DAG Schedule Spec",
+  "description": "Defines Airflow DAG scheduling, retries, failure handling, and task dependencies.",
+  "type": "object",
+  "required": ["dataset_name", "schema_version", "schedule", "tasks"],
+  "additionalProperties": false,
+  "properties": {
+    "dataset_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,40}$"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "v1"
+    },
+    "dag_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,60}$",
+      "description": "Airflow DAG identifier (defaults to {dataset_name}_pipeline)"
+    },
+    "schedule": {
+      "type": "object",
+      "required": ["cron", "timezone"],
+      "additionalProperties": false,
+      "properties": {
+        "cron": {
+          "type": "string",
+          "minLength": 9,
+          "description": "Cron expression (e.g., '0 6 * * *')"
+        },
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "description": "IANA timezone (e.g., 'US/Eastern')"
+        },
+        "catchup": {
+          "type": "boolean",
+          "default": false
+        },
+        "max_active_runs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 1
+        },
+        "start_date": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    },
+    "retries": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 3
+        },
+        "delay_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 300
+        },
+        "backoff": {
+          "type": "boolean",
+          "default": true
+        },
+        "max_delay_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 3600
+        }
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["task_id", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["glue_job", "quality_check", "sensor", "python_callable", "dummy"]
+          },
+          "script_path": {
+            "type": "string",
+            "description": "Path to the script this task executes"
+          },
+          "depends_on": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+            "default": []
+          },
+          "timeout_minutes": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 60
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "failure_handling": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "on_failure_callback": {
+          "type": "string",
+          "enum": ["sns_alert", "slack_notify", "pagerduty", "email", "none"],
+          "default": "sns_alert"
+        },
+        "notification_channel": {
+          "type": "string"
+        },
+        "escalation_after_minutes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "sla": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "deadline_minutes": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Total pipeline must complete within this many minutes"
+        },
+        "critical_tasks": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "description": "Tasks that trigger SLA breach alerts"
+        }
+      }
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    }
+  }
+}

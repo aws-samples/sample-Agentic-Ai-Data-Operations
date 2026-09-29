@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://adop.internal/contracts/v1/source_profile.schema.json",
+  "title": "Source Profile Spec",
+  "description": "Defines a data source configuration including schema, compliance, and encryption.",
+  "type": "object",
+  "required": ["dataset_name", "version", "source", "schema"],
+  "additionalProperties": false,
+  "properties": {
+    "dataset_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,40}$",
+      "description": "Snake-case workload identifier"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "created_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "compliance": {
+      "type": "string",
+      "enum": ["HIPAA", "GDPR", "CCPA", "SOX", "PCI_DSS", "NONE"]
+    },
+    "source": {
+      "type": "object",
+      "required": ["type", "location", "format", "frequency"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["csv", "parquet", "json", "avro", "jdbc", "kafka", "kinesis"]
+        },
+        "location": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "format": {
+          "type": "string",
+          "enum": ["csv", "parquet", "json", "avro", "orc"]
+        },
+        "frequency": {
+          "type": "string",
+          "enum": ["hourly", "daily", "weekly", "monthly", "streaming", "one_time"]
+        },
+        "credentials": {
+          "type": "object",
+          "required": ["type", "connection_id"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["airflow_connection", "secrets_manager", "iam_role"]
+            },
+            "connection_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "estimated_size": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "rows": { "type": "integer", "minimum": 0 },
+            "size_gb": { "type": "number", "minimum": 0 },
+            "test_rows": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
+    "schema": {
+      "type": "object",
+      "required": ["columns"],
+      "additionalProperties": false,
+      "properties": {
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["name", "type", "role", "nullable"],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["STRING", "INTEGER", "DECIMAL", "DATE", "TIMESTAMP", "BOOLEAN", "ARRAY", "MAP", "BIGINT", "FLOAT", "DOUBLE"]
+              },
+              "description": { "type": "string" },
+              "role": {
+                "type": "string",
+                "enum": ["identifier", "dimension", "measure", "temporal", "metadata"]
+              },
+              "primary_key": { "type": "boolean" },
+              "primary_temporal": { "type": "boolean" },
+              "nullable": { "type": "boolean" },
+              "phi": { "type": "boolean" },
+              "phi_type": {
+                "type": "string",
+                "enum": ["NAME", "DOB", "SSN", "EMAIL", "PHONE", "ADDRESS", "MRN", "ACCOUNT", "IP", "BIOMETRIC", "GENETIC", "PHOTO"]
+              },
+              "sensitivity": {
+                "type": "string",
+                "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+              },
+              "valid_values": {
+                "type": "array",
+                "items": { "type": "string" },
+                "minItems": 1
+              },
+              "decimal_precision": { "type": "integer", "minimum": 1 },
+              "decimal_scale": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    "data_steward": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "owner": { "type": "string" },
+        "domain": { "type": "string" },
+        "sensitivity": { "type": "string" },
+        "contact": { "type": "string", "format": "email" }
+      }
+    },
+    "encryption": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "landing": { "$ref": "#/$defs/encryption_config" },
+        "staging": { "$ref": "#/$defs/encryption_config" },
+        "publish": { "$ref": "#/$defs/encryption_config" },
+        "glue_catalog": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kms_key_alias": { "type": "string", "pattern": "^alias/" }
+          }
+        },
+        "key_rotation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "frequency": { "type": "string", "enum": ["annual", "quarterly", "monthly"] }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "encryption_config": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kms_key_alias": { "type": "string", "pattern": "^alias/" },
+        "algorithm": { "type": "string", "enum": ["AES-256", "AES-128"] },
+        "transport": { "type": "string", "enum": ["TLS_1_3", "TLS_1_2"] }
+      }
+    }
+  }
+}

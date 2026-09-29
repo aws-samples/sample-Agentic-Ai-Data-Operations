@@ -38,6 +38,75 @@
 version: 1
 
 # ---------------------------------------------------------------------------
+# copy — byte-identical vendored code, asserted with cmp
+#
+# The layout under lib/ mirrors the repo's relative structure on purpose.
+# renderer.py resolves TEMPLATES_DIR as __file__.parent.parent.parent/'shared'/
+# 'templates' and spec_loader.py resolves CONTRACTS_DIR the same way, so placing
+# codegen at lib/shared/codegen makes both land correctly with no edits. Every
+# file below is therefore byte-for-byte its source, and a predecessor plugin's
+# approach — rewriting those paths to read ADOP_TEMPLATES_DIR — is what made its
+# copies unverifiable.
+#
+# Proven, not assumed: rendering silver_transform from the same spec and timestamp
+# through lib/ and through shared/ produces byte-identical output.
+# ---------------------------------------------------------------------------
+copy:
+  - target: lib/contracts/README.md
+    source: contracts/README.md
+  - target: lib/contracts/v1/bronze_spec.schema.json
+    source: contracts/v1/bronze_spec.schema.json
+  - target: lib/contracts/v1/dag_spec.schema.json
+    source: contracts/v1/dag_spec.schema.json
+  - target: lib/contracts/v1/gold_spec.schema.json
+    source: contracts/v1/gold_spec.schema.json
+  - target: lib/contracts/v1/quality_spec.schema.json
+    source: contracts/v1/quality_spec.schema.json
+  - target: lib/contracts/v1/run_context.schema.json
+    source: contracts/v1/run_context.schema.json
+  - target: lib/contracts/v1/silver_spec.schema.json
+    source: contracts/v1/silver_spec.schema.json
+  - target: lib/contracts/v1/source_profile.schema.json
+    source: contracts/v1/source_profile.schema.json
+  - target: lib/contracts/v1/workload_manifest.schema.json
+    source: contracts/v1/workload_manifest.schema.json
+  - target: lib/shared/__init__.py
+    source: shared/__init__.py
+  - target: lib/shared/codegen/__init__.py
+    source: shared/codegen/__init__.py
+  - target: lib/shared/codegen/drift_validator.py
+    source: shared/codegen/drift_validator.py
+  - target: lib/shared/codegen/exceptions.py
+    source: shared/codegen/exceptions.py
+  - target: lib/shared/codegen/renderer.py
+    source: shared/codegen/renderer.py
+  - target: lib/shared/codegen/slot_extractor.py
+    source: shared/codegen/slot_extractor.py
+  - target: lib/shared/codegen/spec_loader.py
+    source: shared/codegen/spec_loader.py
+  - target: lib/shared/templates/VERSION
+    source: shared/templates/VERSION
+  - target: lib/shared/templates/__init__.py
+    source: shared/templates/__init__.py
+  - target: lib/shared/templates/account_topology.yaml
+    source: shared/templates/account_topology.yaml
+  - target: lib/shared/templates/agent_output_schema.py
+    source: shared/templates/agent_output_schema.py
+  - target: lib/shared/templates/airflow_dag.py.j2
+    source: shared/templates/airflow_dag.py.j2
+  - target: lib/shared/templates/bronze_ingestion.py.j2
+    source: shared/templates/bronze_ingestion.py.j2
+  - target: lib/shared/templates/glue_job_config.yaml.j2
+    source: shared/templates/glue_job_config.yaml.j2
+  - target: lib/shared/templates/gold_aggregate.py.j2
+    source: shared/templates/gold_aggregate.py.j2
+  - target: lib/shared/templates/iceberg_ddl.sql.j2
+    source: shared/templates/iceberg_ddl.sql.j2
+  - target: lib/shared/templates/quality_check.py.j2
+    source: shared/templates/quality_check.py.j2
+  - target: lib/shared/templates/silver_transform.py.j2
+    source: shared/templates/silver_transform.py.j2
+# ---------------------------------------------------------------------------
 # rewrite — derived from repo sources, paths retargeted
 # ---------------------------------------------------------------------------
 rewrite:
@@ -177,6 +246,14 @@ plugin-only:
   - target: TRANSLATION.yaml
     reason: >-
       this manifest; it describes the derivation and has nothing to derive from
+  - target: scripts/adop_render.py
+    reason: >-
+      entry point the sub-agents reach the vendored renderer through. In a checkout
+      an agent can `import shared.codegen` directly; in a user's repo there is no
+      shared/, so the plugin vendors the engine under lib/ and agents shell out to
+      this script. It exists only because the plugin is installed elsewhere, so it
+      has no repo counterpart to be derived from.
+
   - target: hooks/hooks.json
     reason: >-
       plugin hook wiring. Not derived from .claude/settings.json: the repo's five
