@@ -357,11 +357,23 @@ class AgentTracer:
         phase: Optional[int] = None,
         data_source: str = "",
     ):
-        """Agent presents auto-discovered findings to the user."""
+        """Agent presents auto-discovered findings to the user.
+
+        Renders a width-70 ASCII block the same way log_exchange() does, so the
+        terminal output and the trace payload are byte-identical. `findings` is
+        stored untruncated alongside the rendered art.
+        """
+        from shared.utils.ascii_display import discovery_block
+
+        ascii_art = discovery_block(title, findings)
+        if self.write_to_stdout:
+            print(ascii_art, file=sys.stdout)
+
         payload = {
             "title": title,
             "findings": findings,
             "data_source": data_source,
+            "ascii_display": ascii_art,
         }
         self.conversation_event(
             "discovery_presented", agent_name=agent_name,

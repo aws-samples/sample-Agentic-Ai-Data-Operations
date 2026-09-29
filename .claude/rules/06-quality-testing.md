@@ -20,6 +20,10 @@
 - **Unit tests**: Jest + fast-check for every agent method. Mock external dependencies.
 - **Property-based tests**: Transformation idempotency, lineage completeness, quality monotonicity, schema preservation, Bronze immutability.
 - **Integration tests**: End-to-end Bronze→Silver→Gold pipeline, agent coordination, auth flows.
+  **Sub-agents have no MCP/AWS access**, so an integration test written by a sub-agent means
+  *cross-artifact*, not cross-cloud: source fixture → spec → contract validator → rendered
+  output → run context, asserted to agree. Tests that need live AWS belong to Step 5.9
+  post-deployment verification, which the orchestrator runs.
 - **Coverage target**: 80% minimum.
 - Place in `workloads/{name}/tests/` (workload-specific) or `tests/` (shared infrastructure).
 

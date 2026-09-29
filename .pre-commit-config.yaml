@@ -137,6 +137,16 @@ repos:
         pass_filenames: false
         files: '^contracts/.*\.schema\.json$'
 
+      # Doc/prompt path references. A path the orchestrator Reads that no longer exists fails
+      # silently at read time — the run continues without the content — so nothing else catches
+      # it. Also asserts each regulation is registered in all four places that must agree.
+      - id: doc-links-validator
+        name: validate-doc-and-prompt-paths
+        entry: python scripts/validate_docs_links.py
+        language: python
+        pass_filenames: false
+        files: '\.(md|html)$'
+
       # Drift validator: re-render and check for hand-edits to generated artifacts
       - id: drift-validator
         name: artifact-spec-drift-check

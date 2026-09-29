@@ -169,9 +169,9 @@ seed the topology; downstream prompts will read the same value.
 
 | Prompt | When you're asked |
 |---|---|
-| `prompts/environment-setup-agent/01-setup-aws-infrastructure.md` | Once, when bootstrapping the repo's AWS platform. |
-| `prompts/data-onboarding-agent/03-onboard-build-pipeline.md` | Per workload in the Phase 1 discovery block. |
-| `prompts/devops-agent/iac-generator.md` | When generating IaC, as a Phase 0 question. |
+| `runbooks/environment-setup-agent/01-setup-aws-infrastructure.md` | Once, when bootstrapping the repo's AWS platform. |
+| `runbooks/data-onboarding-agent/03-onboard-build-pipeline.md` | Per workload in the Phase 1 discovery block. |
+| `runbooks/devops-agent/iac-generator.md` | When generating IaC, as a Phase 0 question. |
 
 All three persist into `workloads/{name}/config/deployment.yaml` under an
 `account_topology:` block matching `shared/templates/account_topology.yaml`.

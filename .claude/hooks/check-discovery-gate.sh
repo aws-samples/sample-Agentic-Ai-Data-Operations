@@ -23,7 +23,7 @@ if echo "$FILE" | grep -qE '^workloads/[^/]+/(config|scripts|dags|sql)/'; then
       "hookSpecificOutput": {
         "hookEventName": "PreToolUse",
         "permissionDecision": "deny",
-        "permissionDecisionReason": ("BLOCKED: Phase 1 discovery not complete for workload \"" + $wl + "\". You MUST ask the user about: (1) source details, (2) PK + PII columns, (3) cleaning/transformation rules, (4) quality thresholds, (5) schedule. After user confirms all 5, create workloads/" + $wl + "/.discovery_complete to proceed.")
+        "permissionDecisionReason": ("BLOCKED: Phase 1 discovery not complete for workload \"" + $wl + "\". The user MUST be asked about: (1) source details, (2) PK + PII columns, (3) cleaning/transformation rules, (4) quality thresholds, (5) schedule. The ORCHESTRATOR asks those questions and then creates workloads/" + $wl + "/.discovery_complete. If you are a sub-agent you cannot satisfy this gate — you have no AskUserQuestion tool, so you cannot have asked. Do NOT create the marker to unblock yourself; return status \"blocked\" naming this gate in blocking_issues.")
       }
     }'
     exit 0

@@ -94,7 +94,7 @@ echo "    CSV sources lack explicit PK column."
 echo "    Agent infers from uniqueness but often wrong."
 echo
 echo "  Fix:"
-echo "    Add to prompts/data-onboarding-agent/:"
+echo "    Add to runbooks/data-onboarding-agent/:"
 echo "    'ALWAYS ask user for primary key before profiling CSV sources'"
 echo
 echo "✅ Time Savings:"

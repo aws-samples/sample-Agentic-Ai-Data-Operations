@@ -20,6 +20,7 @@ SPEC_TYPE_TO_SCHEMA = {
     "quality": "quality_spec.schema.json",
     "dag": "dag_spec.schema.json",
     "manifest": "workload_manifest.schema.json",
+    "run_context": "run_context.schema.json",
 }
 
 
@@ -66,7 +67,8 @@ def load_spec(path: Path, spec_type: str, schema_version: str = "v1") -> tuple[d
 
     Args:
         path: Path to the spec YAML or JSON file.
-        spec_type: One of 'source', 'bronze', 'silver', 'gold', 'quality', 'dag', 'manifest'.
+        spec_type: One of 'source', 'bronze', 'silver', 'gold', 'quality', 'dag',
+            'manifest', 'run_context'.
         schema_version: Contract version directory (default 'v1').
 
     Returns:

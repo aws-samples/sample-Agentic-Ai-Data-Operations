@@ -355,7 +355,7 @@ Read pattern?
 | Publish to Neptune SPARQL | **Future — requires AWS Semantic Layer deployment** | |
 | Upload TTL to S3 knowledge-layer bucket | **Future** | |
 
-**Routing rule**: If the user says "generate ontology", "stage ontology for AWS Semantic Layer", "emit OWL", or "onboard to semantic layer", route to the Ontology Staging Agent sub-agent (`prompts/data-onboarding-agent/ontology-staging-agent.md`).
+**Routing rule**: If the user says "generate ontology", "stage ontology for AWS Semantic Layer", "emit OWL", or "onboard to semantic layer", route to the Ontology Staging Agent sub-agent: `Agent(subagent_type="ontology-agent")`, defined in `.claude/agents/ontology-agent.md`.
 
 ---
 

@@ -57,7 +57,21 @@ Ask these using `AskUserQuestion`:
 [ ] Framework: Terraform / AWS CDK (Python) / AWS CDK (TypeScript) / CloudFormation
 [ ] Backend: S3 + DynamoDB (Terraform) / cdk.context.json / S3 (CFN)
 [ ] Apply mode: Manual (generate only) / CI/CD (generate + GitHub Actions workflow)
+[ ] TBAC principals: which role ARNs get Lake Formation access, and at which
+    sensitivity ceiling (NONE / LOW / MEDIUM / HIGH / CRITICAL) per role?
 ```
+
+**TBAC principals cannot be derived.** Knowing which columns hold PII tells you what to
+protect; it does not tell you who is allowed to read it. You are the only party in this flow
+holding `AskUserQuestion`, so ask here — at minimum a Glue service role (typically
+`NONE, LOW, MEDIUM`) and one consumer role (typically `NONE, LOW`). If the user declines to
+name any, stop: an empty list is a blocking issue, and defaulting to the current IAM caller
+would silently grant that caller access to every classification.
+
+Record the answers to Group 1 in `workloads/{name}/run/context.json` under
+`human_answers.iac_target_framework` and `human_answers.iac_tbac_principals` (see
+`contracts/v1/run_context.schema.json`) so the IaC agent reads what the human actually said
+rather than a paraphrase in a prompt string.
 
 ### Group 2 — Monitoring & Alerting
 ```
@@ -144,25 +158,26 @@ if (health && health.includes('NOT_READY')) {
 phase('IaC Generate')
 const buildResults = await parallel([
   // IaC Generator
+  // Delegates to the registered agent rather than restating its rules inline: a second
+  // hand-written IaC prompt here would drift from .claude/agents/iac-agent.md, and the
+  // divergent copy is the one that would actually run.
   () => agent(
-    `You are the IaC Generator for workload: ${WL_NAME}\n` +
-    `Framework: ${FRAMEWORK}\n\n` +
-    `Read the workload config from workloads/${WL_NAME}/config/ and generate IaC for:\n\n` +
-    `AWS Resources to codify:\n` +
-    `1. S3 bucket (or reference existing) with lifecycle policies\n` +
-    `2. Glue Database + Tables (Bronze, Silver, Gold)\n` +
-    `3. Glue Jobs (one per transform script in scripts/transform/)\n` +
-    `4. Glue Data Quality Rulesets\n` +
-    `5. Lake Formation LF-Tags + TBAC grants (based on PII columns in source.yaml)\n` +
-    `6. KMS key (if compliance requires encryption)\n` +
-    `7. IAM roles (Glue execution role, LF admin, data steward, analyst)\n` +
-    `8. MWAA DAG deployment (S3 sync)\n\n` +
-    `Generate the IaC in ${FRAMEWORK} format. Include:\n` +
-    `- Variables/parameters for account_id, region, environment\n` +
-    `- No hardcoded values — all configurable\n` +
-    `- Tagging on every resource (workload, team, environment, cost_center)\n` +
-    `- Output values (table ARNs, role ARNs, bucket paths)\n\n` +
-    `Return the complete IaC code.`,
+    `You are the IaC Generator for workload: ${WL_NAME}, framework: ${FRAMEWORK}.\n\n` +
+    `Read '.claude/agents/iac-agent.md' in full — it is your prompt, including the hard\n` +
+    `scope boundary — then 'runbooks/devops-agent/iac-generator.md' for the resource\n` +
+    `catalog, per-framework file layout, APPLY_GUIDE.md template and Cedar permit shape.\n` +
+    `Follow both. Do not substitute your own plan for theirs.\n\n` +
+    `Inputs: target_framework is '${FRAMEWORK}' (supplied by the human via this command).\n` +
+    `Read tbac_principals from workloads/${WL_NAME}/run/context.json under\n` +
+    `human_answers.iac_tbac_principals. If it is missing or empty, stop and return\n` +
+    `status "blocked" — do NOT derive grants from the PII columns in source.yaml and do\n` +
+    `NOT grant to the current IAM caller.\n\n` +
+    `Write files under workloads/${WL_NAME}/iac/${FRAMEWORK}/ plus\n` +
+    `shared/policies/workloads/${WL_NAME}/permits.cedar. Generation only — no apply, no\n` +
+    `deploy, no AWS calls.\n\n` +
+    `End your final message with a single fenced json block conforming to AgentOutput\n` +
+    `(shared/templates/agent_output_schema.py) with a non-empty decisions array; each\n` +
+    `entry needs alternatives_considered and rejection_reasons.`,
     { model: 'sonnet', label: `iac:${WL_NAME}`, phase: 'IaC Generate' }
   ),
 

@@ -118,8 +118,8 @@ def stage_ontology(
         raise NotImplementedError(
             "AWS Semantic Layer deployment pending. The "
             "`mode='aws_semantic_layer'` branch will be implemented in a "
-            "follow-up prompt (prompts/data-onboarding-agent/"
-            "ontology-publish-agent.md) once the platform's Neptune cluster, "
+            "follow-up ontology-publish-agent runbook (not yet written) once "
+            "the platform's Neptune cluster, "
             "DynamoDB version table, S3 knowledge-layer bucket, and SNS "
             "steward topic exist. For now, commit the local TTL files "
             "emitted by `mode='local'` and hand them off to the Data "

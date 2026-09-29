@@ -25,7 +25,8 @@ This is a human-in-the-loop gate. The HUMAN provides the rules. The agent does N
 **Always ask regardless of zone:**
 1. **PII/compliance** → which columns are PII? GDPR/CCPA/HIPAA/SOX/PCI?
 2. **Quality** → thresholds per dimension, critical vs warning rules
-3. **Scheduling** → cron expression, dependencies, failure handling
+3. **Scheduling** → cron expression, **IANA timezone** (`dag_spec.schedule.timezone` is
+   required — never infer it), dependencies, failure handling
 
 **Auto-discover first** (schema, format, nulls, row count) — then ask only what you couldn't discover. Present findings before questions.
 
@@ -37,7 +38,7 @@ This is a human-in-the-loop gate. The HUMAN provides the rules. The agent does N
 [ ] Transformation rules confirmed by user (derived columns, calculations, custom logic — NEVER skip this even if you think "none needed")
 [ ] PII columns and compliance requirements confirmed by user
 [ ] Quality thresholds explicitly stated (or user says "use defaults")
-[ ] Schedule explicitly stated by user
+[ ] Schedule + timezone explicitly stated by user
 [ ] Ontology collection preference confirmed (opt-in/opt-out for semantic layer enrichment via Ontology agent)
 [ ] If ontology YES: use cases + consumers confirmed (NL→SQL, discovery, BI, ML, compliance — who uses it?)
 ```
@@ -98,6 +99,7 @@ workloads/{name}/
 ├── dags/      # {name}_dag.py
 ├── sql/       # bronze/, silver/, gold/
 ├── tests/     # unit/, integration/
+├── run/       # context.json (shared run state), decisions.jsonl (append-only)
 ├── logs/      # Pipeline execution traces (trace_events.jsonl, run_*/)
 └── README.md
 

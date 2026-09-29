@@ -26,6 +26,27 @@ The Phase 1 discovery gate is the most important rule in this project. The HUMAN
 - ANY change to quality thresholds
 - ANY change to scheduling
 
+## The gate is also a hook — and sub-agents cannot satisfy it
+
+`.claude/hooks/check-discovery-gate.sh` denies any `Write`/`Edit` under
+`workloads/{name}/{config,scripts,dags,sql}/` for a workload that has neither
+`config/source.yaml` nor a `.discovery_complete` marker.
+
+Its deny message ends with "create `workloads/{name}/.discovery_complete` to proceed". **That
+instruction is addressed to the orchestrator**, which is the only party holding
+`AskUserQuestion` and therefore the only party that can have asked the five questions. Every
+sub-agent is launched without `AskUserQuestion` (the harness strips it regardless of
+frontmatter), so a sub-agent that creates the marker is asserting a human conversation that
+never happened.
+
+If you are a sub-agent and this hook denies your write:
+
+- **Do NOT create `.discovery_complete`.** Creating it converts a guardrail into a no-op for
+  every later write in the workload.
+- Return `status: "blocked"` with the gate named in `blocking_issues`.
+- Existing answers in `run/context.json` are **not** a substitute. They may be complete, but
+  the marker records that the orchestrator verified them — that is the orchestrator's call.
+
 ## When the gate does NOT apply
 
 - Fixing a bug the user described (user already stated what to change)

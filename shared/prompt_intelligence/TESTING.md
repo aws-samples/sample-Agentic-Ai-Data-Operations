@@ -134,10 +134,10 @@ Open the prompt file and add the suggested patch:
 
 ```bash
 # Option 1: Manual edit
-code prompts/data-onboarding-agent/03-onboard-build-pipeline.md
+code runbooks/data-onboarding-agent/03-onboard-build-pipeline.md
 
 # Option 2: Automated (for testing)
-cat >> prompts/data-onboarding-agent/03-onboard-build-pipeline.md << 'PATCH'
+cat >> runbooks/data-onboarding-agent/03-onboard-build-pipeline.md << 'PATCH'
 
 ## Phase 1: Discovery - Primary Key Detection
 

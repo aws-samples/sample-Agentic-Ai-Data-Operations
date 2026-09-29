@@ -75,24 +75,28 @@ MAIN CONVERSATION
 
 ### Sub-Agent Output Format (MANDATORY)
 
-Every sub-agent MUST return its result by calling the `submit_agent_output` tool.
-Do NOT write a markdown response — call the tool with a JSON payload.
+Every sub-agent MUST end its final message with a single fenced ```json block conforming to
+`AgentOutput`. Prose before the block is fine — the block is what gets parsed.
 
-The orchestrator reads your output via `AgentOutput.from_bedrock_tool_call()` — if you
-respond in plain text or markdown, the orchestrator cannot parse your output and will
-treat it as a failure.
+The orchestrator reads your output via `AgentOutput.from_agent_message()`. If the final
+message contains no JSON object, or the object is missing a required field, parsing raises and
+the orchestrator treats the step as a failure. If you include an example block earlier in the
+message, the **last** block wins.
+
+(Bedrock `converse()` callers instead force a `submit_agent_output` tool call via
+`SUBMIT_OUTPUT_TOOL` and parse with `from_bedrock_tool_call()`. Both paths share one
+required-field set — `REQUIRED_OUTPUT_FIELDS` — so the schema below applies unchanged.)
 
 **Schema**: `shared/templates/agent_output_schema.py` — `AgentOutput` dataclass + `SUBMIT_OUTPUT_TOOL` dict.
 
-**Required fields** (tool call will fail without these):
+**Required fields** (parsing fails without these):
 - `agent_name`, `agent_type`, `workload_name`, `run_id`, `started_at`, `completed_at`, `status`
 - `artifacts`: list of `{path, type, checksum}` for every file you created
 - `blocking_issues`: empty list `[]` if none — required even when empty
 - `tests`: `{unit: {passed, failed, total}, integration: {passed, failed, total}}`
+- `decisions`: **at least one** — an empty array is rejected, same as omitting the key
 
-**Optional but valuable fields:**
-
-`decisions` — cognitive trace (MANDATORY for audit trails):
+`decisions` — cognitive trace:
 Document every non-trivial choice you make. Each decision:
 - `decision_id`: auto-incremented via `add_decision()` helper
 - `category`: schema_inference | rule_selection | transformation_choice | format_selection | partition_strategy
@@ -107,6 +111,8 @@ Example decisions by agent type:
 - Transformation Agent: cleaning approach, null handling strategy, type casting, Gold format
 - Quality Agent: threshold selection, rule priority, anomaly detection config
 - DAG Agent: task grouping, retry strategy, dependency ordering, parallelism
+
+**Optional but valuable fields:**
 
 `memory_hints` — durable facts the system should remember for future runs:
 Each hint: `{type, content}` where type is one of: `user` (preferences), `feedback` (corrections),
@@ -139,27 +145,55 @@ All sub-agents must produce deterministic output — same inputs always produce 
    # Input hash: {input_hash}
    ```
 
-### Run Context (passed to every sub-agent)
+### Run Context (on disk, read by every sub-agent)
 
-The orchestrator passes this context when spawning each sub-agent:
+Run context is **a file, not a prompt block**. Sub-agents get a fresh context window, so a
+retyped prompt is a paraphrase — the file is the source of truth.
 
-```yaml
-run_context:
-  run_id: "uuid-v4"
-  workload_name: "customer_master"
-  started_at: "2026-03-18T10:30:00Z"
-  template_version: "1.0.0"
-  input_hash: "abc123..."
-  random_seed: 42
-  timestamp_mode: "fixed"  # Use started_at, not current time
-  previous_phases:
-    - phase: 3
-      agent: "metadata"
-      output_hash: "def456..."
-      status: "success"
+The orchestrator writes `workloads/{name}/run/context.json` **once at the end of Phase 2**,
+validated against `contracts/v1/run_context.schema.json`, then treats it as read-only:
+
+```json
+{
+  "schema_version": "v1",
+  "run_id": "uuid-v4",
+  "workload_name": "customer_master",
+  "started_at": "2026-03-18T10:30:00Z",
+  "template_version": "1.0.0",
+  "input_hash": "abc123...",
+  "random_seed": 42,
+  "timestamp_mode": "fixed",
+  "human_answers": {
+    "zones": ["silver"],
+    "recorded_at": "2026-03-18T10:25:00Z",
+    "primary_key": ["customer_id"],
+    "dedup_strategy": "keep latest by updated_at, drop the rest",
+    "null_handling": "quarantine rows with null customer_id",
+    "transformations": "none beyond type casts and PII masking",
+    "pii_columns": ["email", "phone"],
+    "quality_thresholds": {"silver": 0.80},
+    "schedule": "0 2 * * *"
+  },
+  "previous_phases": [
+    {"phase": 3, "agent": "metadata", "output_hash": "def456...", "status": "success"}
+  ]
+}
 ```
 
-Sub-agents MUST include `run_id` in all generated artifacts and validate `previous_phases` checksums before proceeding.
+Load it with `shared.codegen.spec_loader.load_spec(path, "run_context")`.
+
+Rules for sub-agents:
+
+- **`human_answers` outranks your prompt.** It records the Phase 1 gate answers verbatim. If a
+  value in your prompt disagrees, the file wins.
+- Include `run_id` in every generated artifact.
+- Validate `previous_phases` checksums before trusting upstream artifacts.
+- Append your decisions to `run/decisions.jsonl` (append-only) before returning, so later
+  agents can read your reasoning instead of having it re-summarized.
+
+`dedup_strategy` and `null_handling` live here specifically because Transformation (4.3) and
+Quality (4.4) may run in parallel and both depend on them. They are the human's answers from
+the Phase 1 gate — not an agent's inference — so the two agents need no mid-run coordination.
 
 ### Folder Convention
 
@@ -379,7 +413,7 @@ Output:
 ```
 
 If critical resources are missing (IAM role, S3 bucket, Glue DBs), tell the human:
-"Environment not fully set up. Run `prompts/00-setup-environment.md` first."
+"Environment not fully set up. Run `runbooks/environment-setup-agent/01-setup-aws-infrastructure.md` first."
 
 ### Step 0.2: MCP Health Check + Endpoint Inventory
 
@@ -419,13 +453,13 @@ Result: {N}/13 servers connected | Mode: {LOCAL/GATEWAY}
 - WARN servers → proceed with CLI fallback, log: `Warning: MCP fallback — {server} not loaded. Using CLI.`
 - OPTIONAL servers → proceed silently, features deferred
 - Slow-startup servers (`core`, `pii-detection`, `sagemaker-catalog`) may timeout on `claude mcp list` — test with a simple call to confirm
-- If Gateway mode selected but Gateway not deployed → prompt user to run `prompts/09` first, or fall back to Local mode
+- If Gateway mode selected but Gateway not deployed → prompt user to run `runbooks/09` first, or fall back to Local mode
 - Store health check results for the session — Phase 5 can reuse them instead of re-running
 
 ### Phase 0 Gate
 
 Both Step 0.1 and Step 0.2 must complete before proceeding:
-- If critical AWS resources missing → direct to `prompts/00-setup-environment.md`
+- If critical AWS resources missing → direct to `runbooks/environment-setup-agent/01-setup-aws-infrastructure.md`
 - If REQUIRED MCP servers down → troubleshoot or switch modes before continuing
 - If all checks pass → proceed to Phase 1
 
@@ -916,12 +950,12 @@ Ask these in order. Each category serves a different agent/layer — do NOT mix 
    >   - **Audit logging** — all access logged to CloudTrail
    >   - **Encryption** — zone-specific KMS keys, re-encrypt at boundaries"
 
-   If the user selects a regulation, load the corresponding prompt from `prompts/data-onboarding-agent/regulation/`:
-   - **GDPR** → `prompts/data-onboarding-agent/regulation/gdpr.md`
-   - **CCPA** → `prompts/data-onboarding-agent/regulation/ccpa.md`
-   - **HIPAA** → `prompts/data-onboarding-agent/regulation/hipaa.md`
-   - **SOX** → `prompts/data-onboarding-agent/regulation/sox.md`
-   - **PCI DSS** → `prompts/data-onboarding-agent/regulation/pci-dss.md`
+   If the user selects a regulation, load the corresponding prompt from `runbooks/data-onboarding-agent/regulation/`:
+   - **GDPR** → `runbooks/data-onboarding-agent/regulation/gdpr.md`
+   - **CCPA** → `runbooks/data-onboarding-agent/regulation/ccpa.md`
+   - **HIPAA** → `runbooks/data-onboarding-agent/regulation/hipaa.md`
+   - **SOX** → `runbooks/data-onboarding-agent/regulation/sox.md`
+   - **PCI DSS** → `runbooks/data-onboarding-agent/regulation/pci-dss.md`
 
    These prompts are **MANDATORY** when selected — apply ALL controls listed.
    They are **NOT loaded by default** — only when explicitly requested.
@@ -1088,12 +1122,11 @@ Before building any pipeline logic, profile the actual data using a **5% sample*
 
 ```
 Agent(
-  subagent_type="general-purpose",
+  subagent_type="metadata-agent",
   description="Profile source data",
   prompt="""
-    You are the Metadata Agent. See SKILLS.md for your full prompt.
-
     Workload: {workload_name}
+    Run context: workloads/{workload_name}/run/context.json  ← read this first
     Source: {source_details from Phase 1}
 
     Tasks:
@@ -1207,12 +1240,11 @@ workloads/{workload_name}/
 
 ```
 Agent(
-  subagent_type="general-purpose",
+  subagent_type="metadata-agent",
   description="Formalize metadata and register catalog",
   prompt="""
-    You are the Metadata Agent. See SKILLS.md for your full prompt.
-
     Workload: {workload_name}
+    Run context: workloads/{workload_name}/run/context.json  ← read this first
     Profiling results: workloads/{workload_name}/config/source.yaml
     Human-confirmed columns: {confirmed column roles, PK, dimensions, measures}
     Human-confirmed PII: {confirmed PII/PHI/PCI classifications}
@@ -1268,21 +1300,17 @@ This runs asynchronously — it does not block proceeding to the next sub-agent.
 
 ```
 Agent(
-  subagent_type="general-purpose",
+  subagent_type="transformation-agent",
   description="Generate transformation scripts",
   prompt="""
-    You are the Transformation Agent. See SKILLS.md for your full prompt.
-
     Workload: {workload_name}
+    Run context: workloads/{workload_name}/run/context.json  ← read this first;
+      human_answers.dedup_strategy and human_answers.null_handling are authoritative
     Schema: workloads/{workload_name}/config/source.yaml
     Human-confirmed column roles: {measures, dimensions, temporal, identifiers from semantic.yaml}
     Publish zone format: {flat_iceberg | star_schema | star_schema_with_views} (from Phase 1 discovery)
     PII masking decisions: {user-confirmed PII columns and their masking method: hash/mask/leave/drop}
     Additional transforms: {any extra rules the user specified beyond defaults, or "none"}
-
-    EXECUTION MODEL: All scripts MUST target AWS Glue ETL (PySpark + GlueContext + Iceberg).
-    Each script MUST also support --local mode (pandas fallback for dev/testing).
-    Use try/except ImportError to detect runtime. See SKILLS.md Script Generation section for template.
 
     Default transforms (apply ALL of these automatically — do NOT ask):
     - Deduplication on PK (keep first)
@@ -1306,8 +1334,8 @@ Agent(
 
     Tasks:
     1. Generate transformations.yaml config with default rules + PII masking + any additional rules
-    2. Generate Landing→Staging Glue ETL script (PySpark + --local pandas fallback + lineage)
-    3. Generate Staging→Publish Glue ETL script (PySpark + --local pandas fallback + lineage)
+    2. Render Landing→Staging Glue ETL script via the codegen renderer (template_id: silver_transform)
+    3. Render Staging→Publish Glue ETL script via the codegen renderer (template_id: gold_aggregate)
     4. Generate SQL DDL for each zone (tables under landing_db, staging_db, publish_db)
 
     Encryption:
@@ -1379,12 +1407,12 @@ After sub-agent returns, run:
 
 ```
 Agent(
-  subagent_type="general-purpose",
+  subagent_type="quality-agent",
   description="Generate quality rules and check scripts",
   prompt="""
-    You are the Quality Agent. See SKILLS.md for your full prompt.
-
     Workload: {workload_name}
+    Run context: workloads/{workload_name}/run/context.json  ← read this first;
+      human_answers.null_handling and human_answers.quality_thresholds are authoritative
     Schema: workloads/{workload_name}/config/source.yaml
     Profiling baselines: {null rates, distinct counts, value ranges from Phase 3}
     PII classifications: {from Metadata Agent}
@@ -1483,12 +1511,12 @@ After sub-agent returns, run:
 
 ```
 Agent(
-  subagent_type="general-purpose",
+  subagent_type="dag-agent",
   description="Generate Airflow DAG",
   prompt="""
-    You are the Orchestration DAG Agent. See SKILLS.md for your full prompt.
-
     Workload: {workload_name}
+    Run context: workloads/{workload_name}/run/context.json  ← read this first;
+      human_answers.schedule is authoritative
     Scripts:
     - Extract: workloads/{workload_name}/scripts/extract/
     - Transform: workloads/{workload_name}/scripts/transform/
@@ -1500,7 +1528,7 @@ Agent(
 
     Tasks:
     1. Check shared/operators/ and shared/hooks/ for reusable components
-    2. Generate Airflow DAG file following the template in SKILLS.md
+    2. Render the DAG via the codegen renderer (template_id: airflow_dag)
     3. Wire task dependencies: extract → transform_b2s → quality_silver → transform_s2g → quality_gold → catalog
     4. Configure scheduling, retries, alerts, SLA
     5. Add cross-DAG sensors if dependencies exist
@@ -1917,374 +1945,46 @@ Warning: MCP fallback — {mcp_server} not loaded for {operation}. Using CLI.
 ## Skill: Metadata Agent — SUB-AGENT (spawned by Data Onboarding Agent)
 
 **Trigger**: Spawned by Data Onboarding Agent during Phase 3 (profiling) and Phase 4 Step 4.2 (formalize metadata).
-**Purpose**: Capture and manage metadata from data sources; register in the SageMaker SageMaker Catalog.
-**Execution**: Runs as a sub-agent via the `Agent` tool. Receives workload context from the orchestrator. Returns artifacts + writes tests.
+**Purpose**: Capture and manage metadata from data sources; register in the SageMaker Catalog.
+**Execution**: Runs as a sub-agent via `Agent(subagent_type="metadata-agent", ...)`. Returns artifacts + writes tests.
 
-### Prompt
+**Prompt**: `.claude/agents/metadata-agent.md` — loaded automatically at spawn. The
+orchestrator supplies only workload-specific context (source details, confirmed column roles,
+confirmed PII) plus the path to `run/context.json`. Do NOT paste the agent's prompt into the
+spawn call, and do NOT tell it to read this file.
 
-```
-You are the Metadata Agent. You extract, infer, classify, and catalog metadata for data sources across all zones.
-
-IMPORTANT: You are running as a SUB-AGENT. You must:
-1. Write all output artifacts to the workload folder paths specified in your task.
-2. Write unit tests to workloads/{workload_name}/tests/unit/test_metadata.py
-3. Write integration tests to workloads/{workload_name}/tests/integration/test_metadata.py
-4. Run all tests before returning. Report pass/fail counts in your response.
-5. If tests fail, fix the issue and re-run. Do NOT return with failing tests.
-6. Do NOT execute AWS operations (S3 uploads, Glue API calls, catalog registration). You do not have MCP access. Generate scripts and configs only — the main conversation will deploy via MCP.
-
-## Capabilities
-
-1. **Metadata Extraction**: Connect to data sources and extract structural metadata (tables, columns, types, constraints).
-2. **Schema Inference**: Analyze raw data to infer schema — field names, types, nullability, statistics (min, max, cardinality, distribution).
-3. **Data Classification**: Detect and flag sensitive data:
-   - PII: names, emails, SSNs, phone numbers, addresses, dates of birth
-   - PHI: medical record numbers, diagnosis codes, insurance IDs
-   - PCI: credit card numbers, CVVs, expiration dates
-   - Assign confidence scores to each classification.
-4. **Catalog Registration**: Register datasets in the SageMaker Catalog with schema, source, classifications, and tags.
-5. **Lineage Tracking**: Record source→target relationships with transformation details for every data movement.
-6. **Relationship Discovery**: Analyze field names and value distributions to suggest primary/foreign key relationships between datasets.
-
-## Workflow
-
-1. Receive data source connection info from the Data Onboarding Agent.
-2. Connect to source and extract raw metadata.
-3. Infer schema from a data sample (first 10,000 rows or configurable).
-4. Run classification patterns against all string/text fields.
-5. Store results in:
-   - `workloads/{name}/config/source.yaml` — source metadata
-   - SageMaker Catalog — formal registration
-   - SageMaker Catalog (custom metadata columns) — relationships and business context
-6. Return metadata summary to the calling agent.
-
-## Output Artifacts
-
-- Schema definition (YAML or JSON)
-- Classification report (field-level PII/PHI/PCI flags with confidence)
-- Relationship suggestions (candidate foreign keys)
-- Lineage record (source → bronze dataset mapping)
-
-## Security Rules
-
-- NEVER log or print actual data values for classified fields — only metadata.
-- NEVER store raw credentials — reference secret manager ARNs.
-- ALWAYS encrypt metadata at rest if it references PII/PHI/PCI field names.
-- When detecting PII/PHI/PCI, flag the field AND recommend masking/encryption strategies.
-
-## Reuse
-
-- Before creating new schema definitions, check `workloads/*/config/source.yaml` for existing schemas from the same source.
-- Use `shared/utils/schema_utils.py` for schema inference if it exists.
-```
+**Output artifacts**: schema definition, field-level PII/PHI/PCI classification report with
+confidence scores, candidate FK relationships, lineage record (source → Bronze).
 
 ---
 
 ## Skill: Transformation Agent — SUB-AGENT (spawned by Data Onboarding Agent)
 
 **Trigger**: Spawned by Data Onboarding Agent during Phase 4 Step 4.3.
-**Purpose**: Handle all data transformations between zones using **AWS Glue ETL (PySpark + Iceberg)** with **Glue Data Lineage enabled**.
-**Execution**: Runs as a sub-agent via the `Agent` tool. Receives schema + transformation rules from orchestrator. Returns Glue ETL scripts + tests.
-**Runtime**: Scripts ALWAYS target AWS Glue ETL (PySpark with GlueContext). Lineage is captured automatically by Glue's native Data Lineage feature (`--enable-data-lineage: true`).
+**Purpose**: Produce Bronze/Silver/Gold transform specs and render **AWS Glue ETL (PySpark + Iceberg)** scripts through the deterministic codegen renderer, with **Glue Data Lineage enabled**.
+**Execution**: Runs as a sub-agent, `subagent_type="transformation-agent"`. Returns rendered Glue ETL scripts + tests.
+**Runtime**: Scripts ALWAYS target AWS Glue ETL (PySpark with GlueContext). There is no local/pandas fallback mode. Lineage is captured by Glue's native Data Lineage feature (`--enable-data-lineage: true`).
 
-### Prompt
+**Prompt**: `.claude/agents/transformation-agent.md` — loaded automatically at spawn. It
+carries the Landing→Staging / Staging→Publish rules, the codegen contract, the lineage
+requirements, and the schema-evolution rules. The orchestrator supplies only
+workload-specific context plus the path to `run/context.json`. Do NOT paste the agent's
+prompt into the spawn call.
 
-```
-You are the Transformation Agent. You generate AWS Glue ETL jobs (PySpark + Iceberg) for data movement across Landing → Staging → Publish zones.
+**Reads authoritatively from `run/context.json#human_answers`**: `dedup_strategy` and
+`null_handling`. Step 4.3 and Step 4.4 may run in parallel and both read these two values, so
+neither agent infers them and neither needs to coordinate with the other.
 
-IMPORTANT: You are running as a SUB-AGENT. You must:
-1. Write all output artifacts to the workload folder paths specified in your task.
-2. Write unit tests to workloads/{workload_name}/tests/unit/test_transformations.py
-3. Write integration tests to workloads/{workload_name}/tests/integration/test_transformations.py
-4. Run all tests before returning. Report pass/fail counts in your response.
-5. If tests fail, fix the issue and re-run. Do NOT return with failing tests.
-6. Do NOT execute AWS operations (S3 uploads, Glue API calls, catalog registration). You do not have MCP access. Generate scripts and configs only — the main conversation will deploy via MCP.
-7. ALWAYS include ScriptTracer in every generated script for observability (see TRACING below).
+**Output artifacts**: `config/transformations.yaml`, rendered
+`scripts/transform/landing_to_staging.py` and `staging_to_publish.py`, zone DDL under
+`sql/landing/`, `sql/staging/`, `sql/publish/`.
 
-TRACING — REQUIRED IN ALL SCRIPTS:
-Every generated script MUST include ScriptTracer for observability. Add this pattern:
+**Return contract**: end the final message with one fenced ```json block conforming to
+`AgentOutput`, including a populated `decisions` array (reasoning + alternatives considered)
+and per-artifact SHA-256 checksums. The orchestrator parses it with
+`AgentOutput.from_agent_message()`; a message with no JSON object is a failure. Decisions are
+also appended to `run/decisions.jsonl` so later agents can read them.
 
-```python
-# At top of script (after imports)
-from pathlib import Path
-import sys
-SCRIPT_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
-from shared.utils.script_tracer import ScriptTracer
-
-# In main function
-def transform(tracer=None):
-    if tracer is None:
-        tracer = ScriptTracer.for_script(__file__)
-    
-    tracer.log_start(rows_in=input_count, source=source_path)
-    
-    # After each transformation step:
-    tracer.log_transform("deduplicate", duplicates_removed=dup_count)
-    tracer.log_transform("type_casting", columns_cast=["col1", "col2"])
-    tracer.log_quality_check("validation", passed=(invalid_count == 0), invalid_count=invalid_count)
-    
-    # At end:
-    tracer.log_rows(rows_in=input_count, rows_out=output_count, quarantined=quarantine_count)
-    tracer.log_complete(status="success", rows_out=output_count)
-    tracer.close()
-
-# In __main__ block
-if __name__ == "__main__":
-    with ScriptTracer.for_script(__file__) as tracer:
-        transform(tracer=tracer)
-```
-
-This enables full pipeline observability — every transformation step is traced to workloads/{name}/logs/.
-
-EXECUTION MODEL — ALWAYS GLUE ETL:
-- Scripts MUST target AWS Glue ETL runtime (PySpark with GlueContext, DynamicFrame, Iceberg catalog)
-- Scripts ALWAYS run on AWS Glue — there is NO local/pandas fallback mode
-- Read from Glue Data Catalog: glue_context.create_dynamic_frame.from_catalog()
-- Write to Iceberg tables via Glue Catalog: df.writeTo("glue_catalog.db.table").using("iceberg")
-- Tests verify script structure, transformation logic, and schema — they do NOT execute the Glue job
-
-LINEAGE — GLUE DATA LINEAGE (native, automatic):
-- EVERY Glue ETL job MUST have `--enable-data-lineage: true` in job parameters
-- Glue Data Lineage automatically captures:
-  - Table-level lineage: source table → target table
-  - Column-level lineage: source column → target column (including derived columns)
-  - Job metadata: job name, run ID, duration, status
-  - DynamicFrame transform tracking: ApplyMapping, ResolveChoice, etc.
-  - Iceberg snapshot IDs (links lineage to table versions)
-- Viewable in Glue Console → table → Lineage tab
-- NO custom lineage JSON needed — Glue handles it natively
-- To maximize lineage accuracy:
-  - ALWAYS read via Glue Catalog (not raw S3 paths)
-  - ALWAYS write via Glue Catalog (not raw S3 save)
-  - Use DynamicFrames or Spark DataFrames with Glue catalog integration
-
-## Capabilities
-
-- **Multi-account support**: If `workloads/{name}/config/deployment.yaml#account_topology.mode == "multi"`, the generated PySpark scripts MUST:
-  - Accept `--catalog_account_id` as a job argument.
-  - Before any `spark.read`/`spark.table` against `glue_catalog.*`, run:
-    `spark.conf.set("spark.sql.catalog.glue_catalog.glue.id", args["catalog_account_id"])`.
-  - Document the requirement at the top of the script with a comment pointing to `docs/multi-account-deployment.md`.
-  In single-account mode, omit both. The difference between the two emitted scripts MUST be only the two lines above plus the `getResolvedOptions` entry.
-
-### Landing → Staging (Cleaning & Normalization → Iceberg Tables)
-
-**Default rules (always applied):**
-- Deduplication on PK (keep first occurrence)
-- Type casting: String → proper types (INT, DECIMAL, DATE) based on profiling
-- Null handling: keep nulls for optional columns; quarantine rows with null PKs
-- Date validation: quarantine records with future dates (> today + 1 day)
-- FK validation: quarantine orphan FK values (log count, write to quarantine table)
-- Formula verification: recalculate derived columns, quarantine mismatches > 1% tolerance
-- Trim & normalize: strip whitespace, normalize case on categorical columns
-- Schema enforcement: drop unexpected columns, error on missing required columns
-- Handle schema evolution (new fields, removed fields, type changes)
-
-**PII masking (per user's choices):**
-- Hash (SHA-256), mask (partial redaction), leave as-is, or drop — per column
-
-**Write cleaned data as Apache Iceberg tables on Amazon S3 Tables**
-- Partition by business dimensions (e.g., region, date)
-- Register the Iceberg table in Glue Data Catalog (staging_db)
-- Enable time-travel snapshots for auditability
-- Encrypt with alias/staging-data-key (re-encrypt from Landing zone key)
-
-### Staging → Publish (Curated Tables — format based on discovery answers)
-- Retrieve column roles from SageMaker Catalog custom metadata
-- Build Publish tables in the format chosen during Phase 1 discovery:
-  - **Flat Iceberg table**: single denormalized table for simple analytics
-  - **Star schema in Iceberg**: fact table + dimension tables for BI
-  - **Iceberg + materialized views**: pre-aggregated views for dashboards
-- Apply aggregations grouped by dimensions (time, region, category)
-- Build SCD Type 2 tables for slowly changing dimensions (if star schema)
-- Register Publish Iceberg tables in Glue Data Catalog (publish_db)
-- Partition based on query patterns (time + business dimensions)
-- Encrypt with alias/publish-data-key (re-encrypt from Staging zone key)
-
-## Transformation Rule Format
-
-All rules should be defined in `workloads/{name}/config/transformations.yaml`:
-
-```yaml
-encryption:
-  landing_kms_key: "alias/landing-data-key"
-  staging_kms_key: "alias/staging-data-key"
-  publish_kms_key: "alias/publish-data-key"
-
-landing_to_staging:
-  # Default rules (always applied automatically):
-  deduplication:
-    keys: ["id"]
-    strategy: "keep_first"
-  type_casting:
-    infer_from_profiling: true
-  null_handling:
-    pk_columns: "quarantine"    # null PKs go to quarantine
-    optional_columns: "keep"     # keep nulls as-is
-  date_validation:
-    quarantine_future: true      # dates > today + 1 day
-  fk_validation:
-    quarantine_orphans: true     # orphan FKs go to quarantine
-  formula_verification:
-    tolerance_pct: 1.0           # quarantine if > 1% mismatch
-  trim_normalize:
-    strip_whitespace: true
-    normalize_case_categoricals: true
-  schema_enforcement:
-    mode: "strict"               # strict | lenient | evolve
-    on_mismatch: "quarantine"    # quarantine | drop | fail
-  # PII masking (from user confirmation):
-  pii_masking:
-    - field: "email"
-      method: "hash"             # hash | mask | leave | drop
-    - field: "phone"
-      method: "mask"
-  # Additional cleaning (from user, if any):
-  cleaning_rules:
-    - field: "created_at"
-      operations: ["parse_date", "standardize_timezone:UTC"]
-  output:
-    iceberg_properties:
-      format_version: 2
-      write.metadata.compression-codec: "gzip"
-      write.parquet.compression-codec: "zstd"
-
-staging_to_publish:
-  publish_format: "star_schema"  # flat_iceberg | star_schema | star_schema_with_views — from Phase 1 discovery
-  fact_table:
-    name: "sales_fact"
-    partition_by: ["region", "month(order_date)"]
-  dimension_tables:
-    - name: "dim_customer"
-      source_columns: ["customer_id", "customer_name"]
-      scd_type: 1  # 1 = overwrite latest, 2 = track history
-    - name: "dim_product"
-      source_columns: ["product_name", "product_category"]
-    - name: "dim_region"
-      source_columns: ["region"]
-    - name: "dim_date"
-      generated: true  # auto-generate date dimension from order_date range
-  output:
-    iceberg_properties:
-      format_version: 2
-      write.metadata.compression-codec: "gzip"
-      write.parquet.compression-codec: "zstd"
-```
-
-## Script Generation
-
-When generating transformation scripts, place them in:
-- `workloads/{name}/scripts/transform/landing_to_staging.py` — AWS Glue ETL PySpark job
-- `workloads/{name}/scripts/transform/staging_to_publish.py` — AWS Glue ETL PySpark job
-
-Scripts ALWAYS run on AWS Glue. There is NO local/pandas fallback mode.
-
-Script structure:
-```python
-import sys
-from awsglue.transforms import *
-from awsglue.utils import getResolvedOptions
-from awsglue.context import GlueContext
-from awsglue.job import Job
-from pyspark.context import SparkContext
-from pyspark.sql import functions as F
-
-args = getResolvedOptions(sys.argv, [
-    "JOB_NAME", "source_database", "source_table",
-    "target_database", "target_table", "target_s3_path",
-])
-
-sc = SparkContext()
-glue_context = GlueContext(sc)
-spark = glue_context.spark_session
-job = Job(glue_context)
-job.init(args["JOB_NAME"], args)
-
-# Configure Iceberg catalog
-spark.conf.set("spark.sql.catalog.glue_catalog", "org.apache.iceberg.spark.SparkCatalog")
-spark.conf.set("spark.sql.catalog.glue_catalog.warehouse", args["target_s3_path"])
-spark.conf.set("spark.sql.catalog.glue_catalog.catalog-impl", "org.apache.iceberg.aws.glue.GlueCatalog")
-spark.conf.set("spark.sql.catalog.glue_catalog.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
-
-# Read from Glue Catalog (required for lineage tracking)
-source_dyf = glue_context.create_dynamic_frame.from_catalog(
-    database=args["source_database"],
-    table_name=args["source_table"],
-    transformation_ctx="source_data",  # Required for lineage
-)
-df = source_dyf.toDF()
-
-# ... transformation logic (PySpark) ...
-
-# Write as Iceberg table via Glue Catalog (required for lineage tracking)
-df.writeTo(f"glue_catalog.{args['target_database']}.{args['target_table']}") \
-  .using("iceberg") \
-  .tableProperty("format-version", "2") \
-  .createOrReplace()
-
-job.commit()
-```
-
-**Glue Job Parameters** (MUST include for every job):
-```json
-{
-  "--enable-data-lineage": "true",
-  "--enable-glue-datacatalog": "true",
-  "--conf": "spark.sql.catalog.glue_catalog=org.apache.iceberg.spark.SparkCatalog",
-  "--source_database": "demo_ai_agents",
-  "--source_table": "bronze_product_inventory",
-  "--target_database": "demo_ai_agents",
-  "--target_table": "silver_product_inventory",
-  "--target_s3_path": "s3://bucket/silver/product_inventory/"
-}
-```
-
-SQL DDL goes in (tables under shared zone databases — see `prompts/environment-setup-agent/sql/create_zone_databases.sql`):
-- `workloads/{name}/sql/landing/` — tables under `landing_db`
-- `workloads/{name}/sql/staging/` — tables under `staging_db`
-- `workloads/{name}/sql/publish/` — tables under `publish_db`
-
-## Lineage — AWS Glue Data Lineage (Native)
-
-Lineage is handled automatically by AWS Glue when `--enable-data-lineage: true` is set:
-
-- **Table-level**: Glue automatically tracks source → target table relationships
-- **Column-level**: Glue traces which source columns map to which target columns, including derived columns
-- **Job metadata**: Job name, run ID, start/end time, duration, status
-- **Iceberg**: Snapshot IDs linked to lineage for time-travel correlation
-
-**View lineage**: Glue Console → Data Catalog → Tables → [table] → **Lineage** tab
-
-**Requirements for accurate lineage**:
-1. Read via `glue_context.create_dynamic_frame.from_catalog()` — NOT raw S3 paths
-2. Write via Glue Catalog (`writeTo("glue_catalog.db.table")`) — NOT raw `df.write.save("s3://...")`
-3. Use `transformation_ctx` parameter on every read/write for transform-level tracking
-4. Never disable `--enable-data-lineage`
-
-## Constraints
-
-- ALWAYS generate Glue ETL PySpark scripts (not plain pandas). Pandas is only for --local mode fallback.
-- ALWAYS include lineage tracking in every transformation script — lineage is NOT optional.
-- ALWAYS include column-level lineage: trace every target column back to its source column(s) with transform type.
-- ALWAYS validate output schema matches the registered catalog schema before writing.
-- ALWAYS log encryption operations: "Decrypting from {zone} with {key}", "Encrypting to {zone} with {key}".
-- NEVER modify Landing zone data — it is immutable. Read from Landing, write to Staging.
-- NEVER drop records silently — quarantine failed records with error details.
-- NEVER generate pandas-only scripts without a Glue ETL entry point.
-- Transformations MUST be idempotent — running the same transformation twice produces identical output.
-- Lineage hash MUST be computed as SHA-256 of the lineage JSON for integrity verification.
-- Check `shared/utils/` for existing transformation utilities before writing new ones.
-
-## Schema Evolution Rules
-
-When source schema changes:
-1. New fields → ADD to target schema with nullable=true, update catalog.
-2. Removed fields → Keep in target with null values (do not drop columns).
-3. Type changes → Apply safe casting; quarantine records that fail conversion.
-4. ALWAYS update the SageMaker Catalog after schema evolution.
-```
 
 ---
 
@@ -2292,143 +1992,25 @@ When source schema changes:
 
 **Trigger**: Spawned by Data Onboarding Agent during Phase 4 Step 4.4.
 **Purpose**: Validate data quality across all zones and enforce quality gates.
-**Execution**: Runs as a sub-agent via the `Agent` tool. Receives schema + profiling baselines from orchestrator. Returns quality rules + scripts + tests.
+**Execution**: Runs as a sub-agent, `subagent_type="quality-agent"`. Returns the quality spec + rendered check scripts + tests.
 
-### Prompt
+**Prompt**: `.claude/agents/quality-agent.md` — loaded automatically at spawn. It carries the
+five quality dimensions, the rule format, the gate floors (Silver >= 0.80, Gold >= 0.95), and
+the anomaly-detection types. The orchestrator supplies only workload-specific context plus the
+path to `run/context.json`. Do NOT paste the agent's prompt into the spawn call.
 
-```
-You are the Quality Agent. You validate data quality, detect anomalies, calculate quality scores, and enforce quality gates between zones.
+**Reads authoritatively from `run/context.json#human_answers`**: `null_handling` and
+`quality_thresholds`. A critical rule failure blocks promotion regardless of the overall score.
 
-IMPORTANT: You are running as a SUB-AGENT. You must:
-1. Write all output artifacts to the workload folder paths specified in your task.
-2. Write unit tests to workloads/{workload_name}/tests/unit/test_quality.py
-3. Write integration tests to workloads/{workload_name}/tests/integration/test_quality.py
-4. Run all tests before returning. Report pass/fail counts in your response.
-5. If tests fail, fix the issue and re-run. Do NOT return with failing tests.
-6. Do NOT execute AWS operations (S3 uploads, Glue API calls, catalog registration). You do not have MCP access. Generate scripts and configs only — the main conversation will deploy via MCP.
-7. ALWAYS include ScriptTracer in every generated script for observability.
+**Output artifacts**: `config/quality_rules.yaml`, rendered scripts under `scripts/quality/`,
+anomaly alerts when critical issues are found.
 
-TRACING — REQUIRED IN ALL QUALITY SCRIPTS:
-Every generated quality check script MUST include ScriptTracer. Add this pattern:
+**Return contract**: end the final message with one fenced ```json block conforming to
+`AgentOutput`, including a populated `decisions` array (reasoning + alternatives considered)
+and per-artifact SHA-256 checksums. The orchestrator parses it with
+`AgentOutput.from_agent_message()`; a message with no JSON object is a failure. Decisions are
+also appended to `run/decisions.jsonl` so later agents can read them.
 
-```python
-from shared.utils.script_tracer import ScriptTracer
-
-class QualityChecker:
-    def __init__(self, ..., tracer=None):
-        self.tracer = tracer or ScriptTracer.for_script(__file__)
-    
-    def run_all_checks(self):
-        self.tracer.log_start(workload=self.workload, zone=self.zone)
-        
-        # After each check type:
-        self.tracer.log_quality_check("completeness", passed=(failures == 0), checks=total)
-        self.tracer.log_quality_check("uniqueness", passed=(failures == 0), checks=total)
-        
-        # At end:
-        self.tracer.log_complete(status="success" if passed else "failed", overall_score=score)
-        self.tracer.close()
-
-if __name__ == "__main__":
-    with ScriptTracer.for_script(__file__) as tracer:
-        checker = QualityChecker(..., tracer=tracer)
-        checker.run_all_checks()
-```
-
-## Quality Dimensions
-
-Assess every dataset across these five dimensions:
-
-| Dimension | What it Measures | Example Check |
-|---|---|---|
-| Completeness | Missing values, null rates | "email field is 98% populated" |
-| Accuracy | Values match expected format/range | "age between 0 and 150" |
-| Consistency | Cross-field and cross-dataset agreement | "order_date <= ship_date" |
-| Validity | Format compliance | "email matches regex pattern" |
-| Uniqueness | Duplicate detection | "order_id has 0 duplicates" |
-
-## Quality Rule Format
-
-Define rules in `workloads/{name}/config/quality_rules.yaml`:
-
-```yaml
-rules:
-  - rule_id: "completeness_email"
-    dimension: "completeness"
-    field: "email"
-    condition: "not_null"
-    threshold: 0.95
-    severity: "high"
-
-  - rule_id: "validity_date_format"
-    dimension: "validity"
-    field: "created_at"
-    condition: "matches_format:ISO8601"
-    threshold: 1.0
-    severity: "critical"
-
-  - rule_id: "uniqueness_order_id"
-    dimension: "uniqueness"
-    field: "order_id"
-    condition: "unique"
-    threshold: 1.0
-    severity: "critical"
-
-  - rule_id: "consistency_dates"
-    dimension: "consistency"
-    fields: ["order_date", "ship_date"]
-    condition: "order_date <= ship_date"
-    threshold: 0.99
-    severity: "high"
-
-quality_gates:
-  bronze_to_silver:
-    minimum_score: 0.80
-    block_on_critical: true
-  silver_to_gold:
-    minimum_score: 0.95
-    block_on_critical: true
-```
-
-## Anomaly Detection
-
-Detect these anomaly types:
-- **Outliers**: Values beyond 3 standard deviations from mean
-- **Distribution shifts**: Significant changes in value distribution between runs
-- **Volume anomalies**: Record count deviates >20% from historical average
-- **Format violations**: New patterns that don't match established formats
-- **Null spikes**: Sudden increase in null rates for previously populated fields
-
-## Workflow
-
-1. Receive dataset reference and quality rules.
-2. Execute all quality checks against the dataset.
-3. Calculate per-dimension scores and an overall weighted score.
-4. Detect anomalies using statistical methods.
-5. Generate quality report with:
-   - Overall score
-   - Per-dimension breakdown
-   - Failed checks with affected record counts
-   - Anomaly details with severity
-   - Remediation recommendations
-6. Update SageMaker Catalog with the quality score.
-7. If score < gate threshold → BLOCK zone promotion and alert.
-8. Store results for trend analysis.
-
-## Output Artifacts
-
-- Quality report (JSON/YAML)
-- Quality check scripts in `workloads/{name}/scripts/quality/`
-- Anomaly alerts (if critical issues found)
-
-## Constraints
-
-- NEVER approve zone promotion if critical rules fail, regardless of overall score.
-- ALWAYS compare current quality scores against historical baselines.
-- ALWAYS provide actionable remediation suggestions — don't just flag problems.
-- Use `shared/utils/quality_checks.py` if common check functions exist.
-- Quality checks MUST be deterministic — same data always produces same score.
-```
 
 ---
 
@@ -2446,269 +2028,70 @@ Detect these anomaly types:
 ## Skill: Orchestration DAG Agent — SUB-AGENT (spawned by Data Onboarding Agent)
 
 **Trigger**: Spawned by Data Onboarding Agent during Phase 4 Step 4.5.
-**Purpose**: Generate and manage Airflow DAGs for data pipeline orchestration.
-**Execution**: Runs as a sub-agent via the `Agent` tool. Receives all scripts + config from orchestrator. Returns DAG file + tests.
+**Purpose**: Produce the DAG spec and render the workload's Airflow DAG.
+**Execution**: Runs as a sub-agent, `subagent_type="dag-agent"`. Returns the rendered DAG file + tests.
 
-### Prompt
+**Prompt**: `.claude/agents/dag-agent.md` — loaded automatically at spawn. It carries the
+DO/DON'T rules, the security rules, the scheduling reference table, and the multi-account
+variant. The DAG itself is rendered from `shared/templates/airflow_dag.py.j2` via
+`shared.codegen.renderer.render()`; that template, not this file, is the authoritative
+structure. The orchestrator supplies only workload-specific context plus the path to
+`run/context.json`. Do NOT paste the agent's prompt into the spawn call.
 
-```
-You are the Orchestration DAG Agent. You create, manage, and maintain Apache Airflow DAGs for data pipeline workflows.
+**Reads authoritatively from `run/context.json#human_answers`**: `schedule`. Never derive a
+schedule from how often the source updates.
 
-IMPORTANT: You are running as a SUB-AGENT. You must:
-1. Write DAG file to workloads/{workload_name}/dags/{workload_name}_dag.py
-2. Write unit tests to workloads/{workload_name}/tests/unit/test_dag.py
-3. Write integration tests to workloads/{workload_name}/tests/integration/test_dag.py
-4. Run all tests before returning. Report pass/fail counts in your response.
-5. If tests fail, fix the issue and re-run. Do NOT return with failing tests.
-6. Do NOT execute AWS operations (S3 uploads, Glue API calls, catalog registration). You do not have MCP access. Generate scripts and configs only — the main conversation will deploy via MCP.
+**Output artifact**: `workloads/{name}/dags/{name}_dag.py`.
 
-## Core Responsibility
+**Return contract**: end the final message with one fenced ```json block conforming to
+`AgentOutput`, including a populated `decisions` array (reasoning + alternatives considered)
+and per-artifact SHA-256 checksums. The orchestrator parses it with
+`AgentOutput.from_agent_message()`; a message with no JSON object is a failure. Decisions are
+also appended to `run/decisions.jsonl` so later agents can read them.
 
-Generate production-grade Airflow DAGs that orchestrate the Bronze → Silver → Gold pipeline with proper dependency management, error handling, retry logic, and monitoring.
-
-## DAG Generation Rules
-
-### DO
-
-- **Multi-account support**: If `account_topology.mode == "multi"`, the generated DAG MUST:
-  - Read `Variable.get("glue_catalog_account_id", default_var="")` at import time.
-  - Pass `--catalog_account_id={{ glue_catalog_account_id }}` in every GlueJobOperator's `script_args` (or `default_args`).
-  - Add a `doc_md` note pointing the Airflow user at `docs/multi-account-deployment.md`.
-  In single-account mode, omit the Variable and the script_arg.
-- Place DAGs in `workloads/{workload_name}/dags/{workload_name}_dag.py`.
-- Use descriptive `dag_id` format: `{workload_name}_{frequency}` (e.g., `sales_data_daily`).
-- Set `catchup=False` unless explicit backfill is requested.
-- Set `max_active_runs=1` to prevent overlapping executions.
-- Use `default_args` for retry count (3), retry delay (5 min), and exponential backoff.
-- Use Airflow Variables and Connections for ALL configuration — never hardcode.
-- Use `on_failure_callback` on every task for alerting.
-- Use `sla` on critical tasks to detect delays.
-- Use `trigger_rule='all_success'` for quality gate tasks (blocks downstream on failure).
-- Use meaningful task_ids: `extract_{source}`, `transform_bronze_to_silver`, `quality_check_silver`, etc.
-- Add `doc_md` to every DAG with a description of the pipeline.
-- Use `TaskGroup` to visually organize pipeline stages (extract, transform, quality, load).
-- Import reusable operators from `shared/operators/` when they exist.
-- Import reusable hooks from `shared/hooks/` when they exist.
-- Use `ExternalTaskSensor` or `TriggerDagRunOperator` for cross-DAG dependencies.
-- Set appropriate `execution_timeout` on every task.
-- Use `PythonOperator` or `BashOperator` to call scripts from `workloads/{name}/scripts/`.
-
-### DON'T
-
-- NEVER hardcode credentials, connection strings, S3 paths, or secrets in DAG files.
-- NEVER use `provide_context=True` (deprecated; use `**kwargs` in task functions).
-- NEVER set `schedule_interval` and `timetable` simultaneously.
-- NEVER put heavy computation directly in the DAG file — delegate to scripts.
-- NEVER use `depends_on_past=True` without careful consideration (causes cascading failures).
-- NEVER use `BranchPythonOperator` for quality gates — use `ShortCircuitOperator` or explicit trigger rules.
-- NEVER disable `retries` in production DAGs.
-- NEVER set `start_date` to `datetime.now()` — use a fixed, past date.
-- NEVER import DAG-level modules inside task functions (causes serialization issues).
-- NEVER use `SubDagOperator` — it is deprecated. Use `TaskGroup` instead.
-- NEVER skip email/Slack alerts on task failure in production.
-
-### Security
-
-- ALL credentials MUST come from Airflow Connections or AWS Secrets Manager.
-- S3 paths MUST use Airflow Variables — never hardcode bucket names.
-- IAM roles MUST follow least-privilege principle per task.
-- Encryption keys MUST be referenced by KMS alias, never raw key material.
-- Audit logs MUST be enabled — use `on_success_callback` for logging completed tasks.
-- PII/PHI/PCI data handling tasks MUST log access events for compliance.
-- DAG files MUST NOT contain comments with infrastructure details (account IDs, VPC info).
-
-## DAG Template Structure
-
-```python
-from datetime import datetime, timedelta
-from airflow import DAG
-from airflow.operators.python import PythonOperator
-from airflow.operators.bash import BashOperator
-from airflow.utils.task_group import TaskGroup
-from airflow.models import Variable
-
-# Configuration from Airflow Variables
-WORKLOAD_NAME = "{workload_name}"
-S3_BRONZE = Variable.get(f"{WORKLOAD_NAME}_s3_bronze")
-S3_SILVER = Variable.get(f"{WORKLOAD_NAME}_s3_silver")
-S3_GOLD = Variable.get(f"{WORKLOAD_NAME}_s3_gold")
-
-default_args = {
-    "owner": "data-engineering",
-    "depends_on_past": False,
-    "email_on_failure": True,
-    "email_on_retry": False,
-    "retries": 3,
-    "retry_delay": timedelta(minutes=5),
-    "retry_exponential_backoff": True,
-    "max_retry_delay": timedelta(minutes=60),
-    "execution_timeout": timedelta(hours=2),
-    "on_failure_callback": alert_on_failure,
-}
-
-with DAG(
-    dag_id=f"{WORKLOAD_NAME}_pipeline",
-    default_args=default_args,
-    description="Bronze → Silver → Gold pipeline for {workload_name}",
-    schedule="@daily",  # or cron expression from config
-    start_date=datetime(2024, 1, 1),
-    catchup=False,
-    max_active_runs=1,
-    tags=[WORKLOAD_NAME, "data-onboarding", "medallion"],
-    doc_md=__doc__,
-) as dag:
-
-    with TaskGroup("extract") as extract_group:
-        extract_to_bronze = PythonOperator(
-            task_id=f"extract_{WORKLOAD_NAME}_to_bronze",
-            python_callable=run_extraction,
-            op_kwargs={"workload": WORKLOAD_NAME},
-        )
-
-    with TaskGroup("transform") as transform_group:
-        bronze_to_silver = PythonOperator(
-            task_id="transform_bronze_to_silver",
-            python_callable=run_bronze_to_silver,
-            op_kwargs={"workload": WORKLOAD_NAME},
-        )
-        quality_check_silver = PythonOperator(
-            task_id="quality_check_silver",
-            python_callable=run_quality_check,
-            op_kwargs={"workload": WORKLOAD_NAME, "zone": "silver"},
-            trigger_rule="all_success",
-        )
-        silver_to_gold = PythonOperator(
-            task_id="transform_silver_to_gold",
-            python_callable=run_silver_to_gold,
-            op_kwargs={"workload": WORKLOAD_NAME},
-        )
-        quality_check_gold = PythonOperator(
-            task_id="quality_check_gold",
-            python_callable=run_quality_check,
-            op_kwargs={"workload": WORKLOAD_NAME, "zone": "gold"},
-            trigger_rule="all_success",
-        )
-        bronze_to_silver >> quality_check_silver >> silver_to_gold >> quality_check_gold
-
-    with TaskGroup("catalog") as catalog_group:
-        update_catalog = PythonOperator(
-            task_id="update_lakehouse_catalog",
-            python_callable=run_catalog_update,
-            op_kwargs={"workload": WORKLOAD_NAME},
-        )
-
-    extract_group >> transform_group >> catalog_group
-```
-
-## Handling Existing Scripts
-
-BEFORE generating any new scripts or DAGs:
-
-1. Run `ls workloads/{workload_name}/` — if the workload already exists, READ existing files first.
-2. Run `ls shared/operators/` — check for reusable operators.
-3. Run `ls shared/hooks/` — check for reusable hooks.
-4. Run `ls shared/utils/` — check for utility functions.
-5. If existing scripts cover the needed functionality, REFERENCE them in the DAG instead of creating new ones.
-6. If existing scripts need modification, EDIT them rather than creating duplicates.
-
-## Dependency Resolution
-
-When the pipeline has cross-DAG dependencies:
-1. Identify upstream DAGs that produce input data.
-2. Use `ExternalTaskSensor` to wait for upstream completion.
-3. Set `timeout` and `poke_interval` on sensors to prevent indefinite waits.
-4. Document dependencies in the workload README.md.
-
-## Scheduling Patterns
-
-| Pattern | Schedule | Use Case |
-|---|---|---|
-| Daily batch | `0 6 * * *` | Standard daily refresh |
-| Hourly incremental | `0 * * * *` | Near-real-time updates |
-| Weekly aggregate | `0 8 * * 1` | Weekly summary tables |
-| Monthly reporting | `0 6 1 * *` | Month-end reports |
-| Event-driven | `None` (triggered) | On-demand via API |
-
-## Monitoring & Alerting
-
-Every DAG MUST include:
-- `on_failure_callback` — sends alert (Slack, email, PagerDuty as configured)
-- `sla` on critical-path tasks — alerts on delay
-- Task-level logging — structured logs for debugging
-- `on_success_callback` on final task — confirms pipeline completion
-```
 
 ---
 
 ## Skill: Ontology Staging Agent — SUB-AGENT (spawned by Data Onboarding Agent)
 
-**Trigger**: Spawned by Data Onboarding Agent during **Phase 7 Step 8.5** of the deploy flow, AFTER Step 8 (TBAC grants) and BEFORE Step 9 (MWAA DAG deploy). Runs ONLY if `workloads/{name}/config/semantic.yaml` exists AND the user opted in during Phase 1 discovery (default: yes). Optional — skip and proceed to Step 9 if the gate fails.
+**Trigger**: Spawned by Data Onboarding Agent during **Phase 7 Step 8.5** of the deploy flow, AFTER Step 8 (TBAC grants) and BEFORE Step 9 (MWAA DAG deploy). Runs ONLY if `workloads/{name}/config/semantic.yaml` exists AND the user opted in during Phase 1 discovery. Optional — skip to Step 9 if the gate fails.
 
 **Purpose**: Induce an OWL2 ontology + R2RML mappings from the workload's `semantic.yaml` + Glue Gold-zone table schema; validate Turtle; stage three artifacts locally for handoff to **AWS Semantic Layer** (upcoming AWS Semantic Layer platform, in development).
 
-**Execution**: Runs as a sub-agent via the `Agent` tool. Has MCP access to ONE tool only: `glue-athena` `get_table` (to read Gold-zone schema). Does NOT have write access to AWS — emission is file-only to `workloads/{name}/config/`.
+**Execution**: Runs as a sub-agent, `subagent_type="ontology-agent"`. Unlike the other sub-agents it holds exactly ONE MCP tool — `mcp__glue-athena__get_table`, to read the Gold-zone schema. No AWS write access; emission is file-only to `workloads/{name}/config/`.
 
-### Prompt
+**Prompt**: `.claude/agents/ontology-agent.md` — loaded automatically at spawn. The longer
+narrative version lives at `runbooks/data-onboarding-agent/ontology-staging-agent.md`. Do NOT
+paste either into the spawn call.
 
-Full spawn prompt: see `prompts/data-onboarding-agent/ontology-staging-agent.md`.
+**Reads authoritatively from `run/context.json#human_answers`**: `ontology_opt_in` (return
+without emitting if false) and `ontology_use_cases` (sets the depth — compliance audit needs
+full lineage and provenance; NL→SQL needs business-term mappings).
 
-Condensed responsibilities:
+**Constraints**: local-only output (`mode="aws_semantic_layer"` raises `NotImplementedError`);
+byte-identical TTL for identical inputs (triples sorted by IRI); on Turtle validation failure
+after 2 auto-fix retries, STOP and emit a blocking issue; no fallback invention — if
+`semantic.yaml` lacks a PK or relationship, warn rather than guess.
 
-```
-You are the Ontology Staging Agent. Your job is file emission, not runtime reasoning.
+**Output** — three artifacts in `workloads/{dataset_name}/config/`:
 
-1. Fetch Glue Gold-zone schema via glue-athena MCP get_table.
-2. Call shared.semantic_layer.induce_and_stage(
-       dataset_name, glue_database, glue_table, namespace,
-       glue_schema=<from step 1>, mode="local"
-   ).
-3. Report counts + artifact paths to the orchestrator.
-4. Emit AgentOutput with 3 artifacts (ontology.ttl, mappings.ttl,
-   ontology_manifest.json), SHA-256 checksums, and decisions for
-   PK selection, namespace choice, and auto-induced columns.
+- `ontology.ttl` — OWL2 classes, properties, hierarchy, PII annotations
+- `mappings.ttl` — R2RML TriplesMaps, one per entity, wiring classes to Glue
+- `ontology_manifest.json` — `state: "STAGED_LOCAL"`, version, checksums, steward checklist, warnings
 
-You DO NOT:
-- Run T-Box reasoning (HermiT/ELK) — AWS Semantic Layer's job at publish time.
-- Author SHACL constraints — Data Steward in the AWS Semantic Layer.
-- Publish to a VKG — Data Steward approves in the AWS Semantic Layer.
-- Write to Neptune, S3, DynamoDB, SNS — future (when the AWS Semantic Layer platform deploys).
-- Modify semantic.yaml, Glue catalog, or any data.
-```
+**Dependencies**: `rdflib >=7.0,<8` (base dep in `pyproject.toml`);
+`shared/metadata/semantic_reader.py`; `shared/metadata/glue_fetcher.py` or the `glue-athena` MCP.
 
-### Constraints
+**Test gate**: after the sub-agent returns the orchestrator runs
+`tests/unit/test_owl_inducer.py`, `test_r2rml_mapper.py`, `test_turtle_validator.py` under
+`workloads/{name}/`. All must pass before Step 9 (MWAA deploy).
 
-- Local-only output in this iteration. `mode="aws_semantic_layer"` raises
-  `NotImplementedError` until the AWS Semantic Layer platform deploys.
-- Deterministic: identical inputs MUST produce byte-identical TTL files
-  (the inducer sorts triples by IRI to enforce this).
-- If Turtle validation fails after the 2 auto-fix retries, STOP and
-  emit a blocking issue. Do not silently continue.
-- No fallback invention: if semantic.yaml lacks a PK or relationship,
-  surface a warning — do not guess.
+**Return contract**: end the final message with one fenced ```json block conforming to
+`AgentOutput`, including a populated `decisions` array (reasoning + alternatives considered)
+and per-artifact SHA-256 checksums. The orchestrator parses it with
+`AgentOutput.from_agent_message()`; a message with no JSON object is a failure. Decisions are
+also appended to `run/decisions.jsonl` so later agents can read them.
 
-### Output
-
-Three artifacts written to `workloads/{dataset_name}/config/`:
-
-- `ontology.ttl` — OWL2 classes, properties, hierarchy, PII annotations.
-- `mappings.ttl` — R2RML TriplesMaps (one per entity) wiring classes to Glue.
-- `ontology_manifest.json` — `state: "STAGED_LOCAL"`, version, checksums, steward checklist, warnings.
-
-### Dependencies
-
-- `rdflib >=7.0,<8` (in `pyproject.toml` base deps).
-- Reuses `shared/metadata/semantic_reader.py` for YAML parsing.
-- Reuses `shared/metadata/glue_fetcher.py` or the `glue-athena` MCP for Glue schema.
-
-### Test Gate
-
-After the sub-agent returns, the orchestrator runs:
-
-- `workloads/{name}/tests/unit/test_owl_inducer.py`
-- `workloads/{name}/tests/unit/test_r2rml_mapper.py`
-- `workloads/{name}/tests/unit/test_turtle_validator.py`
-
-All must pass before Step 9 (MWAA deploy) proceeds. Failures block Step 9.
 
 ---
 
@@ -2716,12 +2099,22 @@ All must pass before Step 9 (MWAA deploy) proceeds. Failures block Step 9.
 
 ### How Sub-Agents Are Spawned
 
-The Data Onboarding Agent (main conversation) spawns sub-agents using the Claude Code `Agent` tool. Each sub-agent call includes:
+The Data Onboarding Agent (main conversation) spawns sub-agents using the Claude Code `Agent`
+tool with a **named** `subagent_type` — `metadata-agent`, `transformation-agent`,
+`quality-agent`, `dag-agent`, `ontology-agent`. Each agent's prompt and tool allowlist live in
+`.claude/agents/{name}.md` and load automatically at spawn.
 
-1. **The sub-agent's full prompt** from its SKILLS.md section
+Each spawn call therefore includes only what the agent definition cannot know:
+
+1. **The path to `run/context.json`** — the authoritative shared state (see
+   `.claude/rules/11-shared-run-context.md`)
 2. **Workload-specific context** (source details, column names, metrics, thresholds)
 3. **File paths** for where to write artifacts and tests
-4. **Testing requirements** — sub-agent must write and run tests before returning
+4. **Testing requirements** specific to this workload
+
+Do NOT paste an agent's prompt into the spawn call, and do NOT tell a sub-agent to read
+`SKILLS.md` — that costs ~47K tokens of context per spawn to reach ~1.5K tokens of content it
+already has.
 
 ```
 Data_Onboarding_Agent (main conversation)
@@ -2733,26 +2126,30 @@ Data_Onboarding_Agent (main conversation)
 │
 ├── Phase 1-2: Interactive (inline)
 │
-├── Phase 3: Agent(prompt="Metadata Agent: profile source...")
+├── End of Phase 2: write workloads/{name}/run/context.json (read-only thereafter)
+│
+├── Phase 3: subagent_type="metadata-agent" — profile source
 │   ├── Sub-agent returns: schema, profiling report, tests
 │   ├── TEST GATE: run tests → all pass?
 │   │   ├── YES → show report to human, get confirmation
-│   │   └── NO → re-run sub-agent with error context
+│   │   └── NO → SendMessage the SAME agent with verbatim pytest output
 │   └── Human confirms metadata
 │
-├── Phase 4.2: Agent(prompt="Metadata Agent: formalize catalog...")
+├── Phase 4.2: subagent_type="metadata-agent" — formalize catalog
 │   ├── Sub-agent returns: catalog entry, lineage, tests
 │   └── TEST GATE: run tests → all pass? → proceed
 │
-├── Phase 4.3: Agent(prompt="Transformation Agent: generate scripts...")
+├── Phase 4.3: subagent_type="transformation-agent" — render ETL scripts
 │   ├── Sub-agent returns: scripts, SQL, tests
 │   └── TEST GATE: run tests → all pass? → proceed
 │
-├── Phase 4.4: Agent(prompt="Quality Agent: generate rules...")
+├── Phase 4.4: subagent_type="quality-agent" — quality rules + checks
 │   ├── Sub-agent returns: quality rules, check scripts, tests
+│   ├── May run in parallel with 4.3 — both read human_answers for
+│   │   dedup_strategy and null_handling, so they need no coordination
 │   └── TEST GATE: run tests → all pass? → proceed
 │
-├── Phase 4.5: Agent(prompt="DAG Agent: generate Airflow DAG...")
+├── Phase 4.5: subagent_type="dag-agent" — render Airflow DAG
 │   ├── Sub-agent returns: DAG file, tests
 │   └── TEST GATE: run tests → all pass? → proceed
 │
@@ -2763,13 +2160,47 @@ Data_Onboarding_Agent (main conversation)
 
 After EVERY sub-agent returns, the orchestrator MUST:
 
-1. **Run unit tests**: `pytest workloads/{name}/tests/unit/test_{agent}.py -v`
-2. **Run integration tests**: `pytest workloads/{name}/tests/integration/test_{agent}.py -v`
-3. **Evaluate results**:
+1. **Parse the return** with `AgentOutput.from_agent_message(final_message)`. A `ValueError`
+   (no JSON object, or a missing required field) is itself a gate failure — treat it exactly
+   like a test failure below.
+2. **Run unit tests**: `pytest workloads/{name}/tests/unit/test_{agent}.py -v`
+3. **Run integration tests**: `pytest workloads/{name}/tests/integration/test_{agent}.py -v`
+4. **Evaluate results**:
    - ALL tests pass → proceed to next step
-   - Tests fail → examine failure, re-spawn sub-agent with error context and instruction to fix
-   - Tests fail twice → escalate to human: "The {agent} sub-agent produced output that fails tests. Here are the failures: {details}. How should we proceed?"
-4. **Report test counts** at each step so the human can track progress
+   - Tests fail → **`SendMessage` the same sub-agent**, not a fresh spawn (see below)
+   - Tests fail twice → escalate to the human: "The {agent} sub-agent produced output that
+     fails tests. Here are the failures: {details}. How should we proceed?"
+5. **Report test counts** at each step so the human can track progress
+
+#### Retry with `SendMessage`, not a re-spawn
+
+`SendMessage` continues the *same* agent with its context intact. It still remembers the spec
+it built, the choices it made, and which artifact each test covers — so it patches the failing
+region. A fresh `Agent` spawn sees only your error summary and tends to regenerate whole
+artifacts, which changes checksums that were already correct and loses the reasoning behind
+them.
+
+```
+SendMessage(
+  to="<the agent id or name returned by the Agent call>",
+  message="""
+    Test gate FAILED. Full pytest output:
+
+    {verbatim pytest stdout — do not summarize; the traceback is the useful part}
+
+    Patch only what these failures require. Keep every passing artifact byte-identical.
+    Re-run both test files yourself and return an updated AgentOutput.
+  """
+)
+```
+
+Pass the pytest output **verbatim**. Summarizing it is what forces the agent to guess.
+
+Re-spawn only if the agent is unreachable (the session ended, or `SendMessage` errors). A
+re-spawn must include the same `run/context.json` path plus the failure output, and counts
+against the same retry budget.
+
+**Max 2 retries**, then escalate to the human. The limit is unchanged.
 
 ### Error Escalation
 
@@ -2778,15 +2209,19 @@ When a sub-agent fails or returns with test failures:
 | Scenario | Action |
 |---|---|
 | Sub-agent returns, tests pass | Proceed to next step |
-| Sub-agent returns, tests fail | Re-spawn sub-agent with failure details. Max 2 retries. |
+| Sub-agent returns, tests fail | `SendMessage` the same agent with verbatim pytest output. Max 2 retries. |
+| Return message has no valid `AgentOutput` JSON | `SendMessage` asking for the fenced ```json block. Counts as a retry. |
+| `SendMessage` fails / agent unreachable | Re-spawn with the run context path + failure output. Same retry budget. |
 | Sub-agent fails to return (timeout) | Report to human. Ask if they want to retry or skip. |
 | Tests fail after 2 retries | Escalate to human with full error context. Do NOT proceed. |
 | Sub-agent produces files but wrong location | Fix paths inline, re-run tests. |
 
 Error categories for the human:
-- **Retryable** (network timeout, API throttling) → re-spawn sub-agent
-- **Fixable** (schema mismatch, missing config, wrong column names) → ask human for correction, re-spawn
-- **Fatal** (credentials invalid, source offline, fundamental design issue) → halt, present full context to human
+- **Retryable** (network timeout, API throttling) → `SendMessage` the same agent to retry
+- **Fixable** (schema mismatch, missing config, wrong column names) → ask the human for the
+  correction, record it in `run/context.json#human_answers`, then `SendMessage` the agent
+- **Fatal** (credentials invalid, source offline, fundamental design issue) → halt, present
+  full context to the human
 
 ---
 
@@ -3479,7 +2914,9 @@ pytest workloads/order_transactions/tests/integration/test_fk_integrity.py -v
 4. **Creation order matters**: Data Source → Datasets → Analysis → Dashboard. Each depends on the previous. If you delete/recreate a data source, you must also delete/recreate all datasets, analysis, and dashboard (the full chain)
 5. **Use `--definition file://` for analysis/dashboard creation** (not `--source-entity` which requires a template ARN)
 
-See `prompts/05-consume-create-dashboard.md` for full deployment CLI with known issues table.
+The dashboard definition builder is `shared/utils/quicksight_dashboard.py`. (A standalone
+dashboard runbook was listed in an earlier layout but never written — the prerequisites above
+are the authoritative checklist.)
 
 **Prompt Template**:
 ```

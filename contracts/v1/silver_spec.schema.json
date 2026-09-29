@@ -4,7 +4,19 @@
   "title": "Silver Transform Spec",
   "description": "Defines Bronze-to-Silver transformation: dedup, nulls, casting, PII masking, quality threshold.",
   "type": "object",
-  "required": ["dataset_name", "schema_version", "source_table", "primary_key", "dedup_strategy", "quality_threshold"],
+  "required": ["dataset_name", "schema_version", "source_table", "primary_key", "dedup_strategy", "quality_threshold", "iceberg_database", "iceberg_table"],
+  "allOf": [
+    {
+      "if": {
+        "properties": { "dedup_strategy": { "enum": ["keep_latest", "keep_first"] } },
+        "required": ["dedup_strategy"]
+      },
+      "then": {
+        "required": ["dedup_order_by"],
+        "$comment": "Without dedup_order_by the template falls back to orderBy(monotonically_increasing_id()), which is neither 'latest' nor stable across runs — it would silently break both the human's stated intent and transformation idempotency."
+      }
+    }
+  ],
   "additionalProperties": false,
   "properties": {
     "dataset_name": {

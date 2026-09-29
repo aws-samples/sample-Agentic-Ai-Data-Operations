@@ -68,7 +68,17 @@ def exchange_block(
     return f"{q}\n{connector}\n{r}"
 
 
+def stage_block(title: str, lines: list[str]) -> str:
+    """Announce a pipeline stage (phase or numbered step) with a summary."""
+    return _box(title, [f"* {line}" for line in lines])
+
+
 def discovery_block(title: str, findings: list[str]) -> str:
+    # The prefix is added here, but rules/00-zone-questions.md shows the *rendered*
+    # title, so callers reasonably pass it already prefixed. Absorb it either way.
+    title = title.strip()
+    if title.upper().startswith("DISCOVERED:"):
+        title = title[len("DISCOVERED:"):].lstrip()
     lines = []
     for f in findings:
         lines.append(f"* {f}")

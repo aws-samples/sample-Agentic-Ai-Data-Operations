@@ -348,7 +348,7 @@ const results = await pipeline(
     phase('Build')
     const BUILD_MODEL = getBuildModel(wl.regulation)
     const regNote = wl.regulation && wl.regulation.length > 0 && wl.regulation[0] !== 'NONE'
-      ? `Apply regulation controls: ${JSON.stringify(wl.regulation)}. Reference prompts/data-onboarding-agent/regulation/ for details.`
+      ? `Apply regulation controls: ${JSON.stringify(wl.regulation)}. Reference runbooks/data-onboarding-agent/regulation/ for details.`
       : 'No specific regulation — standard quality gates only.'
 
     // Stage 1: Metadata + Quality in parallel
