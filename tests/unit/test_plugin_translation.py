@@ -422,3 +422,31 @@ def test_render_cli_maps_each_template_to_a_contract_that_has_its_slots():
         "template/contract mapping problems:\n  " + "\n  ".join(unrenderable)
         + f"\n\nExpected only the known upstream gap:\n  {known[0]}"
     )
+
+
+def test_plugin_contains_no_broken_or_escaping_symlinks():
+    """A symlink is fragile in a distributed plugin and this one shipped broken.
+
+    mcp-servers/pii-detection-server/pii_detection_and_tagging.py is a symlink in the
+    repo, pointing at ../../shared/utils/. That resolves from mcp-servers/, but the
+    vendored copy lives under lib/shared/utils/, so copying it verbatim produced a
+    dangling link — invisible to `ls`, and only caught by comparing the installed cache
+    against the repo.
+
+    Regular files are the right answer here: a plugin is copied into a cache at install
+    time, and a relative link that leaves the plugin root cannot be relied on to survive.
+    """
+    offenders = []
+    for p in PLUGIN.rglob("*"):
+        if not p.is_symlink():
+            continue
+        target = p.resolve()
+        rel = p.relative_to(PLUGIN).as_posix()
+        if not target.exists():
+            offenders.append(f"{rel} -> {p.readlink()} (BROKEN)")
+        elif PLUGIN.resolve() not in target.parents:
+            offenders.append(f"{rel} -> {p.readlink()} (escapes the plugin root)")
+    assert not offenders, (
+        "symlinks that will not survive an install:\n  " + "\n  ".join(offenders)
+        + "\nReplace with a real file copy."
+    )

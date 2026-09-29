@@ -508,6 +508,20 @@ plugin-only:
 # untranslatable — recorded as a limitation, not hidden
 # ---------------------------------------------------------------------------
 untranslatable:
+  - source: mcp-servers/pii-detection-server/pii_detection_and_tagging.py
+    reason: >-
+      Not shipped, and it is vestigial upstream. In the repo it is a symlink to
+      ../../shared/utils/pii_detection_and_tagging.py, but server.py does not import it at
+      all (0 references), setup.sh creates a link to
+      workloads/us_mutual_funds_etf/scripts/governance/ — a workload that no longer exists
+      — and README.md documents a third path as the fix for an ImportError that cannot
+      occur. Three locations named for one file that nothing loads.
+
+      Copying it verbatim produced a dangling symlink in the plugin, because the vendored
+      module lives at lib/shared/utils/, not ../../shared/utils/. Replacing it with a real
+      file would have shipped a second 552-line copy of something already vendored. So it
+      is dropped: anything that needs the module can import it from lib/. Worth cleaning up
+      upstream.
   - source: .pre-commit-config.yaml
     reason: >-
       18 hooks that reject a commit. A plugin cannot install git hooks into the
