@@ -21,6 +21,7 @@ convert those. Pending entries are reported, not failed, so the harness is usefu
 during the port instead of only after it.
 """
 import pathlib
+import sys
 
 import pytest
 
@@ -199,6 +200,88 @@ def test_plugin_only_entries_state_a_reason(manifest):
         if len((e.get("reason") or "").split()) < 5
     ]
     assert not thin, "plugin-only entries need a reason: " + ", ".join(thin)
+
+
+# --------------------------------------------------------------------------
+# The vendored library must actually work from its vendored location
+# --------------------------------------------------------------------------
+
+# Modules a sub-agent can reach. These must import with nothing beyond the three
+# codegen dependencies (jinja2, jsonschema, pyyaml), because a user installing the
+# plugin to render a pipeline should not also need the AWS SDK.
+SUBAGENT_SAFE = [
+    "shared.codegen.renderer",
+    "shared.codegen.spec_loader",
+    "shared.codegen.slot_extractor",
+    "shared.codegen.drift_validator",
+    "shared.logging.agent_tracer",
+    "shared.logging.trace_viewer",
+    "shared.metadata.semantic_reader",
+    "shared.templates.agent_output_schema",
+    "shared.utils.ascii_display",
+    "shared.utils.deterministic_yaml",
+    "shared.utils.orchestrator_logger",
+    "shared.utils.script_tracer",
+    "shared.utils.structured_logger",
+]
+
+# Modules that call AWS and therefore need boto3, which pyproject.toml keeps
+# optional. All four are orchestrator work — profiling a source, tagging PII,
+# verifying a deployment. Listed so the boundary is explicit: if one of these ever
+# becomes importable without boto3, or a SUBAGENT_SAFE module starts needing it,
+# the split has moved and somebody should notice.
+NEEDS_AWS_SDK = [
+    "shared.metadata.glue_fetcher",
+    "shared.metadata.lakeformation_fetcher",
+    "shared.utils.pii_detection_and_tagging",
+    "shared.utils.post_deployment_verifier",
+]
+
+
+def _import_in_subprocess(module: str) -> tuple[int, str]:
+    """Import in a clean interpreter so sys.modules from this session cannot mask a failure."""
+    import subprocess
+
+    r = subprocess.run(
+        [sys.executable, "-c", f"import sys; sys.path.insert(0, {str(PLUGIN / 'lib')!r}); import {module}"],
+        capture_output=True,
+        text=True,
+    )
+    return r.returncode, r.stderr.strip().splitlines()[-1] if r.stderr.strip() else ""
+
+
+@pytest.mark.parametrize("module", SUBAGENT_SAFE)
+def test_subagent_safe_modules_import_from_the_vendored_tree(module):
+    """Byte-identity is not enough — the copy has to be importable where it sits.
+
+    This is what proves the lib/shared/... layout works: renderer.py resolves its
+    template directory by walking three parents up from __file__, so a flattened
+    vendoring would import fine here and then fail to find a template at render
+    time.
+    """
+    code, err = _import_in_subprocess(module)
+    assert code == 0, f"{module} does not import from plugins/claude-code/lib: {err}"
+
+
+@pytest.mark.parametrize("module", NEEDS_AWS_SDK)
+def test_aws_modules_are_confined_to_the_named_four(module):
+    """Documents rather than forbids: these need boto3, and that is expected.
+
+    Skips when boto3 is installed, since then there is nothing to observe. The
+    value is in the list itself — it names the AWS surface the plugin carries, so
+    growth in it is visible in review.
+    """
+    try:
+        import boto3  # noqa: F401
+
+        pytest.skip("boto3 present; the boundary is only observable without it")
+    except ImportError:
+        pass
+    code, _ = _import_in_subprocess(module)
+    assert code != 0, (
+        f"{module} imported without boto3 — it was expected to need the AWS SDK. "
+        "If it no longer does, move it to SUBAGENT_SAFE."
+    )
 
 
 # --------------------------------------------------------------------------

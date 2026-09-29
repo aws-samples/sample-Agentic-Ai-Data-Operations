@@ -84,6 +84,20 @@ copy:
     source: shared/codegen/slot_extractor.py
   - target: lib/shared/codegen/spec_loader.py
     source: shared/codegen/spec_loader.py
+  - target: lib/shared/logging/__init__.py
+    source: shared/logging/__init__.py
+  - target: lib/shared/logging/agent_tracer.py
+    source: shared/logging/agent_tracer.py
+  - target: lib/shared/logging/trace_viewer.py
+    source: shared/logging/trace_viewer.py
+  - target: lib/shared/metadata/__init__.py
+    source: shared/metadata/__init__.py
+  - target: lib/shared/metadata/glue_fetcher.py
+    source: shared/metadata/glue_fetcher.py
+  - target: lib/shared/metadata/lakeformation_fetcher.py
+    source: shared/metadata/lakeformation_fetcher.py
+  - target: lib/shared/metadata/semantic_reader.py
+    source: shared/metadata/semantic_reader.py
   - target: lib/shared/templates/VERSION
     source: shared/templates/VERSION
   - target: lib/shared/templates/__init__.py
@@ -106,6 +120,22 @@ copy:
     source: shared/templates/quality_check.py.j2
   - target: lib/shared/templates/silver_transform.py.j2
     source: shared/templates/silver_transform.py.j2
+  - target: lib/shared/utils/__init__.py
+    source: shared/utils/__init__.py
+  - target: lib/shared/utils/ascii_display.py
+    source: shared/utils/ascii_display.py
+  - target: lib/shared/utils/deterministic_yaml.py
+    source: shared/utils/deterministic_yaml.py
+  - target: lib/shared/utils/orchestrator_logger.py
+    source: shared/utils/orchestrator_logger.py
+  - target: lib/shared/utils/pii_detection_and_tagging.py
+    source: shared/utils/pii_detection_and_tagging.py
+  - target: lib/shared/utils/post_deployment_verifier.py
+    source: shared/utils/post_deployment_verifier.py
+  - target: lib/shared/utils/script_tracer.py
+    source: shared/utils/script_tracer.py
+  - target: lib/shared/utils/structured_logger.py
+    source: shared/utils/structured_logger.py
 # ---------------------------------------------------------------------------
 # rewrite — derived from repo sources, paths retargeted
 # ---------------------------------------------------------------------------
