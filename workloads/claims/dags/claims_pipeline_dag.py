@@ -26,13 +26,19 @@ GLUE_IAM_ROLE = Variable.get("glue_iam_role", default_var="AWSGlueServiceRole-Cl
 AWS_ACCOUNT_ID = Variable.get("aws_account_id", default_var="000000000000")
 
 
+# The two --local tasks below stage intermediate parquet under /tmp/data-lake.
+# bandit flags each path as B108 (predictable temp directory). Kept as-is and
+# annotated rather than changed: these paths only run in the local demo mode, both
+# tasks must agree on the same location to hand data between them, and the DAG's
+# real Glue tasks never touch them. Anywhere multi-tenant this should move to an
+# Airflow Variable or a per-run mkdtemp() shared via XCom.
 def run_bronze_to_silver(**context):
     import subprocess
     result = subprocess.run(
         ["python3", "workloads/claims/scripts/transform/bronze_to_silver_claims.py",
          "--local",
          "--bronze_path", "demo/sample_data/claims.csv",
-         "--silver_path", "/tmp/data-lake/silver/claims/claims.parquet"],
+         "--silver_path", "/tmp/data-lake/silver/claims/claims.parquet"],  # nosec B108
         capture_output=True, text=True
     )
     if result.returncode != 0:
@@ -45,8 +51,8 @@ def run_silver_to_gold(**context):
     result = subprocess.run(
         ["python3", "workloads/claims/scripts/transform/silver_to_gold_claims.py",
          "--local",
-         "--silver_path", "/tmp/data-lake/silver/claims/claims.parquet",
-         "--gold_path", "/tmp/data-lake/gold/claims/claims_analytical.parquet"],
+         "--silver_path", "/tmp/data-lake/silver/claims/claims.parquet",  # nosec B108
+         "--gold_path", "/tmp/data-lake/gold/claims/claims_analytical.parquet"],  # nosec B108
         capture_output=True, text=True
     )
     if result.returncode != 0:
