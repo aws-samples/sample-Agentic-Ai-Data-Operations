@@ -143,6 +143,31 @@ def test_copy_entries_are_byte_identical(manifest):
 # rewrite: anchors survive the retargeting
 # --------------------------------------------------------------------------
 
+def test_declared_anchors_exist_in_the_source(manifest):
+    """An anchor must be a real string in the source, even for a pending entry.
+
+    Added after recording "Intent-to-Tool" as a TOOL_ROUTING.md anchor when the
+    heading is "Tool Selection for Agentic Data Onboarding". The anchor check below
+    skips pending and planned entries, so a typo in one of those sits undetected
+    until the translation happens and then fails for a reason that looks like the
+    translation's fault. Checking against the source catches it at declaration.
+
+    An anchor already retargeted for the plugin (a plugin-namespaced agent name,
+    a ${CLAUDE_PLUGIN_ROOT} path) legitimately will not appear in the source, so
+    presence in either file is enough.
+    """
+    bogus = []
+    for e in _entries(manifest, "rewrite"):
+        for a in e.get("anchors") or []:
+            src = REPO / e["source"]
+            tgt = PLUGIN / e["target"]
+            in_src = src.is_file() and a in src.read_text()
+            in_tgt = tgt.is_file() and a in tgt.read_text()
+            if not (in_src or in_tgt):
+                bogus.append(f"{e['target']}: anchor {a!r} appears in neither source nor target")
+    assert not bogus, "\n  ".join(["anchors that match nothing:"] + bogus)
+
+
 def test_rewrite_entries_keep_their_anchors(manifest):
     """A rewrite may retarget paths but must not drop the mechanisms it names.
 
