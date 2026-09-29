@@ -409,14 +409,6 @@ transform:
       dropping Accuracy and Consistency, which makes scores incomparable between
       workloads; 06-quality-testing.md is the authority here
 
-  # Phase B5 replaces these four with vendored copies of the repo originals
-  # rather than hand-maintained summaries. servers.yaml already demonstrates why:
-  # it carries 12 servers where tool-registry/servers.yaml has 13, so `core` is
-  # missing and two BLOCK invariants have no server to route to.
-  - target: skills/decision-engine/config/standards.md
-    sources: [.claude/rules/02-architecture.md]
-    status: pending
-
 
 # ---------------------------------------------------------------------------
 # plugin-only — no repo source, and a stated reason
@@ -429,6 +421,21 @@ plugin-only:
   - target: TRANSLATION.yaml
     reason: >-
       this manifest; it describes the derivation and has nothing to derive from
+
+  - target: skills/decision-engine/config/standards.md
+    reason: >-
+      A blank the installing user fills in, not a translation of anything. Its own
+      first lines say so: "your organization's architecture constraints ... The model
+      fills these in; it does not redraw them. Replace the examples with your real
+      standards." The examples happen to describe ADOP's own defaults (Bronze/Silver/Gold,
+      Iceberg on S3, Glue PySpark) because they have to say something, but the file's
+      purpose is to be overwritten by whoever installs the plugin.
+
+      It was previously declared `status: pending` against .claude/rules/02-architecture.md.
+      That was wrong twice over: the file is not derived from 02-architecture.md, and
+      `pending` is the one status no test checks — so the single entry claiming an
+      unverified derivation was also the single entry exempt from verification, in a
+      manifest whose whole premise is that derivation is checkable.
   - target: scripts/adop_render.py
     reason: >-
       entry point the sub-agents reach the vendored renderer through. In a checkout

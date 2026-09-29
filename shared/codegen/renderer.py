@@ -95,7 +95,7 @@ def render(
     source, template_hash, template_path = _load_template(template_id)
     _validate_slots(source, spec, template_id)
 
-    # nosec B701 - these templates emit Python, SQL and YAML, never HTML.
+    # B701: these templates emit Python, SQL and YAML, never HTML.
     # autoescape=True would HTML-escape quotes and ampersands and corrupt
     # every generated artifact.
     env = jinja2.Environment(  # nosec B701
@@ -170,7 +170,7 @@ def render_dry_run(
     source, template_hash, template_path = _load_template(template_id)
     _validate_slots(source, spec, template_id)
 
-    # nosec B701 - these templates emit Python, SQL and YAML, never HTML.
+    # B701: these templates emit Python, SQL and YAML, never HTML.
     # autoescape=True would HTML-escape quotes and ampersands and corrupt
     # every generated artifact.
     env = jinja2.Environment(  # nosec B701

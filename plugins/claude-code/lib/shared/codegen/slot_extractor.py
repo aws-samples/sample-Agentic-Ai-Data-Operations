@@ -16,7 +16,7 @@ def extract_slots(template_source: str) -> set[str]:
     Loop variables (e.g., 'x' in '{% for x in items %}') are excluded.
     Dotted access (e.g., '{{ spec.key }}') returns only the root name ('spec').
     """
-    # nosec B701 - parse() only, to discover variable names. Nothing is ever
+    # B701: parse() only, to discover variable names. Nothing is ever
     # rendered through this environment, so autoescape has no effect.
     env = jinja2.Environment()  # nosec B701
     ast = env.parse(template_source)
