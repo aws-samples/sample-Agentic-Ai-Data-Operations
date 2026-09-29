@@ -437,6 +437,16 @@ plugin-only:
       this script. It exists only because the plugin is installed elsewhere, so it
       has no repo counterpart to be derived from.
 
+  - target: scripts/adop_preflight.py
+    reason: >-
+      Answers "do I have what I need?", which nothing did before. The command's Phase 0
+      health check is a prompt asking the model to verify MCP connectivity, not a
+      deterministic test, so a missing dependency surfaced as a confusing failure several
+      minutes into a run. Reports the local and AWS tiers separately because they need very
+      different things — most of ADOP needs no AWS account at all — and warns when run
+      inside a project whose own .claude/hooks/ will make the plugin's hooks stand down.
+      No repo counterpart: a checkout's prerequisites are its pyproject.toml.
+
   - target: scripts/adop_check_drift.py
     reason: >-
       Companion entry point to adop_render.py, exposing the vendored

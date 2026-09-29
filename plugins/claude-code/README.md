@@ -31,12 +31,32 @@ will happily describe a plugin that failed to load:
 claude plugin list        # adop@adop-marketplace   ✔ enabled
 ```
 
-### Requirements
+### Check your prerequisites first
 
-Python 3.10+ with `jinja2`, `jsonschema` and `pyyaml` for the renderer. Add `boto3` for the four
-modules that call AWS — source profiling, PII tagging and post-deployment verification. AWS
-credentials via the standard chain; the plugin does not set `AWS_PROFILE`, so your own selection
-applies.
+```
+python3 "$CLAUDE_PLUGIN_ROOT/scripts/adop_preflight.py"
+```
+
+It reports two tiers separately, because they need very different things.
+
+**Local tier — no AWS account, no test data.** Python 3.10+ with `jinja2`, `jsonschema` and
+`pyyaml`. That is enough to run the discovery questions, have sub-agents write specs, render
+PySpark/SQL/DAG artifacts with provenance headers, and check them for drift. You can point the
+command at an `s3://` path that does not exist yet and still get a complete pipeline — the output
+is code, and it runs against real data later.
+
+**AWS tier — only for profiling a real source and deploying.** Adds `boto3`, `uv`/`uvx` to launch
+the MCP servers, and credentials via the standard chain. The plugin does not set `AWS_PROFILE`, so
+your own selection applies. Without this, Phase 3 profiling and Phase 5 deployment are unavailable
+and everything else still works.
+
+Preflight exits 1 if the local tier is blocked and names what to install; a degraded AWS tier is
+reported but never fails, because generating a pipeline without an AWS account is a legitimate way
+to use this.
+
+It also warns when you run it inside a project that has its own `.claude/hooks/` — the plugin's
+PreToolUse hooks stand down there, so you would be exercising that project's gate rather than the
+plugin's.
 
 ## Design principle: agents in dev, artifacts in prod
 
