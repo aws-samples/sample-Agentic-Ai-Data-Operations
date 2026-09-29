@@ -14,7 +14,9 @@ repos:
       - id: check-added-large-files
         name: block-large-files
         args: ['--maxkb=5120']  # 5MB limit
-      - id: mixed-line-endings
+      # `mixed-line-ending`, singular. pre-commit aborts the entire run on an
+      # unresolvable hook id, so the plural spelling silenced every hook below.
+      - id: mixed-line-ending
         args: ['--fix=lf']
       - id: trailing-whitespace
         args: ['--markdown-linebreak-ext=md']
@@ -85,6 +87,7 @@ repos:
         name: yaml-config-validator
         entry: python shared/utils/hook_validators/yaml_config_validator.py
         language: python
+        additional_dependencies: ['pyyaml']
         files: 'workloads/.*/config/.*\.yaml$'
 
       # Sensitive information scanner (hardcoded secrets, infra details, connection strings)
@@ -117,6 +120,7 @@ repos:
         name: prompt-injection-scanner
         entry: python shared/utils/hook_validators/prompt_injection_scanner.py
         language: python
+        additional_dependencies: ['pyyaml']
         files: 'workloads/.*/config/.*\.yaml$'
 
       # Tool registry consistency (servers.yaml matches .mcp.json, no stale refs)
