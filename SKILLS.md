@@ -1604,7 +1604,7 @@ After sub-agent returns, run:
    cd workloads/{workload_name}/dags
    python3 -c "from {workload_name}_pipeline import *"
    ```
-   
+
    **Common errors**:
    - `TaskGroup can only be used inside a dag` → must use `with DAG(...) as dag:` context manager
    - `Task X doesn't have a DAG` → ensure DAG context manager wraps all TaskGroups/operators
