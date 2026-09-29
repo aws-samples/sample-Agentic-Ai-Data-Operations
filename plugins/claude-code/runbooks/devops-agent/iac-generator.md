@@ -1,8 +1,8 @@
 # IaC Generator — Reference Material
 
 > **This is reference material, not the live prompt.** The prompt that takes
-> effect is [`agents/devops-agent.md`](../../agents/devops-agent.md),
-> which the harness resolves on `subagent_type: "adop:devops-agent"` and whose `tools:`
+> effect is [`agents/iac-agent.md`](../../agents/iac-agent.md),
+> which the harness resolves on `subagent_type: "adop:iac-agent"` and whose `tools:`
 > frontmatter is the actual enforcement point. Where the two disagree, the
 > agent file wins. Two instructions below are **superseded** and called out
 > where they appear: "ask the user" in §Phase 0 (sub-agents have no

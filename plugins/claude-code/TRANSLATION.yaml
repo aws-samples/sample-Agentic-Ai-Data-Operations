@@ -174,30 +174,6 @@ rewrite:
   # originals predate .claude/agents/ existing and instruct the sub-agent to write
   # PySpark directly, which CLAUDE.md:137 forbids. Until then they are recorded as
   # pending so the harness reports the gap instead of ignoring it.
-  - target: agents/metadata-agent.md
-    source: .claude/agents/metadata-agent.md
-    status: pending
-    note: plugin copy is freehand-generation; repo copy is spec-then-render
-  - target: agents/ontology-agent.md
-    source: .claude/agents/ontology-agent.md
-    status: pending
-    note: repo copy holds the one sanctioned MCP exception (glue-athena get_table)
-  - target: agents/transformation-agent.md
-    source: .claude/agents/transformation-agent.md
-    status: pending
-    note: repo copy renders via shared.codegen.renderer
-  - target: agents/data-quality-agent.md
-    source: .claude/agents/quality-agent.md
-    status: pending
-    note: same role, different name
-  - target: agents/orchestration-agent.md
-    source: .claude/agents/dag-agent.md
-    status: pending
-    note: same role, different name
-  - target: agents/devops-agent.md
-    source: .claude/agents/iac-agent.md
-    status: pending
-    note: same role, different name
 
   - target: commands/onboard-workflow.md
     source: .claude/commands/onboard-workflow.md
@@ -215,13 +191,12 @@ rewrite:
   - target: runbooks/devops-agent/iac-generator.md
     source: runbooks/devops-agent/iac-generator.md
     anchors: ["IaC Generator", "reference material, not the live prompt",
-              "agents/devops-agent.md", "adop:devops-agent"]
+              "agents/iac-agent.md", "adop:iac-agent"]
     note: >-
       Not a pure copy. Its header points readers at the live prompt, which in a
       checkout is .claude/agents/iac-agent.md reached via subagent_type
-      "iac-agent". Inside the plugin the live prompt is agents/devops-agent.md and
-      dispatch is namespaced to adop:devops-agent, so two references are
-      retargeted. The 1,076-line resource catalog below them is untouched.
+      "iac-agent". Inside the plugin the live prompt is agents/iac-agent.md and
+      dispatch is namespaced to adop:iac-agent, so two references are retargeted. The 1,076-line resource catalog below them is untouched.
       Caught by the doc-links gate, which resolved ../../.claude/agents/ from the
       plugin's runbooks directory and found nothing — the first case where a
       vendored file could not stay byte-identical.
@@ -276,6 +251,47 @@ rewrite:
       sections or by pointing at the vendored templates that now carry the same
       information.
 
+  # Six agents, derived from .claude/agents/ and adopting its names. Three of the
+  # plugin's previous files were renamed: data-quality-agent -> quality-agent,
+  # orchestration-agent -> dag-agent, devops-agent -> iac-agent. The repo's names are
+  # also the subagent_type values SKILLS.md documents, so a reader who follows
+  # TOOL_ROUTING.md to SKILLS.md finds names that match what the plugin dispatches
+  # (as adop:<name>). Keeping the old names would have meant a 3-of-6 mismatch and a
+  # manifest mapping nobody could check by eye.
+  #
+  # The previous plugin versions instructed sub-agents to write PySpark directly;
+  # CLAUDE.md:137 calls free-form generation forbidden. These produce a validated spec
+  # and invoke the vendored renderer, which is the architecture the repo mandates.
+  - target: agents/metadata-agent.md
+    source: .claude/agents/metadata-agent.md
+    anchors: ["metadata-agent"]
+    note: >-
+      opus, 6 tools. Retargets the load_spec invocation to put lib/ on sys.path, and rewrites the discovery-gate paragraph: the repo's PreToolUse hook does not exist for a plugin user, so the constraint is the agent's to honour rather than the harness's to impose.
+  - target: agents/ontology-agent.md
+    source: .claude/agents/ontology-agent.md
+    anchors: ["ontology-agent"]
+    note: >-
+      opus, 7 tools — the only agent holding an MCP tool, mcp__glue-athena__get_table, read-only, to fetch the Gold-zone schema.
+  - target: agents/transformation-agent.md
+    source: .claude/agents/transformation-agent.md
+    anchors: ["transformation-agent"]
+    note: >-
+      opus. Renderer block converted from the Python API to the CLI; bronze/silver/gold contracts and required fields retained.
+  - target: agents/quality-agent.md
+    source: .claude/agents/quality-agent.md
+    anchors: ["quality-agent"]
+    note: >-
+      opus. Was data-quality-agent. Records that lib/shared/utils/quality_checks.py is deliberately absent so the agent does not create it.
+  - target: agents/dag-agent.md
+    source: .claude/agents/dag-agent.md
+    anchors: ["dag-agent"]
+    note: >-
+      sonnet. Was orchestration-agent. The only agent whose VERSION key the repo names explicitly (DAG_TEMPLATE_VERSION); the CLI now resolves it, so the agent no longer passes template_version.
+  - target: agents/iac-agent.md
+    source: .claude/agents/iac-agent.md
+    anchors: ["iac-agent"]
+    note: >-
+      opus. Was devops-agent. Points at runbooks/devops-agent/iac-generator.md for the resource catalog.
 # ---------------------------------------------------------------------------
 # transform — content carried by a different primitive
 # ---------------------------------------------------------------------------
