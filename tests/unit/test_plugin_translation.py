@@ -372,3 +372,53 @@ def test_report_pending_translations(manifest, capsys):
         print(f"\n  translation pending: {len(pending)}")
         for section, status, target, note in pending:
             print(f"    [{status:<7}] {target}" + (f"  — {note.strip()}" if note else ""))
+
+
+# --------------------------------------------------------------------------
+# Every template must be renderable from the contract the CLI maps it to
+# --------------------------------------------------------------------------
+
+def test_render_cli_maps_each_template_to_a_contract_that_has_its_slots():
+    """A template whose required slots are absent from its contract can never render.
+
+    Found by an end-to-end run rather than by unit tests: 2 of 7 templates failed with
+    MissingSlotError. One was a mapping error of mine — glue_job_config needs `tasks`,
+    which only dag_spec defines, and it was mapped to silver. The other, iceberg_ddl,
+    needs `tables`, which no v1 contract defines at all, so it is unrenderable upstream
+    too and is xfailed here rather than silently skipped.
+    """
+    import json
+    import re
+
+    cli = (PLUGIN / "scripts" / "adop_render.py").read_text()
+    table = re.search(r"TEMPLATES = \{(.*?)\n\}", cli, re.S).group(1)
+    mapping = dict(re.findall(r'"([a-z_]+)": \("[a-z]+", "([a-z_]+)"', table))
+    assert mapping, "could not parse the TEMPLATES table"
+
+    tmpl_dir = PLUGIN / "lib" / "shared" / "templates"
+    unrenderable = []
+    for template_id, contract in mapping.items():
+        candidates = list(tmpl_dir.glob(f"{template_id}.*.j2"))
+        assert candidates, f"no template file for {template_id}"
+        # required_slots is line 2 of the header block, not line 0 — reading only the
+        # first line made this test find nothing and pass vacuously on its first run.
+        head = "\n".join(candidates[0].read_text().splitlines()[:6])
+        m = re.search(r"required_slots:\s*(.+?)\s*#\}", head)
+        if not m:
+            continue
+        needed = {s.strip() for s in m.group(1).split(",") if s.strip()}
+        schema = json.loads(
+            (PLUGIN / "lib" / "contracts" / "v1" / f"{contract}_spec.schema.json").read_text()
+        )
+        missing = sorted(needed - set(schema.get("properties", {})))
+        if missing:
+            unrenderable.append(f"{template_id} -> {contract}_spec is missing {missing}")
+
+    # iceberg_ddl is a known upstream gap: `tables` is in no v1 contract. Asserting the
+    # exact set means this test starts failing the moment it is fixed upstream, which is
+    # the reminder to remove the exemption.
+    known = ["iceberg_ddl -> silver_spec is missing ['tables']"]
+    assert unrenderable == known, (
+        "template/contract mapping problems:\n  " + "\n  ".join(unrenderable)
+        + f"\n\nExpected only the known upstream gap:\n  {known[0]}"
+    )

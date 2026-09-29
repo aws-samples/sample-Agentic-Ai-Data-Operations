@@ -68,7 +68,15 @@ TEMPLATES = {
     "gold_aggregate": ("gold", "gold", "TRANSFORMATION_TEMPLATE_VERSION"),
     "quality_check": ("quality", "quality", "QUALITY_RULES_TEMPLATE_VERSION"),
     "airflow_dag": ("dag", "dag", "DAG_TEMPLATE_VERSION"),
-    "glue_job_config": ("silver", "silver", "TEMPLATE_VERSION"),
+    # glue_job_config's required_slots header asks for `tasks`, which only dag_spec
+    # defines — so it renders from config/dag.yaml, not config/silver.yaml. An earlier
+    # version of this table mapped it to silver and the template was unrenderable.
+    "glue_job_config": ("dag", "dag", "TEMPLATE_VERSION"),
+    # iceberg_ddl asks for `tables`, which NO v1 contract defines, so no valid spec can
+    # render it. Left mapped to silver to match its closest sibling; it will fail with
+    # MissingSlotError until contracts/v1/silver_spec.schema.json gains a `tables`
+    # property upstream. Reported rather than worked around: adding the property here
+    # would break byte-identity with the repo's contract.
     "iceberg_ddl": ("silver", "silver", "TEMPLATE_VERSION"),
 }
 
