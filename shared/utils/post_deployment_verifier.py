@@ -252,7 +252,10 @@ class PostDeploymentVerifier:
             }
             data = f"dags list -o json".encode()
             req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-            response = urllib.request.urlopen(req)
+            # nosec B310 - the scheme is the literal "https://" above and the host
+            # comes from an authenticated mwaa.create_cli_token() response, so the
+            # file:/ and custom-scheme cases B310 guards against cannot arise.
+            response = urllib.request.urlopen(req)  # nosec B310
             import base64
             output = base64.b64decode(json.loads(response.read())["stdout"]).decode()
 
