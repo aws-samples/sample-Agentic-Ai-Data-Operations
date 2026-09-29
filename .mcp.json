@@ -2,17 +2,7 @@
   "mcpServers": {
     "glue-athena": {
       "command": "uv",
-      "args": [
-        "run",
-        "--no-project",
-        "--with",
-        "fastmcp",
-        "--with",
-        "boto3",
-        "--python",
-        "3.13",
-        "mcp-servers/glue-athena-server/server.py"
-      ],
+      "args": ["run", "--no-project", "--with", "fastmcp", "--with", "boto3", "--python", "3.13", "mcp-servers/glue-athena-server/server.py"],
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default"
@@ -20,17 +10,7 @@
     },
     "lakeformation": {
       "command": "uv",
-      "args": [
-        "run",
-        "--no-project",
-        "--with",
-        "fastmcp",
-        "--with",
-        "boto3",
-        "--python",
-        "3.13",
-        "mcp-servers/lakeformation-server/server.py"
-      ],
+      "args": ["run", "--no-project", "--with", "fastmcp", "--with", "boto3", "--python", "3.13", "mcp-servers/lakeformation-server/server.py"],
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default"
@@ -38,17 +18,7 @@
     },
     "sagemaker-catalog": {
       "command": "uv",
-      "args": [
-        "run",
-        "--no-project",
-        "--with",
-        "fastmcp",
-        "--with",
-        "boto3",
-        "--python",
-        "3.13",
-        "mcp-servers/sagemaker-catalog-server/server.py"
-      ],
+      "args": ["run", "--no-project", "--with", "fastmcp", "--with", "boto3", "--python", "3.13", "mcp-servers/sagemaker-catalog-server/server.py"],
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default"
@@ -56,11 +26,7 @@
     },
     "core": {
       "command": "uvx",
-      "args": [
-        "--from",
-        "awslabs-core-mcp-server",
-        "awslabs.core-mcp-server"
-      ],
+      "args": ["--from", "awslabs-core-mcp-server", "awslabs.core-mcp-server"],
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default",
@@ -69,11 +35,7 @@
     },
     "iam": {
       "command": "uvx",
-      "args": [
-        "--from",
-        "awslabs-iam-mcp-server",
-        "awslabs.iam-mcp-server"
-      ],
+      "args": ["--from", "awslabs-iam-mcp-server", "awslabs.iam-mcp-server"],
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default",
@@ -82,11 +44,7 @@
     },
     "lambda": {
       "command": "uvx",
-      "args": [
-        "--from",
-        "awslabs-lambda-mcp-server",
-        "awslabs.lambda-mcp-server"
-      ],
+      "args": ["--from", "awslabs-lambda-mcp-server", "awslabs.lambda-mcp-server"],
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default",
@@ -95,11 +53,7 @@
     },
     "s3-tables": {
       "command": "uvx",
-      "args": [
-        "--from",
-        "awslabs-s3-tables-mcp-server",
-        "awslabs.s3-tables-mcp-server"
-      ],
+      "args": ["--from", "awslabs-s3-tables-mcp-server", "awslabs.s3-tables-mcp-server"],
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default",
@@ -108,11 +62,7 @@
     },
     "cloudtrail": {
       "command": "uvx",
-      "args": [
-        "--from",
-        "awslabs-cloudtrail-mcp-server",
-        "awslabs.cloudtrail-mcp-server"
-      ],
+      "args": ["--from", "awslabs-cloudtrail-mcp-server", "awslabs.cloudtrail-mcp-server"],
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default",
@@ -121,11 +71,7 @@
     },
     "redshift": {
       "command": "uvx",
-      "args": [
-        "--from",
-        "awslabs-redshift-mcp-server",
-        "awslabs.redshift-mcp-server"
-      ],
+      "args": ["--from", "awslabs-redshift-mcp-server", "awslabs.redshift-mcp-server"],
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default",
@@ -134,11 +80,7 @@
     },
     "cloudwatch": {
       "command": "uvx",
-      "args": [
-        "--from",
-        "awslabs-cloudwatch-mcp-server",
-        "awslabs.cloudwatch-mcp-server"
-      ],
+      "args": ["--from", "awslabs-cloudwatch-mcp-server", "awslabs.cloudwatch-mcp-server"],
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default",
@@ -147,11 +89,7 @@
     },
     "cost-explorer": {
       "command": "uvx",
-      "args": [
-        "--from",
-        "awslabs-cost-explorer-mcp-server",
-        "awslabs.cost-explorer-mcp-server"
-      ],
+      "args": ["--from", "awslabs-cost-explorer-mcp-server", "awslabs.cost-explorer-mcp-server"],
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default",
@@ -160,11 +98,7 @@
     },
     "dynamodb": {
       "command": "uvx",
-      "args": [
-        "--from",
-        "awslabs-dynamodb-mcp-server",
-        "awslabs.dynamodb-mcp-server"
-      ],
+      "args": ["--from", "awslabs-dynamodb-mcp-server", "awslabs.dynamodb-mcp-server"],
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default",
@@ -173,17 +107,7 @@
     },
     "pii-detection": {
       "command": "uv",
-      "args": [
-        "run",
-        "--no-project",
-        "--with",
-        "boto3",
-        "--with",
-        "fastmcp",
-        "--python",
-        "3.13",
-        "mcp-servers/pii-detection-server/server.py"
-      ],
+      "args": ["run", "--no-project", "--with", "boto3", "--with", "fastmcp", "--python", "3.13", "mcp-servers/pii-detection-server/server.py"],
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default"
