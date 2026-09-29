@@ -484,3 +484,36 @@ def test_plugin_contains_no_broken_or_escaping_symlinks():
         "symlinks that will not survive an install:\n  " + "\n  ".join(offenders)
         + "\nReplace with a real file copy."
     )
+
+
+def test_drift_cli_refuses_paths_that_contain_no_artifacts(tmp_path):
+    """Nothing to check must not read as nothing wrong.
+
+    `adop_check_drift.py` already refused an empty *argument* list. Arguments that
+    resolve to zero artifacts hit the same wall one level in: pointing it at a workload
+    whose artifacts are absent, or sit outside scripts/dags/sql, printed nothing and
+    exited 0 — indistinguishable from "every artifact clean". Found by an end-to-end
+    run, not by a unit test: the tool reported success without naming a single file.
+
+    Exercised as a subprocess because the guard lives in `__main__`, and a test that
+    imported the helper would not prove the CLI wires it up.
+    """
+    import subprocess
+
+    cli = PLUGIN / "scripts" / "adop_check_drift.py"
+    (tmp_path / "workloads" / "hollow" / "config").mkdir(parents=True)
+
+    r = subprocess.run(
+        [sys.executable, str(cli), "workloads/hollow"],
+        cwd=tmp_path, capture_output=True, text=True,
+    )
+    assert r.returncode == 2, (
+        f"a path with no artifacts exited {r.returncode}; 0 would read as a pass\n"
+        f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    )
+    assert "no rendered artifacts found" in r.stderr
+
+    r = subprocess.run(
+        [sys.executable, str(cli)], cwd=tmp_path, capture_output=True, text=True,
+    )
+    assert r.returncode == 2 and "no paths given" in r.stderr
