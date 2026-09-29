@@ -1,21 +1,23 @@
 #!/bin/bash
 # ADOP hook launcher for Kiro.
 #
-# Solves two incompatibilities between Claude Code and Kiro:
+# The gate scripts under this directory are shared with the other ADOP editions, so they read
+# and write a slightly different hook contract than Kiro uses. This launcher sits in front of
+# them and adapts both directions. Everything below is what that adaptation involves.
 #
-#  1. PATH RESOLUTION. Claude Code hooks use ${CLAUDE_PLUGIN_ROOT} to locate bundled
-#     scripts. Kiro documents no bundle-root variable and does not path-resolve hook
-#     commands. This script locates the bundle from its OWN path, so it works whether
-#     Kiro invokes it relatively or absolutely, from any cwd.
+#  1. PATH RESOLUTION. Kiro does not path-resolve hook commands and documents no bundle-root
+#     variable, so this script locates its own directory from ${BASH_SOURCE[0]} and finds the
+#     gates relative to that. Works whether Kiro invokes it relatively or absolutely, from any
+#     working directory.
 #
-#  2. BLOCK CONTRACT. Claude Code signals a block with JSON on STDOUT + exit 0:
+#  2. BLOCK CONTRACT. Kiro blocks a tool call when a hook exits 2, and shows the reason from
+#     STDERR. The gate scripts instead print a JSON decision on STDOUT and exit 0:
 #       {"hookSpecificOutput":{"permissionDecision":"deny","permissionDecisionReason":"..."}}
-#       {"decision":"block","reason":"..."}                      (PostToolUse form)
-#     Kiro signals a block with EXIT CODE 2 and the reason on STDERR, and ignores that
-#     JSON entirely. Ported verbatim, every gate would exit 0 and Kiro would allow the
-#     write -- the gate would silently stop working.
+#       {"decision":"block","reason":"..."}
+#     Kiro ignores that JSON. Without translation every gate would exit 0, Kiro would allow the
+#     write, and the gate would silently stop working while appearing healthy.
 #
-# Usage: adop-hook.sh <script-name-in-hooks-dir>
+# Usage: adop-hook.sh <script-name-in-this-directory>
 set -uo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -28,14 +30,13 @@ fi
 
 INPUT=$(cat)
 
-# 3. KEY NORMALISATION. Measured from a live Kiro IDE PreToolUse payload:
+# 3. KEY NORMALISATION. A live Kiro PreToolUse payload looks like:
 #      {"tool_name":"fs_write","tool_input":{"path":"/abs/path","text":"..."}}
-#    The upstream hooks were written against Claude Code's names:
-#      file_path / content / new_string
-#    block_credentials reads content|new_string only, so given Kiro's "text" it saw
-#    empty content and allowed writes carrying credentials -- exit 0, no complaint.
-#    Normalise additively here rather than editing the vendored scripts, so upstream
-#    stays cheap to re-sync and one change covers every hook.
+#    The gate scripts expect file_path / content / new_string. This is not cosmetic: the
+#    credentials gate reads content|new_string, so given only "text" it saw an empty body and
+#    allowed writes carrying AWS keys -- exit 0, no complaint, no sign anything was wrong.
+#    Keys are added here rather than renamed in the scripts, so the shared implementation stays
+#    shared and one change covers every gate.
 if command -v jq >/dev/null 2>&1; then
   NORM=$(printf '%s' "$INPUT" | jq -c '
     if (.tool_input | type) == "object" then
@@ -59,11 +60,10 @@ if [ "$RC" -eq 2 ]; then
   exit 2
 fi
 
-# 4. CONTEXT-INJECTION TRANSLATION. Claude Code returns session context as
-#    {"hookSpecificOutput":{"additionalContext":"..."}} on stdout. Kiro's SessionStart and
-#    UserPromptSubmit contract is simpler: exit 0 and whatever is on STDOUT is added to the
-#    agent's context. So unwrap the field and emit it as plain text, or the agent receives a
-#    JSON blob it has to interpret instead of usable context.
+# 4. CONTEXT INJECTION. For SessionStart and UserPromptSubmit, Kiro adds whatever a hook
+#    prints on STDOUT to the agent's context. The run-context hook instead returns it wrapped as
+#    {"hookSpecificOutput":{"additionalContext":"..."}}. Unwrap it, or the agent receives a JSON
+#    blob to interpret instead of usable context.
 if command -v jq >/dev/null 2>&1; then
   CTX=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.additionalContext // .additionalContext // empty' 2>/dev/null)
   if [ -n "$CTX" ]; then
@@ -72,7 +72,7 @@ if command -v jq >/dev/null 2>&1; then
   fi
 fi
 
-# Translate both Claude Code block dialects into Kiro's.
+# Translate either JSON decision form into Kiro's exit-2 + STDERR contract.
 if printf '%s' "$OUT" | grep -qE '"(permissionDecision"[[:space:]]*:[[:space:]]*"deny|decision"[[:space:]]*:[[:space:]]*"block)"'; then
   REASON=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecisionReason // .reason // empty' 2>/dev/null)
   [ -z "$REASON" ] && REASON="Blocked by ADOP policy gate."

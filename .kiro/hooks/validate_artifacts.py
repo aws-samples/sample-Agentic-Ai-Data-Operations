@@ -6,7 +6,7 @@ code is caught at build time, before promotion. Non-blocking by default: it surf
 to the model via a JSON decision so it can self-correct, and only BLOCKs on hard failures
 (unparseable Python, credential leaks).
 
-Reads the PostToolUse payload from stdin (Claude Code contract). Emits a JSON object on stdout:
+Reads the PostToolUse payload from stdin. Emits a JSON object on stdout:
   {"decision": "block", "reason": "..."}  -> feeds reason back to the model
   {}                                        -> allow, nothing to say
 """
