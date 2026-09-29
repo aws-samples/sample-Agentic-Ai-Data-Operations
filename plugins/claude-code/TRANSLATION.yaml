@@ -356,10 +356,16 @@ rewrite:
 transform:
   - target: skills/decision-engine/SKILL.md
     sources: [.claude/rules/02-architecture.md, TOOL_ROUTING.md]
-    status: pending
+    note: >-
+      Config table now points at the vendored tool-registry/ and TOOL_ROUTING.md rather
+      than hand-maintained copies, and records what those copies had drifted to: 12
+      servers of 13, 10 invariants of 11, 5 routing intents of 8.
   - target: skills/data-compliance/SKILL.md
     sources: [runbooks/data-onboarding-agent/regulation/README.md]
-    status: pending
+    note: >-
+      Framework table now points at the vendored regulation packs, which are the control
+      sets themselves (235-293 lines each) rather than the 18-23 line summaries it
+      previously listed.
 
   # Phase D creates these three. `planned` means the target does not exist yet,
   # as distinct from `pending`, where it exists but still holds untranslated
