@@ -175,18 +175,6 @@ rewrite:
   # PySpark directly, which CLAUDE.md:137 forbids. Until then they are recorded as
   # pending so the harness reports the gap instead of ignoring it.
 
-  - target: commands/onboard-workflow.md
-    source: .claude/commands/onboard-workflow.md
-    status: pending
-    anchors: ["Step 1", "Step 2", "Completion Gate", "AskUserQuestion",
-              "discovery_complete", "Workflow"]
-    note: >-
-      plugin copy is 130 lines against the repo's 546 and is missing four
-      mechanisms: the Workflow tool, AskUserQuestion, the .discovery_complete
-      marker, and the renderer.
-  - target: commands/devops-workflow.md
-    source: .claude/commands/devops-workflow.md
-    status: pending
 
   - target: runbooks/devops-agent/iac-generator.md
     source: runbooks/devops-agent/iac-generator.md
@@ -292,6 +280,41 @@ rewrite:
     anchors: ["iac-agent"]
     note: >-
       opus. Was devops-agent. Points at runbooks/devops-agent/iac-generator.md for the resource catalog.
+  - target: commands/onboard-workflow.md
+    source: .claude/commands/onboard-workflow.md
+    anchors: ["Step 1", "Completion Gate", "AskUserQuestion", "discovery_complete",
+              "Workflow", "STOP — Human-in-the-Loop Gate", "adop_render.py",
+              "adop:transformation-agent"]
+    note: >-
+      546 -> 636 lines. The repo's Workflow script is carried intact: 9 Steps, 6 question
+      Groups, the Completion Gate, the .discovery_complete marker and all 12 inline
+      agent() calls. Retargeted: the renderer fence from `from shared.codegen.renderer
+      import render` to the vendored CLI, contracts/v1 to lib/contracts/v1, and every
+      command reference to /adop:.
+
+      Two additions, both deliberate. First, CLAUDE.md's STOP gate is repeated in the
+      command body — in a checkout CLAUDE.md is always in context and a PreToolUse hook
+      independently denies writes until discovery completes, and a plugin has neither, so
+      the command body is the only place the gate is guaranteed to be read. Second, a
+      section documenting direct dispatch of adop:<agent> for re-running a single stage,
+      which makes the six agent files first-class entry points rather than definitions the
+      command happens not to use.
+
+      Note the repo disagrees with itself here and the plugin inherits that: rules/02 and
+      SKILLS.md describe dispatch by subagent_type, while this command inlines prompts
+      into a Workflow script. Both arrived in the same commit (ba97329), so it reads as an
+      intent the command was never migrated to. Translating faithfully means the plugin
+      tracks whatever the repo settles on.
+
+  - target: commands/devops-workflow.md
+    source: .claude/commands/devops-workflow.md
+    anchors: ["adop:devops-workflow", "${CLAUDE_PLUGIN_ROOT}/agents/iac-agent.md"]
+    note: >-
+      397 lines. Its Workflow script tells the sub-agent to Read the iac-agent file as its
+      prompt rather than dispatching by name — a third pattern again — so that Read is
+      retargeted to ${CLAUDE_PLUGIN_ROOT}/agents/iac-agent.md. Also retargets
+      lib/contracts/v1, lib/shared/templates and the /adop: command prefixes.
+
 # ---------------------------------------------------------------------------
 # transform — content carried by a different primitive
 # ---------------------------------------------------------------------------
