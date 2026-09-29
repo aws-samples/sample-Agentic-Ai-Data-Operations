@@ -208,6 +208,40 @@ def test_every_rule_file_is_claimed_by_some_target(manifest):
     )
 
 
+@pytest.mark.parametrize(
+    "subdir,pattern",
+    [
+        (".claude/commands", "*.md"),
+        (".claude/agents", "*.md"),
+        (".claude/hooks", "*.py"),
+        (".claude/hooks", "*.sh"),
+    ],
+)
+def test_every_repo_component_is_claimed_by_some_target(manifest, subdir, pattern):
+    """The rules/ guard above was the only completeness check, and that was the hole.
+
+    `test_every_rule_file_is_claimed_by_some_target` covers .claude/rules/ and
+    nothing else, so an omission anywhere else in .claude/ was invisible. That is
+    how `.claude/commands/security-review.md` and three of the five
+    `.claude/hooks/` went missing from both the plugin and the manifest with every
+    test green — the manifest asserts the derivation is complete, and the only
+    directory anyone verified was the one directory already known to be complete.
+
+    A component may legitimately not cross over. It may not do so silently: list
+    it under `untranslatable` with a reason, and this passes.
+    """
+    claimed = {s for _, s in _all_sources(manifest)}
+    found = sorted(
+        p.relative_to(REPO).as_posix() for p in (REPO / subdir).glob(pattern)
+    )
+    orphans = [f for f in found if f not in claimed]
+    assert not orphans, (
+        f"these {subdir}/{pattern} files are neither translated nor declared:\n  "
+        + "\n  ".join(orphans)
+        + "\nAdd each to TRANSLATION.yaml — as a target, or as untranslatable with a reason."
+    )
+
+
 def test_untranslatable_entries_state_a_reason(manifest):
     """An undocumented gap is indistinguishable from an oversight."""
     thin = [

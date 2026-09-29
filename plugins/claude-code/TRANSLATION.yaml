@@ -337,6 +337,67 @@ rewrite:
       months behind a one-character typo. This is the machinery behind the plugin's most
       emphasised rule: without it the Phase 1 gate is advisory prose.
 
+  - target: hooks/check_logging.py
+    source: .claude/hooks/check-logging.sh
+    anchors: ["StructuredLogger", "logs/ directory does not exist",
+              "trace_events.jsonl does not exist", "decisions array",
+              "stand_down_if_project_owns"]
+    note: >-
+      Python port, same four checks in the same order, deny wording preserved verbatim so
+      a user who hits a block finds the identical sentence in the repo. Ported for the
+      same reason as check_discovery_gate.py: the shell original calls jq six times, and
+      when jq is absent it prints to stderr, continues, finds an empty file_path and
+      exits 0 — the gate silently opens. Differentially tested against the original over
+      19 payloads (6 deny, 13 allow): agreement 19/19.
+
+      Two of the original's quirks are kept rather than improved: check 4 applies to every
+      written file, not only workload artifacts; and check 1 fires only when `content` is
+      present, so an Edit that strips the import passes. Both belong in a repo fix, not in
+      a divergence only this file would record.
+
+  - target: hooks/inject_run_context.py
+    source: .claude/hooks/inject_run_context.py
+    anchors: ["IN-FLIGHT ADOP RUN", "AUTHORITATIVE", "TERMINAL_PHASES",
+              "stand_down_if_project_owns"]
+    note: >-
+      One line had to change and it is the line that makes a plugin a plugin:
+      PROJECT_ROOT moves from Path(__file__).resolve().parents[2] to Path(os.getcwd()).
+      In the plugin __file__ resolves inside the install cache, which holds no workloads/,
+      so deriving the root from the hook's own location would scan the cache, find
+      nothing, and stay silent forever — indistinguishable from "no in-flight run".
+
+      Also added _rel(), because the original calls relative_to(PROJECT_ROOT) bare and
+      that raises ValueError once PROJECT_ROOT is the working directory rather than a
+      known ancestor. A display-only string must not be what breaks session startup.
+
+      Needed because the plugin ships skills/pipeline-conventions carrying
+      .claude/rules/11-shared-run-context.md, which tells agents to read
+      run/context.json and treat human_answers as authoritative. Without this hook
+      nothing surfaces that file at session start, so after a compaction the
+      orchestrator re-asks the human — the exact failure the rule exists to prevent.
+      Shipping the rule without the hook ships the instruction without the mechanism.
+
+  - target: hooks/log_conversation.py
+    source: .claude/hooks/log_conversation.py
+    anchors: ["AskUserQuestion", "question_asked", "user_responded",
+              "stand_down_if_project_owns"]
+    note: >-
+      Body unchanged — the original already writes to a relative logs/ path, which
+      resolves against the working directory and is therefore correct for a plugin with
+      no edit. Only the stand-down guard is added, because hooks are not namespaced.
+
+      Needed because the plugin ships skills/observability carrying
+      .claude/rules/07-error-logging.md, which requires every Q&A exchange to be
+      captured; nothing else captures them automatically.
+
+      Two discrepancies in the original are preserved, not quietly fixed: its docstring
+      says it writes "the active workload's trace_events.jsonl via AgentTracer", but it
+      writes logs/conversation_events.jsonl itself and never imports AgentTracer, and the
+      relative path lands at the project root rather than under workloads/{name}/.
+      ADOP_WORKLOAD is recorded inside each entry but does not steer the path. Both are
+      the repo's behaviour; a translation that silently improved on its source would be
+      one nobody could verify.
+
   - target: hooks/enforce_template_codegen.py
     source: .claude/hooks/enforce_template_codegen.py
     anchors: ["adop_render.py", "MissingSlotError", "stand_down_if_project_owns",
@@ -525,6 +586,23 @@ plugin-only:
 # untranslatable — recorded as a limitation, not hidden
 # ---------------------------------------------------------------------------
 untranslatable:
+  - source: .claude/commands/security-review.md
+    reason: >-
+      A generic branch security review — it reads `git status`, `git diff --name-only
+      origin/HEAD...` and `git log`, then reasons about the diff. Nothing in it is about
+      Bronze/Silver/Gold, specs, contracts or the codegen renderer, and it would behave
+      identically in any repository.
+
+      Not shipped because the plugin's job is to carry ADOP's data-operations capability
+      into a user's own data repo, and a git-diff reviewer is not that capability. A user
+      who wants it is better served by a dedicated security-review plugin than by one
+      bundled inside ADOP, where it would inherit ADOP's release cadence and version.
+
+      Recorded here rather than left absent: it was missing from both the plugin and this
+      manifest until `test_every_repo_component_is_claimed_by_some_target` was added, and
+      an undeclared omission is indistinguishable from an oversight — which is precisely
+      what this one was.
+
   - source: mcp-servers/pii-detection-server/pii_detection_and_tagging.py
     reason: >-
       Not shipped, and it is vestigial upstream. In the repo it is a symlink to
