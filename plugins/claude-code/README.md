@@ -21,7 +21,7 @@ stay auditable and cost-predictable.
 ## What's in the plugin
 
 ```
-adop-plugin/
+plugins/claude-code/
 ├── .claude-plugin/
 │   ├── plugin.json         # plugin manifest
 │   └── marketplace.json    # local marketplace entry (for /plugin marketplace add)
@@ -62,11 +62,11 @@ adop-plugin/
 
 ## Install
 
-From the directory containing `adop-plugin/`:
+From the repository root:
 
 ```
 # In Claude Code
-/plugin marketplace add ./adop-plugin
+/plugin marketplace add ./plugins/claude-code
 /plugin install adop@adop-marketplace
 ```
 
