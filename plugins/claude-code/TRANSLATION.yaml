@@ -300,12 +300,22 @@ transform:
     sources:
       - .claude/rules/00-zone-questions.md
       - .claude/rules/01-human-gate-examples.md
-    status: planned
+    note: >-
+      252 lines of source. States plainly that the gate is weaker here than in a
+      checkout — rules are always in context and a PreToolUse hook blocks writes,
+      whereas a skill body loads on demand and the plugin installs no hook into the
+      user's repo. The load-bearing part therefore also lives in the command body.
   - target: skills/observability/SKILL.md
     sources:
       - .claude/rules/07-error-logging.md
       - .claude/rules/11-shared-run-context.md
-    status: planned
+      - .claude/rules/10-ascii-stages.md
+    note: >-
+      10-ascii-stages lives here rather than in pipeline-conventions: its purpose is
+      that terminal output and trace_events.jsonl stay byte-identical at width 70,
+      which is a tracing concern. Carries the run-context contract the agents cite
+      seven times, the prose-to-spec translation rules, the three trace layers and
+      the error taxonomy.
   - target: skills/pipeline-conventions/SKILL.md
     sources:
       - .claude/rules/03-python-airflow.md
@@ -314,8 +324,6 @@ transform:
       - .claude/rules/06-quality-testing.md
       - .claude/rules/08-transformations.md
       - .claude/rules/09-glossary.md
-      - .claude/rules/10-ascii-stages.md
-    status: planned
     note: >-
       the predecessor's version substituted its own five quality dimensions,
       dropping Accuracy and Consistency, which makes scores incomparable between
