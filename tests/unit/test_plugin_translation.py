@@ -310,6 +310,53 @@ def test_aws_modules_are_confined_to_the_named_four(module):
 
 
 # --------------------------------------------------------------------------
+# The README must keep describing the plugin that exists
+# --------------------------------------------------------------------------
+
+def test_readme_names_every_skill_and_agent():
+    """The README went stale during this port and nothing caught it.
+
+    By the end of Phase D it still listed 2 skills where 7 shipped, and named three
+    agents — data-quality-agent, orchestration-agent, devops-agent — that had been
+    renamed out of existence. A reader following it would have invoked agents that do
+    not exist. Adding or renaming a component now fails here.
+    """
+    readme = (PLUGIN / "README.md").read_text()
+    components = [p.parent.name for p in (PLUGIN / "skills").glob("*/SKILL.md")]
+    components += [p.stem for p in (PLUGIN / "agents").glob("*.md")]
+    missing = sorted(c for c in components if c not in readme)
+    assert not missing, (
+        "README does not mention these components:\n  " + "\n  ".join(missing)
+    )
+
+
+def test_readme_does_not_name_components_that_were_removed():
+    """Catches the other half: a name left behind after a rename."""
+    readme = (PLUGIN / "README.md").read_text()
+    live = {p.stem for p in (PLUGIN / "agents").glob("*.md")}
+    # Names the plugin used before Phase C1 adopted the repository's.
+    retired = {"data-quality-agent", "orchestration-agent", "devops-agent"}
+    stale = sorted(n for n in retired - live if n in readme)
+    assert not stale, (
+        "README still names agents that no longer exist: " + ", ".join(stale)
+    )
+
+
+def test_readme_states_both_fidelity_gaps():
+    """Two limitations are structural, and a user who hits them unwarned is owed better.
+
+    Skill bodies load on demand where .claude/rules/ is always in context, and a plugin
+    cannot install the commit-time gate. Both must stay documented.
+    """
+    readme = (PLUGIN / "README.md").read_text().lower()
+    for phrase, what in (
+        ("on-demand", "always-on rules becoming on-demand skills"),
+        ("pre-commit", "commit-time gating being opt-in"),
+    ):
+        assert phrase in readme, f"README no longer states the limitation: {what}"
+
+
+# --------------------------------------------------------------------------
 # Port progress — visible, not enforced
 # --------------------------------------------------------------------------
 
