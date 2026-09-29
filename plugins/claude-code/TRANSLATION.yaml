@@ -315,6 +315,31 @@ rewrite:
       retargeted to ${CLAUDE_PLUGIN_ROOT}/agents/iac-agent.md. Also retargets
       lib/contracts/v1, lib/shared/templates and the /adop: command prefixes.
 
+  - target: hooks/check_discovery_gate.py
+    source: .claude/hooks/check-discovery-gate.sh
+    anchors: ["Do NOT create the marker", "discovery_complete", "AskUserQuestion",
+              "stand_down_if_project_owns"]
+    note: >-
+      Python port of the shell original, same behaviour. Ported rather than vendored
+      because the original shells out to jq twice and a plugin cannot assume jq exists
+      on an arbitrary machine — and a gate that silently fails to run is worse than no
+      gate, which is exactly how this repo's whole pre-commit suite sat disabled for six
+      months behind a one-character typo. This is the machinery behind the plugin's most
+      emphasised rule: without it the Phase 1 gate is advisory prose.
+
+  - target: hooks/enforce_template_codegen.py
+    source: .claude/hooks/enforce_template_codegen.py
+    anchors: ["adop_render.py", "MissingSlotError", "stand_down_if_project_owns",
+              "config/*.yaml is not protected"]
+    note: >-
+      Deliberately STRICTER than its source. The repo's version allows a write when
+      ADOP_RENDERER_TOKEN is set (line 80, `and not token`), so anything able to export
+      that variable can write a hand-authored artifact — including the agent the hook
+      constrains. This version has no bypass and does not need one: the vendored renderer
+      writes through _atomic_write() straight to disk, not through the Write tool, so a
+      legitimate render never reaches a PreToolUse hook. Verified the token no longer
+      unlocks it.
+
 # ---------------------------------------------------------------------------
 # transform — content carried by a different primitive
 # ---------------------------------------------------------------------------
@@ -395,6 +420,18 @@ plugin-only:
       shared/, so the plugin vendors the engine under lib/ and agents shell out to
       this script. It exists only because the plugin is installed elsewhere, so it
       has no repo counterpart to be derived from.
+
+  - target: hooks/_stand_down.py
+    reason: >-
+      Plugin-only by necessity. Plugin agents, commands and skills are namespaced and
+      cannot shadow a project's own; hooks are the exception — they carry no namespace, so
+      every matching hook fires. Verified: installing this plugin into an ADOP checkout
+      took the hook count from 5 to 6, purely additive. That is the one way the plugin
+      could affect a repository's own /onboard-workflow, which is precisely what the repo
+      owner asked us to avoid. Each plugin hook calls this guard and exits quietly when the
+      project already ships the equivalent, so inside a checkout the project's hooks win
+      and outside one the plugin's do their job. The repo has no counterpart because the
+      repo has nothing to stand down for.
 
   - target: hooks/hooks.json
     reason: >-
