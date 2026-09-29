@@ -23,8 +23,8 @@ stay auditable and cost-predictable.
 ```
 plugins/claude-code/
 ├── .claude-plugin/
-│   ├── plugin.json         # plugin manifest
-│   └── marketplace.json    # local marketplace entry (for /plugin marketplace add)
+│   └── plugin.json         # plugin manifest
+│                           # (the marketplace manifest lives at the repo root)
 ├── commands/
 │   ├── onboard-workflow.md # /onboard-workflow — build a pipeline
 │   └── devops-workflow.md  # /devops-workflow — production readiness
@@ -62,15 +62,19 @@ plugins/claude-code/
 
 ## Install
 
-From the repository root:
-
 ```
-# In Claude Code
-/plugin marketplace add ./plugins/claude-code
+# In Claude Code — no clone needed
+/plugin marketplace add aws-samples/sample-Agentic-Ai-Data-Operations
 /plugin install adop@adop-marketplace
 ```
 
-Or point Claude Code at the published repo marketplace, then `/plugin install adop`.
+To work from a local clone instead, run this from the repository root — the
+marketplace manifest lives at the root and points here:
+
+```
+/plugin marketplace add ./
+/plugin install adop@adop-marketplace
+```
 
 Verify:
 ```
