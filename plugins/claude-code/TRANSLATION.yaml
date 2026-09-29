@@ -1,0 +1,212 @@
+# Translation manifest — the repository is normative, the plugin is derived.
+#
+# The repo works by being cloned: open Claude Code inside it and .claude/ loads
+# automatically. The plugin exists so the same capability works in the user's OWN
+# repo, where none of these files are present. So the plugin must CONTAIN the
+# content, not reference it — a plugin is copied into
+# ~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/ at install time and
+# cannot see this repository at all.
+#
+# Copies drift. This manifest is what makes that detectable: every file under
+# plugins/claude-code/ must appear here with a source and a category, and
+# tests/test_plugin_translation.py enforces it. A plugin file with no entry fails
+# the suite, which is the point — it stops content being invented in the plugin
+# that should have come from the repo.
+#
+# Categories, by how faithfully a plugin primitive can carry a repo primitive:
+#
+#   copy       Byte-identical. Asserted with filecmp. Used for the Python library,
+#              schemas, templates and data the agents load at runtime.
+#
+#   rewrite    Same content, paths retargeted — the plugin's library lives at
+#              ${CLAUDE_PLUGIN_ROOT}/lib, not shared/. Asserted structurally:
+#              the named anchors must still be present in the derived file.
+#
+#   transform  A different primitive carries the content (rules -> skills,
+#              CLAUDE.md -> command preamble). Asserted by coverage: every source
+#              must be claimed by some target, so a new rule cannot be forgotten.
+#
+#   plugin-only  No repo source. Only legitimate where the plugin must solve a
+#              problem the repo solves by other means; each entry states why.
+#
+#   untranslatable  A repo capability with no plugin equivalent at all. Recorded
+#              so it is a documented limitation rather than a silent absence.
+#
+# Phase A establishes the harness against the files that exist today. Entries are
+# added as Phases B-D vendor and translate the rest.
+
+version: 1
+
+# ---------------------------------------------------------------------------
+# rewrite — derived from repo sources, paths retargeted
+# ---------------------------------------------------------------------------
+rewrite:
+  # Phase C replaces these six with translations of .claude/agents/. Lavanya's
+  # originals predate .claude/agents/ existing and instruct the sub-agent to write
+  # PySpark directly, which CLAUDE.md:137 forbids. Until then they are recorded as
+  # pending so the harness reports the gap instead of ignoring it.
+  - target: agents/metadata-agent.md
+    source: .claude/agents/metadata-agent.md
+    status: pending
+    note: plugin copy is freehand-generation; repo copy is spec-then-render
+  - target: agents/ontology-agent.md
+    source: .claude/agents/ontology-agent.md
+    status: pending
+    note: repo copy holds the one sanctioned MCP exception (glue-athena get_table)
+  - target: agents/transformation-agent.md
+    source: .claude/agents/transformation-agent.md
+    status: pending
+    note: repo copy renders via shared.codegen.renderer
+  - target: agents/data-quality-agent.md
+    source: .claude/agents/quality-agent.md
+    status: pending
+    note: same role, different name
+  - target: agents/orchestration-agent.md
+    source: .claude/agents/dag-agent.md
+    status: pending
+    note: same role, different name
+  - target: agents/devops-agent.md
+    source: .claude/agents/iac-agent.md
+    status: pending
+    note: same role, different name
+
+  - target: commands/onboard-workflow.md
+    source: .claude/commands/onboard-workflow.md
+    status: pending
+    anchors: ["Step 1", "Step 2", "Completion Gate", "AskUserQuestion",
+              "discovery_complete", "Workflow"]
+    note: >-
+      plugin copy is 130 lines against the repo's 546 and is missing four
+      mechanisms: the Workflow tool, AskUserQuestion, the .discovery_complete
+      marker, and the renderer.
+  - target: commands/devops-workflow.md
+    source: .claude/commands/devops-workflow.md
+    status: pending
+
+# ---------------------------------------------------------------------------
+# transform — content carried by a different primitive
+# ---------------------------------------------------------------------------
+transform:
+  - target: skills/decision-engine/SKILL.md
+    sources: [.claude/rules/02-architecture.md, TOOL_ROUTING.md]
+    status: pending
+  - target: skills/data-compliance/SKILL.md
+    sources: [runbooks/data-onboarding-agent/regulation/README.md]
+    status: pending
+
+  # Phase D creates these three. `planned` means the target does not exist yet,
+  # as distinct from `pending`, where it exists but still holds untranslated
+  # content. Declared now so test_every_rule_file_is_claimed_by_some_target can
+  # prove no rule is dropped — the predecessor plugin lost exactly this, shipping
+  # condensations of rules that were later rewritten underneath it.
+  #
+  # The gate in 00 and 01 also goes into the command preamble, not only here:
+  # rules are always in context in a checkout, whereas a skill body loads on
+  # demand, and a gate that has to be invoked is not a gate.
+  - target: skills/discovery-protocol/SKILL.md
+    sources:
+      - .claude/rules/00-zone-questions.md
+      - .claude/rules/01-human-gate-examples.md
+    status: planned
+  - target: skills/observability/SKILL.md
+    sources:
+      - .claude/rules/07-error-logging.md
+      - .claude/rules/11-shared-run-context.md
+    status: planned
+  - target: skills/pipeline-conventions/SKILL.md
+    sources:
+      - .claude/rules/03-python-airflow.md
+      - .claude/rules/04-sql.md
+      - .claude/rules/05-yaml.md
+      - .claude/rules/06-quality-testing.md
+      - .claude/rules/08-transformations.md
+      - .claude/rules/09-glossary.md
+      - .claude/rules/10-ascii-stages.md
+    status: planned
+    note: >-
+      the predecessor's version substituted its own five quality dimensions,
+      dropping Accuracy and Consistency, which makes scores incomparable between
+      workloads; 06-quality-testing.md is the authority here
+
+  # Phase B5 replaces these four with vendored copies of the repo originals
+  # rather than hand-maintained summaries. servers.yaml already demonstrates why:
+  # it carries 12 servers where tool-registry/servers.yaml has 13, so `core` is
+  # missing and two BLOCK invariants have no server to route to.
+  - target: skills/decision-engine/config/servers.yaml
+    sources: [tool-registry/servers.yaml]
+    status: pending
+    note: 12 servers vs 13 in the source; `core` absent
+  - target: skills/decision-engine/config/invariants.yaml
+    sources: [tool-registry/invariants.yaml]
+    status: pending
+    note: 10 invariants vs 11; `iam-simulate-first` absent
+  - target: skills/decision-engine/config/TOOL_ROUTING.md
+    sources: [TOOL_ROUTING.md]
+    status: pending
+  - target: skills/decision-engine/config/standards.md
+    sources: [.claude/rules/02-architecture.md]
+    status: pending
+
+  # Phase B3 replaces these five summaries with the real regulation packs.
+  # The repo's HIPAA pack is 267 lines; the plugin's summary is 21.
+  - target: skills/data-compliance/regulations/gdpr.md
+    sources: [runbooks/data-onboarding-agent/regulation/gdpr.md]
+    status: pending
+  - target: skills/data-compliance/regulations/ccpa.md
+    sources: [runbooks/data-onboarding-agent/regulation/ccpa.md]
+    status: pending
+  - target: skills/data-compliance/regulations/hipaa.md
+    sources: [runbooks/data-onboarding-agent/regulation/hipaa.md]
+    status: pending
+    note: 21-line summary of a 267-line source
+  - target: skills/data-compliance/regulations/sox.md
+    sources: [runbooks/data-onboarding-agent/regulation/sox.md]
+    status: pending
+  - target: skills/data-compliance/regulations/pci_dss.md
+    sources: [runbooks/data-onboarding-agent/regulation/pci-dss.md]
+    status: pending
+
+# ---------------------------------------------------------------------------
+# plugin-only — no repo source, and a stated reason
+# ---------------------------------------------------------------------------
+plugin-only:
+  - target: .claude-plugin/plugin.json
+    reason: plugin manifest; no repo equivalent exists
+  - target: README.md
+    reason: install and usage docs for the packaged form
+  - target: TRANSLATION.yaml
+    reason: >-
+      this manifest; it describes the derivation and has nothing to derive from
+  - target: hooks/hooks.json
+    reason: >-
+      plugin hook wiring. Not derived from .claude/settings.json: the repo's five
+      hooks are tuned to a checkout of this repo, and three of them would
+      duplicate behaviour the plugin has no business enforcing in a user's tree.
+  - target: hooks/validate_artifacts.py
+    reason: >-
+      the nearest reachable translation of .pre-commit-config.yaml. Plugin hooks
+      fire on the agent's tool calls; pre-commit fires on git commit. This cannot
+      gate a human's commit, so it gates the agent's writes instead — Python must
+      parse, no hardcoded credentials, plus DAG-retry and Glue-lineage warnings.
+
+# ---------------------------------------------------------------------------
+# untranslatable — recorded as a limitation, not hidden
+# ---------------------------------------------------------------------------
+untranslatable:
+  - source: .pre-commit-config.yaml
+    reason: >-
+      18 hooks that reject a commit. A plugin cannot install git hooks into the
+      user's repository, and plugin hooks intercept a different thing — the
+      agent's tool calls, not commits. Mitigated by hooks/validate_artifacts.py
+      for the agent path; the commit gate must stay an opt-in the user installs.
+  - source: CLAUDE.md
+    reason: >-
+      Always in context for every turn in a checkout. A plugin has no equivalent:
+      skill descriptions are always-on but bodies load on demand. Phase D carries
+      the load-bearing part — the Phase 1 human-in-the-loop gate — into the
+      command body, which IS always loaded when the command runs. The remainder
+      becomes skills and is therefore weaker than in the repo.
+  - source: workloads/
+    reason: >-
+      Output, not capability. Generated pipelines land in the user's own repo, so
+      the plugin deliberately ships none of the 49 example files.
