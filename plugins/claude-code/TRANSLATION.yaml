@@ -52,6 +52,16 @@ version: 1
 # through lib/ and through shared/ produces byte-identical output.
 # ---------------------------------------------------------------------------
 copy:
+  - target: evals/fixtures/replay_workload/config/bronze.yaml
+    source: tests/fixtures/replay_workload/config/bronze.yaml
+  - target: evals/fixtures/replay_workload/config/dag.yaml
+    source: tests/fixtures/replay_workload/config/dag.yaml
+  - target: evals/fixtures/replay_workload/config/gold.yaml
+    source: tests/fixtures/replay_workload/config/gold.yaml
+  - target: evals/fixtures/replay_workload/config/quality.yaml
+    source: tests/fixtures/replay_workload/config/quality.yaml
+  - target: evals/fixtures/replay_workload/config/silver.yaml
+    source: tests/fixtures/replay_workload/config/silver.yaml
   - target: lib/contracts/README.md
     source: contracts/README.md
   - target: lib/contracts/v1/bronze_spec.schema.json
@@ -420,6 +430,49 @@ plugin-only:
       shared/, so the plugin vendors the engine under lib/ and agents shell out to
       this script. It exists only because the plugin is installed elsewhere, so it
       has no repo counterpart to be derived from.
+
+  - target: scripts/adop_check_drift.py
+    reason: >-
+      Companion entry point to adop_render.py, exposing the vendored
+      lib/shared/codegen/drift_validator.py. In a checkout that module is reachable as
+      `python -m shared.codegen.drift_validator`, which is how .pre-commit-config.yaml and
+      the Validate Prompts workflow invoke it; a user's repository has no importable
+      shared. Also refuses an empty argument list rather than exiting 0, because the
+      underlying validator treats no paths as a pass — the same vacuous-pass shape the
+      repo's own CI job works around by enumerating workload directories explicitly.
+
+  - target: evals/discovery-gate/case.yaml
+    reason: >-
+      Six behavioural eval cases, adapted from the predecessor plugin. Each targets a
+      defect the v0.1.0 baseline actually had rather than a hypothetical: discovery-gate
+      and discovery-gate-under-pressure because the baseline shipped an explicit escape
+      hatch from the Phase 1 gate; quality-dimensions because it substituted its own five
+      dimensions, dropping Accuracy and Consistency; spec-not-script and drift-detection
+      because it claimed determinism while shipping no renderer; hipaa-phi-controls because
+      its regulation packs were 8% of their sources. Every case carries a non-vacuity
+      guard, after a partial run showed the negative graders scoring 0.33 on an empty
+      transcript — "no invented config values appear" is trivially true of nothing.
+      No repo source: the repository has no eval suite.
+
+  - target: evals/discovery-gate-under-pressure/case.yaml
+    reason: >-
+      Eval case: "don't ask me questions" must reduce prompting depth, not skip confirmation — the baseline had an explicit escape hatch. No repo source — the repository has no eval suite.
+
+  - target: evals/quality-dimensions/case.yaml
+    reason: >-
+      Eval case: ADOP's five dimensions must be used, not a substituted set; the baseline dropped Accuracy and Consistency. No repo source — the repository has no eval suite.
+
+  - target: evals/hipaa-phi-controls/case.yaml
+    reason: >-
+      Eval case: PHI masked in Silver and suppressed in Gold at build time; the baseline's HIPAA pack was 21 lines of 267. No repo source — the repository has no eval suite.
+
+  - target: evals/spec-not-script/case.yaml
+    reason: >-
+      Eval case: a transform must be rendered from a spec, never hand-written. No repo source — the repository has no eval suite.
+
+  - target: evals/drift-detection/case.yaml
+    reason: >-
+      Eval case: a hand-edited artifact must be caught and fixed by re-rendering. No repo source — the repository has no eval suite.
 
   - target: hooks/_stand_down.py
     reason: >-

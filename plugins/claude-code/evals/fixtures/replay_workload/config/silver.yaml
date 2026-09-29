@@ -1,0 +1,39 @@
+dataset_name: replay_test
+schema_version: v1
+source_table: glue_catalog.replay_test_db.bronze_replay_test
+primary_key:
+  - record_id
+dedup_strategy: keep_latest
+dedup_order_by: updated_at
+null_handling:
+  strategy: drop_row
+  critical_columns:
+    - record_id
+    - amount
+quality_threshold: 0.85
+iceberg_database: replay_test_db
+iceberg_table: silver_replay_test
+iceberg_partition_spec: []
+type_casts:
+  - column: amount
+    from_type: STRING
+    to_type: DECIMAL
+    format: "10,2"
+    params:
+      precision: 10
+      scale: 2
+  - column: created_date
+    from_type: STRING
+    to_type: DATE
+    format: "yyyy-MM-dd"
+pii_masking:
+  enabled: true
+  columns:
+    - name: email
+      method: hash
+    - name: phone
+      method: redact
+quarantine:
+  enabled: true
+  location: s3://data-lake/replay_test/quarantine/
+  retention_days: 30

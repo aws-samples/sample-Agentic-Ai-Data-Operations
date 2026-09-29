@@ -1,0 +1,23 @@
+dataset_name: replay_test
+schema_version: v1
+source_table: glue_catalog.replay_test_db.silver_replay_test
+schema_type: flat_iceberg
+grain:
+  dimensions:
+    - category
+    - region
+  temporal: daily
+measures:
+  - name: total_amount
+    source_column: amount
+    aggregation: sum
+  - name: record_count
+    source_column: record_id
+    aggregation: count
+  - name: avg_amount
+    source_column: amount
+    aggregation: avg
+quality_threshold: 0.95
+iceberg_database: replay_test_db
+iceberg_table: gold_replay_test
+iceberg_partition_spec: []
