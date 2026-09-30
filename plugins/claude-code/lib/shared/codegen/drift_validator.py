@@ -36,6 +36,10 @@ class DriftReport:
 class WorkloadDriftReport:
     workload_path: str
     reports: list[DriftReport] = field(default_factory=list)
+    # Counted so a caller can tell "checked and clean" from "found nothing to check".
+    # `ok` is all() over `reports`, and all([]) is True, so those two are the same boolean.
+    files_scanned: int = 0
+    exempt: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -154,8 +158,59 @@ def verify_artifact(artifact_path: Path) -> DriftReport:
     )
 
 
+# Headerless artifacts that predate deterministic codegen, or that no template can produce.
+#
+# A RATCHET, not a permission slip. Every other artifact without a provenance header is drift:
+# `verify_artifact` has always reported one correctly, but `verify_workload` used to append a
+# report only `if parse_artifact_header(content) is not None` — so the directory-level entry
+# point, which is what CI and the orchestrator call, skipped exactly the files that violate
+# CLAUDE.md:137. `workloads/claims` is a complete hand-written Bronze->Silver->Gold pipeline
+# plus DAG, and this function reported it clean by finding nothing in it.
+#
+# Exact paths, never globs: a glob on `*/scripts/quality/glue_data_quality.py` would exempt a
+# third workload's copy the moment someone hand-writes one, which is the opposite of a ratchet.
+# The only correct direction is for this to shrink.
+EXEMPT_HEADERLESS = {
+    "workloads/claims/scripts/transform/bronze_to_silver_claims.py":
+        "Pre-codegen. claims/config is the OLD shape (transformations.yaml, quality_rules.yaml, "
+        "schedule.yaml) not the renderer's (bronze/silver/gold/quality/dag.yaml), so it cannot "
+        "be re-rendered without authoring five specs — which means inventing the dedup, null, "
+        "threshold and timezone answers CLAUDE.md says only a human may supply. Superseded by "
+        "workloads/claims_v2, which is the rendered equivalent of the same source.",
+    "workloads/claims/scripts/transform/silver_to_gold_claims.py":
+        "Pre-codegen, same reason as bronze_to_silver_claims.py — superseded by claims_v2.",
+    "workloads/claims/dags/claims_pipeline_dag.py":
+        "Pre-codegen, same reason — superseded by claims_v2/dags/claims_v2_pipeline.py, which "
+        "is rendered from dag.yaml.",
+    "workloads/claims_v2/scripts/quality/glue_data_quality.py":
+        "DQDL / AWS Glue Data Quality. No template covers it: quality_check.py.j2 renders the "
+        "PySpark check_quality.py instead, which is a different mechanism, not the same artifact. "
+        "Needs a glue_data_quality template before it can carry a header.",
+    "workloads/customer_master/scripts/quality/glue_data_quality.py":
+        "DQDL, same missing template as claims_v2's copy.",
+    "workloads/customer_master/dags/customer_master_pipeline.py":
+        "customer_master has new-shape specs but no dag.yaml — it still carries the old "
+        "schedule.yaml — so airflow_dag has nothing to render from. Renderable as soon as a "
+        "dag.yaml exists; the narrowest entry on this list.",
+}
+
+
+def _exempt_key(artifact: Path) -> str:
+    """Repo-relative POSIX path, so the ratchet keys are stable across call sites."""
+    try:
+        return artifact.resolve().relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        return artifact.as_posix()
+
+
 def verify_workload(workload_path: Path) -> WorkloadDriftReport:
-    """Verify every generated artifact in a workload directory."""
+    """Verify every generated artifact in a workload directory.
+
+    A file with no provenance header is reported as drift rather than skipped. Skipping it
+    made a hand-written pipeline indistinguishable from a rendered one — and worse, made a
+    workload of nothing but hand-written files report `ok=True`, because `ok` is `all()` over
+    the reports and `all([])` is True.
+    """
     workload_path = Path(workload_path)
     report = WorkloadDriftReport(workload_path=str(workload_path))
 
@@ -165,10 +220,27 @@ def verify_workload(workload_path: Path) -> WorkloadDriftReport:
         if not dir_path.exists():
             continue
         for artifact in sorted(dir_path.rglob("*")):
-            if artifact.is_file() and artifact.suffix in (".py", ".sql", ".yaml", ".yml"):
-                content = artifact.read_text(encoding="utf-8")
-                if parse_artifact_header(content) is not None:
-                    report.reports.append(verify_artifact(artifact))
+            if not (artifact.is_file() and artifact.suffix in (".py", ".sql", ".yaml", ".yml")):
+                continue
+            report.files_scanned += 1
+            content = artifact.read_text(encoding="utf-8")
+            if parse_artifact_header(content) is not None:
+                report.reports.append(verify_artifact(artifact))
+            elif _exempt_key(artifact) in EXEMPT_HEADERLESS:
+                report.exempt.append(_exempt_key(artifact))
+            else:
+                report.reports.append(DriftReport(
+                    artifact_path=str(artifact),
+                    ok=False,
+                    reason=(
+                        "No deterministic header. CLAUDE.md:137 — artifacts under "
+                        "workloads/*/{scripts,dags,sql}/ come only from "
+                        "shared.codegen.renderer.render(); free-form generation is forbidden, "
+                        "because a hand-written artifact has no spec_hash and nothing can tell "
+                        "it from a rendered one. Render it from a spec, or add it to "
+                        "EXEMPT_HEADERLESS in drift_validator.py with the reason it cannot be."
+                    ),
+                ))
 
     return report
 
@@ -238,6 +310,24 @@ def main():
         path = Path(path_str)
         if path.is_dir():
             report = verify_workload(path)
+            for key in report.exempt:
+                # First sentence only. Split on ". " and not on "." so that "no dag.yaml"
+                # and "claims_v2/dags/claims_v2_pipeline.py" survive intact — cutting at
+                # every period turned both into something that read as a different claim.
+                reason = EXEMPT_HEADERLESS[key]
+                head = reason.split(". ", 1)[0].rstrip(".")
+                print(f"  EXEMPT: {key}")
+                print(f"        {head}.")
+            if not report.reports:
+                # Distinguish "checked and clean" from "found nothing to check". CI already
+                # guards the outer shape of this (an empty argv is a vacuous pass, not a clean
+                # one); the same hole exists one level in, and `ok` cannot express it because
+                # all([]) is True.
+                if report.files_scanned:
+                    print(f"  NONE: {path} — {report.files_scanned} artifact(s), all exempt; "
+                          f"nothing was verified")
+                else:
+                    print(f"  NONE: {path} — no artifacts under scripts/, dags/ or sql/")
             for r in report.reports:
                 status = "OK" if r.ok else "DRIFT"
                 print(f"  {status}: {r.artifact_path}")
