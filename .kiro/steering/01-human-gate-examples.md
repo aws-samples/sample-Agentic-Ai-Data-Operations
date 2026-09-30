@@ -28,7 +28,7 @@ The Phase 1 discovery gate is the most important rule in this project. The HUMAN
 
 ## The gate is also a hook — and sub-agents cannot satisfy it
 
-`.claude/hooks/check-discovery-gate.sh` denies any `Write`/`Edit` under
+`enforce_template_codegen.py`, wired as a PreToolUse gate, denies any `fs_write` under
 `workloads/{name}/{config,scripts,dags,sql}/` for a workload that has neither
 `config/source.yaml` nor a `.discovery_complete` marker.
 
