@@ -100,7 +100,10 @@ KNOWN_UNREAD = {
         "schema_columns": "declared schema is not enforced on read",
     },
     "silver": {
-        "null_handling": "M3 - never read; PK nulls are dropped unconditionally instead",
+        # null_handling was here (M3). All four strategies now render: drop_row, quarantine,
+        # fill_default and allow. Removed because the ratchet failed it as stale.
+        # fill_default refuses without a matching fill_values entry, and quarantine refuses
+        # without quarantine.location — inventing either would override a human decision.
         # quarantine was here (H1). drop_exact_duplicates_only now writes PK conflicts to
         # quarantine.location, so the template reads it and the entry had to go — which is
         # the ratchet working: fixing a template makes its exemption fail as stale.

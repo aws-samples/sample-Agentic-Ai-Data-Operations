@@ -1,6 +1,6 @@
 # spec_hash: 567a3af743016510400d1485d651649670991023857a83daf0edd87ba9c45e5f
 # template_id: silver_transform
-# template_hash: df9e39c14ed04ef5d06ec95e40f313f6519f177b88470925fdc4fbb28255a719
+# template_hash: 2193e5e72e179e9727f253bec7ab059cfe220386bb6bbd751d12277d1d7aa585
 # schema_version: v1
 # rendered_at: 2026-05-21T06:00:00Z
 import sys
@@ -37,8 +37,12 @@ def transform(glue_context, args):
     input_rows = bronze_df.count()
     logger.log("info", "input_count", rows=input_rows)
 
-    # Drop rows with null primary key columns
-    bronze_df = bronze_df.filter(F.col("claim_id").isNotNull())
+    # Null handling: drop_row over claim_id
+    _null_in_checked = (F.col("claim_id").isNull())
+    null_rows = bronze_df.filter(_null_in_checked).count()
+
+    bronze_df = bronze_df.filter(~_null_in_checked)
+    null_rows_dropped, null_rows_retained, null_rows_quarantined = null_rows, 0, 0
     after_pk_filter = bronze_df.count()
 
     # Deduplication: keep_latest

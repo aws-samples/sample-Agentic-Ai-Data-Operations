@@ -537,3 +537,104 @@ class TestComplianceRulesAreActuallyRendered:
         )
         for caller in ('scored_rule(rule, "validity")', 'scored_rule(rule, "compliance")'):
             assert caller in source, f"{caller} does not use the shared macro"
+
+
+class TestNullHandlingIsHonoured:
+    """The pipeline used to drop null-PK rows whatever the human answered.
+
+    `silver_transform.py.j2` filtered `F.col(pk).isNotNull()` unconditionally and never read
+    `null_handling` at all. A human answering "allow" or "quarantine" got silent drops
+    either way — an override of the one category of decision CLAUDE.md says the agent must
+    never make for them (finding M3).
+
+    The second consequence is worse. Dropping the rows first made the critical rule
+    `not_null_<pk>` **unfalsifiable**: the offending rows were gone before the rule could
+    measure them, so it always scored 1.0. A guardrail that cannot fail.
+
+    `workloads/customer_master/config/silver.yaml` asks for `quarantine` on customer_id,
+    email and last_name; it was getting drops.
+    """
+
+    def _silver(self, tmp_path, null_handling=None, quarantine="keep", **over):
+        spec, spec_hash = load_spec(FIXTURES / "silver.yaml", "silver")
+        spec = {**spec, **over}
+        if null_handling is None:
+            spec.pop("null_handling", None)
+        else:
+            spec["null_handling"] = null_handling
+        if quarantine == "drop":
+            spec.pop("quarantine", None)
+        elif isinstance(quarantine, dict):
+            spec["quarantine"] = quarantine
+        out = tmp_path / "s.py"
+        render(spec, spec_hash, "silver_transform", "1.0.0", out, RUN_STARTED_AT)
+        body = out.read_text()
+        compile(body, "s.py", "exec")
+        return body
+
+    def test_allow_keeps_the_rows(self, tmp_path):
+        """The whole point: the rule downstream must be able to fail."""
+        body = self._silver(tmp_path, {"strategy": "allow", "critical_columns": []})
+        assert "filter(~_null_in_checked)" not in body, (
+            "strategy 'allow' still removes rows — the human's answer is overridden"
+        )
+        assert "null_rows_retained" in body, "the retained count is not reported"
+
+    def test_drop_row_drops(self, tmp_path):
+        body = self._silver(tmp_path, {"strategy": "drop_row", "critical_columns": ["amount"]})
+        assert "filter(~_null_in_checked)" in body
+
+    def test_quarantine_writes_the_rows_somewhere(self, tmp_path):
+        body = self._silver(
+            tmp_path,
+            {"strategy": "quarantine", "critical_columns": ["amount"]},
+            quarantine={"enabled": True, "location": "s3://bucket/q/"},
+        )
+        assert "s3://bucket/q/" in body, "the rows are dropped, not quarantined"
+        assert 'mode("append")' in body, (
+            "quarantine must append — overwrite erases rows awaiting review"
+        )
+
+    @pytest.mark.parametrize("quarantine", ["drop", {"enabled": True}])
+    def test_quarantine_without_a_location_refuses(self, quarantine, tmp_path):
+        """Otherwise the template must choose between a silent drop and a failed run."""
+        with pytest.raises(UnsupportedSpecValueError) as exc:
+            self._silver(
+                tmp_path,
+                {"strategy": "quarantine", "critical_columns": ["amount"]},
+                quarantine=quarantine,
+            )
+        assert "quarantine.location" in str(exc.value)
+
+    def test_fill_default_fills_from_the_spec(self, tmp_path):
+        body = self._silver(
+            tmp_path,
+            {"strategy": "fill_default", "critical_columns": ["amount"],
+             "fill_values": {"record_id": "UNKNOWN", "amount": 0}},
+        )
+        assert "F.coalesce" in body and "UNKNOWN" in body
+
+    def test_fill_default_without_a_value_refuses(self, tmp_path):
+        """Gap G-1: the contract has no conditional tying fill_default to fill_values.
+
+        So a spec can say "fill nulls with defaults" and name none. Inventing one would put
+        a value nobody chose into a column the human called critical.
+        """
+        with pytest.raises(UnsupportedSpecValueError) as exc:
+            self._silver(
+                tmp_path,
+                {"strategy": "fill_default", "critical_columns": ["amount"],
+                 "fill_values": {"amount": 0}},   # record_id, the PK, has no default
+            )
+        assert "fill_values has no entry for 'record_id'" in str(exc.value)
+
+    def test_the_primary_key_is_checked_even_if_not_listed_critical(self, tmp_path):
+        """A row with no primary key cannot be deduped or joined to anything."""
+        body = self._silver(tmp_path, {"strategy": "drop_row", "critical_columns": []})
+        assert 'F.col("record_id").isNull()' in body
+
+    def test_a_spec_without_null_handling_behaves_as_before(self, tmp_path):
+        """Back-compat: drop_row over the primary key, which is what it always did."""
+        body = self._silver(tmp_path, None)
+        assert "filter(~_null_in_checked)" in body
+        assert 'F.col("record_id").isNull()' in body

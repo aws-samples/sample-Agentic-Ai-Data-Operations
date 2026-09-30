@@ -74,10 +74,69 @@ def transform(glue_context, args):
     input_rows = bronze_df.count()
     logger.log("info", "input_count", rows=input_rows)
 
-    # Drop rows with null primary key columns
-{% for pk_col in primary_key %}
-    bronze_df = bronze_df.filter(F.col("{{ pk_col }}").isNotNull())
+{#
+  Null handling. Previously this step dropped rows with a null primary key
+  unconditionally and never read null_handling at all, so a human who answered
+  "allow" or "quarantine" got silent drops either way (finding M3). Worse, it made the
+  critical rule not_null_<pk> unfalsifiable: the offending rows were gone before the rule
+  could measure them, so it always scored 1.0 — a guardrail that cannot fail.
+
+  The checked set is primary_key plus null_handling.critical_columns. The primary key is
+  implicitly critical: a row without one cannot be deduped or joined to anything.
+#}
+{% set _nh = null_handling | default({}) %}
+{% set _strategy = _nh.strategy | default("drop_row") %}
+{% set _checked = (primary_key + (_nh.critical_columns | default([]))) | unique | list %}
+    # Null handling: {{ _strategy }} over {{ _checked | join(", ") }}
+    _null_in_checked = ({% for c in _checked %}F.col("{{ c }}").isNull(){{ " | " if not loop.last }}{% endfor %})
+    null_rows = bronze_df.filter(_null_in_checked).count()
+
+{% if _strategy == "drop_row" %}
+    bronze_df = bronze_df.filter(~_null_in_checked)
+    null_rows_dropped, null_rows_retained, null_rows_quarantined = null_rows, 0, 0
+{% elif _strategy == "quarantine" %}
+{% if not (quarantine is defined and quarantine.location is defined) %}
+{{ unsupported("null_handling.strategy is 'quarantine' but no quarantine.location is set, "
+   ~ "so the offending rows have nowhere to go. Without this the template would have to "
+   ~ "choose between dropping a row the human asked to keep for review and failing the "
+   ~ "run; it fails the render instead.") }}
+{% endif %}
+    if null_rows > 0:
+        # Appended, and written before the count is logged: a later run must not erase rows
+        # awaiting review, and a failed write must not read as "no offending rows".
+        bronze_df.filter(_null_in_checked).write.mode("append").parquet(
+            "{{ quarantine.location }}"
+        )
+    bronze_df = bronze_df.filter(~_null_in_checked)
+    null_rows_dropped, null_rows_retained, null_rows_quarantined = 0, 0, null_rows
+{% elif _strategy == "fill_default" %}
+{% for c in _checked %}
+{% if c not in (_nh.fill_values | default({})) %}
+{{ unsupported("null_handling.strategy is 'fill_default' but fill_values has no entry for "
+   ~ "'" ~ c ~ "'. The contract permits this — there is no conditional tying fill_default "
+   ~ "to fill_values (gap G-1) — so the spec validates while naming no default. Inventing "
+   ~ "one would put a value into a PHI-adjacent column that no human chose.") }}
+{% endif %}
+    bronze_df = bronze_df.withColumn(
+        "{{ c }}",
+        F.coalesce(F.col("{{ c }}"), F.lit({{ _nh.fill_values[c] | tojson }})),
+    )
 {% endfor %}
+    null_rows_dropped, null_rows_retained, null_rows_quarantined = 0, 0, 0
+{% elif _strategy == "allow" %}
+    # Nulls kept, as answered. not_null_<column> can now genuinely fail, which is the
+    # point — previously the rows were removed before any rule could measure them.
+    #
+    # Note for whoever reads the log: a null primary key here partitions with every other
+    # null under an ordered dedup strategy, so keep_latest/keep_first would collapse
+    # unrelated rows into one. null_rows_retained is reported so that is visible.
+    null_rows_dropped, null_rows_retained, null_rows_quarantined = 0, null_rows, 0
+{% else %}
+{{ unsupported("null_handling.strategy '" ~ _strategy ~ "' has no branch in this template. "
+   ~ "Implemented: drop_row, quarantine, fill_default, allow. Silently falling back to a "
+   ~ "drop is what this block used to do, and it overrode the one category of decision "
+   ~ "CLAUDE.md says the agent must never make for the human.") }}
+{% endif %}
     after_pk_filter = bronze_df.count()
 
 {% if dedup_strategy == "drop_exact_duplicates_only" %}
