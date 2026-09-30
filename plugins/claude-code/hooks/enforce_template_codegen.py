@@ -72,7 +72,10 @@ def deny_reason(path: str) -> str:
         f"        --out {path}\n\n"
         f"`adop_render.py --list` shows every template with its spec file and contract. "
         f"If the renderer reports MissingSlotError, extend the spec — never the template.\n\n"
-        f"config/*.yaml is not protected: write specs there directly."
+        f"config/*.yaml is not protected by this hook: write specs there directly. But "
+        f"check_discovery_gate.py does guard config/ until the workload has a "
+        f"config/source.yaml or a .discovery_complete marker, so on a brand-new workload the "
+        f"discovery questions come first. Hooks are not namespaced — both fire on one Write."
     )
 
 
