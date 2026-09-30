@@ -118,7 +118,10 @@ KNOWN_UNREAD = {
         "sla": "M1 - deadline_minutes unenforced; quality tasks get no execution_timeout",
     },
     "quality": {
-        "compliance_rules": "C1 - CRITICAL. The HIPAA masking gate never executes",
+        # compliance_rules was here (C1, CRITICAL). quality_check.py.j2 now loops it through
+        # the shared scored_rule macro, so compliance results reach `results` and therefore
+        # critical_failures. Removed because the ratchet failed it as stale — which is the
+        # mechanism reporting a gap closed rather than me asserting it.
         "anomaly_detection": "no anomaly logic is emitted despite the rules being asked for",
     },
 }

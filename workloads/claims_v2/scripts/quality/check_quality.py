@@ -1,6 +1,6 @@
 # spec_hash: 443cf3198768bbc2d498f052e8c66983e535f1faa0a9e45a5eed928adf084c14
 # template_id: quality_check
-# template_hash: f124e89a1d6b1ef5169aeee5976d24af4ac59943a066af2ec6c8c2dcadc0bb92
+# template_hash: 6ded183748889baf487924e6d9ce3567333fe6dca821f909b87cf2a2347e548d
 # schema_version: v1
 # rendered_at: 2026-05-21T06:00:00Z
 import sys

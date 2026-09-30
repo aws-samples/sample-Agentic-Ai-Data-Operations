@@ -2,6 +2,53 @@
 {# template_version: 1.0.0 #}
 {# required_slots: dataset_name, rules, quality_gates #}
 {# schema_version: v1 #}
+{#
+  One dispatch, used by both rules.validity and compliance_rules.rules.
+
+  Deliberately a macro rather than a second copy of the if/elif chain. Two copies of one
+  dispatch is how this template and its contract drifted apart: `compliance_rules` was
+  never looped at all, and five of the contract's nine check types fell through a bare
+  `{% else %}` that passed the row count through as the valid count — scoring 1.0 for a
+  check that never ran. A check type added here now reaches every caller.
+
+  `dimension` is passed in rather than inferred so a reader of the generated script can see
+  which spec section a result came from.
+#}
+{% macro scored_rule(rule, dimension) -%}
+{% if rule.check_type == "range" %}
+    valid_count = df.filter(
+        (F.col("{{ rule.column }}") >= {{ rule.params.min }}) &
+        (F.col("{{ rule.column }}") <= {{ rule.params.max }})
+    ).count()
+{% elif rule.check_type == "enum" %}
+    valid_values = {{ rule.params["values"] | tojson }}
+    valid_count = df.filter(F.col("{{ rule.column }}").isin(valid_values)).count()
+{% elif rule.check_type == "regex" %}
+    valid_count = df.filter(F.col("{{ rule.column }}").rlike("{{ rule.params.pattern }}")).count()
+{% elif rule.check_type == "not_null" %}
+    valid_count = df.filter(F.col("{{ rule.column }}").isNotNull()).count()
+{% else %}
+{{ unsupported("quality rule '" ~ rule.rule_id ~ "' (" ~ dimension ~ ") uses check_type '"
+   ~ rule.check_type ~ "', which this template has no branch for. Implemented: range, "
+   ~ "enum, regex, not_null. This arm used to pass the row count straight through as the "
+   ~ "valid count, scoring 1.0 — so a rule that never ran reported perfect compliance, "
+   ~ "and because overall_score is an unweighted mean, adding an unimplementable rule "
+   ~ "raised it. A compliance rule whose params are a pseudo-function such as "
+   ~ "lf_tags_present(...) or no_phi_literals_in_logs(...) is not a property of the "
+   ~ "dataframe at all: verify it out of band via MCP and record it as severity info, "
+   ~ "rather than declaring an unexecutable check CRITICAL and blocking.") }}
+{% endif %}
+    score = valid_count / total_rows if total_rows > 0 else 0.0
+    results.append({
+        "rule_id": "{{ rule.rule_id }}",
+        "dimension": "{{ dimension }}",
+        "column": "{{ rule.column }}",
+        "score": score,
+        "threshold": {{ rule.threshold }},
+        "severity": "{{ rule.severity | default('warning') }}",
+        "passed": score >= {{ rule.threshold }},
+    })
+{%- endmacro %}
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -68,36 +115,23 @@ def check_quality(spark, table_name, zone):
 {% if rules.validity is defined %}
     # Validity checks
 {% for rule in rules.validity %}
-{% if rule.check_type == "range" %}
-    valid_count = df.filter(
-        (F.col("{{ rule.column }}") >= {{ rule.params.min }}) &
-        (F.col("{{ rule.column }}") <= {{ rule.params.max }})
-    ).count()
-{% elif rule.check_type == "enum" %}
-    valid_values = {{ rule.params["values"] | tojson }}
-    valid_count = df.filter(F.col("{{ rule.column }}").isin(valid_values)).count()
-{% elif rule.check_type == "regex" %}
-    valid_count = df.filter(F.col("{{ rule.column }}").rlike("{{ rule.params.pattern }}")).count()
-{% elif rule.check_type == "not_null" %}
-    valid_count = df.filter(F.col("{{ rule.column }}").isNotNull()).count()
-{% else %}
-{{ unsupported("quality rule '" ~ rule.rule_id ~ "' uses check_type '" ~ rule.check_type
-   ~ "', which this template has no branch for. Implemented: range, enum, regex, not_null. "
-   ~ "This arm used to pass the row count straight through as the valid count, scoring "
-   ~ "1.0 — so a rule that never ran reported perfect compliance, and because "
-   ~ "overall_score is an unweighted mean, adding an unimplementable rule raised it. "
-   ~ "Either implement the branch or move the rule out of rules.validity.") }}
+{{ scored_rule(rule, "validity") }}
+{% endfor %}
 {% endif %}
-    score = valid_count / total_rows if total_rows > 0 else 0.0
-    results.append({
-        "rule_id": "{{ rule.rule_id }}",
-        "dimension": "validity",
-        "column": "{{ rule.column }}",
-        "score": score,
-        "threshold": {{ rule.threshold }},
-        "severity": "{{ rule.severity | default('warning') }}",
-        "passed": score >= {{ rule.threshold }},
-    })
+{% if compliance_rules is defined and compliance_rules.rules is defined %}
+
+    # Compliance checks — {{ compliance_rules.regulation | default('NONE') }}
+    #
+    # These were never rendered before. The spec carried them, they validated, and
+    # quality_check.py.j2 had no loop over compliance_rules.rules — so a rule the human
+    # designated CRITICAL and blocking could not contribute to critical_failures below,
+    # because that count only sees rules that were rendered. The masking gate attested a
+    # control nothing executed.
+    #
+    # They score into `results` on the same footing as every other dimension, so a failing
+    # compliance rule raises critical_failures and blocks the gate.
+{% for rule in compliance_rules.rules %}
+{{ scored_rule(rule, "compliance") }}
 {% endfor %}
 {% endif %}
 

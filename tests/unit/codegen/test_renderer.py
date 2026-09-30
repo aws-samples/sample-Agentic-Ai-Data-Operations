@@ -416,3 +416,124 @@ class TestNoPhiColumnShipsUnmaskedBecauseOfAMissingBranch:
         assert "{% else %}" in loop and "unsupported(" in loop, (
             "the pii_masking loop has no else arm — an unhandled method emits no masking"
         )
+
+
+class TestComplianceRulesAreActuallyRendered:
+    """The HIPAA masking gate did not exist — `compliance_rules` was never looped.
+
+    `quality_check.py.j2` looped rules.completeness, rules.uniqueness and rules.validity.
+    There was no loop over `compliance_rules.rules`, so in a live HIPAA run
+    phi_masking_applied, phi_masking_member_email, phi_masking_member_dob,
+    phi_masking_member_id, phi_columns_lf_tagged and phi_not_in_logs were never executed.
+    `critical_failures` counts only rendered results, so a rule the human designated
+    CRITICAL and blocking could not contribute to it. Of three critical rules, two ran.
+
+    The masking itself works. What was absent is the verification that it happened — so the
+    spec, the Lake Formation tags and the audit record all attested a control that nothing
+    checked. Verifier finding C1.
+    """
+
+    RENDERABLE = {
+        "rule_id": "phi_masking_member_dob",
+        "column": "member_dob",
+        "check_type": "regex",
+        "threshold": 1.0,
+        "severity": "critical",
+        "params": {"pattern": "^[0-9a-f]{64}$"},
+    }
+    # params are a pseudo-function; not a property of the dataframe at all
+    PSEUDO_FUNCTION = {
+        "rule_id": "phi_columns_lf_tagged",
+        "column": "member_dob",
+        "check_type": "custom_sql",
+        "threshold": 1.0,
+        "severity": "critical",
+        "params": {"sql": "lf_tags_present(member_dob)"},
+    }
+
+    def _render(self, rules, tmp_path, regulation="HIPAA"):
+        spec, spec_hash = load_spec(FIXTURES / "quality.yaml", "quality")
+        spec = {**spec, "compliance_rules": {"regulation": regulation, "rules": rules}}
+        out = tmp_path / "q.py"
+        render(spec, spec_hash, "quality_check", "1.0.0", out, RUN_STARTED_AT)
+        return out.read_text()
+
+    def test_a_compliance_rule_reaches_the_generated_script(self, tmp_path):
+        body = self._render([self.RENDERABLE], tmp_path)
+        assert "phi_masking_member_dob" in body, "the rule was silently dropped"
+        assert '"dimension": "compliance"' in body
+        assert "# Compliance checks — HIPAA" in body
+        compile(body, "q.py", "exec")
+
+    def test_a_failing_compliance_rule_blocks_the_gate(self, tmp_path):
+        """Not just present — it must reach critical_failures.
+
+        Executes the rendered scoring arithmetic against a synthetic results list, because
+        the whole defect was a rule that existed on paper and could not affect the outcome.
+        """
+        import textwrap
+
+        lines = self._render([self.RENDERABLE], tmp_path).splitlines()
+
+        i_rule = next(n for n, l in enumerate(lines) if "phi_masking_member_dob" in l)
+        i_count = next(n for n, l in enumerate(lines) if "critical_failures = sum" in l)
+        assert i_rule < i_count, (
+            "the compliance rule is appended after critical_failures is computed, so it "
+            "cannot affect the gate"
+        )
+
+        scoring = textwrap.dedent("\n".join(lines[i_count : i_count + 4]))
+        ns = {
+            "results": [
+                {"rule_id": "phi_masking_member_dob", "passed": False, "severity": "critical"},
+                {"rule_id": "valid_billed", "passed": True, "severity": "warning"},
+            ]
+        }
+        exec(scoring, ns)  # nosec B102
+        assert ns["critical_failures"] == 1, (
+            "an unmasked PHI column did not register as a critical failure"
+        )
+
+    def test_an_unexecutable_compliance_rule_refuses_rather_than_passing(self, tmp_path):
+        """L2: declaring an unexecutable check CRITICAL manufactures a control.
+
+        `lf_tags_present(...)` needs the Lake Formation API; `no_phi_literals_in_logs(...)`
+        is not a property of the data. Neither can be a dataframe check, and neither may
+        quietly score 1.0 while marked blocking.
+        """
+        with pytest.raises(UnsupportedSpecValueError) as exc:
+            self._render([self.PSEUDO_FUNCTION], tmp_path)
+        msg = str(exc.value)
+        assert "phi_columns_lf_tagged" in msg and "(compliance)" in msg, (
+            "the error must name the rule and the section it came from"
+        )
+        assert "severity info" in msg, (
+            "the message must say where such a check belongs, or the reader cannot act"
+        )
+
+    def test_a_spec_with_no_compliance_rules_renders_unchanged(self, tmp_path):
+        """Backward compatibility: every quality spec written before this existed."""
+        spec, spec_hash = load_spec(FIXTURES / "quality.yaml", "quality")
+        out = tmp_path / "q.py"
+        render(spec, spec_hash, "quality_check", "1.0.0", out, RUN_STARTED_AT)
+        body = out.read_text()
+        assert "# Compliance checks" not in body
+        assert '"dimension": "compliance"' not in body
+        compile(body, "q.py", "exec")
+
+    def test_validity_and_compliance_share_one_dispatch(self):
+        """Two copies of one if/elif chain is how this bug class began.
+
+        `compliance_rules` went unrendered and five of nine check types fell through a bare
+        else, because the dispatch lived inline in one place and nowhere else. It is now a
+        macro, so a check type added later reaches every caller.
+        """
+        from shared.codegen.renderer import _load_template
+
+        source, _, _ = _load_template("quality_check")
+        assert "{% macro scored_rule(" in source, "the shared dispatch macro is gone"
+        assert source.count('rule.check_type == "range"') == 1, (
+            "the dispatch is duplicated — the copies will drift"
+        )
+        for caller in ('scored_rule(rule, "validity")', 'scored_rule(rule, "compliance")'):
+            assert caller in source, f"{caller} does not use the shared macro"
