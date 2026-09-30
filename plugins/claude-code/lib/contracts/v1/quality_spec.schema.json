@@ -4,7 +4,12 @@
   "title": "Quality Rules Spec",
   "description": "Defines data quality rules across 5 dimensions with thresholds and anomaly detection.",
   "type": "object",
-  "required": ["dataset_name", "schema_version", "rules", "quality_gates"],
+  "required": [
+    "dataset_name",
+    "schema_version",
+    "rules",
+    "quality_gates"
+  ],
   "additionalProperties": false,
   "properties": {
     "dataset_name": {
@@ -21,50 +26,76 @@
       "properties": {
         "completeness": {
           "type": "array",
-          "items": { "$ref": "#/$defs/quality_rule" },
+          "items": {
+            "$ref": "#/$defs/quality_rule"
+          },
           "default": []
         },
         "uniqueness": {
           "type": "array",
-          "items": { "$ref": "#/$defs/quality_rule" },
+          "items": {
+            "$ref": "#/$defs/quality_rule"
+          },
           "default": []
         },
         "validity": {
           "type": "array",
-          "items": { "$ref": "#/$defs/quality_rule" },
+          "items": {
+            "$ref": "#/$defs/quality_rule"
+          },
           "default": []
         },
         "consistency": {
           "type": "array",
-          "items": { "$ref": "#/$defs/quality_rule" },
+          "items": {
+            "$ref": "#/$defs/quality_rule"
+          },
           "default": []
         },
         "accuracy": {
           "type": "array",
-          "items": { "$ref": "#/$defs/quality_rule" },
+          "items": {
+            "$ref": "#/$defs/quality_rule"
+          },
           "default": []
         }
       }
     },
     "quality_gates": {
       "type": "object",
-      "required": ["bronze_to_silver", "silver_to_gold"],
+      "required": [
+        "bronze_to_silver",
+        "silver_to_gold"
+      ],
       "additionalProperties": false,
       "properties": {
-        "bronze_to_silver": { "$ref": "#/$defs/gate_config" },
-        "silver_to_gold": { "$ref": "#/$defs/gate_config" }
+        "bronze_to_silver": {
+          "$ref": "#/$defs/gate_config"
+        },
+        "silver_to_gold": {
+          "$ref": "#/$defs/gate_config"
+        }
       }
     },
     "anomaly_detection": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": { "type": "boolean", "default": false },
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
         "methods": {
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["z_score", "iqr", "volume_change", "null_spike", "distribution_shift"]
+            "enum": [
+              "z_score",
+              "iqr",
+              "volume_change",
+              "null_spike",
+              "distribution_shift"
+            ]
           }
         },
         "volume_threshold_pct": {
@@ -81,11 +112,21 @@
       "properties": {
         "regulation": {
           "type": "string",
-          "enum": ["HIPAA", "GDPR", "CCPA", "SOX", "PCI_DSS", "NONE"]
+          "enum": [
+            "HIPAA",
+            "GDPR",
+            "CCPA",
+            "SOX",
+            "PCI_DSS",
+            "NONE"
+          ]
         },
         "phi_columns": {
           "type": "array",
-          "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          }
         },
         "audit_retention_days": {
           "type": "integer",
@@ -93,7 +134,9 @@
         },
         "rules": {
           "type": "array",
-          "items": { "$ref": "#/$defs/quality_rule" }
+          "items": {
+            "$ref": "#/$defs/quality_rule"
+          }
         }
       }
     }
@@ -101,7 +144,12 @@
   "$defs": {
     "quality_rule": {
       "type": "object",
-      "required": ["rule_id", "column", "check_type", "threshold"],
+      "required": [
+        "rule_id",
+        "column",
+        "check_type",
+        "threshold"
+      ],
       "additionalProperties": false,
       "properties": {
         "rule_id": {
@@ -114,7 +162,17 @@
         },
         "check_type": {
           "type": "string",
-          "enum": ["not_null", "unique", "range", "regex", "enum", "referential", "custom_sql", "format", "length"]
+          "enum": [
+            "not_null",
+            "unique",
+            "range",
+            "regex",
+            "enum",
+            "referential",
+            "custom_sql",
+            "format",
+            "length"
+          ]
         },
         "threshold": {
           "type": "number",
@@ -123,7 +181,11 @@
         },
         "severity": {
           "type": "string",
-          "enum": ["critical", "warning", "info"],
+          "enum": [
+            "critical",
+            "warning",
+            "info"
+          ],
           "default": "warning"
         },
         "params": {
@@ -131,12 +193,27 @@
           "additionalProperties": true,
           "description": "Check-type-specific parameters (min/max for range, pattern for regex, etc.)"
         },
-        "description": { "type": "string" }
+        "description": {
+          "type": "string"
+        },
+        "zone": {
+          "type": "string",
+          "enum": [
+            "silver",
+            "gold",
+            "both"
+          ],
+          "default": "both",
+          "description": "Which zone this rule applies to. Defaults to both, which is the behaviour that existed before this field: every rule ran against every zone. That is why gold_quality crashed \u2014 the Silver rule set references claim-level columns the Gold fact does not have, so F.col() raised AnalysisException and the 0.95 gate could not even be scored (finding H4). Tag claim-level rules 'silver' and measure-level rules 'gold'."
+        }
       }
     },
     "gate_config": {
       "type": "object",
-      "required": ["overall_score", "action_on_failure"],
+      "required": [
+        "overall_score",
+        "action_on_failure"
+      ],
       "additionalProperties": false,
       "properties": {
         "overall_score": {
@@ -152,7 +229,11 @@
         },
         "action_on_failure": {
           "type": "string",
-          "enum": ["block", "quarantine", "warn"]
+          "enum": [
+            "block",
+            "quarantine",
+            "warn"
+          ]
         }
       }
     }

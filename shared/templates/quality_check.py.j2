@@ -15,6 +15,20 @@
   which spec section a result came from.
 #}
 {% macro scored_rule(rule, dimension) -%}
+{#
+  The body is built into _body and then emitted either as-is or indented into a runtime
+  zone guard. Two reasons for the indirection rather than a second copy of the body:
+
+  - a rule tagged for one zone must not even CONSTRUCT its filter in the other, because
+    F.col() on a column the Gold fact lacks raises AnalysisException when the plan is
+    built, not when it runs. That is finding H4 — the Silver rule set applied to the Gold
+    fact crashed on column resolution, so the 0.95 gate could not be scored at all. Not
+    unmet: unreachable.
+  - rules with the default zone "both" must render byte-identically to before, so adding
+    zone support does not rewrite every existing artifact.
+#}
+{% set _zone = rule.zone | default("both") %}
+{% set _body %}
 {% if rule.check_type == "range" %}
     valid_count = df.filter(
         (F.col("{{ rule.column }}") >= {{ rule.params.min }}) &
@@ -48,6 +62,13 @@
         "severity": "{{ rule.severity | default('warning') }}",
         "passed": score >= {{ rule.threshold }},
     })
+{% endset %}
+{% if _zone == "both" %}
+{{ _body.strip("\n") }}
+{% else %}
+    if zone == "{{ _zone }}":
+{{ _body.strip("\n") | indent(4, first=True) }}
+{% endif %}
 {%- endmacro %}
 import sys
 from datetime import datetime
@@ -115,7 +136,7 @@ def check_quality(spark, table_name, zone):
 {% if rules.validity is defined %}
     # Validity checks
 {% for rule in rules.validity %}
-{{ scored_rule(rule, "validity") }}
+{{ scored_rule(rule, "validity") -}}
 {% endfor %}
 {% endif %}
 {% if compliance_rules is defined and compliance_rules.rules is defined %}
@@ -131,15 +152,25 @@ def check_quality(spark, table_name, zone):
     # They score into `results` on the same footing as every other dimension, so a failing
     # compliance rule raises critical_failures and blocks the gate.
 {% for rule in compliance_rules.rules %}
-{{ scored_rule(rule, "compliance") }}
+{{ scored_rule(rule, "compliance") -}}
 {% endfor %}
 {% endif %}
 
     # Compute overall score
-    if results:
-        overall_score = sum(r["score"] for r in results) / len(results)
-    else:
-        overall_score = 1.0
+    #
+    # An empty result set used to score 1.0 and sail through the gate. That is the whole
+    # defect this file keeps demonstrating: nothing to check is not the same as nothing
+    # wrong. It matters more now that rules carry a `zone` — tag every rule "silver" and the
+    # Gold gate would have had zero rules and passed with a perfect score, which is a worse
+    # outcome than the AnalysisException it used to raise.
+    if not results:
+        raise RuntimeError(
+            f"No quality rules applied to zone '{zone}' of {table_name}. A zone with no "
+            f"rules cannot be scored, and reporting a pass for it would attest checks that "
+            f"never ran. Tag rules for this zone in quality_spec (rules[].zone), or remove "
+            f"the gate for it."
+        )
+    overall_score = sum(r["score"] for r in results) / len(results)
 
     critical_failures = sum(
         1 for r in results

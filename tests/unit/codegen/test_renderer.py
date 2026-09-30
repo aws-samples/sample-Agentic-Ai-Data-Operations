@@ -768,3 +768,97 @@ class TestGoldSchemaIsActuallyBuilt:
             "the measure dispatch is duplicated — the copies will drift again"
         )
         assert "{% macro aggregated_measure(" in source
+
+
+class TestQualityRulesAreScopedToTheirZone:
+    """The Gold gate was unreachable, not merely unmet.
+
+    One `quality_check.py` was rendered from the Silver rule set and `gold_quality` ran that
+    same file against the Gold fact with ZONE=gold. The Gold fact's only non-measure columns
+    are its grain, so every rule naming claim_id, member_email, the amounts, submit_date,
+    claim_status or denial_reason raised AnalysisException on column resolution — including
+    both surviving critical rules. The task crashed instead of scoring, so it could not even
+    fail in the form the gate understands. Finding H4.
+
+    Rules now carry `zone`, and the guard has to be a *runtime* `if` wrapping the filter
+    construction: `F.col()` on an absent column raises when the plan is built, not when it
+    runs, so skipping the append is not enough — the filter must never be constructed.
+    """
+
+    def _quality(self, tmp_path, rules):
+        spec, spec_hash = load_spec(FIXTURES / "quality.yaml", "quality")
+        spec = {**spec, "rules": rules}
+        out = tmp_path / "q.py"
+        render(spec, spec_hash, "quality_check", "1.0.0", out, RUN_STARTED_AT)
+        body = out.read_text()
+        compile(body, "q.py", "exec")
+        return body
+
+    def _rule(self, rule_id, column, zone=None):
+        r = {"rule_id": rule_id, "column": column, "check_type": "not_null", "threshold": 1.0}
+        if zone:
+            r["zone"] = zone
+        return r
+
+    def test_a_zone_tagged_rule_is_guarded_at_runtime(self, tmp_path):
+        body = self._quality(tmp_path, {"validity": [self._rule("g", "amount", "gold")]})
+        lines = body.splitlines()
+        i = next(n for n, l in enumerate(lines) if "valid_count = df.filter" in l)
+        assert lines[i - 1].strip() == 'if zone == "gold":', (
+            "the filter is constructed unconditionally; F.col() on an absent column raises "
+            "when the plan is built, so the guard must wrap the construction"
+        )
+        assert len(lines[i]) - len(lines[i].lstrip()) == 8, "the body is not inside the guard"
+
+    def test_an_untagged_rule_renders_exactly_as_before(self, tmp_path):
+        """Default zone is "both", so adding zone support rewrites no existing artifact."""
+        body = self._quality(tmp_path, {"validity": [self._rule("b", "amount")]})
+        lines = body.splitlines()
+        i = next(n for n, l in enumerate(lines) if "valid_count = df.filter" in l)
+        assert len(lines[i]) - len(lines[i].lstrip()) == 4
+        assert 'if zone == "both"' not in body
+
+    def test_mixed_zones_in_one_artifact(self, tmp_path):
+        body = self._quality(tmp_path, {"validity": [
+            self._rule("g", "amount", "gold"),
+            self._rule("s", "record_id", "silver"),
+            self._rule("b", "amount"),
+        ]})
+        assert 'if zone == "gold":' in body and 'if zone == "silver":' in body
+
+    def test_a_zone_with_no_applicable_rules_raises_instead_of_scoring_one(self, tmp_path):
+        """The trap this fix could easily have created.
+
+        Tag every rule "silver" and the Gold gate would have had zero results. The old code
+        was `if results: ... else: overall_score = 1.0` — a perfect score for zero checks,
+        which is a worse outcome than the crash it replaced.
+
+        Executes the rendered scoring block, because the defect is in generated code.
+        """
+        import textwrap
+
+        lines = self._quality(
+            tmp_path, {"validity": [self._rule("s", "record_id", "silver")]}
+        ).splitlines()
+        i = next(n for n, l in enumerate(lines) if "if not results:" in l)
+        j = next(n for n, l in enumerate(lines) if "overall_score = sum(" in l)
+        block = textwrap.dedent("\n".join(lines[i : j + 1]))
+
+        ns = {"results": [], "zone": "gold", "table_name": "db.gold_x"}
+        with pytest.raises(RuntimeError) as exc:
+            exec(block, ns)  # nosec B102
+        assert "No quality rules applied to zone 'gold'" in str(exc.value)
+
+        ns = {"results": [{"score": 0.9}], "zone": "silver", "table_name": "db.silver_x"}
+        exec(block, ns)  # nosec B102
+        assert ns["overall_score"] == 0.9, "a non-empty result set must still score normally"
+
+    def test_the_template_no_longer_scores_an_empty_result_set_as_perfect(self):
+        """Literal guard: `overall_score = 1.0` on an empty set must not come back."""
+        from shared.codegen.renderer import _load_template
+
+        source, _, _ = _load_template("quality_check")
+        assert "overall_score = 1.0" not in source, (
+            "an empty result set scores a perfect 1.0 again — nothing to check is not the "
+            "same as nothing wrong"
+        )
