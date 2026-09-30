@@ -34,6 +34,10 @@
 {%- endmacro %}
 import sys
 import hashlib
+{% if pre_pii_derived_columns is defined and pre_pii_derived_columns
+      and "${ADOP_LOGICAL_DATE}" in (pre_pii_derived_columns | map(attribute="expression") | join(" ")) %}
+import re
+{% endif %}
 from datetime import datetime
 {% if pii_masking is defined and pii_masking.enabled
       and pii_masking.columns | selectattr("method", "equalto", "hash_salted") | list %}
@@ -253,12 +257,39 @@ def transform(glue_context, args):
 {% endif %}
 
 {% if pre_pii_derived_columns is defined and pre_pii_derived_columns %}
+{% set _pre_pii_src = pre_pii_derived_columns | map(attribute="expression") | join(" ") %}
+{% if "${ADOP_LOGICAL_DATE}" in _pre_pii_src %}
+    #
+    # ${ADOP_LOGICAL_DATE} substitution.
+    #
+    # A pre-PII expression below is written against the run's logical date, not wall clock, so
+    # that a backfill of an old partition recomputes to the same value. The DAG passes it as
+    # --logical_date "{{ '{{ ds }}' }}". Resolve it here and fail loudly if it is absent or
+    # malformed: an unresolved token reaches F.expr() as the literal string
+    # '${ADOP_LOGICAL_DATE}', and with Glue's default ANSI mode off to_date() returns NULL
+    # rather than raising -- so the derived column silently becomes NULL on every row and any
+    # downstream age bucketing or date arithmetic is inert. The table still commits. That is
+    # the failure this guard exists to convert into a crash.
+    logical_date = (args.get("logical_date") or "").strip()
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", logical_date):
+        raise ValueError(
+            "silver_transform requires --logical_date as YYYY-MM-DD because a pre-PII derived "
+            "column references ${ADOP_LOGICAL_DATE}; got "
+            + repr(logical_date)
+            + ". Do NOT substitute current_date() -- that breaks backfill reproducibility."
+        )
+    logger.log("info", "logical_date_resolved", logical_date=logical_date)
+{% endif %}
     # Pre-PII derived columns (computed before masking, e.g. extract domain from raw email)
     pre_pii_df = typed_df
 {% for col_def in pre_pii_derived_columns %}
     pre_pii_df = pre_pii_df.withColumn(
         "{{ col_def.name }}",
+{% if "${ADOP_LOGICAL_DATE}" in col_def.expression %}
+        F.expr({{ col_def.expression | tojson }}.replace("${ADOP_LOGICAL_DATE}", logical_date))
+{% else %}
         F.expr({{ col_def.expression | tojson }})
+{% endif %}
     )
 {% endfor %}
 {% else %}
@@ -369,7 +400,14 @@ def transform(glue_context, args):
 
 
 if __name__ == "__main__":
+{% if pre_pii_derived_columns is defined and pre_pii_derived_columns
+      and "${ADOP_LOGICAL_DATE}" in (pre_pii_derived_columns | map(attribute="expression") | join(" ")) %}
+    # logical_date is required, not optional: getResolvedOptions raises if the DAG omits it,
+    # which is the correct direction. See the ${ADOP_LOGICAL_DATE} note in transform().
+    args = getResolvedOptions(sys.argv, ["JOB_NAME", "logical_date"])
+{% else %}
     args = getResolvedOptions(sys.argv, ["JOB_NAME"])
+{% endif %}
     sc = SparkContext()
     glue_context = GlueContext(sc)
     job = Job(glue_context)

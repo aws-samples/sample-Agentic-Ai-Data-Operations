@@ -1183,3 +1183,95 @@ class TestEveryDimensionGoesThroughTheSharedPath:
             "these dimension loops emit their own inline measurement instead of calling "
             f"scored_rule, so rule.zone does not apply to them: {offenders}"
         )
+
+
+class TestLogicalDateIsResolvedOrTheRunFails:
+    """A `${ADOP_LOGICAL_DATE}` token that survives to runtime makes a column silently NULL.
+
+    `getResolvedOptions(sys.argv, ["JOB_NAME"])` resolved exactly one argument, so every
+    `--ARG` the DAG passed was unreadable. For a pre-PII derived column written against the
+    run's logical date — so a backfill of an old partition recomputes the same value — the
+    token reached `F.expr()` as the literal string `'${ADOP_LOGICAL_DATE}'`. With Glue's
+    default ANSI mode off, `to_date()` returns NULL rather than raising, so the derived column
+    became NULL on every row, any age bucketing built on it was inert, **and the table still
+    committed**.
+
+    Fixed by another agent's run, which is why this test exists separately: the fix arrived
+    without one, so nothing stopped it regressing. It was also applied to the plugin's
+    vendored `lib/` copy rather than the repo source, which broke byte-identity until ported.
+
+    Conditional on demand, so a spec that does not use the token renders exactly as before.
+    """
+
+    TOKEN_EXPR = "date_sub('${ADOP_LOGICAL_DATE}', 30)"
+
+    def _silver(self, tmp_path, pre_pii=None):
+        spec, spec_hash = load_spec(FIXTURES / "silver.yaml", "silver")
+        spec = dict(spec)
+        if pre_pii is None:
+            spec.pop("pre_pii_derived_columns", None)
+        else:
+            spec["pre_pii_derived_columns"] = pre_pii
+        out = tmp_path / "s.py"
+        render(spec, spec_hash, "silver_transform", "1.0.0", out, RUN_STARTED_AT)
+        body = out.read_text()
+        compile(body, "s.py", "exec")
+        return body
+
+    def test_the_token_makes_logical_date_a_required_argument(self, tmp_path):
+        body = self._silver(tmp_path, [{"name": "cutoff", "expression": self.TOKEN_EXPR}])
+        assert 'getResolvedOptions(sys.argv, ["JOB_NAME", "logical_date"])' in body, (
+            "logical_date is not resolved, so the token reaches F.expr() as a literal string"
+        )
+
+    def test_a_missing_or_malformed_logical_date_raises(self, tmp_path):
+        """The whole point: convert a silent NULL column into a crash.
+
+        Executes the generated validation against real inputs, because the defect was that
+        nothing failed.
+        """
+        import re as _re
+        import textwrap
+
+        lines = self._silver(
+            tmp_path, [{"name": "cutoff", "expression": self.TOKEN_EXPR}]
+        ).splitlines()
+        i = next(n for n, l in enumerate(lines) if "logical_date = (args.get" in l)
+        j = next(n for n in range(i, len(lines)) if ")" == lines[n].strip())
+        block = textwrap.dedent("\n".join(lines[i : j + 1]))
+
+        for bad in ("", "   ", "not-a-date", "2026-1-1", "20260101", "current_date()"):
+            ns = {"args": {"logical_date": bad}, "re": _re}
+            with pytest.raises(ValueError) as exc:
+                exec(block, ns)  # nosec B102
+            assert "YYYY-MM-DD" in str(exc.value)
+
+        ns = {"args": {"logical_date": "2026-09-30"}, "re": _re}
+        exec(block, ns)  # nosec B102
+        assert ns["logical_date"] == "2026-09-30"
+
+    def test_it_refuses_to_substitute_current_date(self, tmp_path):
+        """current_date() would make a backfill recompute a different answer every run."""
+        body = self._silver(tmp_path, [{"name": "cutoff", "expression": self.TOKEN_EXPR}])
+        guard = body[body.index("logical_date = (args.get"):]
+        guard = guard[: guard.index("logger.log")]
+        assert "current_date()" in guard and "Do NOT substitute" in guard, (
+            "the error message must say why current_date() is not an acceptable fallback"
+        )
+
+    @pytest.mark.parametrize("pre_pii", [
+        None,
+        [{"name": "upper_id", "expression": "upper(record_id)"}],
+    ])
+    def test_a_spec_without_the_token_is_unchanged(self, pre_pii, tmp_path):
+        """Back-compat: no import re, no extra argument, no validation block."""
+        body = self._silver(tmp_path, pre_pii)
+        assert 'getResolvedOptions(sys.argv, ["JOB_NAME"])' in body
+        assert "logical_date" not in body
+        assert "import re" not in body
+
+    def test_the_token_is_substituted_into_the_expression(self, tmp_path):
+        body = self._silver(tmp_path, [{"name": "cutoff", "expression": self.TOKEN_EXPR}])
+        assert '.replace("${ADOP_LOGICAL_DATE}", logical_date)' in body, (
+            "the token is never substituted, so it reaches Spark as a literal"
+        )
