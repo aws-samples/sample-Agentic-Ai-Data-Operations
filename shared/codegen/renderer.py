@@ -1,6 +1,7 @@
 """Render Jinja2 templates from validated specs — the only legal codegen path."""
 
 import hashlib
+import re
 import os
 import tempfile
 from pathlib import Path
@@ -104,6 +105,47 @@ def _make_env(template_id: str) -> "jinja2.Environment":
         raise UnsupportedSpecValueError(template_id, detail)
 
     env.globals["unsupported"] = unsupported
+
+    def runtime_placeholders(*values: object) -> list[str]:
+        """The ${NAME} parameters appearing anywhere in `values`, sorted.
+
+        CLAUDE.md security rule 2 forbids bucket names, account IDs and other
+        infrastructure detail in source, so specs carry `${DATA_LAKE_BUCKET}` and
+        `${PHI_HASH_SALT_SECRET_ID}` instead of real values. That is the right pattern and
+        it was never wired: only `${ADOP_LOGICAL_DATE}` had a substitution step, so the
+        other four reached rendered artifacts as literal text. Measured on a live run:
+        Bronze wrote to a bucket named `${DATA_LAKE_BUCKET}`, Silver's quarantine prefix —
+        where cleartext PHI goes — was the same literal, `_phi_salt("${PHI_HASH_SALT_
+        SECRET_ID}")` could never resolve a secret, and the SNS topic the failure alert
+        publishes to was a placeholder, so the alert announcing a break was itself broken.
+
+        A template calls this to learn which Glue job arguments it must resolve, then
+        substitutes them at runtime and raises if any survive. Exposed as a global rather
+        than a macro because templates are loaded from strings through BaseLoader, so
+        `{% import %}` has nothing to import from and a macro would have to be copied into
+        every template that needs it.
+
+        ADOP_LOGICAL_DATE is excluded: it has its own dedicated mechanism, arrives as the
+        lowercase `logical_date` argument, and is format-checked separately.
+        """
+        found: set[str] = set()
+
+        def walk(value: object) -> None:
+            if isinstance(value, str):
+                found.update(re.findall(r"\$\{([A-Z_][A-Z0-9_]*)\}", value))
+            elif isinstance(value, dict):
+                for v in value.values():
+                    walk(v)
+            elif isinstance(value, (list, tuple, set)):
+                for v in value:
+                    walk(v)
+
+        for value in values:
+            walk(value)
+        found.discard("ADOP_LOGICAL_DATE")
+        return sorted(found)
+
+    env.globals["runtime_placeholders"] = runtime_placeholders
     return env
 
 

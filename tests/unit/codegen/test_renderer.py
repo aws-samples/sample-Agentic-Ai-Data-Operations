@@ -1501,3 +1501,155 @@ class TestTheGatePublishesRatherThanReportingAfterTheFact:
     def test_the_promotion_is_logged(self, tmp_path):
         body = self._quality(tmp_path, gate_before_publish=True)
         assert "promoted_after_gate" in body
+
+
+class TestRuntimePlaceholdersAreResolvedNotShipped:
+    """Four of the five ${NAME} placeholders were never substituted by anything.
+
+    CLAUDE.md security rule 2 forbids bucket names and account IDs in source, so specs write
+    `${DATA_LAKE_BUCKET}` and `${PHI_HASH_SALT_SECRET_ID}`. That is the correct pattern; it was
+    simply not wired. Only `${ADOP_LOGICAL_DATE}` had a substitution step.
+
+    Measured on a live run (TESTS/ONE):
+      raw_to_bronze.py:31    landing_zone = args.get("landing_zone", "s3://${DATA_LAKE_BUCKET}/bronze/claims/")
+      bronze_to_silver.py:81 "s3://${DATA_LAKE_BUCKET}/quarantine/claims/"      <- cleartext PHI
+      bronze_to_silver.py:157 F.lit(_phi_salt("${PHI_HASH_SALT_SECRET_ID}"))    <- masking cannot run
+
+    And `args.get("source_path", ...)` read as an override while being dead: getResolvedOptions
+    listed only JOB_NAME, so the key was never present and the literal always won.
+    """
+
+    def _render(self, tmp_path, fixture, template, spec_type, over):
+        spec, spec_hash = load_spec(FIXTURES / fixture, spec_type)
+        out = tmp_path / "o.py"
+        render({**spec, **over}, spec_hash, template, "1.0.0", out, RUN_STARTED_AT)
+        body = out.read_text()
+        compile(body, "o.py", "exec")
+        return body
+
+    def _bronze(self, tmp_path, **over):
+        return self._render(tmp_path, "bronze.yaml", "bronze_ingestion", "bronze", over)
+
+    def _silver(self, tmp_path, **over):
+        return self._render(tmp_path, "silver.yaml", "silver_transform", "silver", over)
+
+    PLACEHOLDER_BRONZE = {
+        "source_path": "s3://${DATA_LAKE_BUCKET}/raw/claims.csv",
+        "landing_zone": "s3://${DATA_LAKE_BUCKET}/bronze/claims/",
+    }
+    PLACEHOLDER_SILVER = {
+        "null_handling": {"strategy": "quarantine", "critical_columns": ["claim_id"]},
+        "quarantine": {"enabled": True, "location": "s3://${DATA_LAKE_BUCKET}/quarantine/c/"},
+        "pii_masking": {"enabled": True, "columns": [
+            {"name": "member_email", "method": "hash_salted",
+             "salt_secret_id": "${PHI_HASH_SALT_SECRET_ID}"}]},
+    }
+
+    # --- the extractor -----------------------------------------------------------------
+
+    def test_the_extractor_walks_nested_containers(self):
+        """salt_secret_id lives at pii_masking.columns[].salt_secret_id — two levels down.
+
+        A top-level-only scan is the blind spot that let rules.accuracy go unrendered.
+        """
+        from shared.codegen.renderer import _make_env
+
+        f = _make_env("t").globals["runtime_placeholders"]
+        assert f({"columns": [{"salt_secret_id": "${PHI_HASH_SALT_SECRET_ID}"}]}) == \
+            ["PHI_HASH_SALT_SECRET_ID"]
+        assert f("${A}/x", ["${B}"], {"k": {"j": "${C}"}}) == ["A", "B", "C"]
+
+    def test_logical_date_is_excluded(self):
+        """It has its own mechanism and arrives as lowercase `logical_date`.
+
+        Including it here would list ADOP_LOGICAL_DATE as a second, wrongly-named required
+        Glue argument and every silver job would die at getResolvedOptions.
+        """
+        from shared.codegen.renderer import _make_env
+
+        f = _make_env("t").globals["runtime_placeholders"]
+        assert f("to_date('${ADOP_LOGICAL_DATE}')") == []
+        assert f("${ADOP_LOGICAL_DATE}", "${DATA_LAKE_BUCKET}") == ["DATA_LAKE_BUCKET"]
+
+    # --- bronze ------------------------------------------------------------------------
+
+    def test_bronze_declares_each_placeholder_as_a_required_job_argument(self, tmp_path):
+        body = self._bronze(tmp_path, **self.PLACEHOLDER_BRONZE)
+        args = next(l for l in body.splitlines() if "getResolvedOptions(sys.argv" in l)
+        assert '"DATA_LAKE_BUCKET"' in args, args
+        assert args.count('"') == 4, f"expected JOB_NAME + one placeholder, got: {args}"
+
+    def test_bronze_substitutes_rather_than_shipping_the_literal(self, tmp_path):
+        body = self._bronze(tmp_path, **self.PLACEHOLDER_BRONZE)
+        assert '_resolve("s3://${DATA_LAKE_BUCKET}/raw/claims.csv"' in body
+        assert 'args.get("source_path"' not in body, (
+            "the dead override is back: getResolvedOptions never populates that key"
+        )
+
+    def test_bronze_refuses_a_surviving_placeholder_at_runtime(self, tmp_path):
+        body = self._bronze(tmp_path, **self.PLACEHOLDER_BRONZE)
+        assert 'if "${" in value:' in body
+        assert "raise ValueError" in body
+
+    def test_bronze_refuses_a_path_with_no_uri_scheme(self, tmp_path):
+        """`sample_claims.csv` resolves against the Glue container, not the repo.
+
+        This is the defect that cost a whole build: Spark reported only "Path does not exist".
+        """
+        body = self._bronze(tmp_path, source_path="sample_claims.csv")
+        assert '"://" not in source_path' in body
+        assert "no URI scheme" in body
+
+    def test_bronze_without_placeholders_needs_no_extra_argument(self, tmp_path):
+        """Back-compat for every bronze spec that names real paths."""
+        body = self._bronze(tmp_path)
+        assert "_resolve" not in body
+        args = next(l for l in body.splitlines() if "getResolvedOptions(sys.argv" in l)
+        assert args.strip() == 'args = getResolvedOptions(sys.argv, ["JOB_NAME"])', args
+
+    # --- silver ------------------------------------------------------------------------
+
+    def test_silver_resolves_the_quarantine_prefix(self, tmp_path):
+        """The quarantine prefix receives rows carrying cleartext PHI."""
+        body = self._silver(tmp_path, **self.PLACEHOLDER_SILVER)
+        assert '_resolve("s3://${DATA_LAKE_BUCKET}/quarantine/c/", args, "quarantine.location")' in body
+        # The literal legitimately appears as _resolve's first argument, so counting it is
+        # wrong. The real property is that no BARE use survives — every line mentioning the
+        # placeholder must route through _resolve.
+        bare = [l.strip() for l in body.splitlines()
+                if "${DATA_LAKE_BUCKET}" in l and "_resolve(" not in l]
+        assert not bare, (
+            "these use the placeholder without resolving it, so PHI would land under a "
+            "prefix named after the placeholder:\n  " + "\n  ".join(bare)
+        )
+
+    def test_silver_resolves_the_salt_secret_id(self, tmp_path):
+        body = self._silver(tmp_path, **self.PLACEHOLDER_SILVER)
+        assert '_phi_salt(_resolve("${PHI_HASH_SALT_SECRET_ID}"' in body, (
+            "the secret ID reaches Secrets Manager as a literal placeholder, so masking "
+            "cannot run at all"
+        )
+
+    def test_silver_lists_both_placeholders_alongside_logical_date(self, tmp_path):
+        """logical_date is lowercase and separate; the two must coexist."""
+        body = self._silver(
+            tmp_path,
+            pre_pii_derived_columns=[{"name": "d", "expression": "to_date('${ADOP_LOGICAL_DATE}')"}],
+            **self.PLACEHOLDER_SILVER,
+        )
+        args = next(l for l in body.splitlines() if "getResolvedOptions(sys.argv" in l)
+        for expected in ('"logical_date"', '"DATA_LAKE_BUCKET"', '"PHI_HASH_SALT_SECRET_ID"'):
+            assert expected in args, f"{expected} missing from {args}"
+        assert "ADOP_LOGICAL_DATE" not in args
+
+    def test_silver_without_placeholders_is_unchanged(self, tmp_path):
+        body = self._silver(
+            tmp_path,
+            null_handling={"strategy": "quarantine", "critical_columns": ["claim_id"]},
+            quarantine={"enabled": True, "location": "s3://real-bucket/quarantine/c/"},
+            pii_masking={"enabled": True, "columns": [
+                {"name": "member_email", "method": "hash_salted",
+                 "salt_secret_id": "adop/claims/salt"}]},
+        )
+        assert "_resolve" not in body
+        assert 'F.lit(_phi_salt("adop/claims/salt"))' in body

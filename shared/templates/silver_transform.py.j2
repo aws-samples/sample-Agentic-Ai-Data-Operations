@@ -1,5 +1,5 @@
 {# template_id: silver_transform #}
-{# template_version: 1.2.0 #}
+{# template_version: 1.3.0 #}
 {# required_slots: dataset_name, source_table, primary_key, dedup_strategy, quality_threshold, iceberg_database, iceberg_table #}
 {# schema_version: v1 #}
 {#
@@ -31,6 +31,21 @@
 {% endif %}
 {% endfor %}
 {%- for c in spec %}F.col("{{ c }}"){{ ", " if not loop.last }}{% endfor -%}
+{%- endmacro %}
+{#
+  Runtime parameters. CLAUDE.md security rule 2 keeps bucket names and secret IDs out of
+  source, so specs carry ${DATA_LAKE_BUCKET} and ${PHI_HASH_SALT_SECRET_ID}. Only
+  ${ADOP_LOGICAL_DATE} ever had a substitution step, so the rest reached rendered artifacts
+  as literal text: the quarantine prefix -- where cleartext PHI lands -- became a path named
+  after the placeholder, and _phi_salt() was handed "${PHI_HASH_SALT_SECRET_ID}" as a secret
+  ID, which no Secrets Manager lookup can resolve.
+
+  rt() emits either a plain literal or a _resolve() call, so a spec with no placeholders
+  renders byte-identically to before.
+#}
+{% set _params = runtime_placeholders(quarantine | default({}), pii_masking | default({})) %}
+{% macro rt(value, slot) -%}
+{% if _params %}_resolve({{ value | tojson }}, args, {{ slot | tojson }}){% else %}{{ value | tojson }}{% endif %}
 {%- endmacro %}
 import sys
 import hashlib
@@ -100,6 +115,21 @@ def _phi_salt(secret_id: str) -> str:
 {% endif %}
 
 
+{% if _params %}
+def _resolve(value, args, slot):
+    """Substitute ${NAME} job arguments, and refuse to proceed if any survive."""
+    for name in ({% for p in _params %}"{{ p }}", {% endfor %}):
+        value = value.replace("${" + name + "}", args[name])
+    if "${" in value:
+        raise ValueError(
+            f"{slot} still holds an unresolved placeholder after substitution: {value!r}. "
+            f"Pass it as a Glue job argument. For quarantine this would write PHI to a "
+            f"prefix named after the placeholder; for a salt secret ID the lookup fails."
+        )
+    return value
+
+
+{% endif %}
 def transform(glue_context, args):
     spark = glue_context.spark_session
     logger.log("info", "transform_start", source="{{ source_table }}")
@@ -139,7 +169,7 @@ def transform(glue_context, args):
         # Appended, and written before the count is logged: a later run must not erase rows
         # awaiting review, and a failed write must not read as "no offending rows".
         bronze_df.filter(_null_in_checked).write.mode("append").parquet(
-            "{{ quarantine.location }}"
+            {{ rt(quarantine.location, "quarantine.location") }}
         )
     bronze_df = bronze_df.filter(~_null_in_checked)
     null_rows_dropped, null_rows_retained, null_rows_quarantined = 0, 0, null_rows
@@ -200,7 +230,7 @@ def transform(glue_context, args):
     if pk_conflicts_quarantined > 0:
         # Written before the count is logged, so a write failure cannot be mistaken for
         # "no conflicts". Append: a later run must not erase an unreviewed conflict.
-        conflicting_df.write.mode("append").parquet("{{ quarantine.location }}")
+        conflicting_df.write.mode("append").parquet({{ rt(quarantine.location, "quarantine.location") }})
 {% elif dedup_strategy != "none" %}
     # Deduplication: {{ dedup_strategy }}
     window = Window.partitionBy(
@@ -310,7 +340,7 @@ def transform(glue_context, args):
         "{{ col_mask.name }}",
         F.sha2(
             F.concat(
-                F.lit(_phi_salt("{{ col_mask.salt_secret_id }}")),
+                F.lit(_phi_salt({{ rt(col_mask.salt_secret_id, "pii_masking.salt_secret_id") }})),
                 F.col("{{ col_mask.name }}").cast("string"),
             ),
             256,
@@ -401,7 +431,7 @@ def transform(glue_context, args):
         # "duplicates_removed" would make an unreviewed conflict look like a clean drop.
         exact_duplicates_removed=exact_duplicates_removed,
         pk_conflicts_quarantined=pk_conflicts_quarantined,
-        quarantine_location="{{ quarantine.location }}",
+        quarantine_location={{ rt(quarantine.location, "quarantine.location") }},
 {% endif %}
         output_rows=output_rows,
         target_table=table_name,
@@ -422,9 +452,9 @@ if __name__ == "__main__":
       and "${ADOP_LOGICAL_DATE}" in (pre_pii_derived_columns | map(attribute="expression") | join(" ")) %}
     # logical_date is required, not optional: getResolvedOptions raises if the DAG omits it,
     # which is the correct direction. See the ${ADOP_LOGICAL_DATE} note in transform().
-    args = getResolvedOptions(sys.argv, ["JOB_NAME", "logical_date"])
+    args = getResolvedOptions(sys.argv, ["JOB_NAME", "logical_date"{% for p in _params %}, "{{ p }}"{% endfor %}])
 {% else %}
-    args = getResolvedOptions(sys.argv, ["JOB_NAME"])
+    args = getResolvedOptions(sys.argv, ["JOB_NAME"{% for p in _params %}, "{{ p }}"{% endfor %}])
 {% endif %}
     sc = SparkContext()
     glue_context = GlueContext(sc)

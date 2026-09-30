@@ -1,5 +1,5 @@
 {# template_id: bronze_ingestion #}
-{# template_version: 1.0.0 #}
+{# template_version: 1.1.0 #}
 {# required_slots: dataset_name, source_path, source_format, landing_zone #}
 {# schema_version: v1 #}
 import sys
@@ -24,10 +24,59 @@ logger = StructuredLogger(
 )
 
 
+{#
+  Runtime parameters.
+
+  `args.get("source_path", "{{ source_path }}")` read as an override and was not one:
+  getResolvedOptions listed only JOB_NAME, so `args` never contained the key and the spec
+  literal always won. Dead parameterisation that looks live — the same shape as the
+  ${ADOP_LOGICAL_DATE} defect, and it is why an earlier build asserted this script accepts
+  --source_path when it does not.
+
+  Anything the spec writes as ${NAME} is now a REQUIRED Glue job argument. Required, not
+  optional, because getResolvedOptions raises on a listed argument the caller omitted — which
+  is the loud failure we want. The alternative was the literal string "s3://${DATA_LAKE_BUCKET}
+  /bronze/claims/" reaching .save(), which is a syntactically plausible S3 URI and so fails
+  late, obscurely, or not at all.
+#}
+{% set _params = runtime_placeholders(source_path, landing_zone) %}
+{% if _params %}
+
+
+def _resolve(value, args, slot):
+    """Substitute ${NAME} job arguments, and refuse to proceed if any survive."""
+    for name in ({% for p in _params %}"{{ p }}", {% endfor %}):
+        value = value.replace("${" + name + "}", args[name])
+    if "${" in value:
+        raise ValueError(
+            f"{slot} still holds an unresolved placeholder after substitution: {value!r}. "
+            f"Pass it as a Glue job argument -- writing it literally would create a path "
+            f"named after the placeholder rather than the bucket."
+        )
+    return value
+{% endif %}
+
+
 def ingest(glue_context, args):
     spark = glue_context.spark_session
-    source_path = args.get("source_path", "{{ source_path }}")
-    landing_zone = args.get("landing_zone", "{{ landing_zone }}")
+{% if _params %}
+    source_path = _resolve("{{ source_path }}", args, "source_path")
+    landing_zone = _resolve("{{ landing_zone }}", args, "landing_zone")
+{% else %}
+    source_path = "{{ source_path }}"
+    landing_zone = "{{ landing_zone }}"
+{% endif %}
+
+    # A bare or relative path resolves against the Glue executor's own filesystem, not the
+    # repository the spec was written in, so the read fails with an opaque "Path does not
+    # exist". Named here instead, because this cost a whole build: source_path was the bare
+    # filename "sample_claims.csv" and nothing said why Spark could not find it.
+    if "://" not in source_path:
+        raise ValueError(
+            f"source_path {source_path!r} has no URI scheme. A Glue worker resolves a "
+            f"relative path against its own container, not your repository. Stage the data "
+            f"and use s3://..., or file:///abs/path for a deliberate local run."
+        )
 
     logger.log("info", "ingestion_start", source=source_path, format="{{ source_format }}")
 
@@ -76,7 +125,7 @@ def ingest(glue_context, args):
 
 
 if __name__ == "__main__":
-    args = getResolvedOptions(sys.argv, ["JOB_NAME"])
+    args = getResolvedOptions(sys.argv, ["JOB_NAME"{% for p in _params %}, "{{ p }}"{% endfor %}])
     sc = SparkContext()
     glue_context = GlueContext(sc)
     job = Job(glue_context)
