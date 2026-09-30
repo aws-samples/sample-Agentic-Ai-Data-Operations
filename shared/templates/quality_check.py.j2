@@ -1,5 +1,5 @@
 {# template_id: quality_check #}
-{# template_version: 1.0.0 #}
+{# template_version: 1.1.0 #}
 {# required_slots: dataset_name, rules, quality_gates #}
 {# schema_version: v1 #}
 {#
@@ -262,7 +262,26 @@ def check_quality(spark, table_name, zone):
 
 
 if __name__ == "__main__":
+{#
+  gate_before_publish. The gate publishes, so there is no code path that publishes without it.
+
+  The DAG is transform_silver -> quality_check_silver -> aggregate_gold -> quality_check_gold,
+  and each transform ran createOrReplace() followed by job.commit() before its gate started.
+  So the gate blocked the NEXT zone, not its own publication: a failed Silver gate stopped Gold
+  being built while unmasked PHI was already committed and queryable in Silver. And
+  quality_check_gold is the last task in the graph, so it blocked nothing whatsoever -- it was
+  an alarm wired to no circuit. CLAUDE.md's "Quality gates block promotion -- no bypassing"
+  described a property the rendered pipeline did not have.
+
+  PROMOTE_TO is resolved only in this branch. Glue's getResolvedOptions raises on a listed
+  argument the caller did not supply, so listing it unconditionally would break every DAG that
+  does not stage -- the same reason silver_transform resolves logical_date conditionally.
+#}
+{% if gate_before_publish | default(false) %}
+    args = getResolvedOptions(sys.argv, ["JOB_NAME", "TABLE_NAME", "ZONE", "PROMOTE_TO"])
+{% else %}
     args = getResolvedOptions(sys.argv, ["JOB_NAME", "TABLE_NAME", "ZONE"])
+{% endif %}
     sc = SparkContext()
     glue_context = GlueContext(sc)
     spark = glue_context.spark_session
@@ -272,3 +291,22 @@ if __name__ == "__main__":
             f"Quality gate FAILED: score={result['overall_score']:.3f}, "
             f"critical_failures={result['critical_failures']}"
         )
+{% if gate_before_publish | default(false) %}
+
+    # Publication. Reached only because the gate passed -- the raise above is the only other
+    # exit, so nothing unapproved can be written here.
+    _staging, _target = args["TABLE_NAME"], args["PROMOTE_TO"]
+    if _staging == _target:
+        # Otherwise the "promotion" rewrites the table onto itself: a no-op that logs success
+        # while the transform has already published, which is the failure this whole branch
+        # exists to remove. Louder to refuse than to appear to have gated.
+        raise ValueError(
+            f"PROMOTE_TO equals TABLE_NAME ({_target}). The gate would rewrite the staging "
+            f"table onto itself and publication would still be happening in the transform. "
+            f"Pass the staging table as TABLE_NAME and the real table as PROMOTE_TO."
+        )
+    spark.table(_staging).writeTo(_target).using("iceberg").createOrReplace()
+    logger.log("info", "promoted_after_gate",
+        staging=_staging, target=_target,
+        overall_score=result["overall_score"], zone=result["zone"])
+{% endif %}

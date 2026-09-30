@@ -214,3 +214,146 @@ class TestManualScheduleIsExpressible:
         """start_date and any later backfill still need a zone."""
         errors = validate_spec(self._dag(cron=None), "dag")
         assert errors and any("timezone" in e for e in errors), errors
+
+
+class TestRowSuppressionIsExpressible:
+    """A k-anonymity threshold must have somewhere to live in the spec.
+
+    Same reason this sits with the contract guards rather than the render tests: mutation
+    testing deleted `post_aggregation_filter` from gold_spec.schema.json and all 212 codegen
+    tests still passed, because the render tests build a spec dict in memory and never call
+    validate_spec. With the property gone, `additionalProperties: false` rejects every
+    suppression spec at validation time while the template happily still handles it — the
+    agent would report a contract error for a feature that exists.
+
+    The underlying gap this property closes: `post_aggregation_columns` renders as
+    `withColumn()`, so it can add a `k_anonymity_suppressed` boolean but cannot remove the
+    disclosed row. A live HIPAA run hit this with 3 cells at n=1.
+    """
+
+    GOLD_BASE = {
+        "dataset_name": "probe",
+        "schema_version": "v1",
+        "source_table": "glue_catalog.db.silver_probe",
+        "schema_type": "flat_iceberg",
+        "grain": {"dimensions": ["service_week"], "temporal": "weekly"},
+        "measures": [
+            {"name": "claim_count", "source_column": "claim_id", "aggregation": "count"}
+        ],
+    }
+
+    def _gold(self, **over):
+        return {**self.GOLD_BASE, **over}
+
+    def test_a_suppression_predicate_validates(self):
+        assert not validate_spec(
+            self._gold(post_aggregation_filter="claim_count >= 11"), "gold"
+        ), "a k=11 threshold must be expressible, or it can only be a label"
+
+    def test_absent_is_fine(self):
+        """Every gold spec written before this property existed must still validate."""
+        assert not validate_spec(self._gold(), "gold")
+
+    def test_an_empty_predicate_is_rejected(self):
+        """`F.expr("")` raises at Spark runtime; better to fail validation."""
+        assert validate_spec(self._gold(post_aggregation_filter=""), "gold")
+
+    def test_a_non_string_predicate_is_rejected(self):
+        assert validate_spec(self._gold(post_aggregation_filter=["claim_count >= 11"]), "gold")
+
+    def test_it_is_optional_not_required(self):
+        """Unlike cron, silence here is not an unanswered question.
+
+        Most Gold tables have no disclosure threshold, and forcing one would make every
+        existing spec invalid — a migration, not a fix.
+        """
+        import json
+        from pathlib import Path
+
+        schema = json.loads(
+            (Path(__file__).resolve().parents[3] / "contracts/v1/gold_spec.schema.json").read_text()
+        )
+        assert "post_aggregation_filter" not in schema.get("required", [])
+
+
+class TestGateBeforePublishIsExpressible:
+    """Gate-before-publish needs three spec fields, and none of them existed.
+
+    With them absent and `additionalProperties: false`, a spec asking for it fails validation
+    while the templates handle it perfectly — the agent would report a contract error for a
+    feature that works.
+
+    Here for the same reason as the two classes above: mutation testing deleted each of the
+    three properties in turn and all 251 codegen tests stayed green, because the render tests
+    build spec dicts in memory and never call validate_spec. Three separate mutations, three
+    green suites.
+    """
+
+    QUALITY_BASE = {
+        "dataset_name": "probe",
+        "schema_version": "v1",
+        "rules": {},
+        "quality_gates": {
+            "bronze_to_silver": {"overall_score": 0.80, "action_on_failure": "block"},
+            "silver_to_gold": {"overall_score": 0.95, "action_on_failure": "block"},
+        },
+    }
+    GOLD_BASE = {
+        "dataset_name": "probe",
+        "schema_version": "v1",
+        "source_table": "glue_catalog.db.silver_probe",
+        "schema_type": "flat_iceberg",
+        "grain": {"dimensions": ["service_week"], "temporal": "weekly"},
+        "measures": [
+            {"name": "claim_count", "source_column": "claim_id", "aggregation": "count"}
+        ],
+    }
+
+    def test_quality_accepts_gate_before_publish(self):
+        assert not validate_spec(
+            {**self.QUALITY_BASE, "gate_before_publish": True}, "quality"
+        ), "the gate cannot be told to publish, so publication stays in the transform"
+
+    def test_silver_accepts_publish_via_gate(self):
+        assert not validate_spec(_spec(dedup_strategy="none", publish_via_gate=True), "silver")
+
+    def test_gold_accepts_publish_via_gate(self):
+        assert not validate_spec({**self.GOLD_BASE, "publish_via_gate": True}, "gold")
+
+    @pytest.mark.parametrize("spec_type,base_attr,field", [
+        ("quality", "QUALITY_BASE", "gate_before_publish"),
+        ("gold", "GOLD_BASE", "publish_via_gate"),
+    ])
+    def test_absent_is_valid(self, spec_type, base_attr, field):
+        """Back-compat: every spec written before gating existed."""
+        base = getattr(self, base_attr)
+        assert field not in base
+        assert not validate_spec(base, spec_type)
+
+    def test_silver_absent_is_valid(self):
+        assert not validate_spec(_spec(dedup_strategy="none"), "silver")
+
+    @pytest.mark.parametrize("value", ["true", 1, "yes"])
+    def test_a_non_boolean_is_rejected(self, value):
+        """A truthy string would silently enable gating, or silently not.
+
+        `"false"` is truthy in Jinja, so a string here inverts the meaning of the flag — the
+        transform would stage while the reader of the YAML believes it publishes.
+        """
+        assert validate_spec(_spec(dedup_strategy="none", publish_via_gate=value), "silver")
+        assert validate_spec({**self.QUALITY_BASE, "gate_before_publish": value}, "quality")
+
+    def test_none_of_the_three_is_required(self):
+        """Silence means "publish as before", which is what every existing workload does."""
+        import json
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[3]
+        for spec_type, field in (("quality", "gate_before_publish"),
+                                 ("silver", "publish_via_gate"),
+                                 ("gold", "publish_via_gate")):
+            schema = json.loads((root / f"contracts/v1/{spec_type}_spec.schema.json").read_text())
+            assert field in schema["properties"], f"{spec_type}.{field} is not settable"
+            assert field not in schema.get("required", []), (
+                f"{spec_type}.{field} became required, which invalidates every existing spec"
+            )

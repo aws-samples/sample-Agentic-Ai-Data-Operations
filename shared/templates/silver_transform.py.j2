@@ -1,5 +1,5 @@
 {# template_id: silver_transform #}
-{# template_version: 1.1.0 #}
+{# template_version: 1.2.0 #}
 {# required_slots: dataset_name, source_table, primary_key, dedup_strategy, quality_threshold, iceberg_database, iceberg_table #}
 {# schema_version: v1 #}
 {#
@@ -359,8 +359,26 @@ def transform(glue_context, args):
     final_df = derived_df
 {% endif %}
 
+{#
+  publish_via_gate. Write to staging; the quality gate publishes.
+
+  This write used to be createOrReplace() on the real Silver table, immediately followed by
+  job.commit(), and only then did quality_check_silver start. So a masking rule marked CRITICAL
+  and blocking could not prevent unmasked PHI from being committed and queryable -- it could
+  only stop Gold from being built afterwards.
+
+  iceberg_table stays the real name: semantic.yaml, the LF-Tag grants and gold_spec.source_table
+  all reference it, and renaming it here would silently repoint them at staging.
+#}
+{% if publish_via_gate | default(false) %}
+    # Staging write. Publication is quality_check's job (quality_spec.gate_before_publish),
+    # which reads this table as TABLE_NAME and writes PROMOTE_TO only if the gate passes.
+    # Nothing publishes if that is not wired up — staged and unpublished is the safe failure.
+    table_name = "glue_catalog.{{ iceberg_database }}.{{ iceberg_table }}_staging"
+{% else %}
     # Write to Iceberg Silver table
     table_name = "glue_catalog.{{ iceberg_database }}.{{ iceberg_table }}"
+{% endif %}
 {% if iceberg_partition_spec is defined and iceberg_partition_spec %}
     final_df.writeTo(table_name) \
         .using("iceberg") \

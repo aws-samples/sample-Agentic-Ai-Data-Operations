@@ -104,6 +104,11 @@
       "type": "string",
       "pattern": "^[a-z][a-z0-9_]*$"
     },
+    "publish_via_gate": {
+      "type": "boolean",
+      "default": false,
+      "description": "When true this template writes to {iceberg_table}_staging instead of the real table, leaving publication to the quality gate. iceberg_table stays the real name so semantic.yaml, the LF-Tag grants and gold_spec.source_table keep pointing at it. Requires gate_before_publish on the workload's quality_spec and PROMOTE_TO on the quality task -- without both, the data is staged and never published."
+    },
     "iceberg_partition_spec": {
       "type": "array",
       "items": { "type": "string" },
@@ -160,6 +165,11 @@
       },
       "default": [],
       "description": "Columns derived from aggregated measures (booleans, ratios, masking expressions over Gold dimensions)."
+    },
+    "post_aggregation_filter": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Spark SQL predicate applied to the aggregated rows immediately before the write. Rows not satisfying it are dropped, not labelled. This is the only way to suppress a published cell: post_aggregation_columns can add a column but cannot remove a row, so a k-anonymity flag computed there is a boolean sitting next to the disclosed row rather than a suppression. Example for k=11: claim_count >= 11."
     }
   }
 }

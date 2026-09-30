@@ -294,6 +294,11 @@
       "pattern": "^[a-z][a-z0-9_]*$",
       "description": "Target Iceberg table name"
     },
+    "publish_via_gate": {
+      "type": "boolean",
+      "default": false,
+      "description": "When true this template writes to {iceberg_table}_staging instead of the real table, leaving publication to the quality gate. iceberg_table stays the real name so semantic.yaml, the LF-Tag grants and gold_spec.source_table keep pointing at it. Requires gate_before_publish on the workload's quality_spec and PROMOTE_TO on the quality task -- without both, the data is staged and never published."
+    },
     "quarantine": {
       "type": "object",
       "additionalProperties": false,

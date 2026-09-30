@@ -77,6 +77,11 @@
         }
       }
     },
+    "gate_before_publish": {
+      "type": "boolean",
+      "default": false,
+      "description": "When true the gate itself publishes: quality_check reads the staging table given as TABLE_NAME and, only if the gate passes, writes it to PROMOTE_TO. Default false preserves the original order, in which the transform ran createOrReplace() and job.commit() before the gate started -- so the gate blocked the NEXT zone rather than its own publication, and quality_check_gold, being the last task, blocked nothing at all. Set alongside publish_via_gate on the matching silver_spec or gold_spec."
+    },
     "anomaly_detection": {
       "type": "object",
       "additionalProperties": false,

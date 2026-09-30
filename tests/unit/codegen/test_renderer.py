@@ -1275,3 +1275,229 @@ class TestLogicalDateIsResolvedOrTheRunFails:
         assert '.replace("${ADOP_LOGICAL_DATE}", logical_date)' in body, (
             "the token is never substituted, so it reaches Spark as a literal"
         )
+
+
+class TestSuppressionDropsRowsRatherThanLabellingThem:
+    """k=11 could not be honoured by any spec, because nothing could remove a row.
+
+    `post_aggregation_columns` renders as `withColumn()` — it adds a column. The write is an
+    unconditional `createOrReplace`. `gold_aggregate.py.j2` contained no `.filter()` at all,
+    and `gold_spec` had no property expressing a row predicate.
+
+    So a human answering "suppress cells below k=11" got a `k_anonymity_suppressed` boolean
+    sitting next to the disclosed row: still written, still queryable, still identifying. A
+    label is not a suppression.
+
+    Found by a live HIPAA run on 8 rows, where weekly grain still left 3 cells at n=1 with
+    member_count=1. It correctly reported the gap as not spec-fixable and stopped rather than
+    writing a labelled disclosure.
+    """
+
+    # The fixture has no post_aggregation_columns, so a test that merely skipped when they are
+    # absent would assert nothing about the ordering — which is the property that lets the
+    # predicate reference a derived measure. Supplied explicitly instead.
+    DERIVED = [{"name": "cells_are_small", "expression": "claim_count < 11"}]
+
+    def _gold(self, tmp_path, schema_type, filt=None, derived=None):
+        spec, spec_hash = load_spec(FIXTURES / "gold.yaml", "gold")
+        spec = {**spec, "schema_type": schema_type}
+        if derived is not None:
+            spec["post_aggregation_columns"] = derived
+        if filt is None:
+            spec.pop("post_aggregation_filter", None)
+        else:
+            spec["post_aggregation_filter"] = filt
+        out = tmp_path / "g.py"
+        render(spec, spec_hash, "gold_aggregate", "1.0.0", out, RUN_STARTED_AT)
+        body = out.read_text()
+        compile(body, "g.py", "exec")
+        return body
+
+    @pytest.mark.parametrize("schema_type,df", [("star_schema", "fact_df"),
+                                                ("flat_iceberg", "gold_df")])
+    def test_the_filter_drops_rows_on_the_dataframe_that_is_written(
+        self, schema_type, df, tmp_path
+    ):
+        body = self._gold(tmp_path, schema_type, "claim_count >= 11")
+        assert f"{df} = {df}.filter(F.expr(" in body, (
+            f"the filter is not applied to {df}, which is the dataframe this schema_type "
+            f"writes — so the suppressed rows would still be published"
+        )
+
+    @pytest.mark.parametrize("schema_type", ["star_schema", "flat_iceberg"])
+    def test_the_filter_runs_before_the_write(self, schema_type, tmp_path):
+        """A suppression applied after createOrReplace suppresses nothing."""
+        body = self._gold(tmp_path, schema_type, "claim_count >= 11")
+        lines = body.splitlines()
+        i = next(n for n, l in enumerate(lines) if ".filter(F.expr(" in l)
+        j = next(n for n, l in enumerate(lines) if "createOrReplace()" in l)
+        assert i < j, "the rows are written before the filter runs"
+
+    @pytest.mark.parametrize("schema_type", ["star_schema", "flat_iceberg"])
+    def test_the_filter_runs_after_post_aggregation_columns(self, schema_type, tmp_path):
+        """So the predicate can reference a derived measure, e.g. a ratio added above."""
+        body = self._gold(tmp_path, schema_type, "cells_are_small = false", self.DERIVED)
+        lines = body.splitlines()
+        i = next(n for n, l in enumerate(lines) if "cells_are_small" in l)
+        j = next(n for n, l in enumerate(lines) if ".filter(F.expr(" in l)
+        assert i < j, (
+            "the filter renders before the derived column, so a predicate referencing one "
+            "resolves against a column that does not exist yet"
+        )
+
+    @pytest.mark.parametrize("schema_type", ["star_schema", "flat_iceberg"])
+    def test_no_filter_means_no_filter(self, schema_type, tmp_path):
+        """Back-compat: every gold spec written before this property existed."""
+        body = self._gold(tmp_path, schema_type)
+        assert ".filter(F.expr(" not in body
+
+    def test_the_suppressed_count_is_reported(self, tmp_path):
+        """Silent suppression is its own problem — an operator must see how many rows went.
+
+        A run that drops 90% of its cells to satisfy k=11 has a grain problem, and the only
+        way anyone finds out is if the number is logged.
+        """
+        body = self._gold(tmp_path, "flat_iceberg", "claim_count >= 11")
+        assert "_rows_suppressed" in body
+        assert "post_aggregation_suppression" in body, "the suppression is not logged"
+
+    def test_the_template_can_remove_a_row_at_all(self):
+        """The structural gap: gold_aggregate had zero .filter() calls anywhere.
+
+        Guards the class of defect rather than this instance — a template that can only add
+        columns cannot implement any row-level control, k-anonymity or otherwise.
+        """
+        from shared.codegen.renderer import _load_template
+
+        source, _, _ = _load_template("gold_aggregate")
+        assert ".filter(" in source, (
+            "gold_aggregate can no longer remove rows, so no row-level suppression is "
+            "expressible and post_aggregation_filter is inert"
+        )
+
+
+class TestTheGatePublishesRatherThanReportingAfterTheFact:
+    """The rendered DAG published each zone BEFORE its own gate ran.
+
+    transform_silver -> quality_check_silver -> aggregate_gold -> quality_check_gold, and each
+    transform ended in createOrReplace() then job.commit(). So a masking rule marked CRITICAL
+    and blocking could not stop unmasked PHI being committed and queryable in Silver — it could
+    only stop Gold being built afterwards. quality_check_gold is the last task in the graph, so
+    it blocked nothing at all.
+
+    CLAUDE.md states "Quality gates block promotion — no bypassing" and gives Silver a >= 0.80
+    gate. What the pipeline implemented was "gates block the NEXT zone", which is a different
+    property, and for Gold it was no property.
+    """
+
+    def _render(self, tmp_path, fixture, template, spec_type, over):
+        spec, spec_hash = load_spec(FIXTURES / fixture, spec_type)
+        out = tmp_path / "o.py"
+        render({**spec, **over}, spec_hash, template, "1.0.0", out, RUN_STARTED_AT)
+        body = out.read_text()
+        compile(body, "o.py", "exec")
+        return body
+
+    def _silver_gate(self, tmp_path, **over):
+        return self._render(tmp_path, "silver.yaml", "silver_transform", "silver", over)
+
+    def _gold_gate(self, tmp_path, **over):
+        return self._render(tmp_path, "gold.yaml", "gold_aggregate", "gold", over)
+
+    def _quality(self, tmp_path, **over):
+        return self._render(tmp_path, "quality.yaml", "quality_check", "quality", over)
+
+    # --- the transforms stage instead of publishing -------------------------------------
+
+    def test_silver_writes_staging_when_gated(self, tmp_path):
+        body = self._silver_gate(tmp_path, publish_via_gate=True)
+        line = next(l for l in body.splitlines() if "table_name = " in l)
+        assert line.rstrip().endswith('_staging"'), line
+
+    def test_silver_writes_the_real_table_when_not_gated(self, tmp_path):
+        """Back-compat: every silver spec written before this field existed."""
+        body = self._silver_gate(tmp_path)
+        line = next(l for l in body.splitlines() if "table_name = " in l)
+        assert not line.rstrip().endswith('_staging"'), line
+
+    def test_the_spec_still_names_the_real_table(self, tmp_path):
+        """iceberg_table must NOT become the staging name.
+
+        semantic.yaml, the LF-Tag grants and gold_spec.source_table all reference it. Renaming
+        it to express staging would silently repoint every one of them at the staging table.
+        """
+        spec, _ = load_spec(FIXTURES / "silver.yaml", "silver")
+        assert not spec["iceberg_table"].endswith("_staging")
+
+    def test_gold_flat_stages_when_gated(self, tmp_path):
+        body = self._gold_gate(tmp_path, schema_type="flat_iceberg", publish_via_gate=True)
+        line = next(l for l in body.splitlines() if "table_name = " in l)
+        assert line.rstrip().endswith('_staging"'), line
+
+    def test_gold_refuses_to_half_gate_a_star_schema(self, tmp_path):
+        """The gate promotes ONE table — the one in PROMOTE_TO.
+
+        A star schema also writes a table per dimension, straight from the Gold script. Gating
+        the fact table while every dimension publishes ungated would report that publication
+        was gated when it was not, so the render is refused instead.
+        """
+        with pytest.raises(UnsupportedSpecValueError) as exc:
+            self._gold_gate(
+                tmp_path, schema_type="star_schema", publish_via_gate=True,
+                output_tables=[{"name": "dim_member", "type": "dimension",
+                                "columns": ["member_id"]}],
+            )
+        assert "PROMOTE_TO" in str(exc.value)
+
+    def test_a_star_schema_without_gating_still_renders(self, tmp_path):
+        """The refusal must be about gating, not about dimensions."""
+        body = self._gold_gate(
+            tmp_path, schema_type="star_schema",
+            output_tables=[{"name": "dim_member", "type": "dimension",
+                            "columns": ["member_id"]}],
+        )
+        assert "dim_member_df" in body
+
+    # --- the gate publishes ------------------------------------------------------------
+
+    def test_the_gate_promotes_only_after_the_raise(self, tmp_path):
+        """The whole property. A promote above the raise is the original defect restored."""
+        body = self._quality(tmp_path, gate_before_publish=True)
+        lines = body.splitlines()
+        raise_at = next(n for n, l in enumerate(lines) if "Quality gate FAILED" in l)
+        promote_at = next(n for n, l in enumerate(lines) if ".writeTo(_target)" in l)
+        assert raise_at < promote_at, (
+            "publication is rendered before the gate's failure exit, so a failing gate would "
+            "still publish"
+        )
+
+    def test_the_gate_does_not_publish_when_not_asked(self, tmp_path):
+        body = self._quality(tmp_path)
+        assert ".writeTo(" not in body
+        assert "PROMOTE_TO" not in body
+
+    def test_promote_to_is_resolved_only_when_gating(self, tmp_path):
+        """Glue's getResolvedOptions raises on a listed argument the caller did not pass.
+
+        Listing PROMOTE_TO unconditionally would break every DAG that does not stage — the
+        same reason silver_transform resolves logical_date conditionally.
+        """
+        gated = self._quality(tmp_path, gate_before_publish=True)
+        plain = self._quality(tmp_path)
+        assert '"PROMOTE_TO"' in gated
+        assert "PROMOTE_TO" not in plain
+
+    def test_promoting_a_table_onto_itself_is_refused_at_runtime(self, tmp_path):
+        """Otherwise the promotion is a no-op that logs success.
+
+        If TABLE_NAME and PROMOTE_TO are the same, publication is still happening in the
+        transform and the gate only appears to have controlled it — which is exactly the
+        defect this branch removes, wearing the fix's clothes.
+        """
+        body = self._quality(tmp_path, gate_before_publish=True)
+        assert "_staging == _target" in body
+        assert "raise ValueError" in body
+
+    def test_the_promotion_is_logged(self, tmp_path):
+        body = self._quality(tmp_path, gate_before_publish=True)
+        assert "promoted_after_gate" in body

@@ -1,5 +1,5 @@
 {# template_id: gold_aggregate #}
-{# template_version: 1.1.0 #}
+{# template_version: 1.2.0 #}
 {# required_slots: dataset_name, source_table, schema_type, grain, measures #}
 {# schema_version: v1 #}
 {#
@@ -45,6 +45,35 @@
   because the PENDING claim's null allowed_amount was skipped by SUM while its billed_amount
   stayed in the denominator.
 #}
+{#
+  post_aggregation_filter — the only way to suppress a published cell.
+
+  post_aggregation_columns renders as withColumn(), which can add a column but cannot remove
+  a row, and the write is an unconditional createOrReplace. So a k_anonymity_suppressed flag
+  computed there is a boolean label sitting next to the disclosed row — the row is still
+  written, still queryable, still identifying. A human who answers "suppress cells below
+  k=11" cannot have that honoured by any spec unless the rows are actually dropped.
+
+  One macro called from both write paths, taking the dataframe name, for the same reason
+  aggregated_measure below is one macro: the two identical copies this replaced are how
+  `percentile` came to be silently dropped from one branch and not the other.
+
+  Emitted after post_aggregation_columns so the predicate can reference a derived measure
+  (claim_count >= 11 works because claim_count is a measure; so does a ratio added above),
+  and before the write, because a suppression applied after createOrReplace suppresses
+  nothing. The suppressed count is logged: dropping 90% of cells to satisfy k=11 means the
+  grain is wrong, and the number is the only way anyone finds out.
+#}
+{% macro suppress_rows(df) %}
+    # Suppression: rows failing this predicate are DROPPED, not flagged.
+    _rows_before_suppression = {{ df }}.count()
+    {{ df }} = {{ df }}.filter(F.expr({{ post_aggregation_filter | tojson }}))
+    _rows_suppressed = _rows_before_suppression - {{ df }}.count()
+    logger.log("info", "post_aggregation_suppression",
+        predicate={{ post_aggregation_filter | tojson }},
+        rows_before=_rows_before_suppression,
+        rows_suppressed=_rows_suppressed)
+{% endmacro %}
 {% macro aggregated_measure(measure) -%}
 {#
   Unfiltered measures keep the bare column-name form they have always emitted, so adding
@@ -146,10 +175,19 @@ def aggregate(glue_context, args):
 {% endfor %}
 {% endif %}
 
+{% if post_aggregation_filter is defined %}
+{{ suppress_rows("fact_df") }}
+{% endif %}
+{#
+  publish_via_gate — see silver_transform. quality_check_gold is the LAST task in the rendered
+  DAG, so before this branch existed the Gold gate blocked nothing at all: the table was
+  published by this script and the gate merely reported on it afterwards.
+#}
+{% set _publish_suffix = "_staging" if publish_via_gate | default(false) else "" %}
 {% if iceberg_database is defined and iceberg_table is defined %}
-    table_name = "glue_catalog.{{ iceberg_database }}.{{ iceberg_table }}"
+    table_name = "glue_catalog.{{ iceberg_database }}.{{ iceberg_table }}{{ _publish_suffix }}"
 {% else %}
-    table_name = "glue_catalog.{{ dataset_name }}_db.gold_{{ dataset_name }}"
+    table_name = "glue_catalog.{{ dataset_name }}_db.gold_{{ dataset_name }}{{ _publish_suffix }}"
 {% endif %}
 {% if iceberg_partition_spec is defined and iceberg_partition_spec %}
     fact_df.writeTo(table_name).using("iceberg").partitionedBy({{ partition_columns(iceberg_partition_spec) }}).createOrReplace()
@@ -178,6 +216,14 @@ def aggregate(glue_context, args):
 #}
 {% set _scd2 = (dimensions | default([])) | selectattr("scd_type", "defined")
                 | selectattr("scd_type", "equalto", 2) | map(attribute="name") | list %}
+{% if publish_via_gate | default(false) %}
+{{ unsupported("publish_via_gate is set and this spec also declares " ~ (_dim_tables | length)
+   ~ " dimension table(s). The gate promotes exactly one table — the one named in PROMOTE_TO — "
+   ~ "so the fact table would be gated while every dimension published straight from this "
+   ~ "script, ungated. Half a gate is worse than none: the run would report that publication "
+   ~ "was gated. Use publish_via_gate with flat_iceberg, or with star_schema once quality_check "
+   ~ "can promote a set of tables.") }}
+{% endif %}
 {% for dt in _dim_tables %}
 {% if _scd2 %}
 {{ unsupported("dimension attributes " ~ (_scd2 | join(", ")) ~ " are declared scd_type 2, "
@@ -231,10 +277,19 @@ def aggregate(glue_context, args):
 {% endfor %}
 {% endif %}
 
+{% if post_aggregation_filter is defined %}
+{{ suppress_rows("gold_df") }}
+{% endif %}
+{#
+  publish_via_gate — see silver_transform. quality_check_gold is the LAST task in the rendered
+  DAG, so before this branch existed the Gold gate blocked nothing at all: the table was
+  published by this script and the gate merely reported on it afterwards.
+#}
+{% set _publish_suffix = "_staging" if publish_via_gate | default(false) else "" %}
 {% if iceberg_database is defined and iceberg_table is defined %}
-    table_name = "glue_catalog.{{ iceberg_database }}.{{ iceberg_table }}"
+    table_name = "glue_catalog.{{ iceberg_database }}.{{ iceberg_table }}{{ _publish_suffix }}"
 {% else %}
-    table_name = "glue_catalog.{{ dataset_name }}_db.gold_{{ dataset_name }}"
+    table_name = "glue_catalog.{{ dataset_name }}_db.gold_{{ dataset_name }}{{ _publish_suffix }}"
 {% endif %}
 {% if iceberg_partition_spec is defined and iceberg_partition_spec %}
     gold_df.writeTo(table_name).using("iceberg").partitionedBy({{ partition_columns(iceberg_partition_spec) }}).createOrReplace()

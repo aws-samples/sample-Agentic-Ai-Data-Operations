@@ -88,6 +88,8 @@ copy:
     source: shared/codegen/drift_validator.py
   - target: lib/shared/codegen/exceptions.py
     source: shared/codegen/exceptions.py
+  - target: lib/shared/codegen/gate_consistency.py
+    source: shared/codegen/gate_consistency.py
   - target: lib/shared/codegen/renderer.py
     source: shared/codegen/renderer.py
   - target: lib/shared/codegen/slot_extractor.py
