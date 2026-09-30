@@ -1,6 +1,6 @@
 # spec_hash: 567a3af743016510400d1485d651649670991023857a83daf0edd87ba9c45e5f
 # template_id: silver_transform
-# template_hash: 270b6c620017cf1f7d46bc7032e845e1775a1a43f588767631c3df9bd48f2f6c
+# template_hash: df9e39c14ed04ef5d06ec95e40f313f6519f177b88470925fdc4fbb28255a719
 # schema_version: v1
 # rendered_at: 2026-05-21T06:00:00Z
 import sys
@@ -26,6 +26,7 @@ logger = StructuredLogger(
     workload="claims_v2",
     run_id="standalone",
 )
+
 
 
 def transform(glue_context, args):

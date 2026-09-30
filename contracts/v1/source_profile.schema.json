@@ -4,7 +4,12 @@
   "title": "Source Profile Spec",
   "description": "Defines a data source configuration including schema, compliance, and encryption.",
   "type": "object",
-  "required": ["dataset_name", "version", "source", "schema"],
+  "required": [
+    "dataset_name",
+    "version",
+    "source",
+    "schema"
+  ],
   "additionalProperties": false,
   "properties": {
     "dataset_name": {
@@ -22,16 +27,36 @@
     },
     "compliance": {
       "type": "string",
-      "enum": ["HIPAA", "GDPR", "CCPA", "SOX", "PCI_DSS", "NONE"]
+      "enum": [
+        "HIPAA",
+        "GDPR",
+        "CCPA",
+        "SOX",
+        "PCI_DSS",
+        "NONE"
+      ]
     },
     "source": {
       "type": "object",
-      "required": ["type", "location", "format", "frequency"],
+      "required": [
+        "type",
+        "location",
+        "format",
+        "frequency"
+      ],
       "additionalProperties": false,
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["csv", "parquet", "json", "avro", "jdbc", "kafka", "kinesis"]
+          "enum": [
+            "csv",
+            "parquet",
+            "json",
+            "avro",
+            "jdbc",
+            "kafka",
+            "kinesis"
+          ]
         },
         "location": {
           "type": "object",
@@ -42,20 +67,40 @@
         },
         "format": {
           "type": "string",
-          "enum": ["csv", "parquet", "json", "avro", "orc"]
+          "enum": [
+            "csv",
+            "parquet",
+            "json",
+            "avro",
+            "orc"
+          ]
         },
         "frequency": {
           "type": "string",
-          "enum": ["hourly", "daily", "weekly", "monthly", "streaming", "one_time"]
+          "enum": [
+            "hourly",
+            "daily",
+            "weekly",
+            "monthly",
+            "streaming",
+            "one_time"
+          ]
         },
         "credentials": {
           "type": "object",
-          "required": ["type", "connection_id"],
+          "required": [
+            "type",
+            "connection_id"
+          ],
           "additionalProperties": false,
           "properties": {
             "type": {
               "type": "string",
-              "enum": ["airflow_connection", "secrets_manager", "iam_role"]
+              "enum": [
+                "airflow_connection",
+                "secrets_manager",
+                "iam_role"
+              ]
             },
             "connection_id": {
               "type": "string",
@@ -67,16 +112,27 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "rows": { "type": "integer", "minimum": 0 },
-            "size_gb": { "type": "number", "minimum": 0 },
-            "test_rows": { "type": "integer", "minimum": 1 }
+            "rows": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "size_gb": {
+              "type": "number",
+              "minimum": 0
+            },
+            "test_rows": {
+              "type": "integer",
+              "minimum": 1
+            }
           }
         }
       }
     },
     "schema": {
       "type": "object",
-      "required": ["columns"],
+      "required": [
+        "columns"
+      ],
       "additionalProperties": false,
       "properties": {
         "columns": {
@@ -84,7 +140,12 @@
           "minItems": 1,
           "items": {
             "type": "object",
-            "required": ["name", "type", "role", "nullable"],
+            "required": [
+              "name",
+              "type",
+              "role",
+              "nullable"
+            ],
             "additionalProperties": false,
             "properties": {
               "name": {
@@ -93,32 +154,87 @@
               },
               "type": {
                 "type": "string",
-                "enum": ["STRING", "INTEGER", "DECIMAL", "DATE", "TIMESTAMP", "BOOLEAN", "ARRAY", "MAP", "BIGINT", "FLOAT", "DOUBLE"]
+                "enum": [
+                  "STRING",
+                  "INTEGER",
+                  "DECIMAL",
+                  "DATE",
+                  "TIMESTAMP",
+                  "BOOLEAN",
+                  "ARRAY",
+                  "MAP",
+                  "BIGINT",
+                  "FLOAT",
+                  "DOUBLE"
+                ]
               },
-              "description": { "type": "string" },
+              "description": {
+                "type": "string"
+              },
               "role": {
                 "type": "string",
-                "enum": ["identifier", "dimension", "measure", "temporal", "metadata"]
+                "enum": [
+                  "identifier",
+                  "dimension",
+                  "measure",
+                  "temporal",
+                  "metadata"
+                ]
               },
-              "primary_key": { "type": "boolean" },
-              "primary_temporal": { "type": "boolean" },
-              "nullable": { "type": "boolean" },
-              "phi": { "type": "boolean" },
+              "primary_key": {
+                "type": "boolean"
+              },
+              "primary_temporal": {
+                "type": "boolean"
+              },
+              "nullable": {
+                "type": "boolean"
+              },
+              "phi": {
+                "type": "boolean"
+              },
               "phi_type": {
                 "type": "string",
-                "enum": ["NAME", "DOB", "SSN", "EMAIL", "PHONE", "ADDRESS", "MRN", "ACCOUNT", "IP", "BIOMETRIC", "GENETIC", "PHOTO"]
+                "enum": [
+                  "NAME",
+                  "DOB",
+                  "SSN",
+                  "EMAIL",
+                  "PHONE",
+                  "ADDRESS",
+                  "MRN",
+                  "MEMBER_IDENTIFIER",
+                  "ACCOUNT",
+                  "IP",
+                  "BIOMETRIC",
+                  "GENETIC",
+                  "PHOTO"
+                ]
               },
               "sensitivity": {
                 "type": "string",
-                "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+                "enum": [
+                  "LOW",
+                  "MEDIUM",
+                  "HIGH",
+                  "CRITICAL"
+                ]
               },
               "valid_values": {
                 "type": "array",
-                "items": { "type": "string" },
+                "items": {
+                  "type": "string"
+                },
                 "minItems": 1
               },
-              "decimal_precision": { "type": "integer", "minimum": 1 },
-              "decimal_scale": { "type": "integer", "minimum": 0 }
+              "decimal_precision": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "decimal_scale": {
+                "type": "integer",
+                "minimum": 0
+              }
             }
           }
         }
@@ -128,32 +244,59 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "owner": { "type": "string" },
-        "domain": { "type": "string" },
-        "sensitivity": { "type": "string" },
-        "contact": { "type": "string", "format": "email" }
+        "owner": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "sensitivity": {
+          "type": "string"
+        },
+        "contact": {
+          "type": "string",
+          "format": "email"
+        }
       }
     },
     "encryption": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "landing": { "$ref": "#/$defs/encryption_config" },
-        "staging": { "$ref": "#/$defs/encryption_config" },
-        "publish": { "$ref": "#/$defs/encryption_config" },
+        "landing": {
+          "$ref": "#/$defs/encryption_config"
+        },
+        "staging": {
+          "$ref": "#/$defs/encryption_config"
+        },
+        "publish": {
+          "$ref": "#/$defs/encryption_config"
+        },
         "glue_catalog": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "kms_key_alias": { "type": "string", "pattern": "^alias/" }
+            "kms_key_alias": {
+              "type": "string",
+              "pattern": "^alias/"
+            }
           }
         },
         "key_rotation": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "enabled": { "type": "boolean" },
-            "frequency": { "type": "string", "enum": ["annual", "quarterly", "monthly"] }
+            "enabled": {
+              "type": "boolean"
+            },
+            "frequency": {
+              "type": "string",
+              "enum": [
+                "annual",
+                "quarterly",
+                "monthly"
+              ]
+            }
           }
         }
       }
@@ -164,9 +307,24 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "kms_key_alias": { "type": "string", "pattern": "^alias/" },
-        "algorithm": { "type": "string", "enum": ["AES-256", "AES-128"] },
-        "transport": { "type": "string", "enum": ["TLS_1_3", "TLS_1_2"] }
+        "kms_key_alias": {
+          "type": "string",
+          "pattern": "^alias/"
+        },
+        "algorithm": {
+          "type": "string",
+          "enum": [
+            "AES-256",
+            "AES-128"
+          ]
+        },
+        "transport": {
+          "type": "string",
+          "enum": [
+            "TLS_1_3",
+            "TLS_1_2"
+          ]
+        }
       }
     }
   }

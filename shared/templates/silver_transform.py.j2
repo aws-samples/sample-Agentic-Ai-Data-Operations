@@ -5,6 +5,10 @@
 import sys
 import hashlib
 from datetime import datetime
+{% if pii_masking is defined and pii_masking.enabled
+      and pii_masking.columns | selectattr("method", "equalto", "hash_salted") | list %}
+from functools import lru_cache
+{% endif %}
 from pathlib import Path
 
 from pyspark.sql import functions as F
@@ -26,6 +30,41 @@ logger = StructuredLogger(
     run_id="standalone",
 )
 
+{% if pii_masking is defined and pii_masking.enabled
+      and pii_masking.columns | selectattr("method", "equalto", "hash_salted") | list %}
+
+@lru_cache(maxsize=None)
+def _phi_salt(secret_id: str) -> str:
+    """Fetch a hashing salt from Secrets Manager. Cached: one call per secret per run.
+
+    An unsalted SHA-256 of a low-cardinality identifier is not a one-way function in any
+    useful sense. A date of birth is roughly 40,000 candidate values, so the digest can be
+    reversed by enumerating them — and a plan member-id space is often smaller still. The
+    salt is what makes the digest irreversible without it.
+
+    Raises rather than falling back. A masking step that silently degrades to an
+    enumerable digest is worse than one that fails, because the spec, the LF-Tags and the
+    audit record would all still claim the column was protected.
+
+    The salt reaches Spark via F.lit(), so it is present in the query plan for the life of
+    the job. That is the accepted trade against a per-row UDF; it is never written to the
+    output, and only the secret ID appears in the spec.
+    """
+    import boto3
+
+    client = boto3.client("secretsmanager")
+    response = client.get_secret_value(SecretId=secret_id)
+    salt = response.get("SecretString")
+    if not salt:
+        raise RuntimeError(
+            f"Secret '{secret_id}' has no SecretString. PHI masking cannot proceed "
+            f"unsalted — that would emit an enumerable digest while the spec records a "
+            f"salted one."
+        )
+    return salt
+
+{% endif %}
+
 
 def transform(glue_context, args):
     spark = glue_context.spark_session
@@ -41,7 +80,35 @@ def transform(glue_context, args):
 {% endfor %}
     after_pk_filter = bronze_df.count()
 
-{% if dedup_strategy != "none" %}
+{% if dedup_strategy == "drop_exact_duplicates_only" %}
+    # Deduplication: drop_exact_duplicates_only
+    #
+    # Two distinct things share the name "duplicate", and collapsing them loses
+    # information. A byte-identical row is redundant and safe to drop. Two rows sharing a
+    # primary key but differing in content are a genuine conflict: picking one by
+    # timestamp would silently discard a value nobody reviewed. So the first are dropped
+    # and the second are quarantined for a human.
+    exact_deduped_df = bronze_df.dropDuplicates()
+    exact_duplicates_removed = after_pk_filter - exact_deduped_df.count()
+
+    _pk_window = Window.partitionBy(
+{% for pk_col in primary_key %}
+        "{{ pk_col }}",
+{% endfor %}
+    )
+    _with_pk_count = exact_deduped_df.withColumn(
+        "_pk_occurrences", F.count(F.lit(1)).over(_pk_window)
+    )
+
+    conflicting_df = _with_pk_count.filter(F.col("_pk_occurrences") > 1).drop("_pk_occurrences")
+    deduped_df = _with_pk_count.filter(F.col("_pk_occurrences") == 1).drop("_pk_occurrences")
+
+    pk_conflicts_quarantined = conflicting_df.count()
+    if pk_conflicts_quarantined > 0:
+        # Written before the count is logged, so a write failure cannot be mistaken for
+        # "no conflicts". Append: a later run must not erase an unreviewed conflict.
+        conflicting_df.write.mode("append").parquet("{{ quarantine.location }}")
+{% elif dedup_strategy != "none" %}
     # Deduplication: {{ dedup_strategy }}
     window = Window.partitionBy(
 {% for pk_col in primary_key %}
@@ -118,6 +185,17 @@ def transform(glue_context, args):
         "{{ col_mask.name }}",
         F.sha2(F.col("{{ col_mask.name }}").cast("string"), 256)
     )
+{% elif col_mask.method == "hash_salted" %}
+    masked_df = masked_df.withColumn(
+        "{{ col_mask.name }}",
+        F.sha2(
+            F.concat(
+                F.lit(_phi_salt("{{ col_mask.salt_secret_id }}")),
+                F.col("{{ col_mask.name }}").cast("string"),
+            ),
+            256,
+        )
+    )
 {% elif col_mask.method == "redact" %}
     masked_df = masked_df.withColumn(
         "{{ col_mask.name }}",
@@ -128,6 +206,13 @@ def transform(glue_context, args):
         "{{ col_mask.name }}",
         F.concat(F.substring(F.col("{{ col_mask.name }}"), 1, 2), F.lit("****"))
     )
+{% else %}
+{{ unsupported("pii_masking column '" ~ col_mask.name ~ "' asks for method '"
+   ~ col_mask.method ~ "', which this template has no branch for. Implemented: hash, "
+   ~ "hash_salted, redact, mask_partial. There was no else arm here, so the column was "
+   ~ "emitted with no masking applied at all while the spec, the LF-Tags and the audit "
+   ~ "record all recorded it as protected. A PHI column shipping in clear text must fail "
+   ~ "the render, not the review.") }}
 {% endif %}
 {% endfor %}
 {% else %}
@@ -172,6 +257,14 @@ def transform(glue_context, args):
         input_rows=input_rows,
         pk_null_dropped=input_rows - after_pk_filter,
         duplicates_removed=after_pk_filter - dedup_rows,
+{% if dedup_strategy == "drop_exact_duplicates_only" %}
+        # Split out, because one number cannot carry both meanings: the first are rows
+        # safely discarded, the second are rows a human still has to rule on. A single
+        # "duplicates_removed" would make an unreviewed conflict look like a clean drop.
+        exact_duplicates_removed=exact_duplicates_removed,
+        pk_conflicts_quarantined=pk_conflicts_quarantined,
+        quarantine_location="{{ quarantine.location }}",
+{% endif %}
         output_rows=output_rows,
         target_table=table_name,
         quality_threshold={{ quality_threshold }})

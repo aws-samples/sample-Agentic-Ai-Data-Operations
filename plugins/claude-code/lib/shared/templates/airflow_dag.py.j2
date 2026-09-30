@@ -42,7 +42,13 @@ with DAG(
     dag_id=DAG_ID,
     default_args=default_args,
     description="{{ dataset_name }} data pipeline (Bronze → Silver → Gold)",
+{% if schedule.cron is none %}
+    # Manual / on-demand only. Emitted unquoted and never as a string literal: Airflow
+    # parses any string here as a cron expression, and the DAG then fails to load.
+    schedule_interval=None,
+{% else %}
     schedule_interval="{{ schedule.cron }}",
+{% endif %}
 {% if schedule.start_date is defined %}
     start_date=datetime.fromisoformat("{{ schedule.start_date }}"),
 {% else %}

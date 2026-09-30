@@ -101,7 +101,10 @@ KNOWN_UNREAD = {
     },
     "silver": {
         "null_handling": "M3 - never read; PK nulls are dropped unconditionally instead",
-        "quarantine": "H1 - no quarantine branch; enabled/location/retention_days inert",
+        # quarantine was here (H1). drop_exact_duplicates_only now writes PK conflicts to
+        # quarantine.location, so the template reads it and the entry had to go — which is
+        # the ratchet working: fixing a template makes its exemption fail as stale.
+        # retention_days remains declarative (L6); no template applies a lifecycle rule.
         "transformations": "no loop over the transformations[] array",
     },
     "gold": {

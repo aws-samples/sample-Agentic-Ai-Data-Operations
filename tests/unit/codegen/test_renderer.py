@@ -203,3 +203,216 @@ class TestUnimplementableRulesAreRefusedNotScored:
             "quality_check.py.j2 sets valid_count = total_rows somewhere — that scores 1.0 "
             "for a check that never ran. Use unsupported() to refuse the case instead."
         )
+
+
+class TestManualScheduleRendersUnquoted:
+    """`schedule_interval=None` is ordinary Airflow, and was inexpressible.
+
+    `dag_spec.schedule.cron` was `{type: string, minLength: 9}` and required, inside a
+    `schedule` with `additionalProperties: false`. "@once" is 5 characters and "None" is 4,
+    so both were rejected — there was no valid dag_spec for a manual DAG. A live run's human
+    answered "Manual / on-demand only" and the spec could not hold it.
+
+    The template compounded it: `schedule_interval="{{ schedule.cron }}"` is always quoted,
+    so even a null that survived validation would have emitted a string, which Airflow parses
+    as a cron expression before failing to load the DAG.
+    """
+
+    def _dag_spec(self, cron):
+        spec, spec_hash = load_spec(FIXTURES / "dag.yaml", "dag")
+        spec = {**spec, "schedule": {**spec["schedule"], "cron": cron}}
+        return spec, spec_hash
+
+    def _render(self, cron, tmp_path):
+        spec, spec_hash = self._dag_spec(cron)
+        out = tmp_path / "d.py"
+        render(spec, spec_hash, "airflow_dag", "1.0.0", out, RUN_STARTED_AT)
+        return out.read_text()
+
+    def _schedule_line(self, body):
+        lines = [l.strip() for l in body.splitlines() if "schedule_interval" in l]
+        assert len(lines) == 1, f"expected exactly one schedule_interval line, got {lines}"
+        return lines[0]
+
+    def test_null_cron_emits_a_bare_none(self, tmp_path):
+        assert self._schedule_line(self._render(None, tmp_path)) == "schedule_interval=None,"
+
+    def test_null_cron_never_emits_a_string(self, tmp_path):
+        """The exact defect: a quoted value here is parsed as a cron expression."""
+        line = self._schedule_line(self._render(None, tmp_path))
+        assert '"' not in line and "'" not in line, (
+            f"schedule_interval carries a string literal: {line}"
+        )
+
+    def test_a_cron_string_still_renders_quoted(self, tmp_path):
+        line = self._schedule_line(self._render("0 6 * * *", tmp_path))
+        assert line == 'schedule_interval="0 6 * * *",'
+
+    @pytest.mark.parametrize("cron", [None, "0 6 * * *"])
+    def test_both_forms_compile(self, cron, tmp_path):
+        compile(self._render(cron, tmp_path), "d.py", "exec")
+
+
+class TestDedupAndMaskingBranchesRender:
+    """Every enum value must reach generated code, or the enum is a promise, not a control."""
+
+    def _silver(self, tmp_path, **overrides):
+        spec, spec_hash = load_spec(FIXTURES / "silver.yaml", "silver")
+        spec = {**spec, **overrides}
+        out = tmp_path / "s.py"
+        render(spec, spec_hash, "silver_transform", "1.0.0", out, RUN_STARTED_AT)
+        return out.read_text()
+
+    @pytest.mark.parametrize("strategy", ["keep_latest", "keep_first", "none"])
+    def test_pre_existing_strategies_are_unchanged(self, strategy, tmp_path):
+        body = self._silver(tmp_path, dedup_strategy=strategy, dedup_order_by="submit_date")
+        assert "dropDuplicates()" not in body
+        compile(body, "s.py", "exec")
+
+    def test_drop_exact_duplicates_only_drops_and_quarantines(self, tmp_path):
+        body = self._silver(
+            tmp_path,
+            dedup_strategy="drop_exact_duplicates_only",
+            quarantine={"enabled": True, "location": "s3://bucket/quarantine/probe/"},
+        )
+        assert "dropDuplicates()" in body, "byte-identical rows are not dropped"
+        assert "_pk_occurrences" in body, "PK collisions are not separated from exact dupes"
+        assert "s3://bucket/quarantine/probe/" in body, "conflicts are not written anywhere"
+        assert "append" in body, (
+            "quarantine must append — overwrite would erase an unreviewed conflict"
+        )
+        compile(body, "s.py", "exec")
+
+    def test_conflicts_are_counted_separately_from_exact_duplicates(self, tmp_path):
+        """One number cannot carry both meanings.
+
+        A row dropped as byte-identical is resolved; a row quarantined is not. Reporting
+        both as `duplicates_removed` would make an unreviewed conflict look like a clean
+        drop.
+        """
+        body = self._silver(
+            tmp_path,
+            dedup_strategy="drop_exact_duplicates_only",
+            quarantine={"enabled": True, "location": "s3://b/q/"},
+        )
+        assert "exact_duplicates_removed=" in body
+        assert "pk_conflicts_quarantined=" in body
+
+    def test_hash_salted_emits_a_salted_digest(self, tmp_path):
+        body = self._silver(
+            tmp_path,
+            pii_masking={
+                "enabled": True,
+                "columns": [
+                    {"name": "member_dob", "method": "hash_salted",
+                     "salt_secret_id": "adop/probe/phi_salt"},
+                ],
+            },
+        )
+        assert "def _phi_salt" in body, "no salt is fetched"
+        assert "F.concat" in body, "the salt is not concatenated into the digest input"
+        assert "get_secret_value" in body, "the salt does not come from Secrets Manager"
+        assert "adop/probe/phi_salt" in body
+        compile(body, "s.py", "exec")
+
+    def test_plain_hash_stays_unsalted_and_pulls_in_nothing(self, tmp_path):
+        """A spec that did not ask for salting must render exactly as before.
+
+        Also guards against an unused import: the first version of this change emitted
+        `from functools import lru_cache` into every silver artifact, including workloads
+        with no masking at all.
+        """
+        body = self._silver(
+            tmp_path,
+            pii_masking={"enabled": True,
+                         "columns": [{"name": "member_dob", "method": "hash"}]},
+        )
+        assert "def _phi_salt" not in body
+        assert "import boto3" not in body
+        assert "lru_cache" not in body
+        compile(body, "s.py", "exec")
+
+    def test_the_salt_helper_refuses_to_degrade(self, tmp_path):
+        """A masking step that silently falls back to unsalted is the original bug.
+
+        The spec, the LF-Tags and the audit record would all still say the column was
+        protected, so the failure has to be loud.
+        """
+        body = self._silver(
+            tmp_path,
+            pii_masking={
+                "enabled": True,
+                "columns": [{"name": "member_dob", "method": "hash_salted",
+                             "salt_secret_id": "s"}],
+            },
+        )
+        helper = body[body.index("def _phi_salt"):]
+        helper = helper[: helper.index("\ndef ", 1)] if "\ndef " in helper[1:] else helper
+        assert "raise" in helper, "an empty or missing secret must raise, not fall through"
+
+
+class TestNoPhiColumnShipsUnmaskedBecauseOfAMissingBranch:
+    """An unimplemented masking method used to emit no masking at all.
+
+    The masking loop ran `{% if hash %}{% elif hash_salted %}{% elif redact %}{% elif
+    mask_partial %}{% endif %}` — with no else. The contract also allows `encrypt` and
+    `tokenize`, so either of those fell straight through and the column was written in clear
+    text, while the spec, the Lake Formation tags and the audit record all recorded it as
+    protected.
+
+    Worse than the unsalted-hash defect in the same template: an unsalted digest over a
+    small domain is weak, this is absent.
+
+    Found while investigating why `workloads/customer_master` drifts. Its
+    `config/silver.yaml` specifies `encrypt` for `date_of_birth` and `address`, so rendering
+    that workload from its own spec-of-record produced unmasked PHI. The artifact on disk
+    redacts both, which is how it survived: somebody rendered it under an older spec that
+    said `redact`, the spec was later changed to `encrypt`, and nothing anywhere reported
+    that the new value did nothing.
+    """
+
+    CONTRACT_ALLOWS = {"hash", "hash_salted", "mask_partial", "redact", "tokenize", "encrypt"}
+    IMPLEMENTED = {"hash", "hash_salted", "mask_partial", "redact"}
+
+    def _render(self, method, tmp_path):
+        spec, spec_hash = load_spec(FIXTURES / "silver.yaml", "silver")
+        col = {"name": "member_dob", "method": method}
+        if method == "hash_salted":
+            col["salt_secret_id"] = "adop/probe/phi_salt"
+        spec = {**spec, "pii_masking": {"enabled": True, "columns": [col]}}
+        out = tmp_path / "s.py"
+        render(spec, spec_hash, "silver_transform", "1.0.0", out, RUN_STARTED_AT)
+        return out.read_text()
+
+    @pytest.mark.parametrize("method", sorted(IMPLEMENTED))
+    def test_implemented_methods_emit_a_masking_statement(self, method, tmp_path):
+        body = self._render(method, tmp_path)
+        assert 'masked_df = masked_df.withColumn(\n        "member_dob"' in body, (
+            f"{method} rendered but member_dob was never transformed"
+        )
+        compile(body, "s.py", "exec")
+
+    @pytest.mark.parametrize("method", sorted(CONTRACT_ALLOWS - IMPLEMENTED))
+    def test_unimplemented_methods_refuse_rather_than_emit_clear_text(self, method, tmp_path):
+        with pytest.raises(UnsupportedSpecValueError) as exc:
+            self._render(method, tmp_path)
+        assert method in str(exc.value)
+        assert "member_dob" in str(exc.value), (
+            "the error must name the column, or an operator cannot tell which PHI is at risk"
+        )
+
+    def test_the_masking_loop_has_an_else_arm(self):
+        """Structural guard: re-deleting the else arm restores silent clear text.
+
+        The per-method tests only cover methods the contract allows today. A seventh value
+        added to the enum later would fall through unnoticed without this.
+        """
+        from shared.codegen.renderer import _load_template
+
+        source, _, _ = _load_template("silver_transform")
+        start = source.index("{% for col_mask in pii_masking.columns %}")
+        end = source.index("{% endfor %}", start)
+        loop = source[start:end]
+        assert "{% else %}" in loop and "unsupported(" in loop, (
+            "the pii_masking loop has no else arm — an unhandled method emits no masking"
+        )

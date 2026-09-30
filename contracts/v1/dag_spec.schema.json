@@ -4,7 +4,12 @@
   "title": "DAG Schedule Spec",
   "description": "Defines Airflow DAG scheduling, retries, failure handling, and task dependencies.",
   "type": "object",
-  "required": ["dataset_name", "schema_version", "schedule", "tasks"],
+  "required": [
+    "dataset_name",
+    "schema_version",
+    "schedule",
+    "tasks"
+  ],
   "additionalProperties": false,
   "properties": {
     "dataset_name": {
@@ -22,13 +27,19 @@
     },
     "schedule": {
       "type": "object",
-      "required": ["cron", "timezone"],
+      "required": [
+        "cron",
+        "timezone"
+      ],
       "additionalProperties": false,
       "properties": {
         "cron": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "minLength": 9,
-          "description": "Cron expression (e.g., '0 6 * * *')"
+          "description": "Cron expression (e.g., '0 6 * * *'), or null for a manual / on-demand DAG. minLength applies only to the string form, so null is accepted. Was string-only, which made schedule_interval=None inexpressible even though it is ordinary Airflow."
         },
         "timezone": {
           "type": "string",
@@ -81,7 +92,10 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["task_id", "type"],
+        "required": [
+          "task_id",
+          "type"
+        ],
         "additionalProperties": false,
         "properties": {
           "task_id": {
@@ -90,7 +104,13 @@
           },
           "type": {
             "type": "string",
-            "enum": ["glue_job", "quality_check", "sensor", "python_callable", "dummy"]
+            "enum": [
+              "glue_job",
+              "quality_check",
+              "sensor",
+              "python_callable",
+              "dummy"
+            ]
           },
           "script_path": {
             "type": "string",
@@ -98,7 +118,10 @@
           },
           "depends_on": {
             "type": "array",
-            "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$"
+            },
             "default": []
           },
           "timeout_minutes": {
@@ -120,7 +143,13 @@
       "properties": {
         "on_failure_callback": {
           "type": "string",
-          "enum": ["sns_alert", "slack_notify", "pagerduty", "email", "none"],
+          "enum": [
+            "sns_alert",
+            "slack_notify",
+            "pagerduty",
+            "email",
+            "none"
+          ],
           "default": "sns_alert"
         },
         "notification_channel": {
@@ -143,14 +172,19 @@
         },
         "critical_tasks": {
           "type": "array",
-          "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
           "description": "Tasks that trigger SLA breach alerts"
         }
       }
     },
     "tags": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "default": []
     }
   }
