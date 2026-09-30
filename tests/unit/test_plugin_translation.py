@@ -33,7 +33,11 @@ PLUGIN = REPO / "plugins" / "claude-code"
 MANIFEST = PLUGIN / "TRANSLATION.yaml"
 
 # Files inside the plugin that are build/runtime noise rather than content.
-IGNORED = ("__pycache__", ".pytest_cache", ".venv", ".DS_Store")
+# Build and run artifacts, not plugin content. `results` is where `claude plugin eval`
+# writes each run's report and aggregate JSON: running the suite once made
+# test_every_plugin_file_is_declared fail on six files nobody authored. Skipped here as
+# well as in .gitignore, because this walks the filesystem and never consults git.
+IGNORED = ("__pycache__", ".pytest_cache", ".venv", ".DS_Store", "results")
 
 
 def _load():

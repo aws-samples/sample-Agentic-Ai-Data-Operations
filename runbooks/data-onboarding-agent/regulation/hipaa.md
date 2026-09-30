@@ -118,15 +118,56 @@ Add to workload quality checks:
 
 ### 7. Masking & Anonymization
 
-| Column Type | Method | Example |
-|------------|--------|---------|
-| patient_name | hash (SHA-256) | `a1b2c3...` |
-| email | mask_email | `j***@hospital.com` |
-| phone | mask_partial | `555-***-4567` |
-| address, city, state, zip | redact | `[REDACTED]` |
-| dob | generalize | `1985-**-**` (year only) |
-| ssn | hash (SHA-256) | `d4e5f6...` |
-| medical_record_number | tokenize | `MRN-TOKEN-001` |
+Every method below is a value `silver_spec.pii_masking.columns[].method` accepts **and**
+`silver_transform.py.j2` implements. Naming anything else fails — see the two lists after
+the table.
+
+| Column Type | Method | `salt_secret_id` | Example |
+|------------|--------|---|---------|
+| patient_name | `hash_salted` | required | `a1b2c3...` |
+| email | `mask_partial` | — | `jo****` |
+| phone | `mask_partial` | — | `55****` |
+| address, city, state, zip | `redact` | — | `***REDACTED***` |
+| dob | `hash_salted` | required | `9f8e7d...` |
+| ssn | `hash_salted` | required | `d4e5f6...` |
+| medical_record_number | `hash_salted` | required | `7c6b5a...` |
+
+**Use `hash_salted`, never `hash`, for any identifier with a small domain.** An unsalted
+SHA-256 is a lookup, not a one-way function, once the input space is enumerable:
+
+| Column | Candidate values | Unsalted SHA-256 |
+|---|---|---|
+| `ssn` | ~10⁹ | reversible by rainbow table |
+| `dob` | ~40,000 | reversible in seconds |
+| `member_id` | plan-sized, often <10⁶ | reversible |
+| `patient_name` | long tail, but common names are few | partially reversible |
+
+`hash_salted` requires `salt_secret_id` — the AWS Secrets Manager secret **ID**, never the
+salt value (security rule 1). The rendered script fetches it once per run and raises if the
+secret is empty, rather than proceeding unsalted: a masking step that silently degrades is
+worse than one that fails, because the spec, the LF-Tags and the audit record would all
+still attest the column was protected.
+
+### Not available — do not name these
+
+These were recommended by an earlier version of this table and none of them works:
+
+| Method | Why not |
+|---|---|
+| `mask_email` | not in the `method` enum — the spec fails validation |
+| `generalize` | not in the enum. There is no year-only date masking; use `hash_salted` on `dob`, or add a `pre_pii_derived_columns` entry computing the year *before* masking |
+| `tokenize` | in the enum, but `silver_transform.py.j2` has no branch for it, so the render is refused. Before that refusal existed it emitted **no masking at all** while the spec recorded the column as protected |
+| `encrypt` | same as `tokenize` — in the enum, unimplemented, render refused |
+
+If a workload genuinely needs `tokenize` or `encrypt`, the template needs a branch first.
+The contract accepting a value is not evidence that anything implements it.
+
+### Deriving from a column before it is masked
+
+`member_age_years` from `dob`, or an email domain from `email`, must be computed **before**
+masking or it is computed from a digest. Use `silver_spec.pre_pii_derived_columns`, which
+the renderer emits ahead of the masking block for exactly this reason. `derived_columns`
+runs after, and is the wrong place.
 
 **De-identification**: For research/analytics, apply HIPAA Safe Harbor method — remove all 18 identifiers or use Expert Determination method.
 

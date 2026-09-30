@@ -190,3 +190,148 @@ def test_every_ratchet_entry_states_a_reason():
         if len(reason.strip()) < 20
     ]
     assert not thin, "ratchet entries with no usable reason:\n  " + "\n  ".join(thin)
+
+
+# ---------------------------------------------------------------------------
+# A third direction: guidance -> contract -> template
+#
+# The two checks above keep the contracts and templates honest with each other. Neither
+# looks at the prose the model actually reads. `regulation/hipaa.md` recommended a masking
+# method per PHI column type, and of its six recommendations two were absent from the
+# method enum (spec validation failure), one was in the enum but unimplemented (render
+# refused, and before that refusal existed it emitted no masking at all), and two named
+# plain `hash` for SSN and date of birth, whose input spaces are ~10^9 and ~40,000 — a
+# rainbow-table lookup rather than a one-way function.
+#
+# Found by `claude plugin eval`: the hipaa-phi-controls case failed
+# `phi-masked-in-silver` 3-0 because the model correctly followed the runbook to a method
+# the system could not deliver. A contract value nothing recommends is inert; a
+# recommendation the contract rejects is worse.
+# ---------------------------------------------------------------------------
+
+MASKING_GUIDANCE_DOCS = [
+    "runbooks/data-onboarding-agent/regulation/hipaa.md",
+]
+
+# Methods a doc may name while telling the reader NOT to use them. The "Not available"
+# table is the point of that section, so its entries must be allowed to appear.
+_NEGATIVE_SECTION_MARKERS = ("Not available", "do not name these")
+
+
+def _masking_enum() -> set[str]:
+    schema = _schema("silver")
+    return set(
+        schema["properties"]["pii_masking"]["properties"]["columns"]["items"]
+        ["properties"]["method"]["enum"]
+    )
+
+
+def _implemented_masking_methods() -> set[str]:
+    import re
+
+    source = _template_path("silver_transform").read_text()
+    return set(re.findall(r'col_mask\.method == "([a-z_]+)"', source))
+
+
+@pytest.mark.parametrize("doc", MASKING_GUIDANCE_DOCS)
+def test_recommended_masking_methods_exist_and_are_implemented(doc):
+    """Every method a guidance doc recommends must validate AND render.
+
+    Only the recommendation table is checked — the section that lists unavailable methods
+    has to be able to name them.
+    """
+    import re
+
+    text = (PROJECT_ROOT / doc).read_text()
+    # Everything before the "Not available" heading is recommendation.
+    cut = len(text)
+    for marker in _NEGATIVE_SECTION_MARKERS:
+        i = text.find(marker)
+        if i != -1:
+            cut = min(cut, i)
+    recommending = text[:cut]
+
+    # Methods appear as `backticked` values in the table's Method column.
+    named = set(re.findall(r"`([a-z_]{4,24})`", recommending))
+    candidates = named & (
+        _masking_enum() | {"mask_email", "generalize", "anonymize", "pseudonymize", "encrypt_kms"}
+    )
+
+    not_in_contract = sorted(candidates - _masking_enum())
+    assert not not_in_contract, (
+        f"{doc} recommends masking methods the contract rejects: {not_in_contract}\n"
+        f"A spec naming one of these fails validation. Enum: {sorted(_masking_enum())}"
+    )
+
+    unimplemented = sorted(candidates & _masking_enum() - _implemented_masking_methods())
+    assert not unimplemented, (
+        f"{doc} recommends methods silver_transform.py.j2 has no branch for: "
+        f"{unimplemented}\nThe render is refused. Implemented: "
+        f"{sorted(_implemented_masking_methods())}"
+    )
+
+
+@pytest.mark.parametrize("doc", MASKING_GUIDANCE_DOCS)
+def test_guidance_does_not_recommend_plain_hash_for_an_enumerable_identifier(doc):
+    """`hash` on an SSN or a date of birth is a lookup, not a one-way function.
+
+    ~10^9 and ~40,000 candidates respectively. `hash_salted` exists for these, and a
+    guidance table that names plain `hash` beside `ssn` or `dob` will be followed.
+    """
+    text = (PROJECT_ROOT / doc).read_text()
+    cut = len(text)
+    for marker in _NEGATIVE_SECTION_MARKERS:
+        i = text.find(marker)
+        if i != -1:
+            cut = min(cut, i)
+
+    offenders = []
+    for line in text[:cut].splitlines():
+        if not line.strip().startswith("|"):
+            continue
+        low = line.lower()
+        names_enumerable = any(c in low for c in ("ssn", "dob", "date_of_birth", "member_id"))
+        # `hash` but not `hash_salted`
+        plain_hash = "`hash`" in line or "hash (sha-256)" in low
+        if names_enumerable and plain_hash:
+            offenders.append(line.strip()[:90])
+
+    assert not offenders, (
+        f"{doc} recommends plain `hash` for an enumerable identifier:\n  "
+        + "\n  ".join(offenders)
+        + "\nUse hash_salted, which requires salt_secret_id."
+    )
+
+
+def test_hash_salted_is_discoverable_by_the_model():
+    """A contract value nothing recommends is very nearly no value at all.
+
+    hash_salted was added to the enum and the template, and for a while appeared in
+    neither the runbooks, the agents, the skills nor the README — so the model kept
+    choosing `hash` from the guidance it does read, and the eval kept failing.
+
+    Scans the repo's own guidance only. `plugins/claude-code/` is excluded deliberately:
+    its runbooks are byte-identical vendored copies, so counting them lets the source
+    guidance lose the mention while the test still passes on the duplicate. Mutation
+    testing found exactly that — removing hash_salted from the repo runbook left this
+    green, because the plugin's copy still had it.
+    """
+    searched = 0
+    hits = []
+    for sub in ("runbooks", "skills", "agents", ".claude", "docs"):
+        root = PROJECT_ROOT / sub
+        if not root.is_dir():
+            continue
+        for p in root.rglob("*.md"):
+            if "plugins" in p.parts or ".git" in p.parts:
+                continue
+            searched += 1
+            if "hash_salted" in p.read_text(errors="ignore"):
+                hits.append(p.relative_to(PROJECT_ROOT).as_posix())
+
+    assert searched > 0, "scanned no guidance files — the paths are wrong, not the guidance"
+    assert hits, (
+        f"hash_salted appears in none of the {searched} guidance files the model reads "
+        f"(excluding the plugin's vendored copies). Add it to the HIPAA runbook's masking "
+        f"table at minimum, or nothing will ever select it over plain hash."
+    )
