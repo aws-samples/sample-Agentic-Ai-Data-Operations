@@ -81,7 +81,12 @@ def check_quality(spark, table_name, zone):
 {% elif rule.check_type == "not_null" %}
     valid_count = df.filter(F.col("{{ rule.column }}").isNotNull()).count()
 {% else %}
-    valid_count = total_rows
+{{ unsupported("quality rule '" ~ rule.rule_id ~ "' uses check_type '" ~ rule.check_type
+   ~ "', which this template has no branch for. Implemented: range, enum, regex, not_null. "
+   ~ "This arm used to pass the row count straight through as the valid count, scoring "
+   ~ "1.0 — so a rule that never ran reported perfect compliance, and because "
+   ~ "overall_score is an unweighted mean, adding an unimplementable rule raised it. "
+   ~ "Either implement the branch or move the rule out of rules.validity.") }}
 {% endif %}
     score = valid_count / total_rows if total_rows > 0 else 0.0
     results.append({

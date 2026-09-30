@@ -7,7 +7,12 @@ from pathlib import Path
 
 import jinja2
 
-from .exceptions import MissingSlotError, RenderError, TemplateNotFoundError
+from .exceptions import (
+    MissingSlotError,
+    RenderError,
+    TemplateNotFoundError,
+    UnsupportedSpecValueError,
+)
 from .slot_extractor import parse_required_slots_header
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -73,6 +78,35 @@ def _validate_slots(source: str, spec: dict, template_id: str) -> None:
             raise MissingSlotError(template_id, missing)
 
 
+def _make_env(template_id: str) -> "jinja2.Environment":
+    """The Jinja environment every template renders in.
+
+    B701: these templates emit Python, SQL and YAML, never HTML.
+    autoescape=True would HTML-escape quotes and ampersands and corrupt
+    every generated artifact.
+
+    `unsupported()` is exposed to templates so a branch can refuse a value it cannot
+    implement instead of inventing one. Before it existed, quality_check.py.j2's
+    `{% else %}` arm set `valid_count = total_rows` for any unhandled check_type — a
+    score of 1.0 for a check that never ran. A template with no way to say "I cannot do
+    this" will always find a way to say "fine".
+    """
+    env = jinja2.Environment(  # nosec B701
+        loader=jinja2.BaseLoader(),
+        undefined=jinja2.StrictUndefined,
+        autoescape=False,
+        keep_trailing_newline=True,
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+
+    def unsupported(detail: str) -> None:
+        raise UnsupportedSpecValueError(template_id, detail)
+
+    env.globals["unsupported"] = unsupported
+    return env
+
+
 def render(
     spec: dict,
     spec_hash: str,
@@ -95,17 +129,7 @@ def render(
     source, template_hash, template_path = _load_template(template_id)
     _validate_slots(source, spec, template_id)
 
-    # B701: these templates emit Python, SQL and YAML, never HTML.
-    # autoescape=True would HTML-escape quotes and ampersands and corrupt
-    # every generated artifact.
-    env = jinja2.Environment(  # nosec B701
-        loader=jinja2.BaseLoader(),
-        undefined=jinja2.StrictUndefined,
-        autoescape=False,
-        keep_trailing_newline=True,
-        trim_blocks=True,
-        lstrip_blocks=True,
-    )
+    env = _make_env(template_id)
 
     try:
         template = env.from_string(source)
@@ -170,17 +194,7 @@ def render_dry_run(
     source, template_hash, template_path = _load_template(template_id)
     _validate_slots(source, spec, template_id)
 
-    # B701: these templates emit Python, SQL and YAML, never HTML.
-    # autoescape=True would HTML-escape quotes and ampersands and corrupt
-    # every generated artifact.
-    env = jinja2.Environment(  # nosec B701
-        loader=jinja2.BaseLoader(),
-        undefined=jinja2.StrictUndefined,
-        autoescape=False,
-        keep_trailing_newline=True,
-        trim_blocks=True,
-        lstrip_blocks=True,
-    )
+    env = _make_env(template_id)
 
     try:
         template = env.from_string(source)

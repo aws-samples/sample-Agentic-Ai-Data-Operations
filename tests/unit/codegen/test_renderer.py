@@ -6,7 +6,12 @@ from unittest.mock import patch
 
 import pytest
 
-from shared.codegen.exceptions import MissingSlotError, RenderError, TemplateNotFoundError
+from shared.codegen.exceptions import (
+    MissingSlotError,
+    RenderError,
+    TemplateNotFoundError,
+    UnsupportedSpecValueError,
+)
 from shared.codegen.renderer import RENDERER_TOKEN_ENV, render, render_dry_run
 from shared.codegen.spec_loader import load_spec
 
@@ -111,3 +116,90 @@ class TestRenderer:
         output = tmp_path / "strict.py"
         rendered_bytes, _ = render(spec, "a" * 64, "silver_transform", "1.0.0", output, RUN_STARTED_AT)
         assert len(rendered_bytes) > 0
+
+
+class TestUnimplementableRulesAreRefusedNotScored:
+    """A quality rule the template cannot run must fail the render, never score 1.0.
+
+    `quality_check.py.j2`'s validity branch implements four check types. Its `{% else %}`
+    arm used to set `valid_count = total_rows`, so `score = valid_count / total_rows` came
+    out at exactly 1.0 for the other five. A rule that never executed reported perfect
+    compliance — and because `overall_score` is an unweighted mean, adding a rule the
+    template could not implement *raised* the score.
+
+    Found in a live HIPAA run: three `custom_sql` rules each contributed a fabricated 1.0,
+    diluting a genuine 0.875 failure to 1/26 of the total.
+
+    Failing the render is the lesser harm. A render that stops is a bug someone fixes; a
+    pipeline reporting 1.0 for a check that never ran is a bug someone trusts.
+    """
+
+    IMPLEMENTED = {"range", "enum", "regex", "not_null"}
+    CONTRACT_ALLOWS = {
+        "not_null", "unique", "range", "regex", "enum",
+        "referential", "custom_sql", "format", "length",
+    }
+
+    def _spec(self, check_type):
+        return {
+            "dataset_name": "probe",
+            "schema_version": "v1",
+            "source_table": "t",
+            "quality_gates": {"silver": {"threshold": 0.8}, "gold": {"threshold": 0.95}},
+            "rules": {
+                "validity": [{
+                    "rule_id": f"r_{check_type}",
+                    "column": "c",
+                    "check_type": check_type,
+                    "threshold": 1.0,
+                    "params": {
+                        "min": 0, "max": 1, "values": ["a"],
+                        "pattern": "x", "sql": "1=1",
+                    },
+                }]
+            },
+        }
+
+    def _render(self, check_type, tmp_path):
+        out = tmp_path / f"q_{check_type}.py"
+        render(self._spec(check_type), "deadbeef", "quality_check", "1.0.0",
+               out, RUN_STARTED_AT)
+        return out.read_text()
+
+    @pytest.mark.parametrize("check_type", sorted(IMPLEMENTED))
+    def test_implemented_check_types_still_render(self, check_type, tmp_path):
+        body = self._render(check_type, tmp_path)
+        assert "results.append" in body
+
+    @pytest.mark.parametrize("check_type", sorted(CONTRACT_ALLOWS - IMPLEMENTED))
+    def test_unimplemented_check_types_refuse_to_render(self, check_type, tmp_path):
+        """The contract allows nine; the template implements four. The gap must be loud."""
+        with pytest.raises(UnsupportedSpecValueError) as exc:
+            self._render(check_type, tmp_path)
+        assert check_type in str(exc.value), (
+            "the error must name the offending check_type, or the reader cannot act on it"
+        )
+
+    @pytest.mark.parametrize("check_type", sorted(IMPLEMENTED))
+    def test_no_rendered_output_fabricates_a_perfect_score(self, check_type, tmp_path):
+        """`valid_count = total_rows` is the exact shape of the original defect.
+
+        Guarded by literal so that reintroducing it — by any route, in any branch —
+        fails here rather than in someone's quality report six months from now.
+        """
+        assert "valid_count = total_rows" not in self._render(check_type, tmp_path)
+
+    def test_the_template_contains_no_unconditional_fallthrough(self):
+        """Belt and braces: the source itself must not carry the pattern.
+
+        The per-check tests above only observe branches a spec can reach. This reads the
+        template, so a fall-through added under a condition none of the fixtures trigger
+        is still caught.
+        """
+        from shared.codegen.renderer import _load_template
+
+        source, _, _ = _load_template("quality_check")
+        assert "valid_count = total_rows" not in source, (
+            "quality_check.py.j2 sets valid_count = total_rows somewhere — that scores 1.0 "
+            "for a check that never ran. Use unsupported() to refuse the case instead."
+        )

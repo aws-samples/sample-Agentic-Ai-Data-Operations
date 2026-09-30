@@ -20,6 +20,7 @@ The `status: pending` marker means "declared but not yet translated" — Phases 
 convert those. Pending entries are reported, not failed, so the harness is useful
 during the port instead of only after it.
 """
+import json
 import pathlib
 import sys
 

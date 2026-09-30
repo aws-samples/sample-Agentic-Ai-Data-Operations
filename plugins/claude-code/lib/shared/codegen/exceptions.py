@@ -67,6 +67,29 @@ class RenderError(CodegenError):
         super().__init__(f"Render failed for '{template_id}': {detail}")
 
 
+class UnsupportedSpecValueError(CodegenError):
+    """A template was given a contract-valid value it cannot implement.
+
+    The counterpart to MissingSlotError. That one fires when a template needs a slot the
+    spec lacks; this one fires when the spec carries a value the template has no branch
+    for. Both are the same failure — the contract and the templates disagreeing about
+    what is expressible — seen from opposite ends.
+
+    It exists because the alternative is what quality_check.py.j2 used to do: an
+    unhandled `check_type` fell through to `valid_count = total_rows`, scoring 1.0. A
+    rule the template could not run reported perfect compliance, and because the overall
+    score is an unweighted mean, adding an unimplementable rule *raised* it.
+
+    Failing the render is the lesser harm. A render that stops is a bug someone fixes; a
+    pipeline that reports 1.0 for a check that never executed is a bug someone trusts.
+    """
+
+    def __init__(self, template_id: str, detail: str):
+        self.template_id = template_id
+        self.detail = detail
+        super().__init__(f"Template '{template_id}' cannot implement: {detail}")
+
+
 class DriftDetectedError(CodegenError):
     """Artifact on disk does not match re-render from spec."""
 
