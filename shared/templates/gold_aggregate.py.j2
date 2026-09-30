@@ -2,6 +2,55 @@
 {# template_version: 1.1.0 #}
 {# required_slots: dataset_name, source_table, schema_type, grain, measures #}
 {# schema_version: v1 #}
+{#
+  One measure dispatch, called from both the star_schema and flat_iceberg branches.
+
+  It was two identical copies, which is how `percentile` came to be silently dropped: it is
+  in the contract's aggregation enum, neither copy had a branch for it, and there was no
+  else arm — so the measure vanished from the .agg() call and the render still compiled. A
+  Gold table asked for a p95 and got a table with that column simply absent.
+
+  `measure.filter` was likewise never rendered in either copy, so a filtered aggregation
+  silently became unfiltered. In the live run that understated an allowed-to-billed ratio,
+  because the PENDING claim's null allowed_amount was skipped by SUM while its billed_amount
+  stayed in the denominator.
+#}
+{% macro aggregated_measure(measure) -%}
+{#
+  Unfiltered measures keep the bare column-name form they have always emitted, so adding
+  filter support does not rewrite every measure line in every existing Gold artifact.
+  F.sum("x") and F.sum(F.col("x")) are equivalent in Spark; a diff for no behavioural gain
+  is noise in every future review.
+#}
+{%- set _col -%}
+{% if measure.filter is defined -%}
+F.when(F.expr({{ measure.filter | tojson }}), F.col("{{ measure.source_column }}"))
+{%- else -%}
+"{{ measure.source_column }}"
+{%- endif %}
+{%- endset -%}
+{% if measure.aggregation == "sum" %}
+        F.sum({{ _col }}).alias("{{ measure.name }}"),
+{% elif measure.aggregation == "avg" %}
+        F.avg({{ _col }}).alias("{{ measure.name }}"),
+{% elif measure.aggregation == "count" %}
+        F.count({{ _col }}).alias("{{ measure.name }}"),
+{% elif measure.aggregation == "count_distinct" %}
+        F.countDistinct({{ _col }}).alias("{{ measure.name }}"),
+{% elif measure.aggregation == "min" %}
+        F.min({{ _col }}).alias("{{ measure.name }}"),
+{% elif measure.aggregation == "max" %}
+        F.max({{ _col }}).alias("{{ measure.name }}"),
+{% else %}
+{{ unsupported("measure '" ~ measure.name ~ "' uses aggregation '" ~ measure.aggregation
+   ~ "', which this template has no branch for. Implemented: sum, avg, count, "
+   ~ "count_distinct, min, max. There was no else arm, so the measure was dropped from the "
+   ~ "aggregation entirely and the render still compiled — the Gold table came out missing "
+   ~ "the column, with nothing reported. `percentile` additionally has no parameter in "
+   ~ "gold_spec for WHICH percentile, so the contract needs extending before it can be "
+   ~ "implemented.") }}
+{% endif %}
+{%- endmacro %}
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -53,19 +102,7 @@ def aggregate(glue_context, args):
 {% endfor %}
     ).agg(
 {% for measure in measures %}
-{% if measure.aggregation == "sum" %}
-        F.sum("{{ measure.source_column }}").alias("{{ measure.name }}"),
-{% elif measure.aggregation == "avg" %}
-        F.avg("{{ measure.source_column }}").alias("{{ measure.name }}"),
-{% elif measure.aggregation == "count" %}
-        F.count("{{ measure.source_column }}").alias("{{ measure.name }}"),
-{% elif measure.aggregation == "count_distinct" %}
-        F.countDistinct("{{ measure.source_column }}").alias("{{ measure.name }}"),
-{% elif measure.aggregation == "min" %}
-        F.min("{{ measure.source_column }}").alias("{{ measure.name }}"),
-{% elif measure.aggregation == "max" %}
-        F.max("{{ measure.source_column }}").alias("{{ measure.name }}"),
-{% endif %}
+{{ aggregated_measure(measure) -}}
 {% endfor %}
     )
 
@@ -91,6 +128,57 @@ def aggregate(glue_context, args):
 {% endif %}
     output_rows = fact_df.count()
 
+{#
+  Dimension tables. `output_tables` and `dimensions` were both in the contract and neither
+  was read (finding M7), so schema_type=star_schema produced a single flat fact table: no
+  dim_member, no dim_provider, dimensions[].scd_type inert, and the semantic model's
+  "Member 1:many Claim" join with no dimension side to join to. The Lake Formation grants in
+  semantic.yaml targeted tables that were never created.
+#}
+{% set _dim_tables = (output_tables | default([])) | selectattr("type", "equalto", "dimension") | list %}
+{% if _dim_tables %}
+{#
+  gold_spec.dimensions lists dimension *attributes* — {name, source_column, scd_type} —
+  not tables. So the SCD check cannot match a dimensions[] entry against an output_tables
+  name; they are different namespaces. workloads/customer_master declares scd_type 2 on
+  risk_profile, employment_status and geographic_region while its single output table is
+  called dim_customer, and a name-matching check found nothing to object to.
+
+  Any attribute asking for Type 2 means the table cannot be a Type 1 overwrite.
+#}
+{% set _scd2 = (dimensions | default([])) | selectattr("scd_type", "defined")
+                | selectattr("scd_type", "equalto", 2) | map(attribute="name") | list %}
+{% for dt in _dim_tables %}
+{% if _scd2 %}
+{{ unsupported("dimension attributes " ~ (_scd2 | join(", ")) ~ " are declared scd_type 2, "
+   ~ "and this template writes '" ~ dt.name ~ "' with createOrReplace — a Type 1 overwrite. "
+   ~ "Rendering Type 1 where Type 2 was asked for loses history irrecoverably: the "
+   ~ "superseded rows are never captured, so unlike every other gap here it cannot be "
+   ~ "repaired by re-rendering later. Type 2 needs effective_from / effective_to / "
+   ~ "is_current and a merge, which is a larger change than this one.") }}
+{% endif %}
+{% if dt.columns is not defined or not dt.columns %}
+{{ unsupported("output_tables entry '" ~ dt.name ~ "' names no columns, so there is nothing "
+   ~ "to select into the dimension. Add `columns`, or drop the entry.") }}
+{% endif %}
+    # Dimension table: {{ dt.name }} — SCD Type 1 (createOrReplace overwrites in place).
+    # Any attribute declaring scd_type 2 refuses the render above rather than landing here.
+    {{ dt.name }}_df = pre_agg_df.select(
+{% for c in dt.columns %}
+        "{{ c }}",
+{% endfor %}
+    ).dropDuplicates()
+{% if iceberg_database is defined %}
+    {{ dt.name }}_table = "glue_catalog.{{ iceberg_database }}.{{ dt.name }}"
+{% else %}
+    {{ dt.name }}_table = "glue_catalog.{{ dataset_name }}_db.{{ dt.name }}"
+{% endif %}
+    {{ dt.name }}_df.writeTo({{ dt.name }}_table).using("iceberg").createOrReplace()
+    logger.log("info", "dimension_written",
+        table={{ dt.name }}_table, rows={{ dt.name }}_df.count())
+
+{% endfor %}
+{% endif %}
 {% elif schema_type == "flat_iceberg" %}
     # Flat Iceberg: denormalized table with all measures
     gold_df = pre_agg_df.groupBy(
@@ -99,19 +187,7 @@ def aggregate(glue_context, args):
 {% endfor %}
     ).agg(
 {% for measure in measures %}
-{% if measure.aggregation == "sum" %}
-        F.sum("{{ measure.source_column }}").alias("{{ measure.name }}"),
-{% elif measure.aggregation == "avg" %}
-        F.avg("{{ measure.source_column }}").alias("{{ measure.name }}"),
-{% elif measure.aggregation == "count" %}
-        F.count("{{ measure.source_column }}").alias("{{ measure.name }}"),
-{% elif measure.aggregation == "count_distinct" %}
-        F.countDistinct("{{ measure.source_column }}").alias("{{ measure.name }}"),
-{% elif measure.aggregation == "min" %}
-        F.min("{{ measure.source_column }}").alias("{{ measure.name }}"),
-{% elif measure.aggregation == "max" %}
-        F.max("{{ measure.source_column }}").alias("{{ measure.name }}"),
-{% endif %}
+{{ aggregated_measure(measure) -}}
 {% endfor %}
     )
 
@@ -136,6 +212,13 @@ def aggregate(glue_context, args):
     gold_df.writeTo(table_name).using("iceberg").createOrReplace()
 {% endif %}
     output_rows = gold_df.count()
+{% else %}
+{{ unsupported("schema_type '" ~ schema_type ~ "' has no branch in this template. "
+   ~ "Implemented: star_schema, flat_iceberg. There was no else arm, so this rendered a "
+   ~ "script with no groupBy, no aggregation and no table write at all — and it compiled. "
+   ~ "A Gold zone was produced that silently contained nothing. iceberg_dynamodb is one of "
+   ~ "the three options the discovery wizard offers and CLAUDE.md documents, so the branch "
+   ~ "needs writing before it can be chosen.") }}
 {% endif %}
 
     logger.log("info", "gold_transform_complete",

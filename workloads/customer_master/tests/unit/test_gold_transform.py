@@ -134,6 +134,31 @@ class TestGoldTransformRendered:
 class TestGoldDriftValidation:
     """Ensure rendered Gold script matches spec."""
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            "This workload asks for SCD Type 2 and the template only emits Type 1, so the "
+            "render is now refused rather than silently downgrading.\n"
+            "\n"
+            "config/gold.yaml declares scd_type: 2 on risk_profile, employment_status and "
+            "geographic_region. gold_aggregate.py.j2 writes dimension tables with "
+            "createOrReplace — a Type 1 overwrite. Rendering Type 1 where Type 2 was asked "
+            "for loses history irrecoverably: the superseded rows are never captured, so "
+            "unlike the other template gaps this one cannot be repaired by re-rendering "
+            "later. It therefore refuses (UnsupportedSpecValueError).\n"
+            "\n"
+            "It also declares output_tables: [dim_customer], which was never rendered at all "
+            "before (finding M7) — so this test was passing while the Gold zone contained no "
+            "dimension table, and the Lake Formation grants in semantic.yaml targeted a "
+            "table that was never created.\n"
+            "\n"
+            "Resolving it is a decision for the workload owner: implement SCD Type 2 in the "
+            "template (effective_from / effective_to / is_current plus a merge), or change "
+            "config/gold.yaml to scd_type 1 and accept that attribute history is not kept. "
+            "Do not 'fix' this by deleting the scd_type declarations — that silently discards "
+            "a modelling requirement somebody stated."
+        ),
+    )
     def test_no_drift(self):
         from shared.codegen.renderer import render_dry_run
 

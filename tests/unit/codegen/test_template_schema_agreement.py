@@ -111,8 +111,10 @@ KNOWN_UNREAD = {
         "transformations": "no loop over the transformations[] array",
     },
     "gold": {
-        "dimensions": "M7 - star_schema dimension tables are never created",
-        "output_tables": "M7 - the fact+dimension table list is never rendered",
+        # dimensions and output_tables were here (M7). star_schema now renders one table
+        # per output_tables entry of type "dimension", selected distinct on its columns.
+        # scd_type 2 refuses rather than downgrading to Type 1 — that loses history
+        # irrecoverably, so it is the one case that cannot be repaired by re-rendering.
         "freshness_sla_hours": "declared only; no freshness check is emitted",
         "quality_threshold": "L5 - only quality_gates is rendered; this duplicate is ignored",
     },

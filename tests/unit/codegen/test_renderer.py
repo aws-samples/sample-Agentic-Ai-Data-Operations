@@ -638,3 +638,133 @@ class TestNullHandlingIsHonoured:
         body = self._silver(tmp_path, None)
         assert "filter(~_null_in_checked)" in body
         assert 'F.col("record_id").isNull()' in body
+
+
+class TestGoldSchemaIsActuallyBuilt:
+    """Four separate silent-nothing defects in one template, all the same shape.
+
+    `gold_aggregate.py.j2` had a duplicated measure dispatch and no else arm anywhere, so
+    every contract value it did not implement produced *something that compiled*:
+
+      output_tables / dimensions  never read      -> star_schema gave one flat fact table;
+                                                     no dim_member, no dim_provider, and
+                                                     scd_type inert (M7)
+      measures[].filter           never rendered  -> a filtered aggregation became
+                                                     unfiltered, silently
+      aggregation "percentile"    no branch       -> the measure vanished from .agg()
+      schema_type "iceberg_dynamodb" no branch    -> no groupBy, no agg, no write at all
+
+    The filter one was not hypothetical: `workloads/claims_v2/config/gold.yaml` defines
+    `denied_count` as count(claim_id) WHERE claim_status = 'denied', and the committed
+    artifact rendered `F.count("claim_id")`. That table has been counting every claim as
+    denied.
+    """
+
+    def _gold(self, tmp_path, **over):
+        spec, spec_hash = load_spec(FIXTURES / "gold.yaml", "gold")
+        spec = {**spec, **over}
+        out = tmp_path / "g.py"
+        render(spec, spec_hash, "gold_aggregate", "1.0.0", out, RUN_STARTED_AT)
+        body = out.read_text()
+        compile(body, "g.py", "exec")
+        return body
+
+    STAR_WITH_DIMS = dict(
+        schema_type="star_schema",
+        output_tables=[
+            {"name": "gold_fact", "type": "fact"},
+            {"name": "dim_member", "type": "dimension", "columns": ["record_id", "region"]},
+            {"name": "dim_provider", "type": "dimension", "columns": ["region"]},
+        ],
+        dimensions=[
+            {"name": "dim_member", "source_column": "record_id", "scd_type": 1},
+            {"name": "dim_provider", "source_column": "region", "scd_type": 1},
+        ],
+    )
+
+    def test_star_schema_creates_the_dimension_tables(self, tmp_path):
+        body = self._gold(tmp_path, **self.STAR_WITH_DIMS)
+        for name in ("dim_member", "dim_provider"):
+            assert f"{name}_df = pre_agg_df.select(" in body, f"{name} is never built"
+            assert f"{name}_df.writeTo({name}_table)" in body, f"{name} is never written"
+        assert "dropDuplicates()" in body, "a dimension must be distinct on its columns"
+
+    def test_star_schema_without_output_tables_is_unchanged(self, tmp_path):
+        """Back-compat: every gold spec written before output_tables was read."""
+        body = self._gold(tmp_path, schema_type="star_schema")
+        assert "dim_member" not in body
+        assert "fact_df.writeTo(table_name)" in body
+
+    def test_scd_type_2_refuses_rather_than_emitting_type_1(self, tmp_path):
+        """Type 1 where Type 2 was asked for loses history irrecoverably.
+
+        Unlike most of these, the damage cannot be repaired by re-rendering later — the
+        superseded rows were never captured. So it must refuse, not downgrade.
+        """
+        with pytest.raises(UnsupportedSpecValueError) as exc:
+            self._gold(
+                tmp_path,
+                schema_type="star_schema",
+                output_tables=[{"name": "dim_member", "type": "dimension",
+                                "columns": ["record_id"]}],
+                dimensions=[{"name": "dim_member", "source_column": "record_id",
+                             "scd_type": 2}],
+            )
+        assert "scd_type 2" in str(exc.value) and "history" in str(exc.value)
+
+    def test_a_dimension_with_no_columns_refuses(self, tmp_path):
+        with pytest.raises(UnsupportedSpecValueError) as exc:
+            self._gold(
+                tmp_path,
+                schema_type="star_schema",
+                output_tables=[{"name": "dim_member", "type": "dimension"}],
+            )
+        assert "names no columns" in str(exc.value)
+
+    def test_a_filtered_measure_is_actually_filtered(self, tmp_path):
+        """The live bug: claims_v2's denied_count counted every claim."""
+        body = self._gold(
+            tmp_path,
+            measures=[{"name": "denied_count", "source_column": "record_id",
+                       "aggregation": "count", "filter": "status = 'denied'"}],
+        )
+        assert "F.when(F.expr(" in body, "the filter was dropped from the aggregation"
+        assert "denied_count" in body
+
+    def test_an_unfiltered_measure_keeps_its_original_form(self, tmp_path):
+        """Adding filter support must not rewrite every measure line in every artifact.
+
+        F.sum("x") and F.sum(F.col("x")) are equivalent; a diff for no behavioural gain is
+        noise in every future review.
+        """
+        body = self._gold(
+            tmp_path,
+            measures=[{"name": "total", "source_column": "amount", "aggregation": "sum"}],
+        )
+        assert 'F.sum("amount").alias("total")' in body
+
+    def test_an_unimplemented_aggregation_refuses(self, tmp_path):
+        """`percentile` is in the enum, had no branch, and produced an empty .agg()."""
+        with pytest.raises(UnsupportedSpecValueError) as exc:
+            self._gold(
+                tmp_path,
+                measures=[{"name": "p95", "source_column": "amount",
+                           "aggregation": "percentile"}],
+            )
+        assert "percentile" in str(exc.value)
+
+    def test_an_unimplemented_schema_type_refuses(self, tmp_path):
+        """iceberg_dynamodb rendered a script with no groupBy, no agg and no write."""
+        with pytest.raises(UnsupportedSpecValueError) as exc:
+            self._gold(tmp_path, schema_type="iceberg_dynamodb")
+        assert "iceberg_dynamodb" in str(exc.value)
+
+    def test_the_measure_dispatch_is_not_duplicated(self):
+        """It was two identical copies, which is why percentile fell through unnoticed."""
+        from shared.codegen.renderer import _load_template
+
+        source, _, _ = _load_template("gold_aggregate")
+        assert source.count('measure.aggregation == "sum"') == 1, (
+            "the measure dispatch is duplicated — the copies will drift again"
+        )
+        assert "{% macro aggregated_measure(" in source

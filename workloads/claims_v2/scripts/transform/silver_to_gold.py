@@ -1,6 +1,6 @@
 # spec_hash: e12dafbd6668baa28ec6772798bb88fbc33d859b3d370ae9bd1557463d08b6c9
 # template_id: gold_aggregate
-# template_hash: 35ee80935d120bc92d3951a7149c24651178ed5e5ff9fd1006f3476141133e34
+# template_hash: d8c694d2ccbe1da711c535c1570d1160cec86e4f17331842a5ad7947c1573066
 # schema_version: v1
 # rendered_at: 2026-05-21T06:00:00Z
 import sys
@@ -46,7 +46,7 @@ def aggregate(glue_context, args):
         F.sum("patient_responsibility").alias("total_patient_responsibility"),
         F.count("claim_id").alias("claim_count"),
         F.avg("billed_amount").alias("avg_billed"),
-        F.count("claim_id").alias("denied_count"),
+        F.count(F.when(F.expr("claim_status = \u0027denied\u0027"), F.col("claim_id"))).alias("denied_count"),
     )
 
 
