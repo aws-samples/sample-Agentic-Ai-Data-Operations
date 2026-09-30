@@ -134,7 +134,11 @@ class TestUnimplementableRulesAreRefusedNotScored:
     pipeline reporting 1.0 for a check that never ran is a bug someone trusts.
     """
 
-    IMPLEMENTED = {"range", "enum", "regex", "not_null"}
+    # custom_sql joined this set when accuracy and consistency were wired up — both need a
+    # cross-column comparison or a condition, which is what custom_sql is for. Out-of-band
+    # assertions (lf_tags_present and friends) still refuse; see
+    # TestComplianceRulesAreActuallyRendered.
+    IMPLEMENTED = {"range", "enum", "regex", "not_null", "custom_sql"}
     CONTRACT_ALLOWS = {
         "not_null", "unique", "range", "regex", "enum",
         "referential", "custom_sql", "format", "length",
@@ -1096,4 +1100,86 @@ class TestIcebergPartitioningIsCallable:
                     offenders.append(f"{t.name}:{n}: {line.strip()[:70]}")
         assert not offenders, (
             "partitionedBy is being handed a JSON list again:\n  " + "\n  ".join(offenders)
+        )
+
+
+class TestEveryDimensionGoesThroughTheSharedPath:
+    """H4 was half-applied: validity and compliance were guarded, two loops were not.
+
+    `rule.zone` exists so a Silver rule is not evaluated against the Gold fact, where
+    `F.col()` on an absent column raises AnalysisException when the plan is built. That guard
+    lives in `scored_rule`. completeness and uniqueness emitted their own inline copies, so a
+    completeness rule tagged zone: gold still crashed — the exact failure H4 was for.
+
+    My H4 mutation test passed because it only exercised the validity path. A mutation test
+    proves the guard covers the code you thought about, and nothing more. These two tests are
+    structural on purpose: they assert every loop routes through the macro, rather than
+    checking one dimension at a time and missing the next one added.
+    """
+
+    DIMENSIONS = ["completeness", "uniqueness", "validity", "consistency", "accuracy"]
+
+    def _rule(self, dimension, zone=None):
+        r = {"rule_id": f"r_{dimension}", "column": "amount", "threshold": 1.0,
+             "check_type": "not_null"}
+        if dimension in ("consistency", "accuracy"):
+            r["check_type"] = "custom_sql"
+            r["params"] = {"sql": "amount >= 0"}
+        if zone:
+            r["zone"] = zone
+        return r
+
+    @pytest.mark.parametrize("dimension", DIMENSIONS)
+    def test_a_zone_tagged_rule_is_guarded_in_every_dimension(self, dimension, tmp_path):
+        spec, spec_hash = load_spec(FIXTURES / "quality.yaml", "quality")
+        spec = {**spec, "rules": {dimension: [self._rule(dimension, zone="gold")]}}
+        out = tmp_path / "q.py"
+        render(spec, spec_hash, "quality_check", "1.0.0", out, RUN_STARTED_AT)
+        body = out.read_text()
+        compile(body, "q.py", "exec")
+
+        lines = body.splitlines()
+        i = next(n for n, l in enumerate(lines) if f'"rule_id": "r_{dimension}"' in l)
+        # walk back to this rule's measurement line
+        j = next(n for n in range(i, 0, -1)
+                 if any(k in lines[n] for k in ("df.filter", "df.select")))
+
+        # Indented into a guard, not sitting at the top level. This is the assertion that
+        # matters: at indent 4 the measurement is constructed unconditionally.
+        assert len(lines[j]) - len(lines[j].lstrip()) == 8, (
+            f"{dimension}'s measurement is at top level, so it is constructed whatever the "
+            f"zone — F.col() on a column the other zone lacks raises when the plan is built"
+        )
+        # ...and the guard is the nearest enclosing statement. Not necessarily the previous
+        # line: custom_sql emits explanatory comments between the guard and the measurement.
+        guard = next(
+            (lines[n] for n in range(j, 0, -1) if lines[n].strip().startswith("if zone ==")),
+            None,
+        )
+        assert guard is not None and guard.strip() == 'if zone == "gold":', (
+            f"{dimension} has no enclosing zone guard above its measurement"
+        )
+
+    def test_no_dimension_loop_bypasses_the_macro(self):
+        """Structural: every `{% if rules.X %}` loop body must call scored_rule.
+
+        This is the check that would have caught the half-applied fix. Per-dimension tests
+        only cover the dimensions someone remembered to list.
+        """
+        import re
+        from shared.codegen.renderer import _load_template
+
+        source, _, _ = _load_template("quality_check")
+        # strip the macro definition itself, then inspect each dimension loop body
+        body = source[source.index("{%- endmacro %}"):]
+        offenders = []
+        for m in re.finditer(
+            r"\{% if rules\.([a-z_]+) is defined %\}(.*?)\{% endif %\}", body, re.S
+        ):
+            dim, block = m.group(1), m.group(2)
+            if "scored_rule(rule," not in block:
+                offenders.append(dim)
+        assert not offenders, (
+            "these dimension loops emit their own inline measurement instead of calling "
+            f"scored_rule, so rule.zone does not apply to them: {offenders}"
         )

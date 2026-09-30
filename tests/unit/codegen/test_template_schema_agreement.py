@@ -345,3 +345,68 @@ def test_hash_salted_is_discoverable_by_the_model():
         f"(excluding the plugin's vendored copies). Add it to the HIPAA runbook's masking "
         f"table at minimum, or nothing will ever select it over plain hash."
     )
+
+
+# ---------------------------------------------------------------------------
+# The ratchet above is a TOP-LEVEL key check. That was its blind spot.
+#
+# `TestNoContractFieldGoesUnread` compares top-level spec properties against the Jinja AST.
+# `quality_spec.rules` IS referenced, so it passed — while `rules.accuracy` and
+# `rules.consistency` were never looped, and two of the five dimensions that
+# 06-quality-testing.md names as the standard were silently dropped. A completeness rule's
+# zone guard was missing for the same reason: the check could not see one level down.
+#
+# Nested containers whose members are each rendered separately need their own check. Found by
+# a human's end-to-end run reading the template, not by this suite.
+# ---------------------------------------------------------------------------
+
+# spec -> (container field, template loop pattern, the members that must each be rendered)
+NESTED_CONTAINERS = {
+    "quality": (
+        "rules",
+        r"\{% if rules\.([a-z_]+) is defined %\}",
+        # 06-quality-testing.md: "5 dimensions: Completeness, Accuracy, Consistency,
+        # Validity, Uniqueness"
+        {"completeness", "accuracy", "consistency", "validity", "uniqueness"},
+    ),
+}
+
+
+@pytest.mark.parametrize("spec_type", sorted(NESTED_CONTAINERS))
+def test_every_member_of_a_nested_container_is_rendered(spec_type):
+    """A dimension the contract allows and no template loops is a dropped rule.
+
+    Not a theoretical gap: `amount_sanity_paid_lte_allowed_lte_billed` (consistency) and
+    `denied_claims_pay_zero` (accuracy) were both written by an agent, both validated, and
+    both silently discarded.
+    """
+    import re
+
+    field, pattern, documented = NESTED_CONTAINERS[spec_type]
+    template_id = next(t for t, s in TEMPLATE_TO_SPEC.items() if s == spec_type)
+
+    allowed = set(_schema(spec_type)["properties"][field]["properties"])
+    rendered = set(re.findall(pattern, _template_path(template_id).read_text()))
+
+    unrendered = sorted(allowed - rendered)
+    assert not unrendered, (
+        f"{spec_type}_spec.{field} allows these and {template_id} loops none of them:\n  "
+        + "\n  ".join(unrendered)
+        + f"\nA rule placed under an unlooped member validates and is then discarded."
+    )
+
+    missing_documented = sorted(documented - rendered)
+    assert not missing_documented, (
+        f"06-quality-testing.md documents these as standard and {template_id} does not "
+        f"render them:\n  " + "\n  ".join(missing_documented)
+    )
+
+
+def test_the_contract_allows_every_documented_quality_dimension():
+    """The standard and the contract must agree before the template can honour either."""
+    _, _, documented = NESTED_CONTAINERS["quality"]
+    allowed = set(_schema("quality")["properties"]["rules"]["properties"])
+    assert documented <= allowed, (
+        f"06-quality-testing.md documents dimensions the contract rejects: "
+        f"{sorted(documented - allowed)}"
+    )

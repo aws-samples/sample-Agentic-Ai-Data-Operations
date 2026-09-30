@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin.json",
   "name": "adop",
   "displayName": "Agentic Data Operations Platform (ADOP)",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Agentic Data Operations Platform plugin: specialized agents (data-quality, metadata, ontology, devops, transformation, orchestration), onboarding and devops workflow commands, artifact-validation hooks, and data-compliance & decision-engine skills for data engineering.",
   "author": {
     "name": "Lavanya Bandari and Udaya Jaladi"

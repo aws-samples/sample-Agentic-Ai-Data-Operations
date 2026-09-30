@@ -16,19 +16,33 @@
 #}
 {% macro scored_rule(rule, dimension) -%}
 {#
-  The body is built into _body and then emitted either as-is or indented into a runtime
-  zone guard. Two reasons for the indirection rather than a second copy of the body:
+  One scoring path for every quality dimension.
 
-  - a rule tagged for one zone must not even CONSTRUCT its filter in the other, because
-    F.col() on a column the Gold fact lacks raises AnalysisException when the plan is
-    built, not when it runs. That is finding H4 — the Silver rule set applied to the Gold
-    fact crashed on column resolution, so the 0.95 gate could not be scored at all. Not
-    unmet: unreachable.
-  - rules with the default zone "both" must render byte-identically to before, so adding
-    zone support does not rewrite every existing artifact.
+  It used to serve only rules.validity and compliance_rules.rules. completeness and
+  uniqueness emitted their own inline copies, which meant the runtime zone guard — the whole
+  point of rule.zone — applied to two of the four loops. A completeness rule tagged
+  zone: gold still constructed F.col() unconditionally and still raised AnalysisException
+  against a Gold fact that lacks the column. Half a fix reads exactly like a whole one.
+
+  The measurement differs by dimension; the scoring and the append do not:
+
+    completeness  -> non-null count
+    uniqueness    -> distinct count
+    everything else -> the check_type dispatch below
+
+  Variable names are per-dimension on purpose (non_null_count / distinct_count /
+  valid_count) so folding the inline copies in here does not rewrite every existing
+  artifact for no behavioural gain.
 #}
 {% set _zone = rule.zone | default("both") %}
 {% set _body %}
+{% if dimension == "completeness" %}
+    non_null_count = df.filter(F.col("{{ rule.column }}").isNotNull()).count()
+    score = non_null_count / total_rows if total_rows > 0 else 0.0
+{% elif dimension == "uniqueness" %}
+    distinct_count = df.select("{{ rule.column }}").distinct().count()
+    score = distinct_count / total_rows if total_rows > 0 else 0.0
+{% else %}
 {% if rule.check_type == "range" %}
     valid_count = df.filter(
         (F.col("{{ rule.column }}") >= {{ rule.params.min }}) &
@@ -41,18 +55,52 @@
     valid_count = df.filter(F.col("{{ rule.column }}").rlike("{{ rule.params.pattern }}")).count()
 {% elif rule.check_type == "not_null" %}
     valid_count = df.filter(F.col("{{ rule.column }}").isNotNull()).count()
+{% elif rule.check_type == "custom_sql" %}
+{% if rule.params is not defined or rule.params.sql is not defined %}
+{{ unsupported("quality rule '" ~ rule.rule_id ~ "' (" ~ dimension ~ ") is check_type "
+   ~ "custom_sql but params.sql is not set, so there is no predicate to evaluate.") }}
+{% endif %}
+{#
+  Out-of-band assertions must still refuse (finding L2).
+
+  Implementing custom_sql un-refused these by accident: `lf_tags_present(member_dob)` became
+  F.expr("lf_tags_present(member_dob)"), which Spark rejects as an undefined function at
+  RUNTIME rather than at render time. That is strictly worse than refusing — a job that dies
+  at 3am beats nothing, but a render that stops beats both.
+
+  An explicit list, because whether an arbitrary SQL string calls a function Spark provides
+  cannot be decided at render time. It is additive: add a name when a new pseudo-function
+  shows up in a spec.
+#}
+{% set _out_of_band = ["lf_tags_present", "no_phi_literals_in_logs", "tbac_grant_exists",
+                       "kms_key_rotated", "cloudtrail_event_present"] %}
+{% for _fn in _out_of_band %}
+{% if _fn in rule.params.sql %}
+{{ unsupported("quality rule '" ~ rule.rule_id ~ "' (" ~ dimension ~ ") has params.sql "
+   ~ "calling '" ~ _fn ~ "', which is not a Spark function — it is an assertion about Lake "
+   ~ "Formation, KMS or CloudTrail, not a property of the dataframe. Rendering it would "
+   ~ "produce F.expr() that fails at runtime as an undefined function, while the spec "
+   ~ "records the rule as critical and blocking. Verify it out of band via MCP and record it "
+   ~ "as severity info instead.") }}
+{% endif %}
+{% endfor %}
+    # custom_sql: the predicate is a Spark SQL expression from the spec. Rows satisfying it
+    # are the valid ones. This is what accuracy and consistency rules need — a comparison
+    # across columns, or a condition, rather than a single-column check.
+    valid_count = df.filter(F.expr({{ rule.params.sql | tojson }})).count()
 {% else %}
 {{ unsupported("quality rule '" ~ rule.rule_id ~ "' (" ~ dimension ~ ") uses check_type '"
    ~ rule.check_type ~ "', which this template has no branch for. Implemented: range, "
-   ~ "enum, regex, not_null. This arm used to pass the row count straight through as the "
-   ~ "valid count, scoring 1.0 — so a rule that never ran reported perfect compliance, "
-   ~ "and because overall_score is an unweighted mean, adding an unimplementable rule "
-   ~ "raised it. A compliance rule whose params are a pseudo-function such as "
-   ~ "lf_tags_present(...) or no_phi_literals_in_logs(...) is not a property of the "
+   ~ "enum, regex, not_null, custom_sql. This arm used to pass the row count straight "
+   ~ "through as the valid count, scoring 1.0 — so a rule that never ran reported perfect "
+   ~ "compliance, and because overall_score is an unweighted mean, adding an "
+   ~ "unimplementable rule raised it. A compliance rule whose params are a pseudo-function "
+   ~ "such as lf_tags_present(...) or no_phi_literals_in_logs(...) is not a property of the "
    ~ "dataframe at all: verify it out of band via MCP and record it as severity info, "
    ~ "rather than declaring an unexecutable check CRITICAL and blocking.") }}
 {% endif %}
     score = valid_count / total_rows if total_rows > 0 else 0.0
+{% endif %}
     results.append({
         "rule_id": "{{ rule.rule_id }}",
         "dimension": "{{ dimension }}",
@@ -102,34 +150,14 @@ def check_quality(spark, table_name, zone):
 {% if rules.completeness is defined %}
     # Completeness checks
 {% for rule in rules.completeness %}
-    non_null_count = df.filter(F.col("{{ rule.column }}").isNotNull()).count()
-    score = non_null_count / total_rows if total_rows > 0 else 0.0
-    results.append({
-        "rule_id": "{{ rule.rule_id }}",
-        "dimension": "completeness",
-        "column": "{{ rule.column }}",
-        "score": score,
-        "threshold": {{ rule.threshold }},
-        "severity": "{{ rule.severity | default('warning') }}",
-        "passed": score >= {{ rule.threshold }},
-    })
+{{ scored_rule(rule, "completeness") -}}
 {% endfor %}
 {% endif %}
 
 {% if rules.uniqueness is defined %}
     # Uniqueness checks
 {% for rule in rules.uniqueness %}
-    distinct_count = df.select("{{ rule.column }}").distinct().count()
-    score = distinct_count / total_rows if total_rows > 0 else 0.0
-    results.append({
-        "rule_id": "{{ rule.rule_id }}",
-        "dimension": "uniqueness",
-        "column": "{{ rule.column }}",
-        "score": score,
-        "threshold": {{ rule.threshold }},
-        "severity": "{{ rule.severity | default('warning') }}",
-        "passed": score >= {{ rule.threshold }},
-    })
+{{ scored_rule(rule, "uniqueness") -}}
 {% endfor %}
 {% endif %}
 
@@ -137,6 +165,31 @@ def check_quality(spark, table_name, zone):
     # Validity checks
 {% for rule in rules.validity %}
 {{ scored_rule(rule, "validity") -}}
+{% endfor %}
+{% endif %}
+{#
+  accuracy and consistency. The contract has always allowed both, 06-quality-testing.md
+  names all five dimensions as the standard, and neither was ever looped — so an accuracy
+  rule like denied_claims_pay_zero and a consistency rule like
+  amount_sanity_paid_lte_allowed_lte_billed were silently dropped. Same defect as
+  compliance_rules, in its two remaining siblings; fixing one and not the others is how
+  three of five came to look like five.
+
+  Both naturally need check_type custom_sql — a comparison across columns, or a condition —
+  which is why that branch was added to the macro in the same change.
+#}
+{% if rules.consistency is defined %}
+
+    # Consistency checks
+{% for rule in rules.consistency %}
+{{ scored_rule(rule, "consistency") -}}
+{% endfor %}
+{% endif %}
+{% if rules.accuracy is defined %}
+
+    # Accuracy checks
+{% for rule in rules.accuracy %}
+{{ scored_rule(rule, "accuracy") -}}
 {% endfor %}
 {% endif %}
 {% if compliance_rules is defined and compliance_rules.rules is defined %}
