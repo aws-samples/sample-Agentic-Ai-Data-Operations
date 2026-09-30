@@ -862,3 +862,151 @@ class TestQualityRulesAreScopedToTheirZone:
             "an empty result set scores a perfect 1.0 again — nothing to check is not the "
             "same as nothing wrong"
         )
+
+
+class TestFailuresAreNotSilent:
+    """A task could fail and nobody was told. Findings M1 and M2.
+
+    `default_args` carried only `email_on_failure: False`, and `failure_handling` was never
+    rendered — so `on_failure_callback: sns_alert` and `notification_channel` were
+    declarative only. With `retries.count: 0`, which is what the human asked for, there was
+    not even a retry to notice.
+
+    `sla.deadline_minutes` was never rendered either, and the `quality_check` task branch
+    emitted no `execution_timeout` while the glue_job and sensor branches did. Since
+    Airflow's per-task `sla=` cannot fire without a schedule, `execution_timeout` *is* the
+    per-task SLA mechanism — so the human's 120 minutes was unenforced on exactly the two
+    tasks that decide whether data is promoted.
+
+    `workloads/claims_v2/config/dag.yaml` declares both, and had neither.
+    """
+
+    def _dag(self, tmp_path, **over):
+        spec, spec_hash = load_spec(FIXTURES / "dag.yaml", "dag")
+        spec = dict(spec)
+        for k, v in over.items():
+            if v is None:
+                spec.pop(k, None)
+            else:
+                spec[k] = v
+        out = tmp_path / "d.py"
+        render(spec, spec_hash, "airflow_dag", "1.0.0", out, RUN_STARTED_AT)
+        body = out.read_text()
+        compile(body, "d.py", "exec")
+        return body
+
+    def test_deadline_becomes_dagrun_timeout_not_a_task_sla(self, tmp_path):
+        """`sla=` is measured against a scheduled start, so it is inert on a manual DAG.
+
+        dagrun_timeout bounds the whole run however it was triggered, which is what "the
+        pipeline must complete within N minutes" actually means.
+        """
+        body = self._dag(tmp_path, sla={"deadline_minutes": 90})
+        assert "dagrun_timeout=timedelta(minutes=90)" in body
+        assert "sla=timedelta" not in body, (
+            "per-task sla= cannot fire without a schedule; it must not be emitted"
+        )
+
+    def test_every_task_that_runs_work_gets_an_execution_timeout(self, tmp_path):
+        """The quality branch was the one without it, and it is the gate."""
+        body = self._dag(tmp_path)
+        import re
+
+        tasks = len(re.findall(r"task_id=", body))
+        timeouts = body.count("execution_timeout=")
+        assert timeouts == tasks, (
+            f"{tasks} tasks but {timeouts} execution_timeouts — a task with no timeout has "
+            f"no SLA at all, because per-task sla= is deliberately unused"
+        )
+
+    def test_sns_alert_emits_a_callback_and_wires_it(self, tmp_path):
+        body = self._dag(
+            tmp_path,
+            failure_handling={"on_failure_callback": "sns_alert",
+                              "notification_channel": "arn:aws:sns:us-east-1:1:t"},
+        )
+        assert "def _notify_failure(context):" in body, "no callback is defined"
+        assert '"on_failure_callback": _notify_failure' in body, (
+            "the callback is defined but never wired into default_args — which is exactly "
+            "as silent as not defining it"
+        )
+
+    def test_the_callback_cannot_mask_the_failure_it_reports(self, tmp_path):
+        """An alerting error must not replace the task error in the logs."""
+        body = self._dag(
+            tmp_path,
+            failure_handling={"on_failure_callback": "sns_alert",
+                              "notification_channel": "arn:aws:sns:us-east-1:1:t"},
+        )
+        fn = body[body.index("def _notify_failure"):]
+        fn = fn[: fn.index("\ndefault_args")]
+        assert "except Exception" in fn and "raise" not in fn.split("except Exception")[1]
+
+    def test_email_uses_airflows_own_mechanism(self, tmp_path):
+        body = self._dag(
+            tmp_path,
+            failure_handling={"on_failure_callback": "email",
+                              "notification_channel": "ops@example.invalid"},
+        )
+        assert '"email_on_failure": True' in body
+        assert '"email": ["ops@example.invalid"]' in body
+
+    def test_none_emits_no_callback(self, tmp_path):
+        body = self._dag(tmp_path, failure_handling={"on_failure_callback": "none"})
+        assert "_notify_failure" not in body
+        assert '"email_on_failure": False' in body
+
+    @pytest.mark.parametrize("callback", ["sns_alert", "email"])
+    def test_a_callback_with_nowhere_to_send_refuses(self, callback, tmp_path):
+        """Inventing a destination is how an SNS ARN on account 000000000000 got rendered.
+
+        Finding M5: a failure then resolved to a nonexistent topic and was silent twice over.
+        """
+        with pytest.raises(UnsupportedSpecValueError) as exc:
+            self._dag(tmp_path, failure_handling={"on_failure_callback": callback})
+        assert "notification_channel" in str(exc.value)
+
+    @pytest.mark.parametrize("callback", ["slack_notify", "pagerduty"])
+    def test_an_unimplementable_callback_refuses_rather_than_stubbing(self, callback, tmp_path):
+        """A stub that logs and returns looks like an alerting path and delivers nothing."""
+        with pytest.raises(UnsupportedSpecValueError) as exc:
+            self._dag(
+                tmp_path,
+                failure_handling={"on_failure_callback": callback,
+                                  "notification_channel": "somewhere"},
+            )
+        assert callback in str(exc.value)
+
+    def test_a_critical_task_on_a_manual_dag_needs_a_timeout(self, tmp_path):
+        """Airflow's per-task sla= cannot fire without a schedule, so something else must bound it.
+
+        The first version of this guard refused any manual DAG with critical_tasks set, which
+        was too blunt: it made schedule_interval=None unrenderable for exactly the
+        combination the live run chose. execution_timeout does bound a task however the run
+        was triggered, so the control is deliverable by a different mechanism.
+
+        It refuses only when a task named critical has no timeout at all — then nothing
+        bounds it and the declaration really is inert.
+        """
+        spec, _ = load_spec(FIXTURES / "dag.yaml", "dag")
+        critical = spec["tasks"][0]["task_id"]
+
+        # bounded: renders, with dagrun_timeout and per-task execution_timeout carrying it
+        body = self._dag(
+            tmp_path,
+            sla={"critical_tasks": [critical]},
+            schedule={**spec["schedule"], "cron": None},
+        )
+        assert "schedule_interval=None," in body
+        assert "execution_timeout=" in body
+
+        # unbounded: nothing constrains the task, so the SLA is inert and it refuses
+        with pytest.raises(UnsupportedSpecValueError) as exc:
+            self._dag(
+                tmp_path,
+                sla={"critical_tasks": [critical]},
+                schedule={**spec["schedule"], "cron": None},
+                tasks=[{k: v for k, v in t.items() if k != "timeout_minutes"}
+                       for t in spec["tasks"]],
+            )
+        assert "critical_tasks" in str(exc.value) and "scheduled start" in str(exc.value)

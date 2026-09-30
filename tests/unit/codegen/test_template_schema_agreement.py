@@ -119,8 +119,10 @@ KNOWN_UNREAD = {
         "quality_threshold": "L5 - only quality_gates is rendered; this duplicate is ignored",
     },
     "dag": {
-        "failure_handling": "M2 - on_failure_callback never rendered, so failures are silent",
-        "sla": "M1 - deadline_minutes unenforced; quality tasks get no execution_timeout",
+        # failure_handling and sla were here (M2, M1). on_failure_callback now emits a real
+        # callback (sns_alert) or Airflow's own email path, and refuses when there is nowhere
+        # to send. sla.deadline_minutes renders dagrun_timeout, which works on a manual DAG
+        # where per-task sla= cannot fire. Every task branch now emits execution_timeout.
     },
     "quality": {
         # compliance_rules was here (C1, CRITICAL). quality_check.py.j2 now loops it through

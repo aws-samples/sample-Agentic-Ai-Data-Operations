@@ -2,6 +2,31 @@
 {# template_version: 1.0.0 #}
 {# required_slots: dataset_name, schedule, tasks #}
 {# schema_version: v1 #}
+{#
+  sla.critical_tasks on a manual DAG.
+
+  Airflow's per-task `sla=` is measured against a scheduled start, so on a manual DAG the
+  miss callback never fires. Refusing outright was the first attempt and it was too blunt:
+  it made schedule_interval=None unrenderable whenever critical_tasks was set, which is the
+  exact combination the live run chose.
+
+  execution_timeout does bound a task however the run was triggered, so the control is
+  deliverable — just by a different mechanism. It refuses only when a task named critical
+  has no timeout at all, because then nothing bounds it and the declaration really is inert.
+#}
+{% if sla is defined and sla.critical_tasks is defined and sla.critical_tasks
+      and schedule.cron is none %}
+{% for _ct in sla.critical_tasks %}
+{% set _t = tasks | selectattr("task_id", "equalto", _ct) | first %}
+{% if _t and _t.timeout_minutes is not defined %}
+{{ unsupported("sla.critical_tasks names '" ~ _ct ~ "' and schedule.cron is null, so "
+   ~ "Airflow's per-task sla= cannot fire — it is measured against a scheduled start. On a "
+   ~ "manual DAG execution_timeout is the only per-task bound, and this task has no "
+   ~ "timeout_minutes, so nothing bounds it and the SLA the human asked for would be "
+   ~ "entirely inert. Set tasks[].timeout_minutes for it, or give the DAG a schedule.") }}
+{% endif %}
+{% endfor %}
+{% endif %}
 from datetime import datetime, timedelta
 
 from airflow import DAG
@@ -12,6 +37,62 @@ from airflow.operators.dummy import DummyOperator
 
 GLUE_SCRIPT_S3_PATH = Variable.get("glue_script_s3_path", default_var="s3://glue-scripts/")
 GLUE_IAM_ROLE = Variable.get("glue_iam_role", default_var="AWSGlueServiceRole")
+
+{#
+  failure_handling was never rendered (finding M2). default_args carried only
+  email_on_failure=False, so with retries.count=0 — which is what the human asked for — a
+  task failure produced no notification of any kind. The sns_alert value and
+  notification_channel were declarative only.
+#}
+{% set _fh = failure_handling | default({}) %}
+{% set _callback = _fh.on_failure_callback | default("none") %}
+{% if _callback in ("slack_notify", "pagerduty") %}
+{{ unsupported("failure_handling.on_failure_callback is '" ~ _callback ~ "', which this "
+   ~ "template cannot emit: both need a connection or webhook that the spec has nowhere to "
+   ~ "name — notification_channel is a single string. Emitting a stub that logs and returns "
+   ~ "would look like an alerting path and deliver nothing, which is how this field came to "
+   ~ "be unrendered in the first place. Use sns_alert or email, or add the branch.") }}
+{% endif %}
+{% if _callback in ("sns_alert", "email") and _fh.notification_channel is not defined %}
+{{ unsupported("failure_handling.on_failure_callback is '" ~ _callback ~ "' but "
+   ~ "notification_channel is not set, so there is nowhere to send the alert. Inventing a "
+   ~ "destination is how an SNS ARN on account 000000000000 ended up in a rendered DAG "
+   ~ "(finding M5), where a failure resolved to a nonexistent topic and was silent twice "
+   ~ "over.") }}
+{% endif %}
+{% if _callback == "sns_alert" %}
+
+
+def _notify_failure(context):
+    """on_failure_callback: publish the failed task to SNS.
+
+    Wired from failure_handling.on_failure_callback. Before this existed a task could fail
+    and nobody was told — default_args carried only email_on_failure=False, and with
+    retries=0 there was no retry to notice either.
+
+    Never raises: an alerting failure must not mask the task failure it is reporting.
+    """
+    import boto3
+
+    ti = context.get("task_instance")
+    try:
+        boto3.client("sns").publish(
+            TopicArn=Variable.get(
+                "{{ dataset_name }}_alert_sns_topic",
+                default_var="{{ _fh.notification_channel }}",
+            ),
+            Subject=f"ADOP {{ dataset_name }} task failed: {ti.task_id if ti else 'unknown'}",
+            Message=(
+                f"dag={context.get('dag').dag_id if context.get('dag') else DAG_ID}\n"
+                f"task={ti.task_id if ti else 'unknown'}\n"
+                f"run={context.get('run_id')}\n"
+                f"log={ti.log_url if ti else 'unknown'}"
+            ),
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"_notify_failure: could not publish to SNS: {exc}")
+{% endif %}
+
 
 default_args = {
     "owner": "data-engineering",
@@ -29,7 +110,15 @@ default_args = {
     "retries": 3,
     "retry_delay": timedelta(seconds=300),
 {% endif %}
+{% if _callback == "email" %}
+    "email_on_failure": True,
+    "email": ["{{ _fh.notification_channel }}"],
+{% else %}
     "email_on_failure": False,
+{% endif %}
+{% if _callback == "sns_alert" %}
+    "on_failure_callback": _notify_failure,
+{% endif %}
 }
 
 {% if dag_id is defined %}
@@ -48,6 +137,16 @@ with DAG(
     schedule_interval=None,
 {% else %}
     schedule_interval="{{ schedule.cron }}",
+{% endif %}
+{#
+  sla.deadline_minutes was never rendered (finding M1). It maps to dagrun_timeout, not to
+  Airflow's per-task `sla=`: Airflow computes an SLA miss against a *scheduled* start, so
+  with schedule_interval=None the callback never fires and the deadline is silently inert.
+  dagrun_timeout bounds the whole run regardless of how it was triggered, which is what
+  "the pipeline must complete within N minutes" actually means.
+#}
+{% if sla is defined and sla.deadline_minutes is defined %}
+    dagrun_timeout=timedelta(minutes={{ sla.deadline_minutes }}),
 {% endif %}
 {% if schedule.start_date is defined %}
     start_date=datetime.fromisoformat("{{ schedule.start_date }}"),
@@ -87,6 +186,15 @@ with DAG(
         region_name=Variable.get("aws_region", default_var="us-east-1"),
 {% if task.params is defined %}
         script_args={{ task.params | tojson }},
+{% endif %}
+{#
+  The glue_job and sensor branches emitted execution_timeout; this one did not (finding M1).
+  Since Airflow's per-task sla= is deliberately unused — it cannot fire without a schedule —
+  execution_timeout IS the per-task SLA mechanism, so the human's timeout was unenforced on
+  every quality gate. Those are the two tasks that decide whether data is promoted.
+#}
+{% if task.timeout_minutes is defined %}
+        execution_timeout=timedelta(minutes={{ task.timeout_minutes }}),
 {% endif %}
     )
 {% elif task.type == "sensor" %}
