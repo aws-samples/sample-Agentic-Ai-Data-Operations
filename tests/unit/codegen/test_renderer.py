@@ -1010,3 +1010,90 @@ class TestFailuresAreNotSilent:
                        for t in spec["tasks"]],
             )
         assert "critical_tasks" in str(exc.value) and "scheduled start" in str(exc.value)
+
+
+class TestIcebergPartitioningIsCallable:
+    """`partitionedBy(["x"])` raises at write time, and nothing ever rendered it.
+
+    `DataFrameWriterV2.partitionedBy` has signature `(col: Column, *cols: Column)` — varargs
+    of Column, not a list, and not strings. Three sites emitted
+    `.partitionedBy({{ iceberg_partition_spec | tojson }})`, i.e. `.partitionedBy(["x"])`,
+    so both the Silver and Gold writes would crash on any workload that partitions.
+
+    It survived because **all four shipped workloads set `iceberg_partition_spec: []`**,
+    which takes the else branch and emits no partitionedBy at all. The only way to reach the
+    defect is a non-empty spec, and nothing in the repo has one — a textbook untested path.
+    Found by a human's end-to-end run, not by this suite.
+
+    Note this is not the "one-character fix" it looks like: unpacking the list would still
+    pass strings where Columns are required.
+    """
+
+    SITES = [("silver", "silver_transform"), ("gold", "gold_aggregate")]
+
+    def _render(self, spec_name, template, partition_spec, tmp_path):
+        spec, spec_hash = load_spec(FIXTURES / f"{spec_name}.yaml", spec_name)
+        spec = {**spec, "iceberg_partition_spec": partition_spec}
+        out = tmp_path / "x.py"
+        render(spec, spec_hash, template, "1.0.0", out, RUN_STARTED_AT)
+        body = out.read_text()
+        compile(body, "x.py", "exec")
+        return body
+
+    @pytest.mark.parametrize("spec_name,template", SITES)
+    def test_a_single_partition_column_emits_a_column_not_a_list(
+        self, spec_name, template, tmp_path
+    ):
+        body = self._render(spec_name, template, ["service_date"], tmp_path)
+        assert 'partitionedBy(F.col("service_date"))' in body
+        assert 'partitionedBy(["' not in body, (
+            "a list is still being passed — partitionedBy takes varargs of Column"
+        )
+
+    @pytest.mark.parametrize("spec_name,template", SITES)
+    def test_multiple_partition_columns_are_separate_arguments(
+        self, spec_name, template, tmp_path
+    ):
+        body = self._render(spec_name, template, ["service_date", "plan_type"], tmp_path)
+        assert 'partitionedBy(F.col("service_date"), F.col("plan_type"))' in body
+
+    @pytest.mark.parametrize("spec_name,template", SITES)
+    def test_an_empty_spec_emits_no_partitioning(self, spec_name, template, tmp_path):
+        """The state every shipped workload is in, and why this went unnoticed."""
+        body = self._render(spec_name, template, [], tmp_path)
+        assert "partitionedBy" not in body
+
+    @pytest.mark.parametrize("spec_name,template", SITES)
+    @pytest.mark.parametrize("entry", ["days(ts)", "bucket(16, member_id)", "truncate(4, zip)"])
+    def test_an_iceberg_transform_refuses_rather_than_becoming_a_column_name(
+        self, spec_name, template, entry, tmp_path
+    ):
+        """gold_spec's `type: string` permits these; silver_spec's pattern does not.
+
+        Without the guard, `days(ts)` would render as `F.col("days(ts)")` — a column of that
+        literal name, which does not exist. Partitioning would fail on a name nobody wrote.
+        """
+        with pytest.raises(UnsupportedSpecValueError) as exc:
+            self._render(spec_name, template, [entry], tmp_path)
+        assert "bare column name" in str(exc.value)
+
+    def test_no_template_passes_a_list_to_partitionedby(self):
+        """Literal guard across every template, so the pattern cannot return elsewhere.
+
+        Scans template *code* only — `{# ... #}` comment blocks are stripped first. This is
+        the fifth time in this branch that a guard fired on prose describing the very defect
+        it prevents, and the right fix is a guard that can tell code from a comment about
+        code rather than a comment reworded to dodge its own check.
+        """
+        import re
+        from pathlib import Path
+
+        offenders = []
+        for t in sorted(Path("shared/templates").glob("*.j2")):
+            code = re.sub(r"\{#.*?#\}", "", t.read_text(), flags=re.S)
+            for n, line in enumerate(code.splitlines(), 1):
+                if "partitionedBy" in line and "| tojson" in line:
+                    offenders.append(f"{t.name}:{n}: {line.strip()[:70]}")
+        assert not offenders, (
+            "partitionedBy is being handed a JSON list again:\n  " + "\n  ".join(offenders)
+        )

@@ -3,6 +3,36 @@
 {# required_slots: dataset_name, source_table, schema_type, grain, measures #}
 {# schema_version: v1 #}
 {#
+  Iceberg partition columns.
+
+  DataFrameWriterV2.partitionedBy has signature (col: Column, *cols: Column) — varargs of
+  Column, not a list, and not strings. The previous emission was
+  `.partitionedBy({{ iceberg_partition_spec | tojson }})`, i.e. `.partitionedBy(["x"])`,
+  which raises at write time. Unpacking the list would not fix it either: the members have
+  to be Columns.
+
+  It was never caught because all four shipped workloads set `iceberg_partition_spec: []`,
+  which takes the else branch and emits no partitionedBy at all. The only way to reach the
+  bug is a non-empty spec, and nothing in the repo has one.
+
+  Identity partitioning only. An Iceberg transform such as days(ts) or bucket(16, id) is a
+  different call shape, and silver_spec's pattern ^[a-z][a-z0-9_]*$ forbids one anyway —
+  gold_spec's looser `type: string` does not, so an entry that is not a bare column name is
+  refused here rather than silently becoming a column literally named "days(ts)".
+#}
+{% macro partition_columns(spec) -%}
+{% for c in spec %}
+{% if not (c is string and c | length > 0 and c[0].isalpha() and c.replace("_", "").isalnum()) %}
+{{ unsupported("iceberg_partition_spec entry '" ~ c ~ "' is not a bare column name. "
+   ~ "partitionedBy here emits identity partitioning on F.col(name); an Iceberg transform "
+   ~ "like days(ts) or bucket(16, id) needs a different call and is not implemented. "
+   ~ "silver_spec's pattern already forbids it; gold_spec's type: string does not, which is "
+   ~ "how one could reach this.") }}
+{% endif %}
+{% endfor %}
+{%- for c in spec %}F.col("{{ c }}"){{ ", " if not loop.last }}{% endfor -%}
+{%- endmacro %}
+{#
   One measure dispatch, called from both the star_schema and flat_iceberg branches.
 
   It was two identical copies, which is how `percentile` came to be silently dropped: it is
@@ -122,7 +152,7 @@ def aggregate(glue_context, args):
     table_name = "glue_catalog.{{ dataset_name }}_db.gold_{{ dataset_name }}"
 {% endif %}
 {% if iceberg_partition_spec is defined and iceberg_partition_spec %}
-    fact_df.writeTo(table_name).using("iceberg").partitionedBy({{ iceberg_partition_spec | tojson }}).createOrReplace()
+    fact_df.writeTo(table_name).using("iceberg").partitionedBy({{ partition_columns(iceberg_partition_spec) }}).createOrReplace()
 {% else %}
     fact_df.writeTo(table_name).using("iceberg").createOrReplace()
 {% endif %}
@@ -207,7 +237,7 @@ def aggregate(glue_context, args):
     table_name = "glue_catalog.{{ dataset_name }}_db.gold_{{ dataset_name }}"
 {% endif %}
 {% if iceberg_partition_spec is defined and iceberg_partition_spec %}
-    gold_df.writeTo(table_name).using("iceberg").partitionedBy({{ iceberg_partition_spec | tojson }}).createOrReplace()
+    gold_df.writeTo(table_name).using("iceberg").partitionedBy({{ partition_columns(iceberg_partition_spec) }}).createOrReplace()
 {% else %}
     gold_df.writeTo(table_name).using("iceberg").createOrReplace()
 {% endif %}

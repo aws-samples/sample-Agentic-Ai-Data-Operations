@@ -1,6 +1,6 @@
 # spec_hash: e12dafbd6668baa28ec6772798bb88fbc33d859b3d370ae9bd1557463d08b6c9
 # template_id: gold_aggregate
-# template_hash: d8c694d2ccbe1da711c535c1570d1160cec86e4f17331842a5ad7947c1573066
+# template_hash: c412abf0f34add07a1697756878fc6a75c78b876138b40a2a0b1cc07e6971873
 # schema_version: v1
 # rendered_at: 2026-05-21T06:00:00Z
 import sys
