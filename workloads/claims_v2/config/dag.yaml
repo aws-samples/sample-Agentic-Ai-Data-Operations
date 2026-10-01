@@ -25,6 +25,10 @@ tasks:
     timeout_minutes: 45
   - task_id: quality_check_silver
     type: quality_check
+    # Names the rendered artifact explicitly. airflow_dag.py.j2 used to hardcode
+    # 'quality_check.py' and ignore script_path, so these two tasks pointed at a file
+    # that was never rendered — the real one is check_quality.py.
+    script_path: scripts/quality/check_quality.py
     depends_on:
       - transform_silver
     timeout_minutes: 15
@@ -39,6 +43,10 @@ tasks:
     timeout_minutes: 30
   - task_id: quality_check_gold
     type: quality_check
+    # Names the rendered artifact explicitly. airflow_dag.py.j2 used to hardcode
+    # 'quality_check.py' and ignore script_path, so these two tasks pointed at a file
+    # that was never rendered — the real one is check_quality.py.
+    script_path: scripts/quality/check_quality.py
     depends_on:
       - aggregate_gold
     timeout_minutes: 15

@@ -264,3 +264,208 @@ class TestTheRenderedArtifactsAgreeOnTheStagingName:
             "the name silver_transform renders and the name gate_consistency accepts have "
             f"diverged:\n  " + "\n  ".join(problems)
         )
+
+
+class TestStageConnectivity:
+    """Specs can all validate, scripts can all compile, and the pipeline still cannot run.
+
+    Three such defects shipped together in one HIPAA workload and were found by a human reading
+    generated Terraform, not by any check:
+
+      - the DAG's two quality tasks pointed at a script name that was never rendered
+      - silver_spec.source_table named a Bronze table nothing registers
+      - that reference carried the Iceberg catalog prefix, so it would have failed even AFTER
+        the table was registered
+
+    The third is why this exists. KNOWN_GAPS logged only "source_table names a table
+    bronze_ingestion never registers", so the obvious remedy is to register it — and a check that
+    verified only EXISTENCE would then pass while Silver still failed, because `glue_catalog` is
+    the Iceberg catalog and Bronze is plain Parquet. Fixing the logged half of a defect and
+    passing a check is worse than having no check.
+    """
+
+    def _wl(self, tmp_path, **files):
+        c = tmp_path / "config"
+        c.mkdir(parents=True, exist_ok=True)
+        for name, doc in files.items():
+            if doc is not None:
+                (c / f"{name}.yaml").write_text(yaml.safe_dump(doc))
+        return tmp_path
+
+    def _with_scripts(self, tmp_path, *names):
+        d = tmp_path / "scripts" / "quality"
+        d.mkdir(parents=True, exist_ok=True)
+        for n in names:
+            (d / n).write_text("# rendered\n")
+        return tmp_path
+
+    # --- the catalog-prefix edge, both directions --------------------------------------
+
+    def test_iceberg_prefix_on_a_bronze_source_is_flagged(self, tmp_path):
+        """Silver reads Bronze, which bronze_ingestion writes as plain Parquet."""
+        from shared.codegen.gate_consistency import check_stage_connectivity
+
+        problems = check_stage_connectivity(self._wl(
+            tmp_path, silver={"source_table": "glue_catalog.db.bronze_x"}, bronze={"x": 1}))
+        assert problems, "the Iceberg prefix on a Parquet source was not caught"
+        assert "cannot read a Hive/Parquet table" in problems[0]
+        assert "'db.bronze_x'" in problems[0], "the message must name the correct form"
+
+    def test_a_two_part_bronze_reference_is_accepted(self, tmp_path):
+        from shared.codegen.gate_consistency import check_stage_connectivity
+
+        assert check_stage_connectivity(self._wl(
+            tmp_path, silver={"source_table": "db.bronze_x"}, bronze={"x": 1})) == []
+
+    def test_a_MISSING_prefix_on_a_silver_source_is_also_flagged(self, tmp_path):
+        """The asymmetry matters: Gold reads Silver, which IS Iceberg.
+
+        A rule of "never use glue_catalog" would be wrong — it would break every Gold spec.
+        """
+        from shared.codegen.gate_consistency import check_stage_connectivity
+
+        problems = check_stage_connectivity(self._wl(
+            tmp_path, gold={"source_table": "db.silver_x"}))
+        assert problems and "without the" in problems[0]
+
+    def test_the_prefix_on_a_gold_source_is_correct(self, tmp_path):
+        from shared.codegen.gate_consistency import check_stage_connectivity
+
+        assert check_stage_connectivity(self._wl(
+            tmp_path, gold={"source_table": "glue_catalog.db.silver_x"})) == []
+
+    # --- the DAG script edges ---------------------------------------------------------
+
+    def test_a_glue_job_pointing_at_an_unrendered_script_is_flagged(self, tmp_path):
+        from shared.codegen.gate_consistency import check_stage_connectivity
+
+        wl = self._with_scripts(self._wl(tmp_path, dag={"tasks": [
+            {"task_id": "t", "type": "glue_job", "script_path": "scripts/x/nope.py"}]}),
+            "real.py")
+        problems = check_stage_connectivity(wl)
+        assert problems and "no such file was rendered" in problems[0]
+
+    def test_a_quality_task_with_no_script_path_uses_the_template_default(self, tmp_path):
+        """The edge that would have been skipped.
+
+        A checker walking only script_path sees None here and moves on — and quality tasks are
+        exactly where script_path is absent, so it would pass the broken pair in silence.
+        """
+        from shared.codegen.gate_consistency import check_stage_connectivity
+
+        wl = self._with_scripts(self._wl(tmp_path, dag={"tasks": [
+            {"task_id": "qc", "type": "quality_check"}]}), "check_quality.py")
+        problems = check_stage_connectivity(wl)
+        assert problems, "a quality task resolving to the default was not checked at all"
+        assert "default" in problems[0] and "quality_check.py" in problems[0]
+
+    def test_a_quality_task_naming_the_rendered_file_passes(self, tmp_path):
+        from shared.codegen.gate_consistency import check_stage_connectivity
+
+        wl = self._with_scripts(self._wl(tmp_path, dag={"tasks": [
+            {"task_id": "qc", "type": "quality_check",
+             "script_path": "scripts/quality/check_quality.py"}]}), "check_quality.py")
+        assert check_stage_connectivity(wl) == []
+
+    def test_the_quality_default_matches_the_template(self):
+        """The constant here MIRRORS airflow_dag.py.j2's default. Pin them together.
+
+        If the template's default changes and this module does not, the check keeps passing
+        while testing a key the template no longer emits.
+        """
+        import re
+
+        from shared.codegen.gate_consistency import QUALITY_SCRIPT_DEFAULT
+
+        src = (PROJECT_ROOT / "shared/templates/airflow_dag.py.j2").read_text()
+        m = re.search(r"task\.script_path \| default\('([^']+)'\)", src)
+        assert m, "airflow_dag.py.j2 no longer renders a default for the quality script key"
+        assert m.group(1) == QUALITY_SCRIPT_DEFAULT, (
+            f"template default is {m.group(1)!r} but gate_consistency mirrors "
+            f"{QUALITY_SCRIPT_DEFAULT!r}"
+        )
+
+    # --- a workload that produces nothing for Silver to read --------------------------
+
+    def test_silver_reading_a_bronze_table_with_no_bronze_spec_is_flagged(self, tmp_path):
+        from shared.codegen.gate_consistency import check_stage_connectivity
+
+        problems = check_stage_connectivity(self._wl(
+            tmp_path, silver={"source_table": "db.bronze_x"}))
+        assert problems and "no bronze.yaml" in problems[0]
+
+
+class TestShippedWorkloadsAreConnected:
+    """A ratchet over the real tree, like EXEMPT_HEADERLESS.
+
+    customer_master's silver.yaml reads a Bronze table and the workload has no bronze.yaml.
+    Not fixable here: authoring a Bronze spec means choosing a source path, format and ingestion
+    mode, which CLAUDE.md reserves for the human. Named so a NEW disconnection still fails.
+    """
+
+    KNOWN_DISCONNECTED = {
+        "customer_master": ["no bronze.yaml"],
+    }
+
+    @pytest.mark.parametrize("name", sorted(
+        p.name for p in (PROJECT_ROOT / "workloads").iterdir()
+        if p.is_dir() and (p / "config").is_dir()))
+    def test_shipped_workload_stages_connect(self, name):
+        from shared.codegen.gate_consistency import check_stage_connectivity
+
+        problems = check_stage_connectivity(PROJECT_ROOT / "workloads" / name)
+        allowed = self.KNOWN_DISCONNECTED.get(name)
+        if allowed is None:
+            assert not problems, (
+                f"workloads/{name} stages do not connect:\n  " + "\n  ".join(problems))
+            return
+        assert problems, (
+            f"workloads/{name} now connects — remove it from KNOWN_DISCONNECTED, or the "
+            f"exemption becomes a standing one")
+        unexpected = [p for p in problems if not any(f in p for f in allowed)]
+        assert not unexpected, (
+            f"workloads/{name} has a NEW disconnection beyond its exemption:\n  "
+            + "\n  ".join(unexpected))
+
+    def test_the_exemption_list_only_shrinks(self):
+        assert len(self.KNOWN_DISCONNECTED) <= 1, (
+            "a new workload should connect its stages, not be exempted")
+
+
+def test_the_cli_actually_runs():
+    """Importing the module is not the same as running it, and only the CLI caught this.
+
+    I appended check_stage_connectivity AFTER the `if __name__ == "__main__"` block. On import
+    the whole module executes, the guard is False, and the definition is reached — so every test
+    passed. Run as `python -m`, main() is called before the definition exists:
+
+        NameError: name 'check_stage_connectivity' is not defined
+
+    CI invokes this as a module, so a green suite would have shipped a CLI that cannot start.
+    """
+    import subprocess
+    import sys
+
+    r = subprocess.run(
+        [sys.executable, "-m", "shared.codegen.gate_consistency",
+         str(PROJECT_ROOT / "workloads" / "claims_v2")],
+        cwd=PROJECT_ROOT, capture_output=True, text=True,
+    )
+    assert "Traceback" not in r.stderr, f"the CLI crashed:\n{r.stderr[-600:]}"
+    assert "claims_v2" in r.stdout, f"the CLI produced no report:\n{r.stdout}"
+    assert r.returncode == 0, f"claims_v2 should be consistent, got {r.returncode}:\n{r.stdout}"
+
+
+def test_the_cli_reports_an_inconsistent_workload_nonzero():
+    """Exit 0 on a real problem is the failure mode that matters for CI."""
+    import subprocess
+    import sys
+
+    r = subprocess.run(
+        [sys.executable, "-m", "shared.codegen.gate_consistency",
+         str(PROJECT_ROOT / "workloads" / "customer_master")],
+        cwd=PROJECT_ROOT, capture_output=True, text=True,
+    )
+    assert "Traceback" not in r.stderr
+    assert r.returncode == 1, "an inconsistent workload must exit nonzero or CI ignores it"
+    assert "INCONSISTENT" in r.stdout

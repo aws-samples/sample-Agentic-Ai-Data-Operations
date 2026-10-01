@@ -1,5 +1,5 @@
 {# template_id: airflow_dag #}
-{# template_version: 1.0.0 #}
+{# template_version: 1.1.0 #}
 {# required_slots: dataset_name, schedule, tasks #}
 {# schema_version: v1 #}
 {#
@@ -181,7 +181,19 @@ with DAG(
     {{ task.task_id }} = GlueJobOperator(
         task_id="{{ task.task_id }}",
         job_name="{{ dataset_name }}_{{ task.task_id }}",
-        script_location=f"{GLUE_SCRIPT_S3_PATH}quality_check.py",
+{#
+  Reads task.script_path like the glue_job branch above, defaulting to the historic constant.
+  It used to be the bare constant and ignored script_path entirely, so a quality task could
+  not name the file that was actually rendered — and three different names were in play: this
+  constant `quality_check.py`, the onboard command's `scripts/quality/glue_data_quality.py`,
+  and `check_quality.py` as claims_v2 actually had on disk. Following the command verbatim
+  guaranteed a DAG whose two quality tasks pointed at a file that did not exist, and both
+  shipped workloads were in that state.
+
+  The default keeps every existing DAG rendering byte-identically, since no quality task sets
+  script_path today.
+#}
+        script_location=f"{GLUE_SCRIPT_S3_PATH}{{ task.script_path | default('quality_check.py') }}",
         iam_role_name=GLUE_IAM_ROLE,
         region_name=Variable.get("aws_region", default_var="us-east-1"),
 {% if task.params is defined %}

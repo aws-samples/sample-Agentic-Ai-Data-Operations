@@ -1,4 +1,6 @@
-"""Cross-spec check: if a transform stages, the gate must actually publish.
+"""Cross-spec checks: the stages of a pipeline must actually connect to each other.
+
+Two independent concerns live here, both of which no single-spec validator can see.
 
 Every other validator in this package reads ONE spec. The renderer validates a spec against
 its contract, and each template sees only its own slots — so no existing check can notice that
@@ -139,7 +141,7 @@ def main() -> int:
         return 0
     bad = False
     for p in paths:
-        problems = check_workload(Path(p))
+        problems = check_workload(Path(p)) + check_stage_connectivity(Path(p))
         if problems:
             bad = True
             print(f"  INCONSISTENT: {p}")
@@ -149,6 +151,131 @@ def main() -> int:
             print(f"  OK: {p}")
     return 1 if bad else 0
 
+
+
+# ---------------------------------------------------------------------------
+# Stage connectivity
+#
+# Every spec can validate against its contract, every rendered script can compile, and the
+# pipeline can still be unrunnable because the stages do not refer to each other correctly.
+# Three such defects shipped simultaneously in one HIPAA workload and were found only by a
+# human reading generated Terraform:
+#
+#   - the DAG's quality tasks pointed at a script name that was never rendered
+#   - silver_spec.source_table named a Bronze table nothing registers
+#   - that same reference carried the Iceberg catalog prefix, so it would have failed even
+#     after the table was registered
+#
+# The third is the one worth dwelling on. `KNOWN_GAPS` logged only "source_table names a table
+# bronze_ingestion never registers", so the obvious remedy is to register it — and a checker
+# that verified only EXISTENCE would then go green while Silver still failed, because
+# `glue_catalog` is the Iceberg catalog and Bronze is plain Parquet. Fixing the logged half of
+# a defect and passing a check is worse than not having the check.
+# ---------------------------------------------------------------------------
+
+# The Iceberg catalog name the templates write into. silver_transform and gold_aggregate both
+# emit `table_name = "glue_catalog.{db}.{table}"`, so a SILVER or GOLD table is addressed with
+# this prefix. A BRONZE table is not: bronze_ingestion ends in
+# `df.write.format("parquet").save(landing_zone)` — plain Parquet at a prefix, no catalog
+# registration and nothing Iceberg about it.
+ICEBERG_CATALOG = "glue_catalog."
+
+# spec file -> (the zone it READS, whether that zone's tables are Iceberg)
+READS = {
+    "silver.yaml": ("bronze", False),   # Bronze is raw Parquet -> prefix is wrong
+    "gold.yaml": ("silver", True),      # Silver is Iceberg      -> prefix is right
+}
+
+# airflow_dag.py.j2's DEFAULT for a quality_check task, mirrored here. The template renders
+# `task.script_path | default('quality_check.py')`, so a quality task that names no script_path
+# still resolves to this name.
+#
+# It used to be a bare constant that ignored script_path entirely, which is why the two task
+# types need separate edges at all: a checker walking only script_path would silently skip every
+# quality task — exactly the pair that was broken in both shipped workloads. That correction came
+# from the session that hit it; the version I would have written passed them in silence.
+#
+# This constant is a MIRROR of the template's default. If the template's default changes and this
+# does not, the check goes quietly wrong — so test_the_quality_default_matches_the_template pins
+# the two together by reading the template source.
+QUALITY_SCRIPT_DEFAULT = "quality_check.py"
+
+
+def check_stage_connectivity(workload_dir: Path) -> list[str]:
+    """Return one message per broken link between stages. Empty list means connected."""
+    workload_dir = Path(workload_dir)
+    config = workload_dir / "config"
+    if not config.is_dir():
+        return []
+
+    problems: list[str] = []
+
+    # --- the catalog-prefix edge -------------------------------------------------------
+    for filename, (reads_zone, reads_iceberg) in READS.items():
+        spec = _load(config / filename)
+        if not spec:
+            continue
+        ref = spec.get("source_table")
+        if not isinstance(ref, str) or not ref:
+            continue
+        has_prefix = ref.startswith(ICEBERG_CATALOG)
+        if has_prefix and not reads_iceberg:
+            problems.append(
+                f"{filename} reads {ref!r}, but {reads_zone.title()} is plain Parquet "
+                f"(bronze_ingestion ends in .save(landing_zone), registering no table and "
+                f"writing nothing Iceberg). `{ICEBERG_CATALOG}` routes to the Iceberg catalog, "
+                f"which cannot read a Hive/Parquet table, so spark.table() fails even once the "
+                f"table IS registered. Use the two-part name "
+                f"{ref[len(ICEBERG_CATALOG):]!r}, resolved through the session catalog."
+            )
+        elif not has_prefix and reads_iceberg:
+            problems.append(
+                f"{filename} reads {ref!r} without the `{ICEBERG_CATALOG}` prefix, but "
+                f"{reads_zone.title()} is written as Iceberg by its own template. Without the "
+                f"prefix this resolves through the session catalog and will not see the "
+                f"Iceberg table."
+            )
+
+    # --- does anything claim to produce the Bronze table Silver reads? -----------------
+    silver = _load(config / "silver.yaml")
+    if silver and silver.get("source_table") and not (config / "bronze.yaml").exists():
+        problems.append(
+            f"silver.yaml reads {silver['source_table']!r} but this workload has no "
+            f"bronze.yaml, so no stage in it produces that table. Either add the Bronze spec "
+            f"or document the external producer — a Silver run will fail at spark.table()."
+        )
+
+    # --- the DAG's script references --------------------------------------------------
+    dag = _load(config / "dag.yaml")
+    if dag:
+        rendered = {p.name for p in (workload_dir / "scripts").rglob("*.py")} \
+            if (workload_dir / "scripts").is_dir() else set()
+        for task in dag.get("tasks", []):
+            ttype, tid = task.get("type"), task.get("task_id")
+            if ttype == "glue_job":
+                sp = task.get("script_path")
+                if not sp:
+                    continue        # the template falls back to task_id + '.py'
+                if Path(sp).name not in rendered:
+                    problems.append(
+                        f"dag.yaml task {tid!r} has script_path {sp!r}, but no such file was "
+                        f"rendered under scripts/. Rendered: {sorted(rendered) or 'nothing'}. "
+                        f"The DAG would upload and run a path that does not exist."
+                    )
+            elif ttype == "quality_check":
+                # Same edge as glue_job, but the template supplies a default when script_path is
+                # absent, so the key to check is the resolved one rather than the declared one.
+                key = task.get("script_path") or QUALITY_SCRIPT_DEFAULT
+                if rendered and Path(key).name not in rendered:
+                    problems.append(
+                        f"dag.yaml task {tid!r} resolves to the script key {key!r} "
+                        + ("(its own script_path)" if task.get("script_path")
+                           else f"(airflow_dag.py.j2's default, since it names no script_path)")
+                        + f", but no such file was rendered. Rendered: {sorted(rendered)}. "
+                        f"Set script_path to the artifact that exists."
+                    )
+
+    return problems
 
 if __name__ == "__main__":
     sys.exit(main())

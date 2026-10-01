@@ -1,6 +1,6 @@
-# spec_hash: cd5c5162b485e223f2f39ad363719f5397b0b7aa2c11e0e247b85e2e541dd9d6
+# spec_hash: a6033aee2989ac38e61a8c22d51291d68fc906de15509b5fd1ee5366acfd5484
 # template_id: airflow_dag
-# template_hash: 0f3e4ee5dbe3b6bdf8966acb970b500cd851b53f17688da5cfe8593493a06f21
+# template_hash: cb634f5f910bf87e6113820d067df64eecc844e1b5c85911f6269320bcb4f86d
 # schema_version: v1
 # rendered_at: 2026-05-21T06:00:00Z
 from datetime import datetime, timedelta
@@ -92,7 +92,7 @@ with DAG(
     quality_check_silver = GlueJobOperator(
         task_id="quality_check_silver",
         job_name="claims_v2_quality_check_silver",
-        script_location=f"{GLUE_SCRIPT_S3_PATH}quality_check.py",
+        script_location=f"{GLUE_SCRIPT_S3_PATH}scripts/quality/check_quality.py",
         iam_role_name=GLUE_IAM_ROLE,
         region_name=Variable.get("aws_region", default_var="us-east-1"),
         script_args={"--TABLE_NAME": "glue_catalog.claims_v2_db.silver_claims_v2", "--ZONE": "silver"},
@@ -111,7 +111,7 @@ with DAG(
     quality_check_gold = GlueJobOperator(
         task_id="quality_check_gold",
         job_name="claims_v2_quality_check_gold",
-        script_location=f"{GLUE_SCRIPT_S3_PATH}quality_check.py",
+        script_location=f"{GLUE_SCRIPT_S3_PATH}scripts/quality/check_quality.py",
         iam_role_name=GLUE_IAM_ROLE,
         region_name=Variable.get("aws_region", default_var="us-east-1"),
         script_args={"--TABLE_NAME": "glue_catalog.claims_v2_db.gold_claims_v2", "--ZONE": "gold"},
