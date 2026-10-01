@@ -9,6 +9,59 @@ so it works **in your own repository**. Without it you would clone ADOP and work
 clone; with it, `/adop:onboard-workflow` generates pipelines into whatever repo you are already
 in.
 
+## In short
+
+### What you give it
+
+| | |
+|---|---|
+| **A data source** | One CSV, Parquet or JSON file is enough — a local sample works. It reads the file to learn the columns, nulls, duplicates and likely keys. |
+| **Answers to its questions** | It asks about 20–30, in plain language: what makes a row unique, what to do with duplicates and blanks, which columns are personal data, which regulation applies, how often to refresh, who to alert. **It will not guess these** — that is the point. |
+| **An AWS account** | Optional, and only for two things: profiling a real source, and deploying. You can generate a whole pipeline with no AWS access at all. |
+
+### What you get back
+
+A complete, tested pipeline written into `workloads/{name}/` in your repo:
+
+- **PySpark ETL** for Bronze (raw) → Silver (cleaned, de-duplicated, personal data masked) → Gold (business metrics)
+- **A quality gate** that scores the data and blocks promotion when it fails
+- **An Airflow DAG** so it runs on your schedule, with failure alerting
+- **Unit tests**, and a business glossary / OWL ontology if you want one
+- **Terraform or CDK** for the AWS infrastructure
+- **A written account of anything it could not do** — agents report blockers rather than
+  filling a gap with something that looks finished. If a control you asked for is not
+  enforceable, it says so and stops instead of shipping the appearance of one.
+
+Every generated file carries a provenance header, and a drift checker proves the code still
+matches the decisions you gave it. Nothing is hand-written by the model.
+
+### Deploy it to AWS
+
+```
+/adop:onboard-workflow          # 1. answer the questions -> pipeline code in your repo
+/adop:devops-workflow           # 2. generates workloads/{name}/iac/terraform/ + APPLY_GUIDE.md
+```
+
+**`APPLY_GUIDE.md` is the authority** — it is ordered, specific to your workload, and names
+every value you did not choose yourself. Follow it rather than the sketch below, which is only
+the general shape:
+
+```bash
+cd workloads/{name}/iac/terraform
+# set your account id, region and bucket names as the guide directs
+terraform init
+terraform plan -out=plan.tfplan                # review it
+terraform apply plan.tfplan
+```
+
+That creates the buckets, Glue databases, IAM roles, KMS keys and Lake Formation grants. You
+then stage your source data in S3, upload the generated scripts, and trigger the pipeline. The
+guide ends with post-apply checks that verify the tables, tags and grants actually landed —
+run them; a deployment that created the resources is not the same as one that secured them.
+
+**The plugin never applies anything itself.** It generates infrastructure code and hands it to
+you; you review and apply it. Nothing reaches your account without you running `terraform apply`.
+
 ## Install
 
 ```
