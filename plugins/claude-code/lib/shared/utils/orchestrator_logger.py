@@ -31,10 +31,17 @@ from shared.logging.agent_tracer import AgentTracer
 
 
 def _default_trace_path(workload_name: str) -> str:
-    """Generate default trace output path under workloads/{name}/logs/."""
+    """Compute the default trace path under workloads/{name}/logs/. Creates nothing.
+
+    Same fix as `script_tracer._default_trace_path`, which had an identical body: the
+    `mkdir` fired on path computation rather than on write, and `AgentTracer._emit` already
+    creates the directory immediately before opening the file, so it was redundant.
+
+    Kept relative to cwd on purpose — `test_default_trace_path` isolates itself with
+    `monkeypatch.chdir(tmp_path)`, which only works if this path is relative.
+    """
     ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     log_dir = Path("workloads") / workload_name / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
     return str(log_dir / f"{ts}_{workload_name}.jsonl")
 
 

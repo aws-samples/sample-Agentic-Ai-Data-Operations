@@ -101,10 +101,31 @@ def _infer_agent_name(script_path: str) -> str:
 
 
 def _default_trace_path(workload_name: str) -> str:
-    """Generate default trace output path."""
+    """Compute the default trace path. Creates nothing.
+
+    This used to `mkdir(parents=True)` here, which had two consequences:
+
+    1. **It fired on path computation, not on write.** Merely constructing a ScriptTracer
+       created a directory tree even if no event was ever emitted. `AgentTracer._emit`
+       already calls `mkdir(parents=True, exist_ok=True)` immediately before opening the
+       file, so the directory still appears the moment anything is actually logged — the
+       eager call was pure redundancy with a side effect.
+
+       Because the eager call fired, three directories appeared under `workloads/` purely
+       from running the tests: `unknown/`, `env_workload/` and `sales_transactions/` — the
+       last named after a path `tests/unit/test_script_tracer.py` invents
+       (`/project/workloads/sales_transactions/...`) and which has never existed. Every tool
+       that globs `workloads/*` counted them, and the drift validator reported all three as
+       "no artifacts under scripts/, dags/ or sql/".
+
+    2. The path stays **relative to cwd** deliberately. Anchoring it to the project root
+       looks tidier and is wrong: `test_default_trace_path` isolates itself with
+       `monkeypatch.chdir(tmp_path)`, and an absolute path defeats that — it made a
+       correctly-written test start writing into the real repository. A trace belongs
+       wherever the job was launched from.
+    """
     ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     log_dir = Path("workloads") / workload_name / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
     return str(log_dir / f"{ts}_{workload_name}_script.jsonl")
 
 
@@ -141,9 +162,16 @@ class ScriptTracer:
         )
         self.agent_name = agent_name or _infer_agent_name(script_path)
 
-        # Output path
-        self.output_path = output_path or os.environ.get(
-            "TRACE_OUTPUT_PATH", _default_trace_path(self.workload_name)
+        # Output path. Written as an explicit chain rather than
+        #     os.environ.get("TRACE_OUTPUT_PATH", _default_trace_path(...))
+        # because Python evaluates a function's default ARGUMENT eagerly: that form called
+        # _default_trace_path() even when TRACE_OUTPUT_PATH was set and its result discarded.
+        # Harmless now that the function only computes a string, but it was computing a
+        # timestamp and creating a directory for a path that was then thrown away.
+        self.output_path = (
+            output_path
+            or os.environ.get("TRACE_OUTPUT_PATH")
+            or _default_trace_path(self.workload_name)
         )
 
         # Create the underlying tracer
