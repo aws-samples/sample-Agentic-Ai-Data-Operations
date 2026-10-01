@@ -1,5 +1,5 @@
 {# template_id: bronze_ingestion #}
-{# template_version: 1.2.0 #}
+{# template_version: 1.3.0 #}
 {# required_slots: dataset_name, source_path, source_format, landing_zone #}
 {# schema_version: v1 #}
 import sys
@@ -74,11 +74,23 @@ def ingest(glue_context, args):
     # repository the spec was written in, so the read fails with an opaque "Path does not
     # exist". Named here instead, because this cost a whole build: source_path was the bare
     # filename "sample_claims.csv" and nothing said why Spark could not find it.
-    if "://" not in source_path:
+    # This script runs on AWS Glue — it imports GlueContext and constructs one below, and
+    # .claude/rules/03-python-airflow.md requires it. So the only source a worker can actually
+    # reach is S3.
+    #
+    # The earlier version of this guard rejected a bare path and then invited the next defect
+    # in its own message: "or file:///abs/path for a deliberate local run". There is no local
+    # run. A live HIPAA workload took that invitation and shipped
+    # file:///Users/<name>/.../sample_claims.csv in three files — unreachable from a Glue
+    # worker, and carrying a home directory into source. The guard caught the shape it was
+    # written for and waved through the one it suggested.
+    if not source_path.startswith(("s3://", "s3a://")):
         raise ValueError(
-            f"source_path {source_path!r} has no URI scheme. A Glue worker resolves a "
-            f"relative path against its own container, not your repository. Stage the data "
-            f"and use s3://..., or file:///abs/path for a deliberate local run."
+            f"source_path {source_path!r} is not an S3 URI. This script runs on a Glue worker, "
+            f"which cannot reach a relative path (it resolves against its own container, not "
+            f"your repository) and cannot reach file:// (that is your workstation's disk, and "
+            f"a path under a home directory also leaks a username into the spec). Stage the "
+            f"data in S3 and use s3:// or s3a://."
         )
 
     logger.log("info", "ingestion_start", source=source_path, format="{{ source_format }}")

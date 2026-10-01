@@ -1652,14 +1652,49 @@ class TestRuntimePlaceholdersAreResolvedNotShipped:
         assert 'if "${" in value:' in body
         assert "raise ValueError" in body
 
-    def test_bronze_refuses_a_path_with_no_uri_scheme(self, tmp_path):
-        """`sample_claims.csv` resolves against the Glue container, not the repo.
+    @pytest.mark.parametrize("path", ["s3://bucket/raw/", "s3a://bucket/raw/"])
+    def test_bronze_accepts_an_s3_source(self, path, tmp_path):
+        self._exec_guard(self._bronze(tmp_path, source_path=path), path)
 
-        This is the defect that cost a whole build: Spark reported only "Path does not exist".
+    @pytest.mark.parametrize("path,why", [
+        ("sample_claims.csv", "a bare path resolves against the Glue container, not the repo"),
+        ("./data/claims.csv", "a relative path, same reason"),
+        ("file:///Users/someone/claims.csv",
+         "file:// is the workstation's disk, unreachable from a Glue worker — and a path under "
+         "a home directory leaks a username into the spec"),
+    ])
+    def test_bronze_refuses_a_source_a_glue_worker_cannot_reach(self, path, why, tmp_path):
+        """The file:// case is one my own first version of this guard INVITED.
+
+        The original message read "...or file:///abs/path for a deliberate local run". There is
+        no local run: this template imports GlueContext and constructs one, and
+        03-python-airflow.md requires Glue. A live HIPAA workload took the invitation and
+        shipped file:///Users/<name>/.../sample_claims.csv in three files. The guard caught the
+        shape it was written for and waved through the shape it suggested.
         """
-        body = self._bronze(tmp_path, source_path="sample_claims.csv")
-        assert '"://" not in source_path' in body
-        assert "no URI scheme" in body
+        with pytest.raises(ValueError, match="not an S3 URI"):
+            self._exec_guard(self._bronze(tmp_path, source_path=path), path)
+
+    def _exec_guard(self, body, source_path):
+        """Run the rendered guard itself rather than grepping for its text.
+
+        Asserting on the source string would pass for a guard that is present and wrong.
+        """
+        import ast
+
+        tree = ast.parse(body)
+        fn = next(n for n in tree.body if getattr(n, "name", "") == "ingest")
+        guard = next(n for n in fn.body if isinstance(n, ast.If))
+        mod = ast.Module(body=[ast.FunctionDef(
+            name="check",
+            args=ast.arguments(posonlyargs=[], args=[ast.arg(arg="source_path")],
+                               kwonlyargs=[], kw_defaults=[], defaults=[]),
+            body=[guard], decorator_list=[], returns=None, type_params=[])],
+            type_ignores=[])
+        ast.fix_missing_locations(mod)
+        ns = {}
+        exec(compile(mod, "<guard>", "exec"), ns)  # nosec B102 — our own rendered output
+        ns["check"](source_path)
 
     def test_bronze_without_placeholders_needs_no_extra_argument(self, tmp_path):
         """Back-compat for every bronze spec that names real paths."""
