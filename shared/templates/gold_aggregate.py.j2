@@ -1,7 +1,26 @@
 {# template_id: gold_aggregate #}
-{# template_version: 1.2.0 #}
+{# template_version: 1.3.0 #}
 {# required_slots: dataset_name, source_table, schema_type, grain, measures #}
 {# schema_version: v1 #}
+{#
+  SCD Type 2 detection, hoisted to template scope because three places need it: the
+  dimension-write branch, the `run_logical_date` binding in aggregate(), and the
+  getResolvedOptions call in __main__.
+
+  A dimension TABLE is Type 2 when one of its own columns is the source_column of a
+  dimensions[] attribute declaring scd_type 2. dimensions[] describes attributes and
+  output_tables[] describes tables, so the intersection is the only bridge between the two
+  namespaces — matching on name would silently find nothing, which is how scd_type sat inert.
+#}
+{% set _all_scd2_cols = (dimensions | default([])) | selectattr("scd_type", "defined")
+                | selectattr("scd_type", "equalto", 2) | map(attribute="source_column") | list %}
+{% set _ns = namespace(has_scd2=false) %}
+{% for _t in (output_tables | default([])) | selectattr("type", "equalto", "dimension") %}
+{% if (_t.columns | default([])) | select("in", _all_scd2_cols) | list %}
+{% set _ns.has_scd2 = true %}
+{% endif %}
+{% endfor %}
+{% set _has_scd2 = (schema_type == "star_schema") and _ns.has_scd2 %}
 {#
   Iceberg partition columns.
 
@@ -136,6 +155,15 @@ logger = StructuredLogger(
 def aggregate(glue_context, args):
     spark = glue_context.spark_session
     logger.log("info", "gold_transform_start", source="{{ source_table }}", schema_type="{{ schema_type }}")
+{% if _has_scd2 %}
+
+    # SCD Type 2 versioning is dated by the run's LOGICAL date, never by wall-clock. A retry
+    # or a backfill of the same logical date must land on the same effective_from, otherwise
+    # re-running a day opens a second version of every changed row and the history silently
+    # doubles. getResolvedOptions in __main__ makes this a required argument, so a DAG that
+    # forgets to pass it fails loudly here rather than versioning against today.
+    run_logical_date = args["logical_date"]
+{% endif %}
 
     silver_df = spark.table("{{ source_table }}")
     input_rows = silver_df.count()
@@ -203,6 +231,45 @@ def aggregate(glue_context, args):
   "Member 1:many Claim" join with no dimension side to join to. The Lake Formation grants in
   semantic.yaml targeted tables that were never created.
 #}
+{#
+  Atomic fact tables: one row per source row, written from pre_agg_df rather than at `grain`.
+
+  These exist for the case where the aggregate grain cannot answer a question the spec
+  otherwise claims to support — e.g. a daily (service_date, plan_type, claim_type) aggregate
+  cannot slice denial rate by provider, because provider is not in the grain, so a hashed
+  provider key kept "for provider-level analysis" would have had nothing to join to.
+#}
+{% set _atomic_facts = (output_tables | default([])) | selectattr("type", "equalto", "fact")
+                       | selectattr("atomic", "defined") | selectattr("atomic") | list %}
+{% for af in _atomic_facts %}
+{% if af.columns is not defined or not af.columns %}
+{{ unsupported("output_tables entry '" ~ af.name ~ "' is atomic but names no columns, so "
+   ~ "there is nothing to select. An atomic fact must list its columns explicitly — "
+   ~ "defaulting to every Silver column would republish the whole row-level dataset into "
+   ~ "Gold by accident.") }}
+{% endif %}
+    # ---------------------------------------------------------------------------------
+    # Atomic fact table: {{ af.name }} — ONE ROW PER CLAIM, not at the aggregate grain
+    # ---------------------------------------------------------------------------------
+    # Written from pre_agg_df, so it carries row-level detail the aggregate drops. That is
+    # the point, and also the cost: this is row-level data republished into Gold, so it
+    # inherits Silver's sensitivity and needs its own column-level grants. It is NOT a
+    # cheaper version of the aggregate.
+    {{ af.name }}_df = pre_agg_df.select(
+{% for c in af.columns %}
+        "{{ c }}",
+{% endfor %}
+    )
+{% if iceberg_database is defined %}
+    {{ af.name }}_table = "glue_catalog.{{ iceberg_database }}.{{ af.name }}"
+{% else %}
+    {{ af.name }}_table = "glue_catalog.{{ dataset_name }}_db.{{ af.name }}"
+{% endif %}
+    {{ af.name }}_df.writeTo({{ af.name }}_table).using("iceberg").createOrReplace()
+    logger.log("info", "atomic_fact_written",
+        table={{ af.name }}_table, grain="claim", rows={{ af.name }}_df.count())
+
+{% endfor %}
 {% set _dim_tables = (output_tables | default([])) | selectattr("type", "equalto", "dimension") | list %}
 {% if _dim_tables %}
 {#
@@ -214,8 +281,17 @@ def aggregate(glue_context, args):
 
   Any attribute asking for Type 2 means the table cannot be a Type 1 overwrite.
 #}
-{% set _scd2 = (dimensions | default([])) | selectattr("scd_type", "defined")
-                | selectattr("scd_type", "equalto", 2) | map(attribute="name") | list %}
+{#
+  Bridge the two namespaces PER TABLE rather than globally.
+
+  Previously `_scd2` was computed once over the whole dimensions[] array and any Type 2
+  attribute anywhere refused the render of EVERY dimension table — so a spec with
+  dim_member (Type 2) and dim_provider (Type 1) could not render the Type 1 table either.
+  Matching dimensions[].source_column against this table's columns[] gives the mapping the
+  contract otherwise lacks, so each table is classified on its own attributes.
+#}
+{% set _scd2_cols = (dimensions | default([])) | selectattr("scd_type", "defined")
+                | selectattr("scd_type", "equalto", 2) | map(attribute="source_column") | list %}
 {% if publish_via_gate | default(false) %}
 {{ unsupported("publish_via_gate is set and this spec also declares " ~ (_dim_tables | length)
    ~ " dimension table(s). The gate promotes exactly one table — the one named in PROMOTE_TO — "
@@ -225,20 +301,130 @@ def aggregate(glue_context, args):
    ~ "can promote a set of tables.") }}
 {% endif %}
 {% for dt in _dim_tables %}
-{% if _scd2 %}
-{{ unsupported("dimension attributes " ~ (_scd2 | join(", ")) ~ " are declared scd_type 2, "
-   ~ "and this template writes '" ~ dt.name ~ "' with createOrReplace — a Type 1 overwrite. "
-   ~ "Rendering Type 1 where Type 2 was asked for loses history irrecoverably: the "
-   ~ "superseded rows are never captured, so unlike every other gap here it cannot be "
-   ~ "repaired by re-rendering later. Type 2 needs effective_from / effective_to / "
-   ~ "is_current and a merge, which is a larger change than this one.") }}
-{% endif %}
 {% if dt.columns is not defined or not dt.columns %}
 {{ unsupported("output_tables entry '" ~ dt.name ~ "' names no columns, so there is nothing "
    ~ "to select into the dimension. Add `columns`, or drop the entry.") }}
 {% endif %}
+{#  This table is Type 2 iff one of ITS columns is a Type 2 attribute. #}
+{% set _dt_scd2 = dt.columns | select("in", _scd2_cols) | list %}
+{% if _dt_scd2 %}
+{% if dt.business_key is not defined or not dt.business_key %}
+{{ unsupported("dimension table '" ~ dt.name ~ "' carries scd_type 2 attribute(s) "
+   ~ (_dt_scd2 | join(", ")) ~ " but declares no business_key. A Type 2 merge has to know "
+   ~ "which rows are successive versions of the same entity, and dimensions[] names "
+   ~ "attributes rather than tables, so there is nothing to infer it from. Add "
+   ~ "output_tables[].business_key naming the natural key column(s).") }}
+{% endif %}
+{% for bk in dt.business_key %}
+{% if bk not in dt.columns %}
+{{ unsupported("dimension table '" ~ dt.name ~ "' declares business_key column '" ~ bk
+   ~ "' which is not in its columns list, so the merge predicate would reference a column "
+   ~ "the dimension does not select. Add it to columns, or correct the business_key.") }}
+{% endif %}
+{% endfor %}
+{% set _bk = dt.business_key %}
+{% set _attrs = dt.columns | reject("in", _bk) | list %}
+    # ---------------------------------------------------------------------------------
+    # Dimension table: {{ dt.name }} — SCD TYPE 2
+    # ---------------------------------------------------------------------------------
+    # Type 2 attribute(s) on this table: {{ _dt_scd2 | join(", ") }}
+    # Business key: {{ _bk | join(", ") }}
+    #
+    # Versioned history, not an overwrite. A row is closed (effective_to set, is_current
+    # false) when its tracked attributes change, and a new current row opens. A Type 1
+    # createOrReplace here would discard the superseded rows irrecoverably — which is why
+    # this template used to refuse the render rather than silently downgrade.
+    #
+    # effective_from is the run's logical date, NOT wall-clock: re-running the same logical
+    # date must not open a second version. RUN_LOGICAL_DATE comes from the job arguments.
+    {{ dt.name }}_incoming = pre_agg_df.select(
+{% for c in dt.columns %}
+        "{{ c }}",
+{% endfor %}
+    ).dropDuplicates([{% for bk in _bk %}"{{ bk }}"{{ ", " if not loop.last }}{% endfor %}])
+{% if iceberg_database is defined %}
+    {{ dt.name }}_table = "glue_catalog.{{ iceberg_database }}.{{ dt.name }}"
+{% else %}
+    {{ dt.name }}_table = "glue_catalog.{{ dataset_name }}_db.{{ dt.name }}"
+{% endif %}
+
+    # First run bootstraps the table; later runs merge into it.
+    if not spark.catalog.tableExists({{ dt.name }}_table):
+        (
+            {{ dt.name }}_incoming
+            .withColumn("effective_from", F.lit(run_logical_date).cast("date"))
+            .withColumn("effective_to", F.lit(None).cast("date"))
+            .withColumn("is_current", F.lit(True))
+            .writeTo({{ dt.name }}_table)
+            .using("iceberg")
+            .create()
+        )
+        logger.log("info", "dimension_bootstrapped",
+            table={{ dt.name }}_table, scd_type=2,
+            rows={{ dt.name }}_incoming.count())
+    else:
+{% if _attrs %}
+        {{ dt.name }}_incoming.createOrReplaceTempView("{{ dt.name }}_incoming_v")
+
+        # Close any current row whose tracked attributes changed, then insert the new
+        # version. Two statements, because a single MERGE cannot both update the old row
+        # and insert its replacement for the same key.
+        #
+        # <=> is the NULL-safe equality: a plain != treats NULL as unknown, so a tracked
+        # attribute going NULL -> value (or back) would not register as a change and the
+        # version would never open.
+        spark.sql(f"""
+            MERGE INTO {{ '{' }}{{ dt.name }}_table{{ '}' }} AS tgt
+            USING {{ dt.name }}_incoming_v AS src
+              ON {% for bk in _bk %}tgt.{{ bk }} = src.{{ bk }}{{ " AND " if not loop.last }}{% endfor %}
+
+                 AND tgt.is_current = true
+            WHEN MATCHED AND ({% for a in _attrs %}NOT (tgt.{{ a }} <=> src.{{ a }}){{ " OR " if not loop.last }}{% endfor %})
+              THEN UPDATE SET
+                tgt.effective_to = date_sub(DATE '{run_logical_date}', 1),
+                tgt.is_current   = false
+        """)
+{% else %}
+        # NO ROW-CLOSING MERGE FOR THIS DIMENSION, deliberately. Its business_key
+        # ({{ _bk | join(", ") }}) is its only column, so there is no tracked attribute that
+        # can change and nothing a version could ever record. Emitting the usual
+        # `WHEN MATCHED AND (false)` merge here would be dead SQL that reads as though
+        # versioning were active.
+        #
+        # What this dimension CAN still version is membership of the key set: a key appearing
+        # for the first time opens a row via the append below. A key that stops appearing is
+        # NOT closed — doing so would need a full-set comparison and would misread an empty
+        # or partial batch as every entity being retired.
+{% endif %}
+
+        # Insert rows that are new, or whose previous version was just closed. The
+        # anti-join against current rows is what makes a re-run idempotent.
+        {{ dt.name }}_current = (
+            spark.table({{ dt.name }}_table)
+            .filter(F.col("is_current") == True)  # noqa: E712 — Spark Column, not a bool
+            .select({% for c in dt.columns %}"{{ c }}"{{ ", " if not loop.last }}{% endfor %})
+        )
+        {{ dt.name }}_new = {{ dt.name }}_incoming.join(
+            {{ dt.name }}_current,
+            on=[{% for c in dt.columns %}"{{ c }}"{{ ", " if not loop.last }}{% endfor %}],
+            how="left_anti",
+        )
+        (
+            {{ dt.name }}_new
+            .withColumn("effective_from", F.lit(run_logical_date).cast("date"))
+            .withColumn("effective_to", F.lit(None).cast("date"))
+            .withColumn("is_current", F.lit(True))
+            .writeTo({{ dt.name }}_table)
+            .append()
+        )
+        logger.log("info", "dimension_merged",
+            table={{ dt.name }}_table, scd_type=2,
+            new_versions={{ dt.name }}_new.count())
+
+{% else %}
     # Dimension table: {{ dt.name }} — SCD Type 1 (createOrReplace overwrites in place).
-    # Any attribute declaring scd_type 2 refuses the render above rather than landing here.
+    # No attribute on this table declares scd_type 2. A table that does takes the Type 2
+    # merge branch above instead.
     {{ dt.name }}_df = pre_agg_df.select(
 {% for c in dt.columns %}
         "{{ c }}",
@@ -251,8 +437,9 @@ def aggregate(glue_context, args):
 {% endif %}
     {{ dt.name }}_df.writeTo({{ dt.name }}_table).using("iceberg").createOrReplace()
     logger.log("info", "dimension_written",
-        table={{ dt.name }}_table, rows={{ dt.name }}_df.count())
+        table={{ dt.name }}_table, scd_type=1, rows={{ dt.name }}_df.count())
 
+{% endif %}
 {% endfor %}
 {% endif %}
 {% elif schema_type == "flat_iceberg" %}
@@ -320,7 +507,15 @@ def aggregate(glue_context, args):
 
 
 if __name__ == "__main__":
+{% if _has_scd2 %}
+    # logical_date is REQUIRED, not optional: this spec declares SCD Type 2 dimension(s) and
+    # effective_from/effective_to must be dated by the run's logical date. getResolvedOptions
+    # raises if the DAG omits it, which is the correct direction — versioning history against
+    # wall-clock would be silently wrong on every retry and backfill.
+    args = getResolvedOptions(sys.argv, ["JOB_NAME", "logical_date"])
+{% else %}
     args = getResolvedOptions(sys.argv, ["JOB_NAME"])
+{% endif %}
     sc = SparkContext()
     glue_context = GlueContext(sc)
     job = Job(glue_context)

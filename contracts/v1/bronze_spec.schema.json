@@ -70,6 +70,12 @@
       "enum": ["full_load", "incremental", "cdc"],
       "default": "full_load"
     },
+    "ingest_sequence_column": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Name of a column Bronze STAMPS on every ingested row with the run's logical date, supplying a monotonic ordering across runs that the source itself does not provide. Bronze stays append-only: this ADDS a column, it never updates an existing row, so Bronze immutability holds. Silver then resolves same-primary-key conflicts by taking the highest value, which is the only way to apply an upstream restatement — a claim moving PENDING to PAID, say — when no source column changes on update. Point silver_spec.dedup_order_by at this column. Omit it when the source supplies its own reliable last-updated timestamp and order by that instead.",
+      "$comment": "Needed because ingestion_mode: cdc was unimplementable on its own: a merge has to know which of two rows is newer, and a source whose update does not touch any column cannot say."
+    },
     "file_pattern": {
       "type": "string",
       "description": "Glob pattern to match source files (e.g., *.csv)"

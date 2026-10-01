@@ -699,11 +699,52 @@ class TestGoldSchemaIsActuallyBuilt:
         assert "dim_member" not in body
         assert "fact_df.writeTo(table_name)" in body
 
-    def test_scd_type_2_refuses_rather_than_emitting_type_1(self, tmp_path):
-        """Type 1 where Type 2 was asked for loses history irrecoverably.
+    # SCD Type 2 used to be refused outright, and the test here asserted that refusal. The
+    # capability was then implemented (gold_aggregate 1.3.0), so asserting a refusal would now
+    # be asserting the absence of a feature. The PROPERTY is unchanged and is what these two
+    # tests guard instead: Type 1 where Type 2 was asked for loses history irrecoverably —
+    # the superseded rows are never captured, so unlike every other gap here it cannot be
+    # repaired by re-rendering later. Refusing satisfied that; a real merge satisfies it
+    # better. Overwriting the dimension would not.
 
-        Unlike most of these, the damage cannot be repaired by re-rendering later — the
-        superseded rows were never captured. So it must refuse, not downgrade.
+    def test_scd_type_2_never_overwrites_the_dimension(self, tmp_path):
+        """The dimension write must not be createOrReplace, and must version rows."""
+        body = self._gold(
+            tmp_path,
+            schema_type="star_schema",
+            output_tables=[{"name": "dim_member", "type": "dimension",
+                            "columns": ["record_id"], "business_key": ["record_id"]}],
+            dimensions=[{"name": "dim_member", "source_column": "record_id",
+                         "scd_type": 2}],
+        )
+        # Matched as an emitted withColumn() call, not as a bare substring. `col in body` is
+        # too weak: mutation testing renamed effective_from -> effective_from_renamed and the
+        # substring assertion still passed, because the longer name contains the shorter one.
+        for col in ("effective_from", "effective_to", "is_current"):
+            assert f'.withColumn("{col}",' in body, (
+                f"a Type 2 dimension without a {col} column cannot express a version; it is "
+                f"not emitted as a withColumn() call"
+            )
+
+        # The fact table legitimately uses createOrReplace; the dimension must not.
+        overwrites = [
+            l.strip() for l in body.splitlines()
+            if "createOrReplace" in l and "dim_member" in l and not l.strip().startswith("#")
+        ]
+        assert not overwrites, (
+            "the Type 2 dimension is overwritten, so every superseded row is discarded and "
+            "the history the spec asked for never exists:\n  " + "\n  ".join(overwrites)
+        )
+        assert "tableExists" in body, (
+            "no bootstrap branch, so the first run has nothing to merge into"
+        )
+
+    def test_scd_type_2_without_a_business_key_refuses(self, tmp_path):
+        """The one case that genuinely cannot be rendered.
+
+        A Type 2 merge has to know which rows are successive versions of the same entity, and
+        `dimensions[]` names attributes rather than tables — so with no `business_key` there is
+        nothing to infer it from. Guessing would merge unrelated rows together.
         """
         with pytest.raises(UnsupportedSpecValueError) as exc:
             self._gold(
@@ -714,7 +755,27 @@ class TestGoldSchemaIsActuallyBuilt:
                 dimensions=[{"name": "dim_member", "source_column": "record_id",
                              "scd_type": 2}],
             )
-        assert "scd_type 2" in str(exc.value) and "history" in str(exc.value)
+        assert "business_key" in str(exc.value)
+
+    def test_a_type_1_dimension_still_renders_alongside_a_type_2_one(self, tmp_path):
+        """The latent bug the Type 2 work fixed: one Type 2 attribute refused EVERY dimension.
+
+        My original guard checked whether *any* `dimensions[]` entry had `scd_type: 2` and then
+        refused the whole render, so a workload with one Type 2 attribute could not emit its
+        Type 1 dimensions either. Detection is now per-table.
+        """
+        body = self._gold(
+            tmp_path,
+            schema_type="star_schema",
+            output_tables=[
+                {"name": "dim_member", "type": "dimension", "columns": ["record_id"],
+                 "business_key": ["record_id"]},
+                {"name": "dim_plain", "type": "dimension", "columns": ["category"]},
+            ],
+            dimensions=[{"name": "dim_member", "source_column": "record_id", "scd_type": 2}],
+        )
+        assert "dim_plain_df" in body, "the Type 1 dimension was dropped"
+        assert "effective_from" in body, "the Type 2 dimension lost its versioning"
 
     def test_a_dimension_with_no_columns_refuses(self, tmp_path):
         with pytest.raises(UnsupportedSpecValueError) as exc:

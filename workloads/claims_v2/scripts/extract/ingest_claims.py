@@ -1,6 +1,6 @@
 # spec_hash: 1ba019f45bf4d074fa80ba9f997c59d25c7ced83b79629d423b290ac31ef2332
 # template_id: bronze_ingestion
-# template_hash: c2e0ea8db076cd0fc6b513dc3738af8e45a52738230ca71d8d2730f342ff0f53
+# template_hash: e2c91c9eecf799915f89e7be497d35de096c93edfcc5986f3be021804cda6e8b
 # schema_version: v1
 # rendered_at: 2026-05-21T06:00:00Z
 import sys

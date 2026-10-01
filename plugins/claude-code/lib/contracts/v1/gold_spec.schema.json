@@ -126,10 +126,21 @@
           "columns": {
             "type": "array",
             "items": { "type": "string" }
+          },
+          "atomic": {
+            "type": "boolean",
+            "default": false,
+            "description": "For a `fact` table only: write one row per SOURCE row, straight from the pre-aggregation dataframe, instead of at the spec's `grain`. Use it to publish an atomic fact alongside the aggregate when a consumer needs a dimension that the aggregate grain does not carry — provider-level slicing off a daily plan/claim-type aggregate, for instance, which is otherwise impossible. An atomic fact republishes row-level detail into Gold, so under HIPAA it inherits the source zone's sensitivity and needs its own column-level controls; it is not a cheaper aggregate. Ignored for dimension and flat tables."
+          },
+          "business_key": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string" },
+            "description": "Natural key identifying one entity in this dimension. Used as the MERGE predicate when the table is written as SCD Type 2. REQUIRED when any dimensions[] attribute whose source_column appears in this table's columns declares scd_type 2: a Type 2 merge must know which rows are successive versions of the same entity, and because dimensions[] names attributes rather than tables there is nothing to infer it from. Every listed column must also appear in columns. Ignored for Type 1 dimensions and for fact/flat tables."
           }
         }
       },
-      "description": "For star_schema: list of fact + dimension tables"
+      "description": "For star_schema: list of fact + dimension tables. A dimension table is written as SCD Type 2 when any dimensions[] attribute whose source_column is among its columns declares scd_type 2; otherwise Type 1 (overwrite)."
     },
     "freshness_sla_hours": {
       "type": "integer",

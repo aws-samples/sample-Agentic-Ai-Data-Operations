@@ -133,6 +133,13 @@
             "pattern": "^[a-z][a-z0-9_]*$"
           }
         },
+        "de_identification_standard": {
+          "type": "string",
+          "enum": ["safe_harbor", "expert_determination", "none_phi_with_controls", "not_assessed"],
+          "default": "not_assessed",
+          "description": "Which HIPAA de-identification standard the masked output is claimed to meet. Record it explicitly: masking is not the same as de-identification, and leaving this unstated is how a pipeline comes to be treated as de-identified because its columns are hashed. safe_harbor = 45 CFR 164.514(b)(2), all 18 identifiers removed, dates reduced to year, ages over 89 pooled, no re-identification code the covered entity can reverse. expert_determination = 164.514(b)(1), a documented statistician's determination of very small risk. none_phi_with_controls = the output IS still PHI and is protected by access control, encryption, audit logging and a BAA rather than by de-identification — the honest declaration for most masked-but-joinable analytics. not_assessed = nobody has decided, which should block a production grant.",
+          "$comment": "HHS guidance treats a keyed or salted hash whose key the covered entity retains as a re-identification code, so hashed identifiers alone never reach safe_harbor."
+        },
         "audit_retention_days": {
           "type": "integer",
           "minimum": 1

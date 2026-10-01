@@ -1,5 +1,5 @@
 {# template_id: bronze_ingestion #}
-{# template_version: 1.1.0 #}
+{# template_version: 1.2.0 #}
 {# required_slots: dataset_name, source_path, source_format, landing_zone #}
 {# schema_version: v1 #}
 import sys
@@ -10,6 +10,9 @@ from awsglue.context import GlueContext
 from awsglue.job import Job
 from awsglue.utils import getResolvedOptions
 from pyspark.context import SparkContext
+{% if ingest_sequence_column is defined and ingest_sequence_column %}
+from pyspark.sql import functions as F
+{% endif %}
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent
@@ -102,6 +105,20 @@ def ingest(glue_context, args):
 
     input_rows = df.count()
 
+{% if ingest_sequence_column is defined and ingest_sequence_column %}
+    # Stamp the ingest sequence. This ADDS a column and never rewrites an existing row, so
+    # Bronze immutability holds (pipeline-conventions: "any code that updates Bronze is a bug").
+    #
+    # It exists because a merge needs to know which of two rows is newer and this source
+    # cannot say: the update that matters — a claim moving PENDING to PAID — changes no column
+    # the source already had, so there is nothing to order by. Silver's dedup orders on this
+    # column to apply the restatement instead of discarding or quarantining it.
+    #
+    # The value is the run's LOGICAL date, not wall-clock: a retry or a backfill of the same
+    # logical date must stamp the same value, otherwise re-running a day makes the retry look
+    # like a newer version of every row it touched.
+    df = df.withColumn("{{ ingest_sequence_column }}", F.lit(args["logical_date"]).cast("date"))
+{% endif %}
 {% if partition_keys is defined and partition_keys %}
     df.write.format("parquet") \
         .mode("append") \
@@ -125,7 +142,14 @@ def ingest(glue_context, args):
 
 
 if __name__ == "__main__":
+{% if ingest_sequence_column is defined and ingest_sequence_column %}
+    # logical_date is REQUIRED, not optional: ingest_sequence_column is stamped from it and
+    # Silver's dedup orders on the result. getResolvedOptions raises if the DAG omits it, which
+    # is the correct direction — a NULL sequence would make every restatement unorderable.
+    args = getResolvedOptions(sys.argv, ["JOB_NAME", "logical_date"{% for p in _params %}, "{{ p }}"{% endfor %}])
+{% else %}
     args = getResolvedOptions(sys.argv, ["JOB_NAME"{% for p in _params %}, "{{ p }}"{% endfor %}])
+{% endif %}
     sc = SparkContext()
     glue_context = GlueContext(sc)
     job = Job(glue_context)
