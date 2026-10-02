@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "adop-marketplace",
+  "description": "Agentic Data Operations Platform (ADOP) plugins for Claude Code — turn a natural-language data source description into a tested Bronze→Silver→Gold pipeline with inline compliance controls.",
+  "owner": {
+    "name": "AWS Samples",
+    "url": "https://github.com/aws-samples/sample-Agentic-Ai-Data-Operations"
+  },
+  "plugins": [
+    {
+      "name": "adop",
+      "source": "./plugins/claude-code",
+      "description": "Agentic Data Operations Platform — natural language to a tested Bronze→Silver→Gold data pipeline with inline compliance controls."
+    }
+  ]
+}

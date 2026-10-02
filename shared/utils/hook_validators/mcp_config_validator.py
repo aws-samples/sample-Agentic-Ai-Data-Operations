@@ -6,7 +6,7 @@ Checks .mcp.json and .mcp.gateway.json for:
   - No hardcoded credentials in env values
   - No absolute paths in args
   - Gateway auth uses aws-sigv4
-  - Custom server scripts under mcp-servers/
+  - Custom server scripts under mcp-servers/ (optionally via ${CLAUDE_PLUGIN_ROOT})
   - HTTPS enforcement for gateway URLs
   - Package names match known patterns
 """
@@ -34,6 +34,12 @@ CREDENTIAL_PATTERNS = [
     (r"-----BEGIN.*PRIVATE KEY-----", "Private key"),
     (r"(?i)^(password|secret|token)$", "Bare credential value"),
 ]
+
+# Claude Code expands ${CLAUDE_PLUGIN_ROOT} to wherever the plugin was installed.
+# A plugin vendors its servers under its own mcp-servers/, so this prefix is the
+# portable way to reach them — it is not an absolute path, and stripping it lets
+# the mcp-servers/ containment check below apply to plugin configs unchanged.
+PLUGIN_ROOT_PREFIX = "${CLAUDE_PLUGIN_ROOT}/"
 
 # Absolute path patterns
 ABSOLUTE_PATH_PATTERNS = [
@@ -84,7 +90,7 @@ def validate_server(name: str, config: dict, filepath: str) -> list[str]:
     if command == "uv":
         script_args = [a for a in args if a.endswith(".py")]
         for script in script_args:
-            if not script.startswith("mcp-servers/"):
+            if not script.removeprefix(PLUGIN_ROOT_PREFIX).startswith("mcp-servers/"):
                 errors.append(
                     f"{filepath}: server '{name}' runs script '{script}' "
                     f"outside mcp-servers/ directory"

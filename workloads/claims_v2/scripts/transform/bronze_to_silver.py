@@ -1,6 +1,6 @@
-# spec_hash: 567a3af743016510400d1485d651649670991023857a83daf0edd87ba9c45e5f
+# spec_hash: e4837fc1796d09d2eac2320e90c22d1c97fa28febd3020222875cf9eb6ca4842
 # template_id: silver_transform
-# template_hash: 270b6c620017cf1f7d46bc7032e845e1775a1a43f588767631c3df9bd48f2f6c
+# template_hash: 290734d6cb88adb1c46b3edd1c0b510ef12a8c2da23b70aa97ff7c8848429cc2
 # schema_version: v1
 # rendered_at: 2026-05-21T06:00:00Z
 import sys
@@ -28,16 +28,21 @@ logger = StructuredLogger(
 )
 
 
+
 def transform(glue_context, args):
     spark = glue_context.spark_session
-    logger.log("info", "transform_start", source="glue_catalog.claims_v2_db.bronze_claims_v2")
+    logger.log("info", "transform_start", source="claims_v2_db.bronze_claims_v2")
 
-    bronze_df = spark.table("glue_catalog.claims_v2_db.bronze_claims_v2")
+    bronze_df = spark.table("claims_v2_db.bronze_claims_v2")
     input_rows = bronze_df.count()
     logger.log("info", "input_count", rows=input_rows)
 
-    # Drop rows with null primary key columns
-    bronze_df = bronze_df.filter(F.col("claim_id").isNotNull())
+    # Null handling: drop_row over claim_id
+    _null_in_checked = (F.col("claim_id").isNull())
+    null_rows = bronze_df.filter(_null_in_checked).count()
+
+    bronze_df = bronze_df.filter(~_null_in_checked)
+    null_rows_dropped, null_rows_retained, null_rows_quarantined = null_rows, 0, 0
     after_pk_filter = bronze_df.count()
 
     # Deduplication: keep_latest
@@ -120,7 +125,7 @@ def transform(glue_context, args):
     return {
         "workload": "claims_v2",
         "transformation": "bronze_to_silver",
-        "source": "glue_catalog.claims_v2_db.bronze_claims_v2",
+        "source": "claims_v2_db.bronze_claims_v2",
         "target": table_name,
         "input_rows": input_rows,
         "output_rows": output_rows,

@@ -1,6 +1,6 @@
 dataset_name: claims_v2
 schema_version: v1
-source_table: glue_catalog.claims_v2_db.bronze_claims_v2
+source_table: claims_v2_db.bronze_claims_v2
 primary_key:
   - claim_id
 dedup_strategy: keep_latest

@@ -1,0 +1,638 @@
+# Translation manifest — the repository is normative, the plugin is derived.
+#
+# The repo works by being cloned: open Claude Code inside it and .claude/ loads
+# automatically. The plugin exists so the same capability works in the user's OWN
+# repo, where none of these files are present. So the plugin must CONTAIN the
+# content, not reference it — a plugin is copied into
+# ~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/ at install time and
+# cannot see this repository at all.
+#
+# Copies drift. This manifest is what makes that detectable: every file under
+# plugins/claude-code/ must appear here with a source and a category, and
+# tests/test_plugin_translation.py enforces it. A plugin file with no entry fails
+# the suite, which is the point — it stops content being invented in the plugin
+# that should have come from the repo.
+#
+# Categories, by how faithfully a plugin primitive can carry a repo primitive:
+#
+#   copy       Byte-identical. Asserted with filecmp. Used for the Python library,
+#              schemas, templates and data the agents load at runtime.
+#
+#   rewrite    Same content, paths retargeted — the plugin's library lives at
+#              ${CLAUDE_PLUGIN_ROOT}/lib, not shared/. Asserted structurally:
+#              the named anchors must still be present in the derived file.
+#
+#   transform  A different primitive carries the content (rules -> skills,
+#              CLAUDE.md -> command preamble). Asserted by coverage: every source
+#              must be claimed by some target, so a new rule cannot be forgotten.
+#
+#   plugin-only  No repo source. Only legitimate where the plugin must solve a
+#              problem the repo solves by other means; each entry states why.
+#
+#   untranslatable  A repo capability with no plugin equivalent at all. Recorded
+#              so it is a documented limitation rather than a silent absence.
+#
+# Phase A establishes the harness against the files that exist today. Entries are
+# added as Phases B-D vendor and translate the rest.
+
+version: 1
+
+# ---------------------------------------------------------------------------
+# copy — byte-identical vendored code, asserted with cmp
+#
+# The layout under lib/ mirrors the repo's relative structure on purpose.
+# renderer.py resolves TEMPLATES_DIR as __file__.parent.parent.parent/'shared'/
+# 'templates' and spec_loader.py resolves CONTRACTS_DIR the same way, so placing
+# codegen at lib/shared/codegen makes both land correctly with no edits. Every
+# file below is therefore byte-for-byte its source, and a predecessor plugin's
+# approach — rewriting those paths to read ADOP_TEMPLATES_DIR — is what made its
+# copies unverifiable.
+#
+# Proven, not assumed: rendering silver_transform from the same spec and timestamp
+# through lib/ and through shared/ produces byte-identical output.
+# ---------------------------------------------------------------------------
+copy:
+  - target: evals/fixtures/replay_workload/config/bronze.yaml
+    source: tests/fixtures/replay_workload/config/bronze.yaml
+  - target: evals/fixtures/replay_workload/config/dag.yaml
+    source: tests/fixtures/replay_workload/config/dag.yaml
+  - target: evals/fixtures/replay_workload/config/gold.yaml
+    source: tests/fixtures/replay_workload/config/gold.yaml
+  - target: evals/fixtures/replay_workload/config/quality.yaml
+    source: tests/fixtures/replay_workload/config/quality.yaml
+  - target: evals/fixtures/replay_workload/config/silver.yaml
+    source: tests/fixtures/replay_workload/config/silver.yaml
+  - target: lib/contracts/README.md
+    source: contracts/README.md
+  - target: lib/contracts/v1/bronze_spec.schema.json
+    source: contracts/v1/bronze_spec.schema.json
+  - target: lib/contracts/v1/dag_spec.schema.json
+    source: contracts/v1/dag_spec.schema.json
+  - target: lib/contracts/v1/gold_spec.schema.json
+    source: contracts/v1/gold_spec.schema.json
+  - target: lib/contracts/v1/quality_spec.schema.json
+    source: contracts/v1/quality_spec.schema.json
+  - target: lib/contracts/v1/run_context.schema.json
+    source: contracts/v1/run_context.schema.json
+  - target: lib/contracts/v1/silver_spec.schema.json
+    source: contracts/v1/silver_spec.schema.json
+  - target: lib/contracts/v1/source_profile.schema.json
+    source: contracts/v1/source_profile.schema.json
+  - target: lib/contracts/v1/workload_manifest.schema.json
+    source: contracts/v1/workload_manifest.schema.json
+  - target: lib/shared/__init__.py
+    source: shared/__init__.py
+  - target: lib/shared/codegen/__init__.py
+    source: shared/codegen/__init__.py
+  - target: lib/shared/codegen/drift_validator.py
+    source: shared/codegen/drift_validator.py
+  - target: lib/shared/codegen/exceptions.py
+    source: shared/codegen/exceptions.py
+  - target: lib/shared/codegen/gate_consistency.py
+    source: shared/codegen/gate_consistency.py
+  - target: lib/shared/codegen/renderer.py
+    source: shared/codegen/renderer.py
+  - target: lib/shared/codegen/slot_extractor.py
+    source: shared/codegen/slot_extractor.py
+  - target: lib/shared/codegen/spec_loader.py
+    source: shared/codegen/spec_loader.py
+  - target: lib/shared/logging/__init__.py
+    source: shared/logging/__init__.py
+  - target: lib/shared/logging/agent_tracer.py
+    source: shared/logging/agent_tracer.py
+  - target: lib/shared/logging/trace_viewer.py
+    source: shared/logging/trace_viewer.py
+  - target: lib/shared/metadata/__init__.py
+    source: shared/metadata/__init__.py
+  - target: lib/shared/metadata/glue_fetcher.py
+    source: shared/metadata/glue_fetcher.py
+  - target: lib/shared/metadata/lakeformation_fetcher.py
+    source: shared/metadata/lakeformation_fetcher.py
+  - target: lib/shared/metadata/semantic_reader.py
+    source: shared/metadata/semantic_reader.py
+  - target: lib/shared/templates/VERSION
+    source: shared/templates/VERSION
+  - target: lib/shared/templates/__init__.py
+    source: shared/templates/__init__.py
+  - target: lib/shared/templates/account_topology.yaml
+    source: shared/templates/account_topology.yaml
+  - target: lib/shared/templates/agent_output_schema.py
+    source: shared/templates/agent_output_schema.py
+  - target: lib/shared/templates/airflow_dag.py.j2
+    source: shared/templates/airflow_dag.py.j2
+  - target: lib/shared/templates/bronze_ingestion.py.j2
+    source: shared/templates/bronze_ingestion.py.j2
+  - target: lib/shared/templates/glue_job_config.yaml.j2
+    source: shared/templates/glue_job_config.yaml.j2
+  - target: lib/shared/templates/gold_aggregate.py.j2
+    source: shared/templates/gold_aggregate.py.j2
+  - target: lib/shared/templates/iceberg_ddl.sql.j2
+    source: shared/templates/iceberg_ddl.sql.j2
+  - target: lib/shared/templates/quality_check.py.j2
+    source: shared/templates/quality_check.py.j2
+  - target: lib/shared/templates/silver_transform.py.j2
+    source: shared/templates/silver_transform.py.j2
+  - target: lib/shared/utils/__init__.py
+    source: shared/utils/__init__.py
+  - target: lib/shared/utils/ascii_display.py
+    source: shared/utils/ascii_display.py
+  - target: lib/shared/utils/deterministic_yaml.py
+    source: shared/utils/deterministic_yaml.py
+  - target: lib/shared/utils/orchestrator_logger.py
+    source: shared/utils/orchestrator_logger.py
+  - target: lib/shared/utils/pii_detection_and_tagging.py
+    source: shared/utils/pii_detection_and_tagging.py
+  - target: lib/shared/utils/post_deployment_verifier.py
+    source: shared/utils/post_deployment_verifier.py
+  - target: lib/shared/utils/script_tracer.py
+    source: shared/utils/script_tracer.py
+  - target: lib/shared/utils/structured_logger.py
+    source: shared/utils/structured_logger.py
+  - target: mcp-servers/glue-athena-server/lambda_handler.py
+    source: mcp-servers/glue-athena-server/lambda_handler.py
+  - target: mcp-servers/glue-athena-server/server.py
+    source: mcp-servers/glue-athena-server/server.py
+  - target: mcp-servers/lakeformation-server/server.py
+    source: mcp-servers/lakeformation-server/server.py
+  - target: mcp-servers/pii-detection-server/README.md
+    source: mcp-servers/pii-detection-server/README.md
+  - target: mcp-servers/pii-detection-server/server.py
+    source: mcp-servers/pii-detection-server/server.py
+  - target: mcp-servers/pii-detection-server/setup.sh
+    source: mcp-servers/pii-detection-server/setup.sh
+  - target: mcp-servers/sagemaker-catalog-server/server.py
+    source: mcp-servers/sagemaker-catalog-server/server.py
+  - target: runbooks/data-onboarding-agent/regulation/README.md
+    source: runbooks/data-onboarding-agent/regulation/README.md
+  - target: runbooks/data-onboarding-agent/regulation/ccpa.md
+    source: runbooks/data-onboarding-agent/regulation/ccpa.md
+  - target: runbooks/data-onboarding-agent/regulation/gdpr.md
+    source: runbooks/data-onboarding-agent/regulation/gdpr.md
+  - target: runbooks/data-onboarding-agent/regulation/hipaa.md
+    source: runbooks/data-onboarding-agent/regulation/hipaa.md
+  - target: runbooks/data-onboarding-agent/regulation/pci-dss.md
+    source: runbooks/data-onboarding-agent/regulation/pci-dss.md
+  - target: runbooks/data-onboarding-agent/regulation/sox.md
+    source: runbooks/data-onboarding-agent/regulation/sox.md
+  - target: tool-registry/invariants.yaml
+    source: tool-registry/invariants.yaml
+  - target: tool-registry/servers.yaml
+    source: tool-registry/servers.yaml
+# ---------------------------------------------------------------------------
+# rewrite — derived from repo sources, paths retargeted
+# ---------------------------------------------------------------------------
+rewrite:
+  # Phase C replaces these six with translations of .claude/agents/. Lavanya's
+  # originals predate .claude/agents/ existing and instruct the sub-agent to write
+  # PySpark directly, which CLAUDE.md:137 forbids. Until then they are recorded as
+  # pending so the harness reports the gap instead of ignoring it.
+
+
+  - target: runbooks/devops-agent/iac-generator.md
+    source: runbooks/devops-agent/iac-generator.md
+    anchors: ["IaC Generator", "reference material, not the live prompt",
+              "agents/iac-agent.md", "adop:iac-agent"]
+    note: >-
+      Not a pure copy. Its header points readers at the live prompt, which in a
+      checkout is .claude/agents/iac-agent.md reached via subagent_type
+      "iac-agent". Inside the plugin the live prompt is agents/iac-agent.md and
+      dispatch is namespaced to adop:iac-agent, so two references are retargeted. The 1,076-line resource catalog below them is untouched.
+      Caught by the doc-links gate, which resolved ../../.claude/agents/ from the
+      plugin's runbooks directory and found nothing — the first case where a
+      vendored file could not stay byte-identical.
+
+  - target: .mcp.json
+    source: .mcp.json
+    anchors: ["${CLAUDE_PLUGIN_ROOT}/mcp-servers/glue-athena-server/server.py",
+              "${CLAUDE_PLUGIN_ROOT}/mcp-servers/lakeformation-server/server.py",
+              "${CLAUDE_PLUGIN_ROOT}/mcp-servers/pii-detection-server/server.py",
+              "${CLAUDE_PLUGIN_ROOT}/mcp-servers/sagemaker-catalog-server/server.py"]
+    note: >-
+      Generated from the repo's .mcp.json rather than hand-written, so the server
+      set cannot drift. Three differences, each deliberate: vendored script paths
+      gain ${CLAUDE_PLUGIN_ROOT}, which Claude Code expands to the install
+      directory; AWS_REGION becomes ${AWS_REGION:-us-east-1} so a user's region
+      wins over the repo's demo default; and AWS_PROFILE: default is dropped from
+      all 13, because a plugin running in someone else's repository must not
+      override their profile selection — omitting it lets the standard credential
+      chain apply.
+
+      Known limitation carried over deliberately: three of the nine uvx packages
+      are yanked from PyPI and cannot start — awslabs-core-mcp-server,
+      awslabs-lambda-mcp-server, awslabs-cost-explorer-mcp-server. Verified against
+      pypi.org, independently reproducing a finding the predecessor plugin made.
+      Live successors exist (awslabs-aws-api-mcp-server 1.5.5,
+      awslabs-lambda-tool-mcp-server 2.1.1,
+      awslabs-billing-cost-management-mcp-server 0.0.38) but are NOT substituted
+      here: their tool surfaces are unverified, and TOOL_ROUTING.md routes intents
+      to specific tool names, so a package that starts but exposes different tools
+      would be a worse failure than one that does not start. Repo-side decision.
+
+  - target: TOOL_ROUTING.md
+    source: TOOL_ROUTING.md
+    anchors: ["Tool Selection for Agentic Data Onboarding", "not_when",
+              "tool-registry/servers.yaml"]
+    note: >-
+      506 lines, 8 intents — replaces a hand-maintained 34-line version that
+      carried 5, leaving Bronze ingestion, the Silver and Gold transforms and
+      lineage with no routing at all.
+
+      Two footer links retargeted to absolute GitHub URLs because the documents
+      they point at are not shipped: ./MCP_GUARDRAILS.md (referenced by no
+      .claude/ file, so no agent reads it at runtime) and ./SKILLS.md (168 KB).
+      Both verified HTTP 200. A plugin user can still reach them; a relative link
+      would silently resolve to nothing, which is the failure mode
+      validate_docs_links.py exists to catch.
+
+      Open for Phase C/D: SKILLS.md IS a runtime dependency —
+      .claude/agents/quality-agent.md and .claude/rules/{03-python-airflow,05-yaml}.md
+      cite it for config schemas and DAG templates. Those references have to be
+      resolved when those files are translated, either by vendoring the relevant
+      sections or by pointing at the vendored templates that now carry the same
+      information.
+
+  # Six agents, derived from .claude/agents/ and adopting its names. Three of the
+  # plugin's previous files were renamed: data-quality-agent -> quality-agent,
+  # orchestration-agent -> dag-agent, devops-agent -> iac-agent. The repo's names are
+  # also the subagent_type values SKILLS.md documents, so a reader who follows
+  # TOOL_ROUTING.md to SKILLS.md finds names that match what the plugin dispatches
+  # (as adop:<name>). Keeping the old names would have meant a 3-of-6 mismatch and a
+  # manifest mapping nobody could check by eye.
+  #
+  # The previous plugin versions instructed sub-agents to write PySpark directly;
+  # CLAUDE.md:137 calls free-form generation forbidden. These produce a validated spec
+  # and invoke the vendored renderer, which is the architecture the repo mandates.
+  - target: agents/metadata-agent.md
+    source: .claude/agents/metadata-agent.md
+    anchors: ["metadata-agent"]
+    note: >-
+      opus, 6 tools. Retargets the load_spec invocation to put lib/ on sys.path, and rewrites the discovery-gate paragraph: the repo's PreToolUse hook does not exist for a plugin user, so the constraint is the agent's to honour rather than the harness's to impose.
+  - target: agents/ontology-agent.md
+    source: .claude/agents/ontology-agent.md
+    anchors: ["ontology-agent"]
+    note: >-
+      opus, 7 tools — the only agent holding an MCP tool, mcp__glue-athena__get_table, read-only, to fetch the Gold-zone schema.
+  - target: agents/transformation-agent.md
+    source: .claude/agents/transformation-agent.md
+    anchors: ["transformation-agent"]
+    note: >-
+      opus. Renderer block converted from the Python API to the CLI; bronze/silver/gold contracts and required fields retained.
+  - target: agents/quality-agent.md
+    source: .claude/agents/quality-agent.md
+    anchors: ["quality-agent"]
+    note: >-
+      opus. Was data-quality-agent. Records that lib/shared/utils/quality_checks.py is deliberately absent so the agent does not create it.
+  - target: agents/dag-agent.md
+    source: .claude/agents/dag-agent.md
+    anchors: ["dag-agent"]
+    note: >-
+      sonnet. Was orchestration-agent. The only agent whose VERSION key the repo names explicitly (DAG_TEMPLATE_VERSION); the CLI now resolves it, so the agent no longer passes template_version.
+  - target: agents/iac-agent.md
+    source: .claude/agents/iac-agent.md
+    anchors: ["iac-agent"]
+    note: >-
+      opus. Was devops-agent. Points at runbooks/devops-agent/iac-generator.md for the resource catalog.
+  - target: commands/onboard-workflow.md
+    source: .claude/commands/onboard-workflow.md
+    anchors: ["Step 1", "Completion Gate", "AskUserQuestion", "discovery_complete",
+              "Workflow", "STOP — Human-in-the-Loop Gate", "adop_render.py",
+              "adop:transformation-agent"]
+    note: >-
+      546 -> 636 lines. The repo's Workflow script is carried intact: 9 Steps, 6 question
+      Groups, the Completion Gate, the .discovery_complete marker and all 12 inline
+      agent() calls. Retargeted: the renderer fence from `from shared.codegen.renderer
+      import render` to the vendored CLI, contracts/v1 to lib/contracts/v1, and every
+      command reference to /adop:.
+
+      Two additions, both deliberate. First, CLAUDE.md's STOP gate is repeated in the
+      command body — in a checkout CLAUDE.md is always in context and a PreToolUse hook
+      independently denies writes until discovery completes, and a plugin has neither, so
+      the command body is the only place the gate is guaranteed to be read. Second, a
+      section documenting direct dispatch of adop:<agent> for re-running a single stage,
+      which makes the six agent files first-class entry points rather than definitions the
+      command happens not to use.
+
+      Note the repo disagrees with itself here and the plugin inherits that: rules/02 and
+      SKILLS.md describe dispatch by subagent_type, while this command inlines prompts
+      into a Workflow script. Both arrived in the same commit (ba97329), so it reads as an
+      intent the command was never migrated to. Translating faithfully means the plugin
+      tracks whatever the repo settles on.
+
+  - target: commands/devops-workflow.md
+    source: .claude/commands/devops-workflow.md
+    anchors: ["adop:devops-workflow", "${CLAUDE_PLUGIN_ROOT}/agents/iac-agent.md"]
+    note: >-
+      397 lines. Its Workflow script tells the sub-agent to Read the iac-agent file as its
+      prompt rather than dispatching by name — a third pattern again — so that Read is
+      retargeted to ${CLAUDE_PLUGIN_ROOT}/agents/iac-agent.md. Also retargets
+      lib/contracts/v1, lib/shared/templates and the /adop: command prefixes.
+
+  - target: hooks/check_discovery_gate.py
+    source: .claude/hooks/check-discovery-gate.sh
+    anchors: ["Do NOT create the marker", "discovery_complete", "AskUserQuestion",
+              "stand_down_if_project_owns"]
+    note: >-
+      Python port of the shell original, same behaviour. Ported rather than vendored
+      because the original shells out to jq twice and a plugin cannot assume jq exists
+      on an arbitrary machine — and a gate that silently fails to run is worse than no
+      gate, which is exactly how this repo's whole pre-commit suite sat disabled for six
+      months behind a one-character typo. This is the machinery behind the plugin's most
+      emphasised rule: without it the Phase 1 gate is advisory prose.
+
+  - target: hooks/check_logging.py
+    source: .claude/hooks/check-logging.sh
+    anchors: ["StructuredLogger", "logs/ directory does not exist",
+              "trace_events.jsonl does not exist", "decisions array",
+              "stand_down_if_project_owns"]
+    note: >-
+      Python port, same four checks in the same order, deny wording preserved verbatim so
+      a user who hits a block finds the identical sentence in the repo. Ported for the
+      same reason as check_discovery_gate.py: the shell original calls jq six times, and
+      when jq is absent it prints to stderr, continues, finds an empty file_path and
+      exits 0 — the gate silently opens. Differentially tested against the original over
+      19 payloads (6 deny, 13 allow): agreement 19/19.
+
+      Two of the original's quirks are kept rather than improved: check 4 applies to every
+      written file, not only workload artifacts; and check 1 fires only when `content` is
+      present, so an Edit that strips the import passes. Both belong in a repo fix, not in
+      a divergence only this file would record.
+
+  - target: hooks/inject_run_context.py
+    source: .claude/hooks/inject_run_context.py
+    anchors: ["IN-FLIGHT ADOP RUN", "AUTHORITATIVE", "TERMINAL_PHASES",
+              "stand_down_if_project_owns"]
+    note: >-
+      One line had to change and it is the line that makes a plugin a plugin:
+      PROJECT_ROOT moves from Path(__file__).resolve().parents[2] to Path(os.getcwd()).
+      In the plugin __file__ resolves inside the install cache, which holds no workloads/,
+      so deriving the root from the hook's own location would scan the cache, find
+      nothing, and stay silent forever — indistinguishable from "no in-flight run".
+
+      Also added _rel(), because the original calls relative_to(PROJECT_ROOT) bare and
+      that raises ValueError once PROJECT_ROOT is the working directory rather than a
+      known ancestor. A display-only string must not be what breaks session startup.
+
+      Needed because the plugin ships skills/pipeline-conventions carrying
+      .claude/rules/11-shared-run-context.md, which tells agents to read
+      run/context.json and treat human_answers as authoritative. Without this hook
+      nothing surfaces that file at session start, so after a compaction the
+      orchestrator re-asks the human — the exact failure the rule exists to prevent.
+      Shipping the rule without the hook ships the instruction without the mechanism.
+
+  - target: hooks/log_conversation.py
+    source: .claude/hooks/log_conversation.py
+    anchors: ["AskUserQuestion", "question_asked", "user_responded",
+              "stand_down_if_project_owns"]
+    note: >-
+      Body unchanged — the original already writes to a relative logs/ path, which
+      resolves against the working directory and is therefore correct for a plugin with
+      no edit. Only the stand-down guard is added, because hooks are not namespaced.
+
+      Needed because the plugin ships skills/observability carrying
+      .claude/rules/07-error-logging.md, which requires every Q&A exchange to be
+      captured; nothing else captures them automatically.
+
+      Two discrepancies in the original are preserved, not quietly fixed: its docstring
+      says it writes "the active workload's trace_events.jsonl via AgentTracer", but it
+      writes logs/conversation_events.jsonl itself and never imports AgentTracer, and the
+      relative path lands at the project root rather than under workloads/{name}/.
+      ADOP_WORKLOAD is recorded inside each entry but does not steer the path. Both are
+      the repo's behaviour; a translation that silently improved on its source would be
+      one nobody could verify.
+
+  - target: hooks/enforce_template_codegen.py
+    source: .claude/hooks/enforce_template_codegen.py
+    anchors: ["adop_render.py", "MissingSlotError", "stand_down_if_project_owns",
+              "config/*.yaml is not protected"]
+    note: >-
+      Deliberately STRICTER than its source. The repo's version allows a write when
+      ADOP_RENDERER_TOKEN is set (line 80, `and not token`), so anything able to export
+      that variable can write a hand-authored artifact — including the agent the hook
+      constrains. This version has no bypass and does not need one: the vendored renderer
+      writes through _atomic_write() straight to disk, not through the Write tool, so a
+      legitimate render never reaches a PreToolUse hook. Verified the token no longer
+      unlocks it.
+
+# ---------------------------------------------------------------------------
+# transform — content carried by a different primitive
+# ---------------------------------------------------------------------------
+transform:
+  - target: skills/decision-engine/SKILL.md
+    sources: [.claude/rules/02-architecture.md, TOOL_ROUTING.md]
+    note: >-
+      Config table now points at the vendored tool-registry/ and TOOL_ROUTING.md rather
+      than hand-maintained copies, and records what those copies had drifted to: 12
+      servers of 13, 10 invariants of 11, 5 routing intents of 8.
+  - target: skills/data-compliance/SKILL.md
+    sources: [runbooks/data-onboarding-agent/regulation/README.md]
+    note: >-
+      Framework table now points at the vendored regulation packs, which are the control
+      sets themselves (235-293 lines each) rather than the 18-23 line summaries it
+      previously listed.
+
+  # Phase D creates these three. `planned` means the target does not exist yet,
+  # as distinct from `pending`, where it exists but still holds untranslated
+  # content. Declared now so test_every_rule_file_is_claimed_by_some_target can
+  # prove no rule is dropped — the predecessor plugin lost exactly this, shipping
+  # condensations of rules that were later rewritten underneath it.
+  #
+  # The gate in 00 and 01 also goes into the command preamble, not only here:
+  # rules are always in context in a checkout, whereas a skill body loads on
+  # demand, and a gate that has to be invoked is not a gate.
+  - target: skills/discovery-protocol/SKILL.md
+    sources:
+      - .claude/rules/00-zone-questions.md
+      - .claude/rules/01-human-gate-examples.md
+    note: >-
+      252 lines of source. States plainly that the gate is weaker here than in a
+      checkout — rules are always in context and a PreToolUse hook blocks writes,
+      whereas a skill body loads on demand and the plugin installs no hook into the
+      user's repo. The load-bearing part therefore also lives in the command body.
+  - target: skills/observability/SKILL.md
+    sources:
+      - .claude/rules/07-error-logging.md
+      - .claude/rules/11-shared-run-context.md
+      - .claude/rules/10-ascii-stages.md
+    note: >-
+      10-ascii-stages lives here rather than in pipeline-conventions: its purpose is
+      that terminal output and trace_events.jsonl stay byte-identical at width 70,
+      which is a tracing concern. Carries the run-context contract the agents cite
+      seven times, the prose-to-spec translation rules, the three trace layers and
+      the error taxonomy.
+  - target: skills/pipeline-conventions/SKILL.md
+    sources:
+      - .claude/rules/03-python-airflow.md
+      - .claude/rules/04-sql.md
+      - .claude/rules/05-yaml.md
+      - .claude/rules/06-quality-testing.md
+      - .claude/rules/08-transformations.md
+      - .claude/rules/09-glossary.md
+    note: >-
+      the predecessor's version substituted its own five quality dimensions,
+      dropping Accuracy and Consistency, which makes scores incomparable between
+      workloads; 06-quality-testing.md is the authority here
+
+
+# ---------------------------------------------------------------------------
+# plugin-only — no repo source, and a stated reason
+# ---------------------------------------------------------------------------
+plugin-only:
+  - target: .claude-plugin/plugin.json
+    reason: plugin manifest; no repo equivalent exists
+  - target: README.md
+    reason: install and usage docs for the packaged form
+  - target: TRANSLATION.yaml
+    reason: >-
+      this manifest; it describes the derivation and has nothing to derive from
+
+  - target: skills/decision-engine/config/standards.md
+    reason: >-
+      A blank the installing user fills in, not a translation of anything. Its own
+      first lines say so: "your organization's architecture constraints ... The model
+      fills these in; it does not redraw them. Replace the examples with your real
+      standards." The examples happen to describe ADOP's own defaults (Bronze/Silver/Gold,
+      Iceberg on S3, Glue PySpark) because they have to say something, but the file's
+      purpose is to be overwritten by whoever installs the plugin.
+
+      It was previously declared `status: pending` against .claude/rules/02-architecture.md.
+      That was wrong twice over: the file is not derived from 02-architecture.md, and
+      `pending` is the one status no test checks — so the single entry claiming an
+      unverified derivation was also the single entry exempt from verification, in a
+      manifest whose whole premise is that derivation is checkable.
+  - target: scripts/adop_render.py
+    reason: >-
+      entry point the sub-agents reach the vendored renderer through. In a checkout
+      an agent can `import shared.codegen` directly; in a user's repo there is no
+      shared/, so the plugin vendors the engine under lib/ and agents shell out to
+      this script. It exists only because the plugin is installed elsewhere, so it
+      has no repo counterpart to be derived from.
+
+  - target: scripts/adop_preflight.py
+    reason: >-
+      Answers "do I have what I need?", which nothing did before. The command's Phase 0
+      health check is a prompt asking the model to verify MCP connectivity, not a
+      deterministic test, so a missing dependency surfaced as a confusing failure several
+      minutes into a run. Reports the local and AWS tiers separately because they need very
+      different things — most of ADOP needs no AWS account at all — and warns when run
+      inside a project whose own .claude/hooks/ will make the plugin's hooks stand down.
+      No repo counterpart: a checkout's prerequisites are its pyproject.toml.
+
+  - target: scripts/adop_check_drift.py
+    reason: >-
+      Companion entry point to adop_render.py, exposing the vendored
+      lib/shared/codegen/drift_validator.py. In a checkout that module is reachable as
+      `python -m shared.codegen.drift_validator`, which is how .pre-commit-config.yaml and
+      the Validate Prompts workflow invoke it; a user's repository has no importable
+      shared. Also refuses an empty argument list rather than exiting 0, because the
+      underlying validator treats no paths as a pass — the same vacuous-pass shape the
+      repo's own CI job works around by enumerating workload directories explicitly.
+
+  - target: evals/discovery-gate/case.yaml
+    reason: >-
+      Six behavioural eval cases, adapted from the predecessor plugin. Each targets a
+      defect the v0.1.0 baseline actually had rather than a hypothetical: discovery-gate
+      and discovery-gate-under-pressure because the baseline shipped an explicit escape
+      hatch from the Phase 1 gate; quality-dimensions because it substituted its own five
+      dimensions, dropping Accuracy and Consistency; spec-not-script and drift-detection
+      because it claimed determinism while shipping no renderer; hipaa-phi-controls because
+      its regulation packs were 8% of their sources. Every case carries a non-vacuity
+      guard, after a partial run showed the negative graders scoring 0.33 on an empty
+      transcript — "no invented config values appear" is trivially true of nothing.
+      No repo source: the repository has no eval suite.
+
+  - target: evals/discovery-gate-under-pressure/case.yaml
+    reason: >-
+      Eval case: "don't ask me questions" must reduce prompting depth, not skip confirmation — the baseline had an explicit escape hatch. No repo source — the repository has no eval suite.
+
+  - target: evals/quality-dimensions/case.yaml
+    reason: >-
+      Eval case: ADOP's five dimensions must be used, not a substituted set; the baseline dropped Accuracy and Consistency. No repo source — the repository has no eval suite.
+
+  - target: evals/hipaa-phi-controls/case.yaml
+    reason: >-
+      Eval case: PHI masked in Silver and suppressed in Gold at build time; the baseline's HIPAA pack was 21 lines of 267. No repo source — the repository has no eval suite.
+
+  - target: evals/spec-not-script/case.yaml
+    reason: >-
+      Eval case: a transform must be rendered from a spec, never hand-written. No repo source — the repository has no eval suite.
+
+  - target: evals/drift-detection/case.yaml
+    reason: >-
+      Eval case: a hand-edited artifact must be caught and fixed by re-rendering. No repo source — the repository has no eval suite.
+
+  - target: hooks/_stand_down.py
+    reason: >-
+      Plugin-only by necessity. Plugin agents, commands and skills are namespaced and
+      cannot shadow a project's own; hooks are the exception — they carry no namespace, so
+      every matching hook fires. Verified: installing this plugin into an ADOP checkout
+      took the hook count from 5 to 6, purely additive. That is the one way the plugin
+      could affect a repository's own /onboard-workflow, which is precisely what the repo
+      owner asked us to avoid. Each plugin hook calls this guard and exits quietly when the
+      project already ships the equivalent, so inside a checkout the project's hooks win
+      and outside one the plugin's do their job. The repo has no counterpart because the
+      repo has nothing to stand down for.
+
+  - target: hooks/hooks.json
+    reason: >-
+      plugin hook wiring. Not derived from .claude/settings.json: the repo's five
+      hooks are tuned to a checkout of this repo, and three of them would
+      duplicate behaviour the plugin has no business enforcing in a user's tree.
+  - target: hooks/validate_artifacts.py
+    reason: >-
+      the nearest reachable translation of .pre-commit-config.yaml. Plugin hooks
+      fire on the agent's tool calls; pre-commit fires on git commit. This cannot
+      gate a human's commit, so it gates the agent's writes instead — Python must
+      parse, no hardcoded credentials, plus DAG-retry and Glue-lineage warnings.
+
+# ---------------------------------------------------------------------------
+# untranslatable — recorded as a limitation, not hidden
+# ---------------------------------------------------------------------------
+untranslatable:
+  - source: .claude/commands/security-review.md
+    reason: >-
+      A generic branch security review — it reads `git status`, `git diff --name-only
+      origin/HEAD...` and `git log`, then reasons about the diff. Nothing in it is about
+      Bronze/Silver/Gold, specs, contracts or the codegen renderer, and it would behave
+      identically in any repository.
+
+      Not shipped because the plugin's job is to carry ADOP's data-operations capability
+      into a user's own data repo, and a git-diff reviewer is not that capability. A user
+      who wants it is better served by a dedicated security-review plugin than by one
+      bundled inside ADOP, where it would inherit ADOP's release cadence and version.
+
+      Recorded here rather than left absent: it was missing from both the plugin and this
+      manifest until `test_every_repo_component_is_claimed_by_some_target` was added, and
+      an undeclared omission is indistinguishable from an oversight — which is precisely
+      what this one was.
+
+  - source: mcp-servers/pii-detection-server/pii_detection_and_tagging.py
+    reason: >-
+      Not shipped, and it is vestigial upstream. In the repo it is a symlink to
+      ../../shared/utils/pii_detection_and_tagging.py, but server.py does not import it at
+      all (0 references), setup.sh creates a link to
+      workloads/us_mutual_funds_etf/scripts/governance/ — a workload that no longer exists
+      — and README.md documents a third path as the fix for an ImportError that cannot
+      occur. Three locations named for one file that nothing loads.
+
+      Copying it verbatim produced a dangling symlink in the plugin, because the vendored
+      module lives at lib/shared/utils/, not ../../shared/utils/. Replacing it with a real
+      file would have shipped a second 552-line copy of something already vendored. So it
+      is dropped: anything that needs the module can import it from lib/. Worth cleaning up
+      upstream.
+  - source: .pre-commit-config.yaml
+    reason: >-
+      18 hooks that reject a commit. A plugin cannot install git hooks into the
+      user's repository, and plugin hooks intercept a different thing — the
+      agent's tool calls, not commits. Mitigated by hooks/validate_artifacts.py
+      for the agent path; the commit gate must stay an opt-in the user installs.
+  - source: CLAUDE.md
+    reason: >-
+      Always in context for every turn in a checkout. A plugin has no equivalent:
+      skill descriptions are always-on but bodies load on demand. Phase D carries
+      the load-bearing part — the Phase 1 human-in-the-loop gate — into the
+      command body, which IS always loaded when the command runs. The remainder
+      becomes skills and is therefore weaker than in the repo.
+  - source: workloads/
+    reason: >-
+      Output, not capability. Generated pipelines land in the user's own repo, so
+      the plugin deliberately ships none of the 49 example files.

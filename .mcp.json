@@ -107,7 +107,7 @@
     },
     "pii-detection": {
       "command": "uv",
-      "args": ["run", "--no-project", "--with", "boto3", "--with", "mcp", "--python", "3.13", "mcp-servers/pii-detection-server/server.py"],
+      "args": ["run", "--no-project", "--with", "boto3", "--with", "fastmcp", "--python", "3.13", "mcp-servers/pii-detection-server/server.py"],
       "env": {
         "AWS_REGION": "us-east-1",
         "AWS_PROFILE": "default"
