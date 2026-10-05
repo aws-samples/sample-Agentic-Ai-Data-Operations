@@ -163,6 +163,34 @@ class TestSilverTransformRendered:
 class TestDriftValidation:
     """Ensure rendered script matches spec (no manual edits)."""
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            "This workload cannot currently be rendered, and the test was passing for the "
+            "wrong reason. Two separate problems, both needing the workload owner:\n"
+            "\n"
+            "1. config/silver.yaml specifies method 'encrypt' for date_of_birth and address. "
+            "silver_transform.py.j2 implements hash, hash_salted, redact and mask_partial — "
+            "it had no else arm, so 'encrypt' emitted no masking at all and those two PHI "
+            "columns would have shipped in clear text while the spec recorded them as "
+            "protected. The template now refuses the render instead, so this test raises "
+            "UnsupportedSpecValueError.\n"
+            "\n"
+            "2. The spec below is hardcoded in this test and says 'redact' for both columns, "
+            "not 'encrypt'. That is why this test disagreed with "
+            "`python -m shared.codegen.drift_validator workloads/customer_master`, which "
+            "loads config/silver.yaml and has reported DRIFT on this file for some time. A "
+            "drift test that embeds its own copy of the spec cannot detect drift from the "
+            "spec of record.\n"
+            "\n"
+            "Resolving it is a decision, not a fix: implement an encrypt branch, or change "
+            "config/silver.yaml to a supported method, or accept the redact already on disk. "
+            "The artifact currently redacts both columns, so the deployed behaviour is safe "
+            "— it is the spec of record that is wrong. Do not 'fix' this by re-rendering "
+            "from config/silver.yaml; before the else arm existed that would have removed "
+            "two PHI redactions."
+        ),
+    )
     def test_no_drift(self):
         from shared.codegen.renderer import render_dry_run
 

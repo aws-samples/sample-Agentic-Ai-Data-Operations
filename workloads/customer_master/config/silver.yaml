@@ -1,6 +1,6 @@
 dataset_name: customer_master
 schema_version: v1
-source_table: glue_catalog.customer_master_db.bronze_customer_master
+source_table: customer_master_db.bronze_customer_master
 primary_key:
   - customer_id
 dedup_strategy: keep_latest

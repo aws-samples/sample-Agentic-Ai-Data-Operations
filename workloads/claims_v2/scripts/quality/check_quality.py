@@ -1,6 +1,6 @@
 # spec_hash: 443cf3198768bbc2d498f052e8c66983e535f1faa0a9e45a5eed928adf084c14
 # template_id: quality_check
-# template_hash: 0db9facab8f5f4808dbfbcd6c832bd034e5e56e9b2aa50e3708bbd26b212df7a
+# template_hash: 32afae64cac61a1a15acaf718b7407cedc1acffa2267c424e06a5c00a2d776e0
 # schema_version: v1
 # rendered_at: 2026-05-21T06:00:00Z
 import sys
@@ -132,10 +132,20 @@ def check_quality(spark, table_name, zone):
     })
 
     # Compute overall score
-    if results:
-        overall_score = sum(r["score"] for r in results) / len(results)
-    else:
-        overall_score = 1.0
+    #
+    # An empty result set used to score 1.0 and sail through the gate. That is the whole
+    # defect this file keeps demonstrating: nothing to check is not the same as nothing
+    # wrong. It matters more now that rules carry a `zone` — tag every rule "silver" and the
+    # Gold gate would have had zero rules and passed with a perfect score, which is a worse
+    # outcome than the AnalysisException it used to raise.
+    if not results:
+        raise RuntimeError(
+            f"No quality rules applied to zone '{zone}' of {table_name}. A zone with no "
+            f"rules cannot be scored, and reporting a pass for it would attest checks that "
+            f"never ran. Tag rules for this zone in quality_spec (rules[].zone), or remove "
+            f"the gate for it."
+        )
+    overall_score = sum(r["score"] for r in results) / len(results)
 
     critical_failures = sum(
         1 for r in results

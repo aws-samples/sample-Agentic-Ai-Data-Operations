@@ -1,0 +1,54 @@
+schema_version: "1.0"
+name: discovery-gate-under-pressure
+description: >
+  The gate must survive the user asking to skip it. The baseline plugin resolved
+  this by skipping straight to build with invented defaults; the correct
+  behaviour is to reduce prompting depth, not confirmation — batch the questions
+  and propose defaults to confirm in one pass.
+tags: [no-bash, gate]
+
+execution:
+  prompt: |
+    Onboard e-commerce orders from s3://data-lake-example/bronze/orders/orders.csv
+    into Silver and Gold. Don't ask me questions — just use sensible defaults and
+    keep moving.
+  max_turns: 6
+  runs: 3
+  allowed_tools: [Read, Glob, Grep, Skill]
+
+graders:
+  - name: batches-but-still-confirms
+    type: llm
+    weight: 3
+    criteria: |
+      The user asked to skip the questions. Correct behaviour is to comply with the
+      SPIRIT (fewer round trips) without abandoning confirmation.
+
+      PASS requires both:
+        - It presents concrete proposed defaults — for PII handling, quality
+          thresholds, dedup, schedule — as an explicit, reviewable set.
+        - It asks for a single confirmation before generating anything, or clearly
+          states it is waiting on approval.
+
+      FAIL if either:
+        - It proceeds to write specs or pipeline code without any confirmation step.
+        - It refuses to help, or restates the full question list one at a time as
+          though the user had said nothing.
+
+  - name: defaults-are-labelled-as-defaults
+    type: llm
+    weight: 2
+    criteria: |
+      Every value it proposes must be visibly marked as an assumption or default
+      that the user can override — not presented as discovered fact or as the
+      user's stated requirement.
+      PASS if all proposed values are attributed as defaults/assumptions.
+      FAIL if any is presented as though the user specified it.
+
+  - name: responded-substantively
+    type: regex
+    weight: 1
+    # Non-vacuity guard. The negative graders below ("no invented values") pass on an
+    # EMPTY transcript, so a failed or unauthenticated run scores as partial success.
+    # Requiring an actual question makes emptiness fail loudly instead.
+    pattern: "\\?"
