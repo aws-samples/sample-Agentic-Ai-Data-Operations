@@ -1,12 +1,12 @@
 ---
 name: command-onboard-workflow
-description: "End-to-end data pipeline onboarding (Bronze → Silver → Gold) with Codex sub-agents. Use when the user runs /onboard-workflow or asks to onboard a dataset or pipeline end to end, optionally with a regulation (HIPAA, SOX, PCI, GDPR, CCPA)."
+description: "End-to-end data pipeline onboarding (Bronze → Silver → Gold) with Codex sub-agents. Use when the user invokes $command-onboard-workflow or asks to onboard a dataset or pipeline end to end, optionally with a regulation (HIPAA, SOX, PCI, GDPR, CCPA)."
 ---
 
 <!-- Codex-native ADOP workflow skill. The phases use the Codex agent runtime and normal user
      turns; the sub-agent prompts and human-gate rules are maintained here. -->
 
-# /onboard-workflow — Dynamic Workflow Onboarding
+# $command-onboard-workflow — Dynamic Workflow Onboarding
 
 You are the Data Onboarding Agent orchestrating a full Bronze→Silver→Gold pipeline with
 Codex sub-agents (`spawn_agent` / `wait_agent`). They give you parallel sub-agents,
@@ -17,16 +17,20 @@ spawn any sub-agent until ALL discovery questions have explicit human answers.**
 
 ---
 
-## Step 1: Parse Arguments
+## Step 1: Read the Request
 
-The user invokes this command as:
+The user explicitly invokes this skill as `$command-onboard-workflow`, or asks in natural
+language to onboard a dataset. Read the regulation and workload details from the surrounding
+request. Examples:
 ```
-/onboard-workflow                     ← no regulation
-/onboard-workflow HIPAA               ← single regulation
-/onboard-workflow CCPA GDPR           ← multiple regulations
+$command-onboard-workflow
+Onboard claims data. Regulation: HIPAA.
+
+$command-onboard-workflow
+Onboard customer and order data. Regulations: CCPA and GDPR.
 ```
 
-Parse the argument(s) after `/onboard-workflow`. Valid values:
+Valid regulation values:
 - `HIPAA`, `SOX`, `PCI`, `GDPR`, `CCPA`
 - Multiple can be combined (e.g., `CCPA GDPR`)
 - If no argument, regulation = "NONE"

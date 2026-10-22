@@ -250,6 +250,9 @@ Coding conventions, error handling, logging protocol, testing strategy, transfor
 
 Where a rule says to use `AskUserQuestion`, ask the user in a normal message and wait for the reply (in Plan mode, use `request_user_input`). Sub-agents cannot ask the user, so all human questions come from the orchestrating session.
 
-Codex entry points: the `command-onboard-workflow` skill (`/onboard-workflow`) and the `command-devops-workflow` skill (`/devops-workflow`). Specialist roles are in `.codex/agents/*.toml`; spawn them with `spawn_agent` using the role name (for example `agent_type: "iac-agent"`).
+Codex entry points: invoke `$command-onboard-workflow` for onboarding or
+`$command-devops-workflow` for production readiness, or select the skill from `/skills`.
+Specialist roles are in `.codex/agents/*.toml`; the workflow runtime spawns them using the role
+name (for example `agent_type: "iac-agent"`).
 
 **Deployment topology**: Default single-account. Multi-account opt-in via `docs/multi-account-deployment.md`.

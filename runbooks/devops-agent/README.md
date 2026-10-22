@@ -12,7 +12,7 @@ The DevOps Agent automates deployment, monitoring, and maintenance of data pipel
 
 Today, the agent can generate deployable IaC (Terraform / AWS CDK / CloudFormation) from a completed workload's artifacts. It does NOT apply the IaC — a human reviews and applies manually as a deliberate review step.
 
-It is spawned as `agent_type: "iac-agent"`; the enforced prompt is [`.codex/agents/iac-agent.toml`](../../.codex/agents/iac-agent.toml) and [`iac-generator.md`](./iac-generator.md) is the reference material it reads. Its two uninferrable inputs — target framework and TBAC principals — come from `run/context.json#human_answers`, asked by the orchestrator or by `/devops-workflow`; the agent itself has no `AskUserQuestion` and returns `status: "blocked"` if either is absent.
+It is spawned as `agent_type: "iac-agent"`; the enforced prompt is [`.codex/agents/iac-agent.toml`](../../.codex/agents/iac-agent.toml) and [`iac-generator.md`](./iac-generator.md) is the reference material it reads. Its two uninferrable inputs — target framework and TBAC principals — come from `run/context.json#human_answers`, asked by the orchestrator or by `$command-devops-workflow`; the agent itself has no `AskUserQuestion` and returns `status: "blocked"` if either is absent.
 
 By default the generator assumes **single-account** deployment. Set `account_topology.mode: multi` in `workloads/{name}/config/deployment.yaml` and the generator emits provider aliases, cross-account `sts:AssumeRole` wiring, and `catalog_id`-aware Glue + Lake Formation resources so jobs in Account B can read from an Account A catalog. See [`../../docs/multi-account-deployment.md`](../../docs/multi-account-deployment.md) for the AWS-side pre-requisites (catalog-reader role in Account A, Lake Formation grants, and B → A assume-role trust) — those are NOT automated by the generator.
 
@@ -219,11 +219,11 @@ Want to accelerate DevOps Agent development?
 
 ## Dynamic Workflow Command
 
-The `/devops-workflow` command runs the full production readiness pipeline in parallel:
+The `$command-devops-workflow` command runs the full production readiness pipeline in parallel:
 
 ```bash
-/devops-workflow customer_master terraform    # specific workload + framework
-/devops-workflow                              # interactive (asks which workload)
+$command-devops-workflow customer_master terraform    # specific workload + framework
+$command-devops-workflow                              # interactive (asks which workload)
 ```
 
 **What it does** (all in one workflow):

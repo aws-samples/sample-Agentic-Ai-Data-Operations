@@ -24,8 +24,8 @@ the project is trusted.
 
 | Command | Purpose | What it does |
 |---|---|---|
-| `/onboard-workflow [REGULATION]` | Build a data pipeline | Parallel sub-agents generate specs for Bronze→Silver→Gold pipeline (~15 agents, 10-20 min) |
-| `/devops-workflow [WORKLOAD] [FRAMEWORK]` | Production readiness | Parallel IaC + monitoring + cost tags + runbook generation (~8 agents, 5-10 min) |
+| `$command-onboard-workflow [REGULATION]` | Build a data pipeline | Parallel sub-agents generate specs for Bronze→Silver→Gold pipeline (~15 agents, 10-20 min) |
+| `$command-devops-workflow [WORKLOAD] [FRAMEWORK]` | Production readiness | Parallel IaC + monitoring + cost tags + runbook generation (~8 agents, 5-10 min) |
 
 Both commands ask discovery questions first, then fan out parallel agents. The agent contracts
 select reasoning effort (`low`, `medium`, or `high`) per role; the active Codex model remains the
@@ -58,7 +58,7 @@ Open Codex in this repo and paste a prompt describing **where the data lives, wh
 
 ### Example 1 — Batch from S3 (CSV, daily) with Dynamic Workflow
 ```
-/onboard-workflow HIPAA
+$command-onboard-workflow HIPAA
 
 Onboard claims data from s3://data-lake-<account>-us-east-1/bronze/claims/ingestion_date=YYYY-MM-DD/claims.csv
 into Silver with dedup on claim_id and not-null policy_number, and into a flat denormalized
@@ -66,12 +66,12 @@ Gold Iceberg table with derived measures (net_paid_ratio, days_to_submission, de
 Run daily at 03:00 UTC. Apply HIPAA controls with PHI masking in Silver and PHI suppression in Gold.
 ```
 
-> The `/onboard-workflow HIPAA` prefix triggers parallel execution via Dynamic Workflow.
+> The `$command-onboard-workflow HIPAA` prefix triggers parallel execution via Dynamic Workflow.
 > HIPAA changes the compliance controls and review requirements; it does not hard-code a model.
 
 ### Example 2 — Streaming from Kafka (Glue Streaming ETL)
 ```
-/onboard-workflow PCI
+$command-onboard-workflow PCI
 
 Onboard transaction events from Kafka topic `payments.auth.v1` (bootstrap:
 b-1.msk-prod.kafka.us-east-1.amazonaws.com:9098, IAM auth) using AWS Glue Streaming ETL.
@@ -82,7 +82,7 @@ auth_rate). Apply PCI DSS — tokenize PAN, drop CVV, Luhn check as a quality ru
 
 ### Example 3 — Streaming from Kinesis (Glue Streaming ETL)
 ```
-/onboard-workflow GDPR
+$command-onboard-workflow GDPR
 
 Onboard clickstream events from Kinesis Data Stream `web-events-prod` (shard count 8,
 PutRecord enhanced fan-out consumer) using AWS Glue Streaming ETL with a checkpoint on S3.
@@ -212,14 +212,14 @@ A user describes their data source in natural language. The **Data Onboarding Ag
 | Mode | Invocation | Phase 4 | Wall Clock | Token Cost |
 |------|-----------|---------|------------|------------|
 | **Sequential** (standard) | Paste prompt directly | Sub-agents run one at a time | ~30 min | 1x |
-| **Dynamic Workflow** (parallel) | `/onboard-workflow [REGULATION]` | Sub-agents run in parallel | ~15-20 min | 3-5x |
+| **Dynamic Workflow** (parallel) | `$command-onboard-workflow [REGULATION]` | Sub-agents run in parallel | ~15-20 min | 3-5x |
 
 ```
 # Standard mode:
 User: "Onboard customer data from PostgreSQL, daily refresh, PII masking required"
 
 # Workflow mode (parallel, faster, resumable):
-User: "/onboard-workflow HIPAA"
+User: "$command-onboard-workflow HIPAA"
 User: "Onboard patient records from S3..."
 ```
 
@@ -236,7 +236,7 @@ Phase 5: Deploy ────── uploads to S3, creates Glue catalog, applies 
 Output: workloads/{dataset_name}/ with config/, scripts/, dags/, sql/, tests/
 ```
 
-**Dynamic Workflow advantages** (via `/onboard-workflow`):
+**Dynamic Workflow advantages** (via `$command-onboard-workflow`):
 - Metadata + Quality agents run in parallel (Phase 4 Stage 1)
 - Reasoning routing: compliance-critical work uses higher-effort generation and review contracts
 - Validation agents use lower-effort checks where the contract permits
@@ -474,10 +474,10 @@ See [shared/prompt_intelligence/QUICKSTART.md](shared/prompt_intelligence/QUICKS
 **Runs in:** Development environment (generates IaC, monitoring configs, runbooks — human applies)
 **Output:** Terraform/CDK/CFN, CloudWatch dashboards, SNS alerts, cost tags, budget alerts, RUNBOOK.md
 
-### Available Now: `/devops-workflow`
+### Available Now: `$command-devops-workflow`
 
 ```bash
-/devops-workflow customer_master terraform
+$command-devops-workflow customer_master terraform
 ```
 
 Triggers a Dynamic Workflow that generates everything in parallel:

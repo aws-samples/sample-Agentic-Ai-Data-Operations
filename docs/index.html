@@ -645,7 +645,7 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </ul>
 </li>
 <li><a href="#7-devops-agent">7. DevOps Agent</a><ul>
-<li><a href="#available-now-devops-workflow">Available Now: /devops-workflow</a></li>
+<li><a href="#available-now-devops-workflow">Available Now: $command-devops-workflow</a></li>
 <li><a href="#planned-features-q3-2026">Planned Features (Q3 2026)</a></li>
 </ul>
 </li>
@@ -831,7 +831,7 @@ codex</pre>
       <div class="start-step-num">2</div>
       <div>
         <div class="start-step-title">Initiate Workflow</div>
-        <pre class="start-step-code">/onboard-workflow HIPAA
+        <pre class="start-step-code">$command-onboard-workflow HIPAA
 
 Onboard claims data from s3://...</pre>
       </div>
@@ -846,7 +846,7 @@ Onboard claims data from s3://...</pre>
 - <strong>Target zones</strong> (Silver quality rules, Gold transformations)
 - <strong>Compliance</strong> (GDPR, CCPA, HIPAA, SOX, PCI DSS — or none)</p>
 <h3 id="example-1-batch-from-s3-csv-daily-with-dynamic-workflow">Example 1 — Batch from S3 (CSV, daily) with Dynamic Workflow<a class="headerlink" href="#example-1-batch-from-s3-csv-daily-with-dynamic-workflow" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>/onboard-workflow HIPAA
+<div class="highlight"><pre><span></span><code>$command-onboard-workflow HIPAA
 
 Onboard claims data from s3://data-lake-&lt;account&gt;-us-east-1/bronze/claims/ingestion_date=YYYY-MM-DD/claims.csv
 into Silver with dedup on claim_id and not-null policy_number, and into a flat denormalized
@@ -855,11 +855,11 @@ Run daily at 03:00 UTC. Apply HIPAA controls with PHI masking in Silver and PHI 
 </code></pre></div>
 
 <blockquote>
-<p>The <code>/onboard-workflow HIPAA</code> prefix triggers parallel execution via Dynamic Workflow.
+<p>The <code>$command-onboard-workflow HIPAA</code> prefix triggers parallel execution via Dynamic Workflow.
 Phase 4 build agents use high reasoning effort for compliance-critical work. Omit the prefix for sequential mode.</p>
 </blockquote>
 <h3 id="example-2-streaming-from-kafka-glue-streaming-etl">Example 2 — Streaming from Kafka (Glue Streaming ETL)<a class="headerlink" href="#example-2-streaming-from-kafka-glue-streaming-etl" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>/onboard-workflow PCI
+<div class="highlight"><pre><span></span><code>$command-onboard-workflow PCI
 
 Onboard transaction events from Kafka topic `payments.auth.v1` (bootstrap:
 b-1.msk-prod.kafka.us-east-1.amazonaws.com:9098, IAM auth) using AWS Glue Streaming ETL.
@@ -869,7 +869,7 @@ auth_rate). Apply PCI DSS — tokenize PAN, drop CVV, Luhn check as a quality ru
 </code></pre></div>
 
 <h3 id="example-3-streaming-from-kinesis-glue-streaming-etl">Example 3 — Streaming from Kinesis (Glue Streaming ETL)<a class="headerlink" href="#example-3-streaming-from-kinesis-glue-streaming-etl" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>/onboard-workflow GDPR
+<div class="highlight"><pre><span></span><code>$command-onboard-workflow GDPR
 
 Onboard clickstream events from Kinesis Data Stream `web-events-prod` (shard count 8,
 PutRecord enhanced fan-out consumer) using AWS Glue Streaming ETL with a checkpoint on S3.
@@ -972,7 +972,7 @@ Schedule: Daily batch at 09:30 UTC, retries=3, exponential backoff, alert on fai
 </tr>
 <tr>
 <td><strong>Dynamic Workflow</strong> (parallel)</td>
-<td><code>/onboard-workflow [REGULATION]</code></td>
+<td><code>$command-onboard-workflow [REGULATION]</code></td>
 <td>Sub-agents run in parallel</td>
 <td>~15-20 min</td>
 <td>3-5x</td>
@@ -983,7 +983,7 @@ Schedule: Daily batch at 09:30 UTC, retries=3, exponential backoff, alert on fai
 User: &quot;Onboard customer data from PostgreSQL, daily refresh, PII masking required&quot;
 
 # Workflow mode (parallel, faster, resumable):
-User: &quot;/onboard-workflow HIPAA&quot;
+User: &quot;$command-onboard-workflow HIPAA&quot;
 User: &quot;Onboard patient records from S3...&quot;
 </code></pre></div>
 
@@ -999,7 +999,7 @@ Phase 5: Deploy ────── uploads to S3, creates Glue catalog, applies 
 Output: workloads/{dataset_name}/ with config/, scripts/, dags/, sql/, tests/
 </code></pre></div>
 
-<p><strong>Dynamic Workflow advantages</strong> (via <code>/onboard-workflow</code>):
+<p><strong>Dynamic Workflow advantages</strong> (via <code>$command-onboard-workflow</code>):
 - Metadata + Quality agents run in parallel (Phase 4 Stage 1)
 - Reasoning routing: compliance-critical work uses higher-effort generation and review contracts
 - Validation agents use lower-effort checks where the contract permits
@@ -1268,8 +1268,8 @@ Estimated Time Saved: 10-15 hours across future onboardings
 <p><strong>Purpose:</strong> Automates IaC generation, monitoring, cost optimization, and operational runbooks for deployed pipelines.</p>
 <p><strong>Runs in:</strong> Development environment (generates IaC, monitoring configs, runbooks — human applies)
 <strong>Output:</strong> Terraform/CDK/CFN, CloudWatch dashboards, SNS alerts, cost tags, budget alerts, RUNBOOK.md</p>
-<h3 id="available-now-devops-workflow">Available Now: <code>/devops-workflow</code><a class="headerlink" href="#available-now-devops-workflow" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>/devops-workflow<span class="w"> </span>customer_master<span class="w"> </span>terraform
+<h3 id="available-now-devops-workflow">Available Now: <code>$command-devops-workflow</code><a class="headerlink" href="#available-now-devops-workflow" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>$command-devops-workflow<span class="w"> </span>customer_master<span class="w"> </span>terraform
 </code></pre></div>
 
 <p>Triggers a Dynamic Workflow that generates everything in parallel:</p>

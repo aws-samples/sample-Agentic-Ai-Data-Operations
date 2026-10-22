@@ -73,8 +73,8 @@ Output: workloads/product_catalog/
 
 ### Mode 2: Dynamic Workflow (parallel, faster)
 ```bash
-# Prefix with /onboard-workflow [REGULATION]
-User: "/onboard-workflow HIPAA"
+# Prefix with $command-onboard-workflow [REGULATION]
+User: "$command-onboard-workflow HIPAA"
 User: "Onboard patient records from S3..."
   ↓ Phase 1 discovery runs interactively (same questions)
   ↓ Phases 2-5 run as a Dynamic Workflow with parallel sub-agents

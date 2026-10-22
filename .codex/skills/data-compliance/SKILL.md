@@ -19,7 +19,7 @@ transformation, quality, and DAG artifacts.
 > practices and access controls before promoting artifacts to production.
 
 ## How it plugs into the workflow
-1. `/onboard-workflow <REGULATION> ...` sets the active framework.
+1. `$command-onboard-workflow` plus the requested regulation sets the active framework.
 2. At Phase 3 (profile), tag candidate PII/PHI/PAN columns.
 3. At Phase 4 (build), inject the framework's control block into:
    - **Silver** rules — masking/pseudonymization/tokenization of sensitive fields.

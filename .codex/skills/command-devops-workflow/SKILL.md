@@ -1,28 +1,28 @@
 ---
 name: command-devops-workflow
-description: "Production readiness for a completed ADOP workload with Codex sub-agents: IaC, monitoring, alerting, cost tags, budget, and runbook. Use when the user runs /devops-workflow or asks to make a built workload production-ready."
+description: "Production readiness for a completed ADOP workload with Codex sub-agents: IaC, monitoring, alerting, cost tags, budget, and runbook. Use when the user invokes $command-devops-workflow or asks to make a built workload production-ready."
 ---
 
 <!-- Codex-native ADOP workflow skill. The phases use the Codex agent runtime and normal user
      turns; the sub-agent prompts and TBAC human gate are maintained here. -->
 
-# /devops-workflow — Production Readiness Workflow
+# $command-devops-workflow — Production Readiness Workflow
 
 You are the DevOps Agent orchestrating full production readiness for a completed workload with
 Codex sub-agents (`spawn_agent` / `wait_agent`). This generates IaC, monitoring, alerting, cost tags, and
 an operational runbook — all in parallel.
 
 **PREREQUISITE: The target workload MUST already have a completed pipeline (configs, scripts,
-DAG, tests passing). This command runs AFTER `/onboard-workflow` or manual onboarding completes.**
+DAG, tests passing). This workflow runs after `$command-onboard-workflow` or manual onboarding
+completes.**
 
 ---
 
 ## Step 1: Parse Arguments
 
 ```
-/devops-workflow                           ← interactive (asks which workload)
-/devops-workflow customer_master           ← target specific workload
-/devops-workflow customer_master terraform ← workload + IaC framework
+$command-devops-workflow
+Make customer_master production-ready with Terraform.
 ```
 
 Arguments:
@@ -45,7 +45,7 @@ If ANY check fails:
 │  ERROR: Workload '{name}' is not ready for DevOps              │
 ├────────────────────────────────────────────────────────────────┤
 │  Missing: {list what's missing}                                │
-│  Run /onboard-workflow first to build the pipeline.            │
+│  Run $command-onboard-workflow first to build the pipeline.    │
 └────────────────────────────────────────────────────────────────┘
 ```
 
@@ -425,7 +425,7 @@ After Phase 3 finishes, write the actual files:
 
 | Situation | Action |
 |---|---|
-| Workload doesn't exist | Block immediately. Tell user to run /onboard-workflow first. |
+| Workload doesn't exist | Block immediately. Tell user to invoke $command-onboard-workflow first. |
 | IaC validation fails | Present errors. Offer auto-fix (re-run IaC agent with error context). |
 | Security review finds HIGH issues | Block apply. Present findings. User must acknowledge. |
 | Security review finds MEDIUM/LOW | Warn but don't block. Include in APPLY_GUIDE.md. |

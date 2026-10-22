@@ -75,7 +75,7 @@ examples/
 
 Result: `workloads/{name}/` with pipeline, DAG and tests, deployed to AWS.
 
-The slash command `/onboard-workflow [REGULATION...]` runs this end to end and is usually the
+The skill invocation `$command-onboard-workflow` plus a regulation request runs this end to end and is usually the
 better entry point; the runbook is what it follows.
 
 ### Operating what you built
