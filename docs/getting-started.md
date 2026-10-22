@@ -1,6 +1,22 @@
-# Getting Started: Reusable Data Onboarding Prompts
+# Getting Started with ADOP in Codex
 
-Welcome! This guide helps you onboard any dataset using **modular, copy-paste prompts**.
+Welcome! This guide shows how to run the Agentic Data Onboarding Platform from a trusted Codex
+project. ADOP supplies project instructions, skills, agent contracts, hooks, and MCP definitions;
+Codex provides the interactive agent runtime.
+
+## 🔷 Codex project surfaces
+
+| Icon | Surface | Location | What it does |
+|---|---|---|---|
+| 🔷 | Project instructions | `AGENTS.md` | Establishes the project rules and safety gates |
+| 🧩 | Workflow skills | `.codex/skills/` | Loads onboarding, DevOps, compliance, and engineering guidance |
+| 🤖 | Specialist agents | `.codex/agents/*.toml` | Defines the role contract and reasoning effort |
+| 🪝 | Hooks | `.codex/hooks.json` | Applies discovery, logging, and generated-code guards |
+| 🔌 | MCP configuration | `.codex/config.toml` | Lists Codex MCP servers; entries are disabled by default |
+
+Start Codex from the repository root so these project files are in scope. Review the requested
+changes before accepting generated artifacts, and keep AWS MCP servers disabled until the
+intended non-production account and profile are configured.
 
 ---
 
@@ -16,7 +32,7 @@ Your data onboarding system now has reusable prompt patterns you can use for any
 | **runbooks/data-onboarding-agent/regulation/** | 🔒 Regulation-specific controls | When GDPR, CCPA, HIPAA, SOX, or PCI DSS compliance is required |
 | **ADOP_WORKFLOWS.md** (bottom section) | 📖 Full documentation | Deep dive into each pattern |
 | **AGENTS.md** | 🏗️ Architecture reference | Understand system design |
-| **deploy_to_aws.py** | 🚀 Deployment script | Deploy workload to AWS (Glue, MWAA, QuickSight) |
+| **runbooks/environment-setup-agent/** | 🚀 Deployment runbooks | Set up AWS, AgentCore Gateway, and Runtime |
 
 ---
 
@@ -63,7 +79,7 @@ Source details:
 Report: existing workload status or confirm new data.
 ```
 
-**What happens**: Codex searches all existing workloads and tells you if this data is already onboarded.
+**What happens**: Codex searches all existing workloads and reports whether this data is already onboarded.
 
 ---
 
@@ -237,7 +253,8 @@ Generate data_product_catalog.yaml and lineage diagram.
    → Run runbooks/environment-setup-agent/02-deploy-agentcore-gateway.md
 
 2. Switch to Gateway tools:
-   → Replace .mcp.json with .mcp.gateway.json
+   → Apply the generated Gateway connection settings to `.codex/config.toml`
+   → Run `codex mcp list` and restart Codex
 
 3. Onboard data as usual:
    → Run runbooks/data-onboarding-agent/03-onboard-build-pipeline.md
@@ -246,10 +263,11 @@ Generate data_product_catalog.yaml and lineage diagram.
 **What happens**:
 - Gateway: All 13 MCP servers (4 custom FastMCP + 9 PyPI) hosted in cloud, each with least-privilege IAM
 - Agent: Runs in Codex on your laptop (human-in-the-loop)
-- Sub-agents: Spawned locally via Codex `Agent` tool
+- Sub-agents: Spawned locally by the ADOP workflow using the Codex agent runtime
 - Same onboarding workflow as before -- only the tool transport changes (stdio to SSE)
 
-To revert to fully local: `git checkout .mcp.json`
+To revert to fully local, restore the local server entries in `.codex/config.toml`, keep them
+disabled until AWS credentials are configured, and restart Codex.
 
 ### Scenario 5b: Production with Runtime (Cloud-Hosted Tools + Cloud Agent)
 

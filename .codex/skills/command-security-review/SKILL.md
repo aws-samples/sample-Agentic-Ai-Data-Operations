@@ -199,6 +199,6 @@ Your final reply must contain the markdown report and nothing else.
 
 ## MANUAL MIGRATION REQUIRED
 
-- Migrated from `.codex/skills/command-security-review/SKILL.md`. Review provider-specific slash-command behavior before relying on this skill.
+- Review provider-specific slash-command behavior before relying on this skill.
 - Replace shell interpolation with explicit Codex instructions to run the command when needed.
 - Review unsupported Codex command frontmatter fields: allowed-tools.

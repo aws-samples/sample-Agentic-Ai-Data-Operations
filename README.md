@@ -1,6 +1,10 @@
 # Agentic Data Onboarding Platform
 
 <p align="center">
+  <img src="docs/icons/codex-mark.svg" alt="Codex" width="64" height="64">
+  <br/>
+  <strong>Codex-native data operations</strong>
+  <br/>
   <a href="https://aws-samples.github.io/sample-Agentic-Ai-Data-Operations/">
     <strong>&#128194; View the styled documentation site &rarr;</strong>
   </a>
@@ -14,16 +18,31 @@
 
 ### Dynamic Workflows
 
-This project uses **Codex Dynamic Workflows** for parallel multi-agent orchestration. Two workflow commands are available:
+This project uses **Codex Dynamic Workflows** for parallel multi-agent orchestration. The repository
+provides the workflow skills, agent contracts, hooks, and MCP configuration that Codex reads when
+the project is trusted.
 
 | Command | Purpose | What it does |
 |---|---|---|
 | `/onboard-workflow [REGULATION]` | Build a data pipeline | Parallel sub-agents generate specs for Bronze→Silver→Gold pipeline (~15 agents, 10-20 min) |
 | `/devops-workflow [WORKLOAD] [FRAMEWORK]` | Production readiness | Parallel IaC + monitoring + cost tags + runbook generation (~8 agents, 5-10 min) |
 
-Both commands ask discovery questions first (human-in-the-loop), then fan out parallel agents with model routing (haiku for checks, sonnet for generation, opus for adversarial review). Progress is tracked via `/workflows` and survives disconnects.
+Both commands ask discovery questions first, then fan out parallel agents. The agent contracts
+select reasoning effort (`low`, `medium`, or `high`) per role; the active Codex model remains the
+user/session configuration. Progress is persisted under each workload's `run/` directory.
 
-Skill definitions: `.codex/skills/command-onboard-workflow/SKILL.md`, `.codex/skills/command-devops-workflow/SKILL.md`
+Skill definitions: `.codex/skills/command-onboard-workflow/SKILL.md`,
+`.codex/skills/command-devops-workflow/SKILL.md`
+
+### Codex project map
+
+| Icon | Codex surface | Repository location | Purpose |
+|---|---|---|---|
+| 🔷 | Codex entry point | `AGENTS.md` | Project-wide instructions Codex should follow |
+| 🧩 | Skills | `.codex/skills/` | On-demand workflow and engineering instructions |
+| 🤖 | Agent contracts | `.codex/agents/*.toml` | Specialist role instructions and reasoning effort |
+| 🪝 | Hooks | `.codex/hooks.json` | Discovery, logging, code-generation, and session guards |
+| 🔌 | MCP | `.codex/config.toml` | Codex MCP server definitions; disabled until explicitly enabled |
 
 ---
 
@@ -48,7 +67,7 @@ Run daily at 03:00 UTC. Apply HIPAA controls with PHI masking in Silver and PHI 
 ```
 
 > The `/onboard-workflow HIPAA` prefix triggers parallel execution via Dynamic Workflow.
-> Phase 4 build agents use Opus (HIPAA = compliance-critical). Omit the prefix for sequential mode.
+> HIPAA changes the compliance controls and review requirements; it does not hard-code a model.
 
 ### Example 2 — Streaming from Kafka (Glue Streaming ETL)
 ```
@@ -219,8 +238,8 @@ Output: workloads/{dataset_name}/ with config/, scripts/, dags/, sql/, tests/
 
 **Dynamic Workflow advantages** (via `/onboard-workflow`):
 - Metadata + Quality agents run in parallel (Phase 4 Stage 1)
-- Model routing: HIPAA/SOX/PCI → Opus for build agents; GDPR/CCPA/none → Sonnet
-- Opus adversarial reviewer + verifier at quality chokepoints regardless of regulation
+- Reasoning routing: compliance-critical work uses higher-effort generation and review contracts
+- Validation agents use lower-effort checks where the contract permits
 - Multi-workload batch: onboard multiple datasets in one invocation
 - Resumable: completed phases survive disconnects
 
@@ -465,12 +484,12 @@ Triggers a Dynamic Workflow that generates everything in parallel:
 
 | Phase | Agents | Output |
 |---|---|---|
-| IaC Generate | 1 sonnet | `iac/terraform/main.tf` + variables + outputs + APPLY_GUIDE.md |
-| Monitoring | 1 sonnet | CloudWatch alarms + SNS topic + EventBridge rules + dashboard |
-| Cost & Tags | 1 sonnet | Cost allocation tags + budget alerts + lifecycle policies |
-| Runbook | 1 sonnet | RUNBOOK.md (failure recovery, escalation, maintenance) |
-| Security Review | 1 opus | Adversarial IaC review (no wildcards, no public access) |
-| Validate | 2 haiku | Syntax checks (terraform fmt, cfn-lint) |
+| IaC Generate | 1 medium-effort agent | `iac/terraform/main.tf` + variables + outputs + APPLY_GUIDE.md |
+| Monitoring | 1 medium-effort agent | CloudWatch alarms + SNS topic + EventBridge rules + dashboard |
+| Cost & Tags | 1 medium-effort agent | Cost allocation tags + budget alerts + lifecycle policies |
+| Runbook | 1 medium-effort agent | RUNBOOK.md (failure recovery, escalation, maintenance) |
+| Security Review | 1 high-effort agent | Adversarial IaC review (no wildcards, no public access) |
+| Validate | 2 low-effort checks | Syntax checks (terraform fmt, cfn-lint) |
 
 ### Planned Features (Q3 2026)
 
@@ -562,7 +581,10 @@ By default the platform deploys to a single AWS account: Glue Data Catalog, Lake
 
 ### MCP Servers (Model Context Protocol)
 
-13 MCP servers provide Codex with direct AWS access — no CLI needed for most operations. Pre-configured in `.mcp.json`, auto-install via `uvx` on first use.
+13 MCP servers are defined for Codex in `.codex/config.toml`. They are disabled by default because
+they call AWS with the configured profile. Enable only the servers needed for a non-production
+account after credentials and region are configured. `.mcp.json` remains as a portable MCP
+configuration for compatible hosts and registry validation.
 
 **PyPI Servers (9)** — installed automatically via `uvx`:
 
@@ -590,10 +612,12 @@ By default the platform deploys to a single AWS account: Glue Data Catalog, Lake
 **Quick start** (after cloning):
 ```bash
 # Prerequisites: uv installed, AWS credentials configured
-inspect Codex MCP configuration   # All 13 servers auto-connect
+# Inspect .codex/config.toml, then enable only the required servers
+python3 scripts/validate_tool_registry.py
 ```
 
-**Health check before deployment**: 3 servers are REQUIRED (`glue-athena`, `lakeformation`, `iam`) -- deployment blocks if any fail. See [MCP Setup Guide](docs/mcp-setup.md) for full setup guide.
+**Health check before deployment**: 3 servers are REQUIRED (`glue-athena`, `lakeformation`, `iam`) —
+deployment blocks if any fail. See [MCP Setup Guide](docs/mcp-setup.md) for enablement and health checks.
 
 ### Agentcore (Optional Cloud Deployment)
 
@@ -890,7 +914,7 @@ Each workload accumulates knowledge across pipeline runs — schema quirks, qual
 - **Storage**: `workloads/{name}/memory/` directory with a `MEMORY.md` ledger (200-line cap, 25KB cap) and individual memory files
 - **Four memory types**: `user` (operator preferences), `feedback` (corrections), `project` (schema facts), `reference` (S3 paths, Glue DB names)
 - **Memory-aware discovery**: Phase 1 loads the workload ledger before asking questions. Known answers are pre-filled and confirmed, not re-asked.
-- **Memory selection**: A cheap Haiku side-call (`find_relevant_memories()`) selects up to 5 relevant memory files from the manifest before each phase — keeps sub-agent context lean.
+- **Memory selection**: `find_relevant_memories()` selects up to 5 relevant memory files from the manifest before each phase — keeping sub-agent context lean.
 - **Post-run extraction**: After each test gate passes, `extract_memories_from_run()` harvests durable learnings from the agent's decisions and memory hints. Runs asynchronously — never blocks the pipeline.
 
 ```
@@ -1092,14 +1116,12 @@ See [Security](docs/security.md) and [CONTRIBUTING](CONTRIBUTING.md#security-iss
 | 5 | Deploy to AWS | ~10K | MCP tool calls (API-heavy, not LLM-heavy) |
 | | **Total per workload** | **~135K** | Input + output tokens combined |
 
-### Estimated Cost Per Workload
+### Cost Guidance
 
-| Model | Input Price | Output Price | Est. Cost/Workload |
-|-------|-------------|--------------|-------------------|
-| **Codex Opus** | $15 / 1M tokens | $75 / 1M tokens | ~$3.65 |
-| **Codex Sonnet** | $3 / 1M tokens | $15 / 1M tokens | ~$0.73 |
-
-*Assumes 80/20 input/output token split. Opus is used for orchestration and complex reasoning; Sonnet is a viable alternative for sub-agents (Metadata, Quality, DAG) where tasks are more structured.*
+This repository does not pin a Codex model or publish a price estimate. Usage and pricing depend
+on the Codex surface, account, selected model, reasoning effort, context size, and retries. Use
+the current Codex usage view or official OpenAI pricing documentation for the account running the
+workflow.
 
 ### Platform-Wide Estimate (All Workloads)
 
@@ -1108,16 +1130,17 @@ See [Security](docs/security.md) and [CONTRIBUTING](CONTRIBUTING.md#security-iss
 | Workloads onboarded | 9 |
 | Avg tokens per workload | ~135K |
 | Total estimated tokens | ~1.2M |
-| **Total cost (all Opus)** | **~$33** |
-| **Total cost (Opus orchestrator + Sonnet sub-agents)** | **~$12** |
+| **Model cost** | Use the active Codex usage view |
+| **AWS cost** | Track Glue, S3, Athena, MWAA, QuickSight, and Agentcore separately |
 
 ### Cost Optimization Tips
 
-- Use **Sonnet for sub-agents** (Metadata, Transformation, Quality, DAG) — tasks are well-defined with structured outputs
-- Use **Opus for orchestration** (Phase 0-2, Phase 5) — requires judgment, multi-step reasoning
+- Use `low` reasoning effort for deterministic validation where appropriate
+- Use `medium` for standard artifact generation
+- Use `high` for compliance-sensitive orchestration and adversarial review
 - **Workload memory** reduces re-runs — learned facts carry forward, fewer retry cycles
 - **REIC routing** prevents mis-classification — correct agent on first try saves wasted tokens
-- **Prompt caching** (automatic with Anthropic API) — repeated system prompts are cached, reducing input tokens on retries
+- Keep skills focused and use workload memory to reduce repeated context
 
 ## License
 

@@ -707,7 +707,9 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
   </aside>
   <main>
     <div class="banner">
+      <img src="icons/codex-mark.svg" alt="Codex" width="56" height="56" />
       <h1>Agentic Data Onboarding Platform</h1>
+      <p><strong>🔷 Codex-native data operations</strong></p>
       <p>Bronze &rarr; Silver &rarr; Gold pipelines from a natural-language prompt &middot; README preview</p>
     </div>
 
@@ -854,7 +856,7 @@ Run daily at 03:00 UTC. Apply HIPAA controls with PHI masking in Silver and PHI 
 
 <blockquote>
 <p>The <code>/onboard-workflow HIPAA</code> prefix triggers parallel execution via Dynamic Workflow.
-Phase 4 build agents use Opus (HIPAA = compliance-critical). Omit the prefix for sequential mode.</p>
+Phase 4 build agents use high reasoning effort for compliance-critical work. Omit the prefix for sequential mode.</p>
 </blockquote>
 <h3 id="example-2-streaming-from-kafka-glue-streaming-etl">Example 2 — Streaming from Kafka (Glue Streaming ETL)<a class="headerlink" href="#example-2-streaming-from-kafka-glue-streaming-etl" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code>/onboard-workflow PCI
@@ -999,8 +1001,8 @@ Output: workloads/{dataset_name}/ with config/, scripts/, dags/, sql/, tests/
 
 <p><strong>Dynamic Workflow advantages</strong> (via <code>/onboard-workflow</code>):
 - Metadata + Quality agents run in parallel (Phase 4 Stage 1)
-- Model routing: HIPAA/SOX/PCI → Opus for build agents; GDPR/CCPA/none → Sonnet
-- Opus adversarial reviewer + verifier at quality chokepoints regardless of regulation
+- Reasoning routing: compliance-critical work uses higher-effort generation and review contracts
+- Validation agents use lower-effort checks where the contract permits
 - Multi-workload batch: onboard multiple datasets in one invocation
 - Resumable: completed phases survive disconnects</p>
 <p>See <code>.codex/skills/command-onboard-workflow/SKILL.md</code> for the skill definition and <code>workloads/customer_master/</code> for a committed example workload.</p>
@@ -1282,32 +1284,32 @@ Estimated Time Saved: 10-15 hours across future onboardings
 <tbody>
 <tr>
 <td>IaC Generate</td>
-<td>1 sonnet</td>
+<td>1 medium-effort agent</td>
 <td><code>iac/terraform/main.tf</code> + variables + outputs + APPLY_GUIDE.md</td>
 </tr>
 <tr>
 <td>Monitoring</td>
-<td>1 sonnet</td>
+<td>1 medium-effort agent</td>
 <td>CloudWatch alarms + SNS topic + EventBridge rules + dashboard</td>
 </tr>
 <tr>
 <td>Cost &amp; Tags</td>
-<td>1 sonnet</td>
+<td>1 medium-effort agent</td>
 <td>Cost allocation tags + budget alerts + lifecycle policies</td>
 </tr>
 <tr>
 <td>Runbook</td>
-<td>1 sonnet</td>
+<td>1 medium-effort agent</td>
 <td>RUNBOOK.md (failure recovery, escalation, maintenance)</td>
 </tr>
 <tr>
 <td>Security Review</td>
-<td>1 opus</td>
+<td>1 high-effort agent</td>
 <td>Adversarial IaC review (no wildcards, no public access)</td>
 </tr>
 <tr>
 <td>Validate</td>
-<td>2 haiku</td>
+<td>2 low-effort checks</td>
 <td>Syntax checks (terraform fmt, cfn-lint)</td>
 </tr>
 </tbody>
@@ -1460,7 +1462,7 @@ Estimated Time Saved: 10-15 hours across future onboardings
 - T-Box reasoning (AWS Semantic Layer, at publish time)
 - Any SPARQL/Neptune writes (future, when the AWS Semantic Layer platform deploys)</p>
 <h3 id="mcp-servers-model-context-protocol">MCP Servers (Model Context Protocol)<a class="headerlink" href="#mcp-servers-model-context-protocol" title="Permanent link">&para;</a></h3>
-<p>13 MCP servers provide Codex with direct AWS access — no CLI needed for most operations. Pre-configured in <code>.mcp.json</code>, auto-install via <code>uvx</code> on first use.</p>
+<p>13 MCP servers are defined for Codex in <code>.codex/config.toml</code>. They are disabled by default because they call AWS with the configured profile. Enable only the servers required for the current non-production task.</p>
 <p><strong>PyPI Servers (9)</strong> — installed automatically via <code>uvx</code>:</p>
 <table>
 <thead>
@@ -1552,7 +1554,7 @@ Estimated Time Saved: 10-15 hours across future onboardings
 </table>
 <p><strong>Quick start</strong> (after cloning):</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Prerequisites: uv installed, AWS credentials configured</span>
-codex<span class="w"> </span>configuration<span class="w">   </span><span class="c1"># Verify the repository's Codex configuration</span>
+codex<span class="w"> </span>mcp<span class="w"> </span>list<span class="w">   </span><span class="c1"># Inspect MCP servers visible to Codex</span>
 </code></pre></div>
 
 <p><strong>Health check before deployment</strong>: 3 servers are REQUIRED (<code>glue-athena</code>, <code>lakeformation</code>, <code>iam</code>) -- deployment blocks if any fail. See <a href="mcp-setup.md">MCP Setup Guide</a> for full setup guide.</p>
@@ -1839,7 +1841,7 @@ python3 -m shared.logging.trace_viewer trace_events.jsonl --decisions
 <li><strong>Storage</strong>: <code>workloads/{name}/memory/</code> directory with a <code>MEMORY.md</code> ledger (200-line cap, 25KB cap) and individual memory files</li>
 <li><strong>Four memory types</strong>: <code>user</code> (operator preferences), <code>feedback</code> (corrections), <code>project</code> (schema facts), <code>reference</code> (S3 paths, Glue DB names)</li>
 <li><strong>Memory-aware discovery</strong>: Phase 1 loads the workload ledger before asking questions. Known answers are pre-filled and confirmed, not re-asked.</li>
-<li><strong>Memory selection</strong>: A cheap Haiku side-call (<code>find_relevant_memories()</code>) selects up to 5 relevant memory files from the manifest before each phase — keeps sub-agent context lean.</li>
+<li><strong>Memory selection</strong>: <code>find_relevant_memories()</code> selects up to 5 relevant memory files from the manifest before each phase — keeps sub-agent context lean.</li>
 <li><strong>Post-run extraction</strong>: After each test gate passes, <code>extract_memories_from_run()</code> harvests durable learnings from the agent's decisions and memory hints. Runs asynchronously — never blocks the pipeline.</li>
 </ul>
 <div class="highlight"><pre><span></span><code>Run 1: Pipeline fails on pe_ratio nulls → agent learns &quot;pe_ratio has expected 5% nulls&quot;
@@ -2188,20 +2190,20 @@ Each agent (Router, Onboarding, Metadata, Transformation, Quality, DAG, Analysis
 </thead>
 <tbody>
 <tr>
-<td><strong>Codex Opus</strong></td>
-<td>$15 / 1M tokens</td>
-<td>$75 / 1M tokens</td>
-<td>~$3.65</td>
+<td><strong>Active Codex model</strong></td>
+<td>Account-dependent</td>
+<td>Account-dependent</td>
+<td>Use Codex usage view</td>
 </tr>
 <tr>
-<td><strong>Codex Sonnet</strong></td>
-<td>$3 / 1M tokens</td>
-<td>$15 / 1M tokens</td>
-<td>~$0.73</td>
+<td><strong>AWS services</strong></td>
+<td>Not applicable</td>
+<td>Not applicable</td>
+<td>Track Glue/S3/Athena/MWAA separately</td>
 </tr>
 </tbody>
 </table>
-<p><em>Assumes 80/20 input/output token split. Opus is used for orchestration and complex reasoning; Sonnet is a viable alternative for sub-agents (Metadata, Quality, DAG) where tasks are more structured.</em></p>
+<p><em>This repository does not pin a model or publish a price estimate. Usage depends on the Codex surface, selected model, reasoning effort, context size, and retries.</em></p>
 <h3 id="platform-wide-estimate-all-workloads">Platform-Wide Estimate (All Workloads)<a class="headerlink" href="#platform-wide-estimate-all-workloads" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -2224,22 +2226,23 @@ Each agent (Router, Onboarding, Metadata, Transformation, Quality, DAG, Analysis
 <td>~1.2M</td>
 </tr>
 <tr>
-<td><strong>Total cost (all Opus)</strong></td>
-<td><strong>~$33</strong></td>
+<td><strong>Model cost</strong></td>
+<td><strong>Use the active Codex usage view</strong></td>
 </tr>
 <tr>
-<td><strong>Total cost (Opus orchestrator + Sonnet sub-agents)</strong></td>
-<td><strong>~$12</strong></td>
+<td><strong>AWS cost</strong></td>
+<td><strong>Track AWS services separately</strong></td>
 </tr>
 </tbody>
 </table>
 <h3 id="cost-optimization-tips">Cost Optimization Tips<a class="headerlink" href="#cost-optimization-tips" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Use <strong>Sonnet for sub-agents</strong> (Metadata, Transformation, Quality, DAG) — tasks are well-defined with structured outputs</li>
-<li>Use <strong>Opus for orchestration</strong> (Phase 0-2, Phase 5) — requires judgment, multi-step reasoning</li>
+<li>Use <strong>low</strong> reasoning effort for deterministic validation where appropriate</li>
+<li>Use <strong>medium</strong> for standard artifact generation</li>
+<li>Use <strong>high</strong> for compliance-sensitive orchestration and adversarial review</li>
 <li><strong>Workload memory</strong> reduces re-runs — learned facts carry forward, fewer retry cycles</li>
 <li><strong>REIC routing</strong> prevents mis-classification — correct agent on first try saves wasted tokens</li>
-<li><strong>Prompt caching</strong> (automatic with Anthropic API) — repeated system prompts are cached, reducing input tokens on retries</li>
+<li>Keep skills focused and use workload memory to reduce repeated context</li>
 </ul>
 <h2 id="license">License<a class="headerlink" href="#license" title="Permanent link">&para;</a></h2>
 <p>This project is licensed under the MIT-0 License. See the <a href="LICENSE">LICENSE</a> file for details.</p>

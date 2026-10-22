@@ -179,7 +179,7 @@ Gate:   Must succeed before proceeding.
 
 MCP:    mcp__iam__list_roles (verify IAM access)
         mcp__cloudtrail__lookup_events (verify CloudTrail access)
-CLI:    inspect Codex MCP configuration
+CLI:    codex mcp list
 
 Output:
   MCP HEALTH CHECK

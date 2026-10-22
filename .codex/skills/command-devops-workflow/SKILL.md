@@ -3,7 +3,8 @@ name: command-devops-workflow
 description: "Production readiness for a completed ADOP workload with Codex sub-agents: IaC, monitoring, alerting, cost tags, budget, and runbook. Use when the user runs /devops-workflow or asks to make a built workload production-ready."
 ---
 
-<!-- Hand-ported from .codex/skills/command-devops-workflow/SKILL.md: the Codex `Workflow` tool script became spawn_agent/wait_agent phases, the IaC generator spawns the migrated `iac-agent` role, `AskUserQuestion` became normal user turns, and model tiers became reasoning effort. Sub-agent prompts and the TBAC human gate are kept verbatim. -->
+<!-- Codex-native ADOP workflow skill. The phases use the Codex agent runtime and normal user
+     turns; the sub-agent prompts and TBAC human gate are maintained here. -->
 
 # /devops-workflow — Production Readiness Workflow
 
@@ -98,17 +99,17 @@ rather than a paraphrase in a prompt string.
 
 ---
 
-## Step 4: Model Routing
+## Step 4: Reasoning-Effort Routing
 
 | Phase | Source tier | `reasoning_effort` | Reason |
 |---|---|---|---|
-| Health Check | haiku | `low` | Lightweight file verification |
-| IaC Generate | sonnet | `medium` | Code generation (Terraform/CDK) |
-| Monitoring | sonnet | `medium` | CloudWatch + SNS config generation |
-| Cost Analysis | sonnet | `medium` | Resource analysis + tagging |
-| Runbook | sonnet | `medium` | Documentation generation |
-| Security Review | opus | `high` | Adversarial IaC review (no IAM wildcards, no public access) |
-| Validate | haiku | `low` | Syntax checks (terraform validate, cdk synth) |
+| Health Check | `low` | Lightweight file verification |
+| IaC Generate | `medium` | Code generation (Terraform/CDK) |
+| Monitoring | `medium` | CloudWatch + SNS config generation |
+| Cost Analysis | `medium` | Resource analysis + tagging |
+| Runbook | `medium` | Documentation generation |
+| Security Review | `high` | Adversarial IaC review (no IAM wildcards, no public access) |
+| Validate | `low` | Syntax checks (terraform validate, cdk synth) |
 
 ---
 
@@ -130,7 +131,8 @@ start time of each phase for the Step 6 trace log.
   as `message`.
 - Do not set `model`. Sub-agents inherit the session model, which works on every
   provider, including Amazon Bedrock. Use Step 4's tiers as `reasoning_effort`:
-  `haiku` → `low`, `sonnet` → `medium`, `opus` → `high`.
+  `low`, `medium`, and `high` are Codex reasoning-effort settings. The active model is selected
+  by the Codex session or project configuration.
 - Placeholders:
   - `{workload_name}` and `{framework}` come from Step 1 or Step 3.
   - `{monitoring}`, `{cost}`, and `{runbook}` are the Step 3 Group 2, 3, and 4 answers,

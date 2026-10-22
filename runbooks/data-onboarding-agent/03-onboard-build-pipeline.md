@@ -569,7 +569,7 @@ After artifacts pass all tests and get human approval, deploy to AWS.
 Before any deployment, verify MCP servers are connected:
 
 ```bash
-inspect Codex MCP configuration
+codex mcp list
 ```
 
 **Required servers** (must be Connected — BLOCK deployment if not):

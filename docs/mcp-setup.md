@@ -1,4 +1,4 @@
-# MCP Server Setup Guide
+# MCP Server Setup Guide for Codex
 
 **How to configure MCP servers for this project**
 
@@ -6,7 +6,9 @@
 
 ## Quick Start (After Cloning)
 
-The `.mcp.json` is included in the repo and works out of the box. Just ensure prerequisites are met:
+Codex reads the project MCP definitions from `.codex/config.toml`. The repository keeps every
+server disabled by default because these commands can call AWS with the configured profile.
+Enable only the servers required for the current non-production task.
 
 ```bash
 # 1. Install uv (Python package runner)
@@ -15,11 +17,15 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # 2. Verify AWS credentials
 aws sts get-caller-identity
 
-# 3. Verify MCP servers connect
-inspect Codex MCP configuration
+# 3. Inspect the servers Codex can see
+codex mcp list
+
+# 4. Validate the repository registry
+python3 scripts/validate_tool_registry.py
 ```
 
-That's it. All 13 MCP servers are pre-configured and will auto-install their dependencies via `uvx` on first use.
+The committed `.mcp.json` is retained for compatible MCP hosts and for registry consistency
+checks. It is not the source of truth for Codex project configuration.
 
 ---
 
@@ -29,13 +35,13 @@ That's it. All 13 MCP servers are pre-configured and will auto-install their dep
 - **uv** (v0.9+) — `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - **Python 3.12+** — required by AWS MCP server packages
 - **AWS credentials** configured (`~/.aws/credentials` or environment variables)
-- **AWS region** — defaults to `us-east-1` (change in `.mcp.json` if needed)
+- **AWS region** — defaults to `us-east-1` in `.codex/config.toml`
 
 ---
 
 ## What's Configured
 
-The `.mcp.json` in the repo root configures 13 MCP servers. Codex reads this automatically.
+`.codex/config.toml` defines 13 MCP servers. Each entry currently has `enabled = false`.
 
 ### Connected Servers (13)
 
@@ -74,14 +80,14 @@ The `.mcp.json` in the repo root configures 13 MCP servers. Codex reads this aut
 
 ### Change AWS Region
 
-Edit `.mcp.json` and replace `us-east-1` with your region:
+Edit `.codex/config.toml` and replace `us-east-1` with your region:
 
 ```bash
 # macOS
-sed -i '' 's/us-east-1/your-region/g' .mcp.json
+sed -i '' 's/us-east-1/your-region/g' .codex/config.toml
 
 # Linux
-sed -i 's/us-east-1/your-region/g' .mcp.json
+sed -i 's/us-east-1/your-region/g' .codex/config.toml
 ```
 
 ### Change AWS Profile
@@ -89,19 +95,18 @@ sed -i 's/us-east-1/your-region/g' .mcp.json
 If you use a named profile instead of `default`:
 
 ```bash
-sed -i '' 's/"default"/"your-profile-name"/g' .mcp.json
+sed -i '' 's/"default"/"your-profile-name"/g' .codex/config.toml
 ```
 
 ### Disable a Server
 
-Add `"disabled": true` to any server entry you don't need:
+Keep `enabled = false` for any server you don't need:
 
 ```json
-"cost-explorer": {
-  "disabled": true,
-  "command": "uvx",
-  ...
-}
+[mcp_servers."cost-explorer"]
+enabled = false
+command = "uvx"
+...
 ```
 
 ---
@@ -111,10 +116,11 @@ Add `"disabled": true` to any server entry you don't need:
 ### Health Check
 
 ```bash
-inspect Codex MCP configuration
+codex mcp list
 ```
 
-Expected: most servers show `Connected`. Some servers (`core`, `pii-detection`) have slow startup and may show `Failed to connect` on the health check but work fine during actual conversation.
+Expected: the configured server entries are listed. A server is not usable until its
+`enabled` flag is set to `true`, its dependencies resolve, and AWS credentials are valid.
 
 ### Test Individual Server
 
@@ -177,7 +183,9 @@ Minimum IAM permissions for MCP servers:
 
 ### `pii-detection` server fails
 
-This custom server needs `boto3` and `mcp` packages. The `.mcp.json` uses `uv run --with boto3 --with mcp` to auto-install them. If it still fails:
+This custom server needs `boto3` and `mcp` packages. The `pii-detection` entry in
+`.codex/config.toml` uses `uv run --with boto3 --with mcp` to install them on demand. If it
+still fails:
 
 ```bash
 # Test directly
@@ -200,7 +208,7 @@ This project supports two MCP deployment architectures:
 **Architecture**: MCP servers run locally on your laptop via stdio transport.
 
 ```
-Codex (.mcp.json)
+Codex (.codex/config.toml)
   ↓ stdio (local processes)
   ├── 13 MCP servers (uvx / uv run)
        ↓ AWS SDK calls
@@ -218,7 +226,8 @@ Codex (.mcp.json)
 - ❌ Version drift between machines
 - ❌ Not suitable for production pipelines
 
-**Setup**: Already done! The `.mcp.json` in this repo is pre-configured.
+**Setup**: The server definitions are already present in `.codex/config.toml`; enable them
+intentionally for the account you want to use.
 
 ---
 
@@ -298,12 +307,13 @@ cat runbooks/environment-setup-agent/02-deploy-agentcore-gateway.md
 
 ```bash
 # Activate Gateway mode
-cp .mcp.gateway.json .mcp.json
+# Apply the generated Gateway connection settings to .codex/config.toml
+codex mcp list
 # Restart Codex
 
 # Revert to Local mode
-cp .mcp.local.json .mcp.json
-# or: git checkout .mcp.json
+# Restore the local stdio server entries in .codex/config.toml
+codex mcp list
 # Restart Codex
 ```
 
@@ -330,8 +340,8 @@ Deploy the **Data Onboarding Agent** to Agentcore Runtime for fully cloud-hosted
 
 | File | Purpose |
 |------|---------|
-| `.mcp.json` | MCP server configuration (committed, portable) |
-| `.mcp.gateway.json` | Gateway MCP configuration (generated by prompt 09) |
+| `.codex/config.toml` | Codex MCP server configuration; disabled by default |
+| `.mcp.json` | Portable MCP configuration for compatible non-Codex hosts |
 | `runbooks/environment-setup-agent/agentcore/` | Gateway config, IAM policies, Runtime agent definition |
 | `MCP_GUARDRAILS.md` | Tool selection rules per pipeline phase |
 | `TOOL_ROUTING.md` | Intent-based tool routing guide |

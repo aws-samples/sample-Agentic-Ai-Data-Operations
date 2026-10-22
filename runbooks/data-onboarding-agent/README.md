@@ -78,13 +78,13 @@ User: "/onboard-workflow HIPAA"
 User: "Onboard patient records from S3..."
   ↓ Phase 1 discovery runs interactively (same questions)
   ↓ Phases 2-5 run as a Dynamic Workflow with parallel sub-agents
-  ↓ ~15-20 min wall clock, progress tracked in /workflows
+  ↓ ~15-20 min wall clock, progress persisted in workloads/{name}/run/
 Output: workloads/patient_records/
 ```
 
 The workflow mode is defined in `.codex/skills/command-onboard-workflow/SKILL.md` and supports:
 - Parallel Phase 4 agents (Metadata + Quality run concurrently)
-- Model routing (HIPAA/SOX/PCI → Opus for build agents, else Sonnet)
+- Reasoning routing (HIPAA/SOX/PCI → high effort for build and review, otherwise medium)
 - Multi-workload batch (multiple datasets in one invocation)
 - Resumable progress (completed phases are not re-run on disconnect)
 
@@ -229,7 +229,7 @@ For regulated data, run a regulation prompt DURING Phase 1 discovery:
 - Action: Modify existing or use different name
 
 **Issue**: "MCP server failed"
-- Check: `inspect Codex MCP configuration`
+- Check: `codex mcp list`
 - See: `../../docs/mcp-setup.md`
 
 **Issue**: "Quality gate failed (score < 0.80)"

@@ -68,7 +68,7 @@ Gate:   Role exists and can invoke Bedrock models
 
 Role name: `{PROJECT}-agentcore-runtime-role`
 Permissions:
-- `bedrock:InvokeModel` (for Codex Sonnet)
+- `bedrock:InvokeModel` (for the configured AgentCore runtime model)
 - Gateway access (all 13 server endpoints)
 - CloudWatch logs
 
@@ -130,7 +130,7 @@ AGENTCORE RUNTIME DEPLOYMENT
 ──────────────────────────────────────────
 Agent ID:          {AGENT_ID}
 Agent Name:        data-onboarding-agent
-Model:             claude-sonnet-4-20250514
+Model:             configured in `agentcore/runtime/agent.yaml`
 Gateway:           {GATEWAY_ID}
 Memory:            data-onboarding (session summary)
 ──────────────────────────────────────────

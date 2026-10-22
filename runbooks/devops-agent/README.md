@@ -231,7 +231,7 @@ The `/devops-workflow` command runs the full production readiness pipeline in pa
 - Creates CloudWatch dashboards + SNS alerting + EventBridge rules
 - Applies cost allocation tags + budget alerts + lifecycle policies
 - Generates an operational runbook (failure recovery, escalation, maintenance)
-- Runs Opus security review (no IAM wildcards, no public access, encryption enforced)
+- Runs a high-effort security review (no IAM wildcards, no public access, encryption enforced)
 
 **Skill file**: `.codex/skills/command-devops-workflow/SKILL.md`
 **Reference workflow**: `.codex/skills/command-devops-workflow/SKILL.md`

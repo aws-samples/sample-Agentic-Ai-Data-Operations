@@ -3,7 +3,8 @@ name: command-onboard-workflow
 description: "End-to-end data pipeline onboarding (Bronze → Silver → Gold) with Codex sub-agents. Use when the user runs /onboard-workflow or asks to onboard a dataset or pipeline end to end, optionally with a regulation (HIPAA, SOX, PCI, GDPR, CCPA)."
 ---
 
-<!-- Hand-ported from .codex/skills/command-onboard-workflow/SKILL.md: the Codex `Workflow` tool script became spawn_agent/wait_agent phases, `AskUserQuestion` became normal user turns, and model tiers became reasoning effort. Sub-agent prompts and human-gate rules are kept verbatim. -->
+<!-- Codex-native ADOP workflow skill. The phases use the Codex agent runtime and normal user
+     turns; the sub-agent prompts and human-gate rules are maintained here. -->
 
 # /onboard-workflow — Dynamic Workflow Onboarding
 
@@ -30,7 +31,7 @@ Parse the argument(s) after `/onboard-workflow`. Valid values:
 - Multiple can be combined (e.g., `CCPA GDPR`)
 - If no argument, regulation = "NONE"
 
-Store the regulation(s) — they control model routing in Phase 4.
+Store the regulation(s) — they control compliance controls and review depth in Phase 4.
 
 ---
 
@@ -216,14 +217,14 @@ After ALL groups are answered, build this JSON object from the answers:
 
 ---
 
-## Step 6: Model Routing
+## Step 6: Reasoning-Effort Routing
 
 Determine the Phase 4 build reasoning effort based on regulation:
 
 | Regulation | Source tier | BUILD_EFFORT |
 |---|---|---|
-| HIPAA, SOX, PCI | `opus` | `high` |
-| GDPR, CCPA, none | `sonnet` | `medium` |
+| HIPAA, SOX, PCI | `high` | Compliance-sensitive generation and review |
+| GDPR, CCPA, none | `medium` | Standard generation and review |
 
 If multiple regulations, use the highest tier (e.g., CCPA + GDPR → medium, HIPAA + SOX → high).
 
@@ -254,9 +255,9 @@ start time of each phase for the Step 8 trace log.
 
   | Source tier | `reasoning_effort` |
   |---|---|
-  | `haiku` | `low` |
-  | `sonnet` | `medium` |
-  | `opus` | `high` |
+  | `low` | Lightweight validation |
+  | `medium` | Standard artifact generation |
+  | `high` | Complex reasoning and adversarial review |
   | `BUILD_MODEL` | `BUILD_EFFORT` from Step 6 |
 
 - **Multi-workload batch:** if the user gave several datasets, run Phases 0–4.5

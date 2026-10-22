@@ -28,10 +28,10 @@ transformation, quality, and DAG artifacts.
    - **Retention & audit** — retention window + processing-metadata logging.
 4. Legal reviews the single prompt file, not the generated PySpark.
 
-## Model routing
-`HIPAA | SOX | PCI` are compliance-critical → build with Opus + Opus adversarial reviewer.
-`GDPR | CCPA | none` → Sonnet generation, Haiku checks. Always keep an Opus reviewer at the
-quality chokepoint.
+## Reasoning effort
+`HIPAA | SOX | PCI` are compliance-critical → use `high` reasoning effort for build and review.
+`GDPR | CCPA | none` → use `medium` for generation and `low` for deterministic checks. Keep a
+high-effort reviewer at the quality chokepoint when the workflow requires one.
 
 ## Available frameworks
 

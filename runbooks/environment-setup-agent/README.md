@@ -87,7 +87,7 @@ aws glue get-databases | grep bronze_zone
 aws lakeformation list-lf-tags
 
 # Check MCP servers (local mode)
-inspect Codex MCP configuration
+codex mcp list
 
 # Check MCP Gateway (if deployed)
 python3 runbooks/environment-setup-agent/agentcore/gateway/test_gateway.py
