@@ -33,7 +33,7 @@
 {%- for c in spec %}F.col("{{ c }}"){{ ", " if not loop.last }}{% endfor -%}
 {%- endmacro %}
 {#
-  Runtime parameters. CLAUDE.md security rule 2 keeps bucket names and secret IDs out of
+  Runtime parameters. AGENTS.md security rule 2 keeps bucket names and secret IDs out of
   source, so specs carry ${DATA_LAKE_BUCKET} and ${PHI_HASH_SALT_SECRET_ID}. Only
   ${ADOP_LOGICAL_DATE} ever had a substitution step, so the rest reached rendered artifacts
   as literal text: the quarantine prefix -- where cleartext PHI lands -- became a path named
@@ -199,7 +199,7 @@ def transform(glue_context, args):
 {{ unsupported("null_handling.strategy '" ~ _strategy ~ "' has no branch in this template. "
    ~ "Implemented: drop_row, quarantine, fill_default, allow. Silently falling back to a "
    ~ "drop is what this block used to do, and it overrode the one category of decision "
-   ~ "CLAUDE.md says the agent must never make for the human.") }}
+   ~ "AGENTS.md says the agent must never make for the human.") }}
 {% endif %}
     after_pk_filter = bronze_df.count()
 

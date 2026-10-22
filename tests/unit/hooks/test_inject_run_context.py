@@ -1,4 +1,4 @@
-"""Unit tests for .claude/hooks/inject_run_context.py.
+"""Unit tests for .codex/hooks/inject_run_context.py.
 
 The hook is loaded in-process and pointed at a tmp_path so the tests never depend
 on which workloads happen to exist in the repo.
@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-HOOK_PATH = PROJECT_ROOT / ".claude" / "hooks" / "inject_run_context.py"
+HOOK_PATH = PROJECT_ROOT / ".codex" / "hooks" / "inject_run_context.py"
 
 
 @pytest.fixture

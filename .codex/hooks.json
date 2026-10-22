@@ -1,0 +1,58 @@
+{
+  "_generated_by": "adop-codex-native-hooks-v1",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .codex/hooks/discovery_gate.py"
+          }
+        ],
+        "matcher": "apply_patch"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .codex/hooks/logging_gate.py"
+          }
+        ],
+        "matcher": "apply_patch"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .codex/hooks/enforce_template_codegen.py",
+            "timeout": 5
+          }
+        ],
+        "matcher": "apply_patch"
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .codex/hooks/inject_run_context.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .codex/hooks/log_conversation.py",
+            "timeout": 3
+          }
+        ],
+        "matcher": "AskUserQuestion"
+      }
+    ]
+  }
+}

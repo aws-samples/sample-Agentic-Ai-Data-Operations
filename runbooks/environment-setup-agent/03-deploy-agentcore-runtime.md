@@ -12,9 +12,9 @@ Runtime deployment is **optional**. If you only need to demo or develop locally,
 
 1. Deploy Gateway only (`runbooks/environment-setup-agent/02-deploy-agentcore-gateway.md`)
 2. Replace `.mcp.json` with `.mcp.gateway.json`
-3. Run Claude Code normally -- all 13 MCP tools are served from Gateway
+3. Run Codex normally -- all 13 MCP tools are served from Gateway
 
-This gives you cloud-hosted tools without deploying the agent to Runtime. The agent runs in Claude Code on your laptop with full human-in-the-loop control. See `runbooks/environment-setup-agent/agentcore/README.md` for details on both execution modes.
+This gives you cloud-hosted tools without deploying the agent to Runtime. The agent runs in Codex on your laptop with full human-in-the-loop control. See `runbooks/environment-setup-agent/agentcore/README.md` for details on both execution modes.
 
 ## When to Use
 
@@ -43,7 +43,7 @@ AWS Region: [us-east-1]
 Project name: [data-onboarding]
 ```
 
-## What Claude Does
+## What Codex Does
 
 ### Step 1: Verify Gateway Health
 
@@ -68,7 +68,7 @@ Gate:   Role exists and can invoke Bedrock models
 
 Role name: `{PROJECT}-agentcore-runtime-role`
 Permissions:
-- `bedrock:InvokeModel` (for Claude Sonnet)
+- `bedrock:InvokeModel` (for Codex Sonnet)
 - Gateway access (all 13 server endpoints)
 - CloudWatch logs
 
@@ -79,7 +79,7 @@ Action: Create Agentcore Runtime agent from agent.yaml
 Read:   runbooks/environment-setup-agent/agentcore/runtime/agent.yaml
 CLI:    aws bedrock-agent create-agent \
           --agent-name {agent.name} \
-          --instruction (from system_prompt_files: CLAUDE.md + SKILLS.md + MCP_GUARDRAILS.md) \
+          --instruction (from system_prompt_files: AGENTS.md + ADOP_WORKFLOWS.md + MCP_GUARDRAILS.md) \
           --foundation-model {agent.model.model_id} \
           --execution-role-arn {ROLE_ARN}
 Output: Agent ID, agent version

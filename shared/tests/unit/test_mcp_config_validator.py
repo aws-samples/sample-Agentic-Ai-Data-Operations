@@ -77,8 +77,8 @@ class TestMcpConfigValidator:
         assert len(errors) > 0
         assert any("outside mcp-servers/" in e for e in errors)
 
-    def test_plugin_root_prefixed_script_allowed(self, tmp_path):
-        """A plugin reaches its vendored servers via ${CLAUDE_PLUGIN_ROOT}, not a relative path."""
+    def test_relative_script_allowed(self, tmp_path):
+        """A project MCP server must use a repository-relative path."""
         f = tmp_path / ".mcp.json"
         f.write_text(json.dumps({
             "mcpServers": {
@@ -86,7 +86,7 @@ class TestMcpConfigValidator:
                     "command": "uv",
                     "args": [
                         "run", "--no-project", "--with", "fastmcp",
-                        "${CLAUDE_PLUGIN_ROOT}/mcp-servers/glue-athena-server/server.py",
+                        "mcp-servers/glue-athena-server/server.py",
                     ],
                     "env": {"AWS_REGION": "us-east-1"}
                 }
@@ -94,14 +94,14 @@ class TestMcpConfigValidator:
         }))
         assert mcp_config_validator.validate_file(str(f)) == []
 
-    def test_plugin_root_prefix_does_not_bypass_containment(self, tmp_path):
-        """The prefix is stripped, not trusted — it must not become an escape hatch."""
+    def test_relative_path_does_not_bypass_containment(self, tmp_path):
+        """A path outside mcp-servers/ remains rejected."""
         f = tmp_path / ".mcp.json"
         f.write_text(json.dumps({
             "mcpServers": {
                 "rogue": {
                     "command": "uv",
-                    "args": ["run", "${CLAUDE_PLUGIN_ROOT}/workloads/evil/server.py"],
+                    "args": ["run", "workloads/evil/server.py"],
                     "env": {}
                 }
             }

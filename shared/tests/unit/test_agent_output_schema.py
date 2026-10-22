@@ -125,7 +125,7 @@ class TestFromBedrockToolCall:
 
 
 # ------------------------------------------------------------------
-# Claude Code sub-agent message parsing
+# Codex sub-agent message parsing
 # ------------------------------------------------------------------
 
 

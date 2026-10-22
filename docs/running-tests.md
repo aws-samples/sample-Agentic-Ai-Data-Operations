@@ -373,7 +373,7 @@ For AWS integration tests, see `docs/aws-account-setup.md`.
 
 ## 📖 Further Reading
 
-- `CLAUDE.md` - Testing strategy section
+- `AGENTS.md` - Testing strategy section
 - `docs/aws-account-setup.md` - AWS integration test setup
 
 ---

@@ -548,7 +548,7 @@ class TestNullHandlingIsHonoured:
 
     `silver_transform.py.j2` filtered `F.col(pk).isNotNull()` unconditionally and never read
     `null_handling` at all. A human answering "allow" or "quarantine" got silent drops
-    either way — an override of the one category of decision CLAUDE.md says the agent must
+    either way — an override of the one category of decision AGENTS.md says the agent must
     never make for them (finding M3).
 
     The second consequence is worse. Dropping the rows first made the critical rule
@@ -1258,8 +1258,8 @@ class TestLogicalDateIsResolvedOrTheRunFails:
     committed**.
 
     Fixed by another agent's run, which is why this test exists separately: the fix arrived
-    without one, so nothing stopped it regressing. It was also applied to the plugin's
-    vendored `lib/` copy rather than the repo source, which broke byte-identity until ported.
+    without one, so nothing stopped it regressing. It was also applied to a generated copy
+    rather than the repository source, which broke byte-identity until ported.
 
     Conditional on demand, so a spec that does not use the token renders exactly as before.
     """
@@ -1446,7 +1446,7 @@ class TestTheGatePublishesRatherThanReportingAfterTheFact:
     only stop Gold being built afterwards. quality_check_gold is the last task in the graph, so
     it blocked nothing at all.
 
-    CLAUDE.md states "Quality gates block promotion — no bypassing" and gives Silver a >= 0.80
+    AGENTS.md states "Quality gates block promotion — no bypassing" and gives Silver a >= 0.80
     gate. What the pipeline implemented was "gates block the NEXT zone", which is a different
     property, and for Gold it was no property.
     """
@@ -1567,7 +1567,7 @@ class TestTheGatePublishesRatherThanReportingAfterTheFact:
 class TestRuntimePlaceholdersAreResolvedNotShipped:
     """Four of the five ${NAME} placeholders were never substituted by anything.
 
-    CLAUDE.md security rule 2 forbids bucket names and account IDs in source, so specs write
+    AGENTS.md security rule 2 forbids bucket names and account IDs in source, so specs write
     `${DATA_LAKE_BUCKET}` and `${PHI_HASH_SALT_SECRET_ID}`. That is the correct pattern; it was
     simply not wired. Only `${ADOP_LOGICAL_DATE}` had a substitution step.
 

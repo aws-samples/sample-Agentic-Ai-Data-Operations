@@ -59,7 +59,7 @@ def _slugify(text: str) -> str:
 
 class PromptEvolver:
     """Evolves prompts by harvesting cross-workload failure insights
-    and grafting corrective patches into SKILLS.md."""
+    and grafting corrective patches into ADOP_WORKFLOWS.md."""
 
     def __init__(self, repo_root: Path = None):
         if repo_root is None:
@@ -144,7 +144,7 @@ class PromptEvolver:
         }
 
     def graft_patch(self, patch_id: str, skills_path: Path = None) -> bool:
-        """Apply a patch to SKILLS.md by inserting it under the matching section.
+        """Apply a patch to ADOP_WORKFLOWS.md by inserting it under the matching section.
 
         Returns True on success, False if the section was not found or the
         patch was already grafted (idempotent).
@@ -158,7 +158,7 @@ class PromptEvolver:
         skills_section = fm.get("skills_section", "")
 
         if skills_path is None:
-            skills_path = self.repo_root / "SKILLS.md"
+            skills_path = self.repo_root / "ADOP_WORKFLOWS.md"
 
         if not skills_path.exists():
             return False
@@ -208,13 +208,13 @@ class PromptEvolver:
         return True
 
     def prune_patch(self, patch_id: str, skills_path: Path = None) -> bool:
-        """Remove a previously grafted patch from SKILLS.md.
+        """Remove a previously grafted patch from ADOP_WORKFLOWS.md.
 
         Resets patch status to 'pending'.
         Returns True if the graft block was found and removed, False otherwise.
         """
         if skills_path is None:
-            skills_path = self.repo_root / "SKILLS.md"
+            skills_path = self.repo_root / "ADOP_WORKFLOWS.md"
 
         if not skills_path.exists():
             return False

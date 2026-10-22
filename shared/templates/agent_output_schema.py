@@ -8,7 +8,7 @@ an AgentOutput instance. The orchestrator parses this to decide:
 - Whether to escalate to the human
 
 Two return paths, same schema:
-- **Claude Code sub-agents** (spawned via the `Agent` tool) have no tool-call channel.
+- **Codex sub-agents** (spawned via the `Agent` tool) have no tool-call channel.
   They end their final message with a fenced ```json block — parse with
   `AgentOutput.from_agent_message(text)`.
 - **Bedrock `converse()`** callers force a tool call with SUBMIT_OUTPUT_TOOL and
@@ -92,7 +92,7 @@ SUBMIT_OUTPUT_TOOL = {
 
 
 # Required fields, derived from SUBMIT_OUTPUT_TOOL so the Bedrock tool-call path and
-# the Claude Code message path can never drift apart.
+# the Codex message path can never drift apart.
 REQUIRED_OUTPUT_FIELDS = frozenset(
     SUBMIT_OUTPUT_TOOL["toolSpec"]["inputSchema"]["json"]["required"]
 )
@@ -266,7 +266,7 @@ class AgentOutput:
     @classmethod
     def from_agent_message(cls, text: str) -> "AgentOutput":
         """
-        Parse AgentOutput from a Claude Code sub-agent's final message.
+        Parse AgentOutput from a Codex sub-agent's final message.
 
         Sub-agents spawned via the `Agent` tool have no `submit_agent_output` tool —
         that is the Bedrock `converse()` path (see SUBMIT_OUTPUT_TOOL). They end their
@@ -294,7 +294,7 @@ class AgentOutput:
         if not payload.get("decisions"):
             raise ValueError(
                 "AgentOutput.decisions is empty. Every sub-agent must record at least one "
-                "decision (choice_made + reasoning) — see .claude/rules/07-error-logging.md."
+                "decision (choice_made + reasoning) — see .codex/skills/observability/SKILL.md."
             )
         return cls.from_dict(payload)
 

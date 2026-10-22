@@ -1,8 +1,8 @@
 # IaC Generator — Reference Material
 
 > **This is reference material, not the live prompt.** The prompt that takes
-> effect is [`.claude/agents/iac-agent.md`](../../.claude/agents/iac-agent.md),
-> which the harness resolves on `subagent_type: "iac-agent"` and whose `tools:`
+> effect is [`.codex/agents/iac-agent.toml`](../../.codex/agents/iac-agent.toml),
+> which the harness resolves on `agent_type: "iac-agent"` and whose contract
 > frontmatter is the actual enforcement point. Where the two disagree, the
 > agent file wins. Two instructions below are **superseded** and called out
 > where they appear: "ask the user" in §Phase 0 (sub-agents have no
@@ -18,8 +18,8 @@
 > and applies the generated IaC manually — that is a deliberate policy, not a
 > limitation. Apply automation is out of scope for this iteration.
 >
-> **Read first**: `.claude/agents/iac-agent.md`, `CLAUDE.md`,
-> `.claude/rules/11-shared-run-context.md`, `TOOL_ROUTING.md`,
+> **Read first**: `.codex/agents/iac-agent.toml`, `AGENTS.md`,
+> `.codex/skills/observability/SKILL.md`, `TOOL_ROUTING.md`,
 > and `shared/templates/agent_output_schema.py`
 > (for the `AgentOutput` dataclass).
 
@@ -34,12 +34,12 @@ else — echoing each one in the guide — and emit Infrastructure as
 Code plus a human-readable `APPLY_GUIDE.md` so the user can apply the IaC
 manually with full context.
 
-You run as a Claude Code sub-agent, spawned with
-`subagent_type: "iac-agent"`. You return by ending your final message with a
+You run as a Codex sub-agent, spawned with
+`agent_type: "iac-agent"`. You return by ending your final message with a
 single fenced ```json block conforming to the `AgentOutput` dataclass in
 `shared/templates/agent_output_schema.py`, parsed by
 `AgentOutput.from_agent_message()`. The `submit_agent_output` tool named later
-in this file is a **Bedrock Converse** tool spec — it does not exist in a Claude
+in this file is a **Bedrock Converse** tool spec — it does not exist in a Codex
 Code sub-agent's toolset.
 
 ---
@@ -158,7 +158,7 @@ applying.
    `workloads/{workload_name}/config/deployment.yaml#account_topology`
    if it exists (populated by the onboarding prompt). If the file is missing,
    default to `mode: single` — that is the project-wide documented default
-   (`CLAUDE.md`, `docs/multi-account-deployment.md`), so it is a default rather
+   (`AGENTS.md`, `docs/multi-account-deployment.md`), so it is a default rather
    than a guess. Record it in `decisions[]` under `account_scope` and echo it in
    `APPLY_GUIDE.md`. Never *infer* multi-account from anything.
 
@@ -261,7 +261,7 @@ Plus, when present, upstream `AgentOutput` JSONs from
 
 **`.runs/{run_id}/` is aspirational — nothing in this repo writes it.** The
 shared run state that does exist is `workloads/{name}/run/context.json` and
-`run/decisions.jsonl` (see `.claude/rules/11-shared-run-context.md`); read those
+`run/decisions.jsonl` (see `.codex/skills/observability/SKILL.md`); read those
 for `human_answers` and for upstream reasoning. For artifacts, expect the
 on-disk fallback path to be the one that executes: read the files directly and
 record a `decisions[]` entry under category `input_source_fallback` with
@@ -496,7 +496,7 @@ For each PySpark script in `scripts/transform/`:
 - `aws_s3_object` for the DAG at `s3://{mwaa_bucket}/dags/{workload}_dag.py`
 - Recursive `aws_s3_object` resources for `shared/utils/`, `shared/logging/`,
   `shared/__init__.py`, and `workloads/{name}/{config,scripts}/` per the
-  upload order in SKILLS.md Phase 5 Step 5.8
+  upload order in ADOP_WORKFLOWS.md Phase 5 Step 5.8
 - Each `aws_s3_object` uses `etag = filemd5(...)` so IaC notices DAG drift
 - Exclude `__pycache__`, `*.pyc`, `tests/` via `for_each` filter
 - **Do not** declare the MWAA environment itself (default `create_mwaa = false`)
@@ -841,7 +841,7 @@ the human-facing companion to the JSON `AgentOutput`. It is **not** optional.
 
 5. **Post-apply verification**
 
-   Point to `SKILLS.md` Phase 5 Step 5.9 smoke tests (Glue Catalog, Athena
+   Point to `ADOP_WORKFLOWS.md` Phase 5 Step 5.9 smoke tests (Glue Catalog, Athena
    queries, LF-Tags, TBAC grants, KMS, MWAA DAG, QuickSight, CloudTrail).
 
 6. **Rollback notes**
@@ -868,7 +868,7 @@ the human-facing companion to the JSON `AgentOutput`. It is **not** optional.
 End your final message with a single fenced ```json block holding the payload
 below. `AgentOutput.from_agent_message()` extracts and validates it.
 (`submit_agent_output` is the Bedrock Converse tool spec in the same module and
-is not available to a Claude Code sub-agent.) The fields are defined in
+is not available to a Codex sub-agent.) The fields are defined in
 `shared/templates/agent_output_schema.py`. Pseudocode payload:
 
 ```python
@@ -1058,8 +1058,8 @@ repo" is a valid rejection reason; absence of one is not.
 
 ## Reference
 
-- `CLAUDE.md` — project identity, security rules, data zone rules.
-- `SKILLS.md` — full agent catalog, orchestration model, Phase 5 Step 5.9
+- `AGENTS.md` — project identity, security rules, data zone rules.
+- `ADOP_WORKFLOWS.md` — full agent catalog, orchestration model, Phase 5 Step 5.9
   smoke tests referenced by `APPLY_GUIDE.md`.
 - `TOOL_ROUTING.md` — which tool to pick (mostly relevant if we ever add a
   deployer; included for context).

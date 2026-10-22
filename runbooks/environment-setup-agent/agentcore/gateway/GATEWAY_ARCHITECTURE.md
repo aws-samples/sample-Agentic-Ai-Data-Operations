@@ -12,7 +12,7 @@ This document describes the AgentCore Gateway deployment architecture for hostin
 ┌────────────────────────────────────────────────────────────────────┐
 │  CLIENT LAYER                                                       │
 │                                                                     │
-│  Claude Code (.mcp.gateway.json)                                   │
+│  Codex (.mcp.gateway.json)                                   │
 │    - Single MCP server entry: "agentcore-gateway"                  │
 │    - Transport: SSE (Server-Sent Events over HTTPS)                │
 │    - Auth: AWS SigV4 (uses AWS credentials)                        │
@@ -29,7 +29,7 @@ This document describes the AgentCore Gateway deployment architecture for hostin
 │                                                                     │
 │  ┌──────────────────────────────────────────────────────────────┐ │
 │  │  Translation Layer                                            │ │
-│  │  - Receives MCP requests from Claude Code                    │ │
+│  │  - Receives MCP requests from Codex                    │ │
 │  │  - Translates to Lambda event format                         │ │
 │  │  - Routes to correct Lambda based on tool name               │ │
 │  │  - Translates Lambda response back to MCP format             │ │
@@ -92,10 +92,10 @@ This document describes the AgentCore Gateway deployment architecture for hostin
 ### Example: List Glue Databases
 
 ```
-1. User in Claude Code:
+1. User in Codex:
    "List all Glue databases"
 
-2. Claude Code MCP Client:
+2. Codex MCP Client:
    → Constructs MCP request:
      {
        "method": "tools/call",
@@ -155,7 +155,7 @@ This document describes the AgentCore Gateway deployment architecture for hostin
        }
      }
 
-10. Claude Code receives MCP response ✓
+10. Codex receives MCP response ✓
     → Displays result to user
 ```
 
@@ -339,7 +339,7 @@ Each Lambda target has a tool schema (JSON) describing its tools.
 ### Authentication Flow
 
 ```
-1. Claude Code User
+1. Codex User
    → Has AWS credentials (~/.aws/credentials)
    → Needs IAM permission: bedrock-agentcore:InvokeGateway
 
@@ -354,7 +354,7 @@ Each Lambda target has a tool schema (JSON) describing its tools.
 
 ### IAM Policies
 
-**User Policy** (attached to Claude Code user):
+**User Policy** (attached to Codex user):
 ```json
 {
   "Effect": "Allow",
@@ -478,8 +478,8 @@ Each Lambda target has a tool schema (JSON) describing its tools.
 | `agentcore/gateway/GATEWAY_ARCHITECTURE.md` | This file |
 | `agentcore/gateway/test_gateway.py` | Health check script |
 | `agentcore/gateway/schemas/glue-athena-tools.json` | Tool schema for glue-athena |
-| `.mcp.gateway.json` | MCP config for Claude Code (Gateway mode) |
-| `.mcp.json` | MCP config for Claude Code (Local mode) |
+| `.mcp.gateway.json` | MCP config for Codex (Gateway mode) |
+| `.mcp.json` | MCP config for Codex (Local mode) |
 
 ## Next Steps
 
@@ -488,10 +488,10 @@ Each Lambda target has a tool schema (JSON) describing its tools.
    - sagemaker-catalog
    - pii-detection
 
-2. **Test end-to-end from Claude Code**:
+2. **Test end-to-end from Codex**:
    ```bash
    cp .mcp.gateway.json .mcp.json
-   # Restart Claude Code
+   # Restart Codex
    # Test: "List all Glue databases"
    ```
 

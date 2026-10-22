@@ -51,7 +51,7 @@ jobs:
         run: python3 scripts/validate_tool_registry.py
 
   agent-definitions:
-    name: .claude/agents definitions
+    name: .codex/agents definitions
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -60,61 +60,40 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
-        run: pip install pyyaml
-
-      # A malformed `tools:` list is the dangerous case: the harness falls back to a broad
-      # toolset, so a sub-agent silently gains MCP access that .claude/rules/02 forbids.
-      - name: Check frontmatter parses and tools are declared
+      # A malformed agent contract is dangerous: the harness may fall back to a broad
+      # toolset, so a sub-agent silently gains access that the Codex skills forbid.
+      - name: Check TOML agent contracts
         run: |
           python3 - <<'PY'
-          import sys, pathlib, yaml
+          import pathlib
+          import sys
+          import tomllib
 
           errors = []
-          agents = sorted(pathlib.Path(".claude/agents").glob("*.md"))
+          agents = sorted(pathlib.Path(".codex/agents").glob("*.toml"))
           if not agents:
-              sys.exit(".claude/agents/ is empty — every named sub-agent would spawn as general-purpose")
+              sys.exit(".codex/agents/ is empty — every named sub-agent would spawn as general-purpose")
 
           for path in agents:
-              text = path.read_text()
-              if not text.startswith("---\n"):
-                  errors.append(f"{path}: no YAML frontmatter")
-                  continue
-              raw = text.split("---\n", 2)[1]
               try:
-                  fm = yaml.safe_load(raw) or {}
-              except yaml.YAMLError as e:
-                  errors.append(f"{path}: frontmatter is not valid YAML: {e}")
+                  contract = tomllib.loads(path.read_text())
+              except tomllib.TOMLDecodeError as e:
+                  errors.append(f"{path}: invalid TOML: {e}")
                   continue
 
-              for key in ("name", "description", "tools"):
-                  if key not in fm:
-                      errors.append(f"{path}: missing '{key}' in frontmatter")
+              for key in ("name", "description", "sandbox_mode", "developer_instructions"):
+                  if not contract.get(key):
+                      errors.append(f"{path}: missing '{key}'")
 
-              if fm.get("name") and fm["name"] != path.stem:
-                  errors.append(f"{path}: name '{fm['name']}' != filename stem '{path.stem}'")
+              if contract.get("name") and contract["name"] != path.stem:
+                  errors.append(f"{path}: name '{contract['name']}' != filename stem '{path.stem}'")
 
-              tools = fm.get("tools")
-              if isinstance(tools, str):
-                  tools = [t.strip() for t in tools.split(",") if t.strip()]
-              if not tools:
-                  errors.append(f"{path}: 'tools' is empty — the harness would grant a default set")
-                  continue
-
-              # Only ontology-agent may hold an MCP tool, and only the read-only get_table.
-              for tool in tools:
-                  if tool.startswith("mcp__") and not (
-                      path.stem == "ontology-agent" and tool == "mcp__glue-athena__get_table"
-                  ):
-                      errors.append(
-                          f"{path}: MCP tool '{tool}' — sub-agents have no MCP access "
-                          f"(.claude/rules/02-architecture.md)"
-                      )
-                  if tool in ("Agent", "SendMessage"):
-                      errors.append(f"{path}: '{tool}' would let a sub-agent spawn peers")
+              instructions = contract.get("developer_instructions", "")
+              if "subagent_type" in instructions:
+                  errors.append(f"{path}: contains a legacy agent-runtime reference")
 
           if errors:
-              print(f"FAIL: {len(errors)} problem(s) in .claude/agents/\n")
+              print(f"FAIL: {len(errors)} problem(s) in .codex/agents/\n")
               for e in errors:
                   print(f"  {e}")
               sys.exit(1)

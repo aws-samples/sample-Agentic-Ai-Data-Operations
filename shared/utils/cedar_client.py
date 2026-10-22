@@ -499,6 +499,14 @@ class _LocalEvaluator:
                 if resource.zone in ("landing", "staging"):
                     return False, f"{reason_prefix}: analysis can only read publish"
 
+        # Ontology staging: emit local config artifacts only.
+        if a == "ontology_staging":
+            if action in ("WriteData", "PromoteData", "InvokeTool"):
+                return False, f"{reason_prefix}: ontology staging is file-only"
+            if action == "WriteFile" and hasattr(resource, "file_type"):
+                if resource.file_type not in ("config", "script"):
+                    return False, f"{reason_prefix}: ontology staging can only write config/script"
+
         return True, f"{reason_prefix}: ALLOW"
 
 

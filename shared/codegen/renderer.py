@@ -109,7 +109,7 @@ def _make_env(template_id: str) -> "jinja2.Environment":
     def runtime_placeholders(*values: object) -> list[str]:
         """The ${NAME} parameters appearing anywhere in `values`, sorted.
 
-        CLAUDE.md security rule 2 forbids bucket names, account IDs and other
+        AGENTS.md security rule 2 forbids bucket names, account IDs and other
         infrastructure detail in source, so specs carry `${DATA_LAKE_BUCKET}` and
         `${PHI_HASH_SALT_SECRET_ID}` instead of real values. That is the right pattern and
         it was never wired: only `${ADOP_LOGICAL_DATE}` had a substitution step, so the

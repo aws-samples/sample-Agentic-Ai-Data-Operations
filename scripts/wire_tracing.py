@@ -136,7 +136,7 @@ def main():
         print("\n(Dry run - use --apply to modify files)")
         print("\nRecommended approach:")
         print("  1. Wire tracing manually using sales_transactions/scripts/transform/bronze_to_silver.py as example")
-        print("  2. Or use Claude Code to wire each file: 'wire tracing into {path}'")
+        print("  2. Or use Codex to wire each file: 'wire tracing into {path}'")
 
     return 0
 

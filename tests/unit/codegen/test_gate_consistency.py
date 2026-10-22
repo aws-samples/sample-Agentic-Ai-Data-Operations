@@ -400,7 +400,7 @@ class TestShippedWorkloadsAreConnected:
 
     customer_master's silver.yaml reads a Bronze table and the workload has no bronze.yaml.
     Not fixable here: authoring a Bronze spec means choosing a source path, format and ingestion
-    mode, which CLAUDE.md reserves for the human. Named so a NEW disconnection still fails.
+    mode, which AGENTS.md reserves for the human. Named so a NEW disconnection still fails.
     """
 
     KNOWN_DISCONNECTED = {

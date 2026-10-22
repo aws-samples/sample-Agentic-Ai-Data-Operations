@@ -3,29 +3,29 @@
 Human-invoked playbooks, organized by the agent persona that owns them. You open a runbook and
 follow it, or the orchestrator reads one on demand.
 
-## Runbooks vs `.claude/agents/` — which is which
+## Runbooks vs `.codex/agents/` — which is which
 
 This folder was called `prompts/`, and that name caused real confusion, because
-`.claude/agents/` also holds prompts. They are different things:
+`.codex/agents/` also holds prompts. They are different things:
 
-| | `runbooks/` (this folder) | `.claude/agents/` |
+| | `runbooks/` (this folder) | `.codex/agents/` |
 |---|---|---|
-| Loaded by | a human, or the orchestrator via `Read` | Claude Code, automatically on spawn |
-| Discovered by the harness? | **No** — nothing parses these files | **Yes** — `subagent_type: "quality-agent"` resolves here |
+| Loaded by | a human, or the orchestrator via `Read` | Codex, automatically on spawn |
+| Discovered by the harness? | **No** — nothing parses these files | **Yes** — `agent_type: "quality-agent"` resolves here |
 | `tools:` frontmatter enforced? | No, there is none | **Yes**, it is an allowlist |
-| Path matters? | No, only the links pointing at it | **Yes** — must be exactly `.claude/agents/{name}.md` |
+| Path matters? | No, only the links pointing at it | **Yes** — must be exactly `.codex/agents/{name}.toml` |
 | Typical size | 3–45 KB procedures | ~90 lines, scoped |
 | Change takes effect | next time someone reads it | within seconds (file-watched) |
 
-**Rule of thumb**: to change how a pipeline sub-agent behaves, edit `.claude/agents/`. To change
+**Rule of thumb**: to change how a pipeline sub-agent behaves, edit `.codex/agents/`. To change
 an operator procedure — AWS setup, compliance controls, troubleshooting, IaC — edit a runbook.
 
 Two files here blur the line and are worth calling out. Both follow the same split — short
-enforced prompt in `.claude/agents/`, long reference narrative here:
+enforced prompt in `.codex/agents/`, long reference narrative here:
 
 - `data-onboarding-agent/ontology-staging-agent.md` → live prompt is
-  `.claude/agents/ontology-agent.md`.
-- `devops-agent/iac-generator.md` → live prompt is `.claude/agents/iac-agent.md`. The runbook
+  `.codex/agents/ontology-agent.toml`.
+- `devops-agent/iac-generator.md` → live prompt is `.codex/agents/iac-agent.toml`. The runbook
   keeps the resource catalog, per-framework file layouts and validator matrix that would bloat
   every spawn; the agent reads it on demand. Two of its instructions are superseded and
   labelled as such in place: "ask the user" (sub-agents have no `AskUserQuestion`) and
@@ -34,7 +34,7 @@ enforced prompt in `.claude/agents/`, long reference narrative here:
 Anything spawned as a sub-agent — registered or inline — must return an `AgentOutput` whose
 `decisions` array has at least one entry. That is enforced in
 `shared/templates/agent_output_schema.py`, so an empty array fails the same as omitting it. See
-`.claude/rules/07-error-logging.md`.
+`.codex/skills/observability/SKILL.md`.
 
 ## Quick navigation
 
@@ -92,7 +92,7 @@ data-onboarding-agent/troubleshooting/
 ## Regulation library
 
 Not applied by default. The orchestrator loads exactly one file per selected regulation during
-Phase 1 discovery — see the dispatch list in `SKILLS.md`.
+Phase 1 discovery — see the dispatch list in `ADOP_WORKFLOWS.md`.
 
 | File | Regulation | Key focus |
 |---|---|---|
@@ -102,7 +102,7 @@ Phase 1 discovery — see the dispatch list in `SKILLS.md`.
 | [sox.md](data-onboarding-agent/regulation/sox.md) | SOX | Financial integrity, 0.95+ quality gate, 7-year audit |
 | [pci-dss.md](data-onboarding-agent/regulation/pci-dss.md) | PCI DSS | Cardholder masking, restricted access, Luhn validation |
 
-Adding one touches four places: the file here, the dispatch list in `SKILLS.md`, the table
+Adding one touches four places: the file here, the dispatch list in `ADOP_WORKFLOWS.md`, the table
 above, and the `compliance_rules.regulation` enum in
 `contracts/v1/quality_spec.schema.json`. Mind the spellings — the enum says `PCI_DSS`, the file
 is `pci-dss.md`, and the slash command takes `PCI DSS`.
@@ -111,8 +111,8 @@ is `pci-dss.md`, and the slash command takes `PCI DSS`.
 
 | File | Purpose |
 |---|---|
-| [`../CLAUDE.md`](../CLAUDE.md) | Project rules, human-in-the-loop gate |
-| [`../SKILLS.md`](../SKILLS.md) | Orchestrator + sub-agent skill definitions |
+| [`../AGENTS.md`](../AGENTS.md) | Project rules, human-in-the-loop gate |
+| [`../ADOP_WORKFLOWS.md`](../ADOP_WORKFLOWS.md) | Orchestrator + sub-agent skill definitions |
 | [`../MCP_GUARDRAILS.md`](../MCP_GUARDRAILS.md) | Per-phase MCP tool guardrails |
 | [`../TOOL_ROUTING.md`](../TOOL_ROUTING.md) | Which MCP tool for which task |
 | [`../docs/workflow-diagrams.md`](../docs/workflow-diagrams.md) | Visual workflow diagrams |

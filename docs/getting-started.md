@@ -14,8 +14,8 @@ Your data onboarding system now has reusable prompt patterns you can use for any
 | **runbooks/** (01-route through 05-govern) | 📋 Copy-paste templates | Quick lookup for prompt structure |
 | **runbooks/examples/README.md** | 📝 Filled-out examples | See real-world usage with details |
 | **runbooks/data-onboarding-agent/regulation/** | 🔒 Regulation-specific controls | When GDPR, CCPA, HIPAA, SOX, or PCI DSS compliance is required |
-| **SKILLS.md** (bottom section) | 📖 Full documentation | Deep dive into each pattern |
-| **CLAUDE.md** | 🏗️ Architecture reference | Understand system design |
+| **ADOP_WORKFLOWS.md** (bottom section) | 📖 Full documentation | Deep dive into each pattern |
+| **AGENTS.md** | 🏗️ Architecture reference | Understand system design |
 | **deploy_to_aws.py** | 🚀 Deployment script | Deploy workload to AWS (Glue, MWAA, QuickSight) |
 
 ---
@@ -63,7 +63,7 @@ Source details:
 Report: existing workload status or confirm new data.
 ```
 
-**What happens**: Claude searches all existing workloads and tells you if this data is already onboarded.
+**What happens**: Codex searches all existing workloads and tells you if this data is already onboarded.
 
 ---
 
@@ -109,7 +109,7 @@ Schedule:
 Build complete pipeline with tests.
 ```
 
-**What happens**: Claude creates:
+**What happens**: Codex creates:
 - Complete folder structure (`workloads/[name]/`)
 - Config files (source, semantic, transformations, quality, schedule)
 - Transformation scripts (Bronze→Silver→Gold)
@@ -152,7 +152,7 @@ Columns:
 - segment: ENUM, Enterprise 20%, SMB 50%, Individual 30%
 - country: STRING, US 60%, UK 20%, CA 10%, DE 10%
 
-Output: demo/sample_data/customer_demo.csv with generator script
+Output: a generated fixture under `workloads/{name}/` with its generator script
 ```
 
 Then onboard it with ONBOARD prompt above.
@@ -181,7 +181,7 @@ Integrity:
 Update semantic.yaml, scripts, DAG, tests.
 ```
 
-**What happens**: Claude adds FK validation, updates configs, adds tests for referential integrity.
+**What happens**: Codex adds FK validation, updates configs, adds tests for referential integrity.
 
 ---
 
@@ -204,7 +204,7 @@ Permissions: [IAM users/groups]
 Create dashboard and return URL.
 ```
 
-**What happens**: Claude creates QuickSight data source, datasets, dashboard with all visuals, and grants permissions.
+**What happens**: Codex creates QuickSight data source, datasets, dashboard with all visuals, and grants permissions.
 
 ---
 
@@ -224,7 +224,7 @@ Provide:
 Generate data_product_catalog.yaml and lineage diagram.
 ```
 
-**What happens**: Claude creates lineage diagrams, relationship graphs, and structured metadata for governance.
+**What happens**: Codex creates lineage diagrams, relationship graphs, and structured metadata for governance.
 
 ---
 
@@ -245,8 +245,8 @@ Generate data_product_catalog.yaml and lineage diagram.
 
 **What happens**:
 - Gateway: All 13 MCP servers (4 custom FastMCP + 9 PyPI) hosted in cloud, each with least-privilege IAM
-- Agent: Runs in Claude Code on your laptop (human-in-the-loop)
-- Sub-agents: Spawned locally via Claude Code `Agent` tool
+- Agent: Runs in Codex on your laptop (human-in-the-loop)
+- Sub-agents: Spawned locally via Codex `Agent` tool
 - Same onboarding workflow as before -- only the tool transport changes (stdio to SSE)
 
 To revert to fully local: `git checkout .mcp.json`
@@ -352,7 +352,7 @@ Cleaning: Dedupe on customer_id, mask email/phone
 Gold: Star schema for reporting
 ```
 
-Claude will ask clarifying questions for anything missing.
+Codex will ask clarifying questions for anything missing.
 
 ### 2. Be Specific Where It Matters
 
@@ -364,7 +364,7 @@ Claude will ask clarifying questions for anything missing.
 - Quality threshold (80% Silver, 95% Gold)
 - Schedule (cron expression)
 
-**Less critical** (Claude can infer or use defaults):
+**Less critical** (Codex can infer or use defaults):
 - Exact partitioning strategy
 - Retry counts
 - Alert recipients
@@ -413,9 +413,9 @@ These prompts add:
 **Example**:
 ```
 User: "We need to onboard patient records"
-Claude: "Does this data require HIPAA compliance?"
+Codex: "Does this data require HIPAA compliance?"
 User: "Yes"
-Claude: [loads runbooks/data-onboarding-agent/regulation/hipaa.md] → adds PHI encryption, audit logging, access controls
+Codex: [loads runbooks/data-onboarding-agent/regulation/hipaa.md] → adds PHI encryption, audit logging, access controls
 ```
 
 ---
@@ -446,7 +446,7 @@ python3 workloads/my_dataset/dags/my_dataset_dag.py
 # - Invalid cron: Use "0 6 * * *" not "6am daily"
 ```
 
-### "Claude asks too many questions"
+### "Codex asks too many questions"
 Be more specific in your prompt. Compare:
 
 **Vague** → Many questions:
@@ -472,7 +472,7 @@ Read workloads/[NAME]/config/semantic.yaml and workloads/[NAME]/scripts/transfor
 Then: Update the [WHAT YOU WANT TO CHANGE] to [NEW BEHAVIOR]
 ```
 
-Claude will edit existing files instead of creating new ones.
+Codex will edit existing files instead of creating new ones.
 
 ---
 
@@ -500,7 +500,7 @@ Claude will edit existing files instead of creating new ones.
 **For your first onboarding:**
 1. Open `runbooks/examples/README.md`
 2. Find an example similar to your data
-3. Copy the ROUTE prompt, fill in your details, send to Claude
+3. Copy the ROUTE prompt, fill in your details, send to Codex
 4. If not found, copy the ONBOARD prompt, fill in, send
 5. Wait for pipeline generation (~5-10 minutes)
 6. Run tests: `pytest workloads/[NAME]/tests/ -v`
@@ -516,8 +516,8 @@ Claude will edit existing files instead of creating new ones.
 
 **Need help?**
 - See detailed examples: `runbooks/examples/README.md`
-- See full documentation: `SKILLS.md` → Modular Prompt Patterns
-- See architecture: `CLAUDE.md`
+- See full documentation: `ADOP_WORKFLOWS.md` → Modular Prompt Patterns
+- See architecture: `AGENTS.md`
 - See deployment guide: `docs/aws-account-setup.md`
 
 ---

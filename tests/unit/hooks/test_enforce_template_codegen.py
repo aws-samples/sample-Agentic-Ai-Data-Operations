@@ -1,4 +1,4 @@
-"""Unit tests for .claude/hooks/enforce_template_codegen.py."""
+"""Unit tests for .codex/hooks/enforce_template_codegen.py."""
 
 import json
 import os
@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-HOOK_PATH = Path(__file__).resolve().parent.parent.parent.parent / ".claude" / "hooks" / "enforce_template_codegen.py"
+HOOK_PATH = Path(__file__).resolve().parent.parent.parent.parent / ".codex" / "hooks" / "enforce_template_codegen.py"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 

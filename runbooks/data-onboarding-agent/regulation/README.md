@@ -69,5 +69,5 @@ Each regulation prompt includes a "Quick check" bash script to verify all prereq
 
 - `docs/governance-framework.md` — Full governance architecture and control matrices
 - `docs/governance-integration-example.md` — End-to-end GDPR+CCPA onboarding example
-- `SKILLS.md` section 6a — Discovery phase compliance questions
-- `CLAUDE.md` Security Rule 5 — Regulatory compliance requirement
+- `ADOP_WORKFLOWS.md` section 6a — Discovery phase compliance questions
+- `AGENTS.md` Security Rule 5 — Regulatory compliance requirement

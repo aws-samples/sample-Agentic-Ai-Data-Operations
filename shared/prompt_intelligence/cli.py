@@ -53,7 +53,7 @@ def main():
 
     # Prune command
     prune_parser = subparsers.add_parser(
-        'prune', help='Revert (prune) a grafted patch from SKILLS.md'
+        'prune', help='Revert (prune) a grafted patch from ADOP_WORKFLOWS.md'
     )
     prune_parser.add_argument(
         '--patch-id', type=str, required=True,
@@ -270,17 +270,17 @@ def run_patches(args):
 
 
 def run_prune(args):
-    """Prune (revert) a patch from SKILLS.md."""
+    """Prune (revert) a patch from ADOP_WORKFLOWS.md."""
     from .patch_registry import PromptEvolver
 
     evolver = PromptEvolver()
     success = evolver.prune_patch(args.patch_id)
 
     if success:
-        print(f"Pruned patch {args.patch_id} from SKILLS.md")
+        print(f"Pruned patch {args.patch_id} from ADOP_WORKFLOWS.md")
         print("Patch status reset to 'pending'.")
     else:
-        print(f"Patch {args.patch_id} not found in SKILLS.md (may not be grafted).")
+        print(f"Patch {args.patch_id} not found in ADOP_WORKFLOWS.md (may not be grafted).")
         sys.exit(1)
 
 

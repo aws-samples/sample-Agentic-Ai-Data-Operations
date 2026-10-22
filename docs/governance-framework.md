@@ -14,7 +14,7 @@ The Agentic Data Onboarding platform includes a **built-in governance framework*
 
 1. **Governance by Default** — All workloads automatically scan for PII during onboarding
 2. **Regulatory Compliance First** — Ask about GDPR, CCPA, HIPAA, SOX, PCI DSS requirements in Phase 1 discovery
-3. **AI-Driven Detection** — Claude analyzes column names and content to identify sensitive data
+3. **AI-Driven Detection** — Codex analyzes column names and content to identify sensitive data
 4. **Column-Level Security** — Lake Formation LF-Tags enable fine-grained access control
 5. **Audit Everything** — All access logged to CloudTrail for compliance reporting
 
@@ -345,7 +345,7 @@ Lake Formation **automatically filters columns** based on the user's tag permiss
 
 Location: `mcp-servers/pii-detection-server/`
 
-**Purpose:** Enable Claude Code to manage PII governance via natural language.
+**Purpose:** Enable Codex to manage PII governance via natural language.
 
 ### Available Tools
 
@@ -353,12 +353,12 @@ Location: `mcp-servers/pii-detection-server/`
 # Setup (one-time)
 cd mcp-servers/pii-detection-server
 ./setup.sh
-# Restart Claude Code
+# Restart Codex
 ```
 
 After setup, use natural language:
 
-| User Request | Claude Action |
+| User Request | Codex Action |
 |--------------|---------------|
 | "Detect PII in finsights_silver.funds_clean" | Runs `detect_pii_in_table`, applies LF-Tags |
 | "Scan all tables in customer database for PII" | Runs `scan_database_for_pii`, tags all PII columns |
@@ -649,5 +649,5 @@ This is not optional. Every workload automatically gets governance as part of on
 - `PII_DETECTION_AND_TAGGING.md` — Technical implementation details
 - `MCP_PII_TAGGING_SOLUTION.md` — Lambda + MCP architecture options
 - `mcp-servers/pii-detection-server/README.md` — MCP server usage guide
-- `CLAUDE.md` — Project configuration (Security Rules section)
-- `SKILLS.md` — Data Onboarding Agent Phase 1 Discovery (Section 6a-6d)
+- `AGENTS.md` — Project configuration (Security Rules section)
+- `ADOP_WORKFLOWS.md` — Data Onboarding Agent Phase 1 Discovery (Section 6a-6d)

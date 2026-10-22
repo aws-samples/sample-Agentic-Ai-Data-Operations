@@ -106,12 +106,12 @@ def test_gateway_health():
     print()
     print("Next Steps:")
     print("1. Copy .mcp.gateway.json to .mcp.json")
-    print("2. Restart Claude Code")
+    print("2. Restart Codex")
     print("3. Test tool invocation:")
     print('   User: "List all Glue databases using the Gateway"')
-    print("   Claude: uses agentcore-gateway.get_databases")
+    print("   Codex: uses agentcore-gateway.get_databases")
     print()
-    print("Gateway is deployed and ready for Claude Code integration!")
+    print("Gateway is deployed and ready for Codex integration!")
     print()
 
 

@@ -138,7 +138,7 @@ The report will include:
 1. **Apply high-priority fixes** from the report
 2. **Monitor future runs** to verify fixes work
 3. **Run analysis periodically** to catch new patterns
-4. **Share successful patterns** as best practices in CLAUDE.md
+4. **Share successful patterns** as best practices in AGENTS.md
 
 ## Troubleshooting
 

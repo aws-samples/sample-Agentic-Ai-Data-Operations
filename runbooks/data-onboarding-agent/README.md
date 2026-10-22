@@ -64,9 +64,9 @@ Two execution modes are available:
 
 ### Mode 1: Sequential (standard)
 ```bash
-# Paste your onboarding prompt directly. Claude runs phases sequentially.
+# Paste your onboarding prompt directly. Codex runs phases sequentially.
 User: "Onboard product catalog from S3"
-  ↓ Claude runs phases 0-5, one sub-agent at a time
+  ↓ Codex runs phases 0-5, one sub-agent at a time
   ↓ ~30 min wall clock
 Output: workloads/product_catalog/
 ```
@@ -82,21 +82,21 @@ User: "Onboard patient records from S3..."
 Output: workloads/patient_records/
 ```
 
-The workflow mode is defined in `.claude/commands/onboard-workflow.md` and supports:
+The workflow mode is defined in `.codex/skills/command-onboard-workflow/SKILL.md` and supports:
 - Parallel Phase 4 agents (Metadata + Quality run concurrently)
 - Model routing (HIPAA/SOX/PCI → Opus for build agents, else Sonnet)
 - Multi-workload batch (multiple datasets in one invocation)
 - Resumable progress (completed phases are not re-run on disconnect)
 
-See `demo/sample_prompt/customer_master_workflow.md` for a full example.
+See `../../workloads/customer_master/` for a committed example workload.
 
 ### Standard flow detail
 ```
 User: "Onboard product catalog from S3"
   ↓
-Claude: Runs 01-route (checks workloads/)
+Codex: Runs 01-route (checks workloads/)
   ↓
-Claude: Runs 02-onboard (master prompt: phases 0-5)
+Codex: Runs 02-onboard (master prompt: phases 0-5)
   ├─ Phase 0: Health check (AWS resources + MCP servers)
   ├─ Phase 1: Discovery (asks questions about source, schema, quality)
   ├─ Phase 2: Validation (dedup check, confirm source)
@@ -220,7 +220,7 @@ For regulated data, run a regulation prompt DURING Phase 1 discovery:
 | **SOX** | `regulation/sox.md` | 0.95+ quality gates, immutable Bronze, auditor roles |
 | **PCI DSS** | `regulation/pci-dss.md` | CVV dropped, PAN tokenized, Luhn validation |
 
-**When to apply**: Claude will ask "Any regulatory requirements?" during Phase 1. If yes, it loads the appropriate regulation prompt.
+**When to apply**: Codex will ask "Any regulatory requirements?" during Phase 1. If yes, it loads the appropriate regulation prompt.
 
 ## Troubleshooting
 
@@ -229,7 +229,7 @@ For regulated data, run a regulation prompt DURING Phase 1 discovery:
 - Action: Modify existing or use different name
 
 **Issue**: "MCP server failed"
-- Check: `claude mcp list`
+- Check: `inspect Codex MCP configuration`
 - See: `../../docs/mcp-setup.md`
 
 **Issue**: "Quality gate failed (score < 0.80)"
@@ -247,10 +247,10 @@ For regulated data, run a regulation prompt DURING Phase 1 discovery:
 
 - `../environment-setup-agent/README.md` - Run this first
 - `../data-analysis-agent/README.md` - Run this after onboarding
-- `../../SKILLS.md` - Detailed agent skill definitions
+- `../../ADOP_WORKFLOWS.md` - Detailed agent skill definitions
 - `../../MCP_GUARDRAILS.md` - MCP tool selection rules per phase
 - `../../docs/workflow-diagrams.md` - Visual diagrams of the workflow
-- `../../CLAUDE.md` - Project-level configuration
+- `../../AGENTS.md` - Project-level configuration
 
 ## Examples
 

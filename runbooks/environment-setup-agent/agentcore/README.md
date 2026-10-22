@@ -27,9 +27,9 @@ Deploy all 13 MCP servers to **Agentcore Gateway** and the Data Onboarding Agent
                │                                     │
   LOCAL DEMO MODE                      PRODUCTION MODE
   ───────────────────                  ───────────────────
-  Claude Code (laptop)                 Agentcore Runtime
+  Codex (laptop)                 Agentcore Runtime
   ├── .mcp.gateway.json                ├── agent.yaml
-  ├── reads SKILLS.md                  ├── CLAUDE.md + SKILLS.md
+  ├── reads ADOP_WORKFLOWS.md                  ├── AGENTS.md + ADOP_WORKFLOWS.md
   ├── spawns sub-agents                │   loaded as instructions
   │   via Agent tool                   ├── sub-agents internal
   └── human-in-the-loop               └── API-accessible
@@ -44,20 +44,20 @@ Gateway is deployed **once** and used by **both** modes. The only difference is 
 
 ### Local Demo Mode
 
-The agent runs in Claude Code on your laptop. MCP tools come from Gateway via SSE.
+The agent runs in Codex on your laptop. MCP tools come from Gateway via SSE.
 
 | Aspect | Details |
 |--------|---------|
-| **Agent** | Claude Code CLI on your laptop |
+| **Agent** | Codex CLI on your laptop |
 | **Tools** | All 13 MCP servers on Gateway (SSE transport) |
-| **Sub-agents** | Spawned via Claude Code `Agent` tool (local) |
-| **Human-in-the-loop** | Yes -- Claude asks questions, presents plans, gets approval |
+| **Sub-agents** | Spawned via Codex `Agent` tool (local) |
+| **Human-in-the-loop** | Yes -- Codex asks questions, presents plans, gets approval |
 | **Use case** | Demos, development, testing, single-user workflows |
 
 **How to set up:**
 1. Deploy Gateway: run `runbooks/environment-setup-agent/02-deploy-agentcore-gateway.md`
 2. Replace `.mcp.json` with the generated `.mcp.gateway.json`
-3. Run Claude Code normally -- use `runbooks/data-onboarding-agent/03-onboard-build-pipeline.md` to onboard data
+3. Run Codex normally -- use `runbooks/data-onboarding-agent/03-onboard-build-pipeline.md` to onboard data
 
 **How to revert to fully local (no Gateway):**
 ```bash
@@ -94,7 +94,7 @@ aws bedrock-agent-runtime invoke-agent \
 | **Gateway** | Hosts all 13 MCP servers in the cloud | Always -- required for both demo and production modes |
 | **Runtime** | Hosts the Data Onboarding Agent as a cloud API | Production mode only -- when the agent needs to be API-accessible |
 
-Runtime requires Gateway (agent needs tools). Gateway can be used standalone with local Claude Code (demo mode).
+Runtime requires Gateway (agent needs tools). Gateway can be used standalone with local Codex (demo mode).
 
 ## Directory Structure
 
@@ -131,7 +131,7 @@ agentcore/
 
 ### Step 1: Deploy Gateway (required for both modes)
 
-Run `runbooks/environment-setup-agent/02-deploy-agentcore-gateway.md` -- Claude will:
+Run `runbooks/environment-setup-agent/02-deploy-agentcore-gateway.md` -- Codex will:
 1. Create Gateway IAM execution role
 2. Attach 13 per-server policies from `agentcore/gateway/iam/`
 3. Register Gateway with Bedrock Agentcore
@@ -143,7 +143,7 @@ After this step, you can use **Local Demo Mode** immediately (replace `.mcp.json
 
 ### Step 2: Deploy Runtime (production mode only)
 
-Run `runbooks/environment-setup-agent/03-deploy-agentcore-runtime.md` -- Claude will:
+Run `runbooks/environment-setup-agent/03-deploy-agentcore-runtime.md` -- Codex will:
 1. Verify Gateway is healthy (all 13 servers)
 2. Create Runtime IAM execution role
 3. Register agent from `agentcore/runtime/agent.yaml`

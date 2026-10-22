@@ -64,7 +64,7 @@ Quality threshold: 95%
 
 ### Phase 1: Discovery
 
-Claude asks:
+Codex asks:
 
 > "Does this data comply with any regulations?"
 > - ☑ GDPR
@@ -75,7 +75,7 @@ Claude asks:
 
 User confirms: **GDPR + CCPA**
 
-Claude applies controls:
+Codex applies controls:
 - Right to erasure (soft delete flag)
 - PII detection required
 - Column-level access control
@@ -84,7 +84,7 @@ Claude applies controls:
 
 ### Phase 3: Profiling + PII Detection
 
-Claude runs `shared/utils/pii_detection_and_tagging.py`:
+Codex runs `shared/utils/pii_detection_and_tagging.py`:
 
 ```
 🔍 Detecting PII in customer_data...
@@ -100,7 +100,7 @@ Summary:
   • 2 non-PII columns
 ```
 
-Claude presents to user:
+Codex presents to user:
 
 > "I detected 2 PII columns:
 >   - `name` → HIGH sensitivity (person name)
@@ -117,7 +117,7 @@ User: "Yes"
 
 ### Phase 4: Build Pipeline
 
-Claude generates transformation scripts with PII masking:
+Codex generates transformation scripts with PII masking:
 
 **scripts/transform/landing_to_staging.py:**
 ```python
@@ -154,7 +154,7 @@ columns:
 
 ### Phase 5: Deploy
 
-Claude applies Lake Formation tags:
+Codex applies Lake Formation tags:
 
 ```bash
 # Via MCP or AWS CLI
@@ -171,7 +171,7 @@ aws lakeformation add-lf-tags-to-resource \
   ]'
 ```
 
-Claude grants tag-based access:
+Codex grants tag-based access:
 
 ```bash
 # Analysts get MEDIUM/LOW only (won't see names/emails)
@@ -193,7 +193,7 @@ aws lakeformation grant-permissions \
 
 ## Natural Language Governance (MCP)
 
-After onboarding, you can manage access via Claude Code:
+After onboarding, you can manage access via Codex:
 
 ### Example 1: Grant Access
 
@@ -202,7 +202,7 @@ After onboarding, you can manage access via Claude Code:
 Grant marketing-team access to customer names and cities, but NOT emails or SSNs
 ```
 
-**Claude Code action:**
+**Codex action:**
 1. Identifies columns:
    - `name` → HIGH ✅
    - `city` → MEDIUM ✅
@@ -224,7 +224,7 @@ Grant marketing-team access to customer names and cities, but NOT emails or SSNs
 Generate PII compliance report for customer_db
 ```
 
-**Claude Code action:**
+**Codex action:**
 1. Calls MCP tool: `get_pii_report`
    - Database: `customer_db`
    - Format: `summary`
@@ -252,7 +252,7 @@ Generate PII compliance report for customer_db
 Scan the new orders table for PII and apply appropriate tags
 ```
 
-**Claude Code action:**
+**Codex action:**
 1. Calls MCP tool: `detect_pii_in_table`
    - Database: `customer_db`
    - Table: `orders`
@@ -348,5 +348,5 @@ The governance framework turns PII detection from a **manual, error-prone task**
 - `shared/utils/pii_detection_and_tagging.py` — Detection engine
 - `mcp-servers/pii-detection-server/` — MCP server for natural language governance
 - `workloads/healthcare_patients/demo_governance_workflow.py` — Live demo
-- `CLAUDE.md` — Security rules (Section: Security Rules)
-- `SKILLS.md` — Discovery questions (Phase 1, Section 6a-6d)
+- `AGENTS.md` — Security rules (Section: Security Rules)
+- `ADOP_WORKFLOWS.md` — Discovery questions (Phase 1, Section 6a-6d)

@@ -130,7 +130,7 @@ repos:
         language: python
         additional_dependencies: ['pyyaml']
         pass_filenames: false
-        files: '(\.mcp\.json|tool-registry/.*\.yaml|TOOL_ROUTING\.md|MCP_GUARDRAILS\.md|CLAUDE\.md)$'
+        files: '(\.mcp\.json|tool-registry/.*\.yaml|TOOL_ROUTING\.md|MCP_GUARDRAILS\.md|AGENTS\.md|ADOP_WORKFLOWS\.md)$'
 
       # Validate contract JSON Schemas are valid Draft 2020-12
       - id: contracts-schema-validator

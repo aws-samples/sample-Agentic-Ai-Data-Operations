@@ -7,7 +7,7 @@ Build a deep logging system that captures what happened (operational), why it ha
 
 1. **Layer 1 — Orchestrator** (`OrchestratorLogger` + `run_pipeline.py`): Phase transitions, sub-agent spawning, test gates, retries
 2. **Layer 2 — Generated Scripts** (Glue ETL, quality checks, DAGs): Row counts, transformations applied, quality scores, errors
-3. **Layer 3 — LLM Self-Reporting** (SKILLS.md spawn prompts): Structured decision traces returned as part of `AgentOutput`
+3. **Layer 3 — LLM Self-Reporting** (ADOP_WORKFLOWS.md spawn prompts): Structured decision traces returned as part of `AgentOutput`
 
 All three layers are linked by a shared `run_id`, producing a unified trace per pipeline execution.
 
@@ -28,12 +28,12 @@ Read these files first to understand what exists:
 - shared/utils/orchestrator_logger.py (Layer 1 — exists, needs enhancement)
 - shared/utils/structured_logger.py (Layer 2 — exists, unused in scripts)
 - shared/templates/agent_output_schema.py (Layer 3 — exists, needs decisions array)
-- SKILLS.md (agent spawn prompts — need decision reporting requirement)
-- CLAUDE.md (project config — needs logging protocol section)
+- ADOP_WORKFLOWS.md (agent spawn prompts — need decision reporting requirement)
+- AGENTS.md (project config — needs logging protocol section)
 
 === EXECUTION MODEL (READ THIS FIRST) ===
 
-This platform uses Claude Code LLM sub-agents, NOT Python agent classes.
+This platform uses Codex LLM sub-agents, NOT Python agent classes.
 You CANNOT instrument LLM reasoning with decorators or function hooks.
 
 The three instrumentable layers are:
@@ -50,7 +50,7 @@ Layer 2 — Generated Scripts (Python code running on Glue/Airflow):
   - FULLY instrumentable — wire StructuredLogger into every script
 
 Layer 3 — LLM Agent Self-Reporting (prompt engineering):
-  - Sub-agents are LLM prompts in SKILLS.md, spawned via Claude Code Agent tool
+  - Sub-agents are LLM prompts in ADOP_WORKFLOWS.md, spawned via Codex Agent tool
   - Cannot observe reasoning externally — must REQUIRE structured output
   - Add a `decisions` array to AgentOutput so agents report their own cognitive trace
   - Each decision: reasoning, choice_made, alternatives_considered, rejection_reasons, confidence
@@ -143,7 +143,7 @@ Build these files in order:
    - Add helper method: add_decision(category, reasoning, choice, alternatives=None, confidence="high")
    - Preserve ALL existing fields and methods
 
-6. Update SKILLS.md sub-agent spawn prompts
+6. Update ADOP_WORKFLOWS.md sub-agent spawn prompts
    - Add this requirement to the Sub-Agent Output Format section:
      "You MUST include a `decisions` array documenting every significant choice you made.
       For each decision, explain your reasoning, what alternatives you considered,
@@ -154,7 +154,7 @@ Build these files in order:
      - Quality Agent: threshold selection, rule priority, anomaly detection config
      - DAG Agent: task grouping, retry strategy, dependency ordering
 
-7. Update CLAUDE.md
+7. Update AGENTS.md
    - Add "Agent Logging Protocol" section after "Error Handling Philosophy"
    - Brief description of three-layer model
    - Rule: "Every pipeline run MUST produce a trace_events.jsonl"
@@ -210,7 +210,7 @@ Trace hierarchy for a typical run:
 === CONSTRAINTS ===
 
 - Do NOT create an AgentTracer decorator or try to wrap LLM calls — LLM agents are prompts, not functions
-- Do NOT add token counting fields (gen_ai_input_tokens etc.) — not available from Claude Code sub-agents
+- Do NOT add token counting fields (gen_ai_input_tokens etc.) — not available from Codex sub-agents
 - Do NOT break existing OrchestratorLogger console output — enhance, don't replace
 - Do NOT change ETL script logic when wiring in StructuredLogger — logging only
 - Keep AgentTracer to ~15 fields max — resist the urge to add 30+ OTel fields
@@ -228,8 +228,8 @@ After implementation, run these checks:
 4. python3 -m shared.logging.trace_viewer docs/logging_examples/trace_events.jsonl --decisions  (shows cognitive events)
 5. python3 -m shared.logging.trace_viewer docs/logging_examples/trace_events.jsonl --export-md  (generates markdown)
 6. jq '.' docs/logging_examples/trace_events.jsonl  (valid JSONL)
-7. Check SKILLS.md contains "decisions" requirement in Sub-Agent Output Format
-8. Check CLAUDE.md contains "Agent Logging Protocol" section
+7. Check ADOP_WORKFLOWS.md contains "decisions" requirement in Sub-Agent Output Format
+8. Check AGENTS.md contains "Agent Logging Protocol" section
 9. Check shared/templates/agent_output_schema.py has decisions field + add_decision method
 10. Check docs/logging_examples/ has all 4 files (trace_events.jsonl, agent_log.md, cognitive_map.json, README.md)
 11. Check each workload has logs/ folder with README.md and .gitignore
@@ -252,8 +252,8 @@ After implementation, run these checks:
 | `shared/utils/orchestrator_logger.py` | Enhanced with AgentTracer integration |
 | `shared/utils/structured_logger.py` | Unchanged (already exists, scripts wire into it) |
 | `shared/templates/agent_output_schema.py` | Extended with `decisions` array + `add_decision()` |
-| `SKILLS.md` | Updated spawn prompts with decision reporting requirement |
-| `CLAUDE.md` | New "Agent Logging Protocol" section |
+| `ADOP_WORKFLOWS.md` | Updated spawn prompts with decision reporting requirement |
+| `AGENTS.md` | New "Agent Logging Protocol" section |
 | `tests/unit/test_agent_tracer.py` | Unit tests for tracer, viewer, and AgentOutput extension |
 | `docs/logging_examples/trace_events.jsonl` | Sample trace (~30 events) |
 | `docs/logging_examples/agent_log.md` | Human-readable run narrative |
@@ -263,10 +263,10 @@ After implementation, run these checks:
 ## Key Design Decisions
 
 ### Why not instrument LLM agents directly?
-Sub-agents are Claude Code prompts (SKILLS.md), not Python classes. You can't attach decorators, middleware, or tracing hooks to an LLM conversation. Instead, we require structured self-reporting via the `decisions` array in `AgentOutput`.
+Sub-agents are Codex prompts (ADOP_WORKFLOWS.md), not Python classes. You can't attach decorators, middleware, or tracing hooks to an LLM conversation. Instead, we require structured self-reporting via the `decisions` array in `AgentOutput`.
 
 ### Why ~15 fields instead of 30+?
-AgentTrace's full OTel schema includes fields like `gen_ai_input_tokens`, `gen_ai_output_tokens`, `gen_ai_model` that aren't available from Claude Code sub-agents. We keep only fields we can actually populate.
+AgentTrace's full OTel schema includes fields like `gen_ai_input_tokens`, `gen_ai_output_tokens`, `gen_ai_model` that aren't available from Codex sub-agents. We keep only fields we can actually populate.
 
 ### Why three surfaces?
 Separating operational/cognitive/contextual lets you filter traces by concern:

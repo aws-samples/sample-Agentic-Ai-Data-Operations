@@ -192,8 +192,8 @@ Some patterns require code changes:
 - Schema validation → Update `shared/utils/schema_utils.py`
 - Quality rules → Update `shared/utils/quality_checks.py`
 
-#### 4. Document in CLAUDE.md
-Once validated, add successful patterns to `CLAUDE.md`.
+#### 4. Document in AGENTS.md
+Once validated, add successful patterns to `AGENTS.md`.
 
 #### 5. Track Effectiveness
 After applying fixes:

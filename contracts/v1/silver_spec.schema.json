@@ -242,7 +242,7 @@
               "salt_secret_id": {
                 "type": "string",
                 "minLength": 1,
-                "description": "AWS Secrets Manager secret ID holding the salt. Required when method is hash_salted. The ID, never the secret value \u2014 CLAUDE.md security rule 1."
+                "description": "AWS Secrets Manager secret ID holding the salt. Required when method is hash_salted. The ID, never the secret value \u2014 AGENTS.md security rule 1."
               }
             },
             "allOf": [

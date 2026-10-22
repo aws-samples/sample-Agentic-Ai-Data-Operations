@@ -746,7 +746,7 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
       </div>
     </div>
     <p class="split-hero-cta">See the infographic for the full picture, and the flow below for the timeline of a single run.<br/>
-    <span class="split-hero-note">Built on <a href="https://docs.claude.com/en/docs/claude-code/overview" target="_blank" rel="noopener">Claude Code</a> workflows for parallel multi-agent orchestration.</span></p>
+    <span class="split-hero-note">Built on Codex workflows for parallel multi-agent orchestration.</span></p>
   </div>
 </section>
 
@@ -821,7 +821,7 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
         <div class="start-step-title">Clone the Repo</div>
         <pre class="start-step-code">git clone https://github.com/aws-samples/sample-Agentic-Ai-Data-Operations
 cd sample-Agentic-Ai-Data-Operations
-claude</pre>
+codex</pre>
       </div>
     </div>
     <div class="start-connector" aria-hidden="true">&rarr;</div>
@@ -837,7 +837,7 @@ Onboard claims data from s3://...</pre>
   </div>
 </div>
 
-<p>Open Claude Code in this repo and paste a prompt describing <strong>where the data lives, where it's going, the cadence, and any compliance requirements.</strong> The Data Onboarding Agent asks clarifying questions, then spawns sub-agents to generate a fully tested workload under <code>workloads/&lt;name&gt;/</code>.</p>
+<p>Open Codex in this repo and paste a prompt describing <strong>where the data lives, where it's going, the cadence, and any compliance requirements.</strong> The Data Onboarding Agent asks clarifying questions, then spawns sub-agents to generate a fully tested workload under <code>workloads/&lt;name&gt;/</code>.</p>
 <p><strong>A good prompt includes:</strong>
 - <strong>Source</strong> (S3 path / Kafka topic / Kinesis stream / JDBC)
 - <strong>Sink cadence</strong> (batch daily / micro-batch / streaming)
@@ -929,7 +929,7 @@ Schedule: Daily batch at 09:30 UTC, retries=3, exponential backoff, alert on fai
 
 <p>Watch the agent run, approve the plan it presents, and the artifacts land under <code>workloads/&lt;name&gt;/</code> (config, scripts, DAG, tests, ontology).</p>
 <h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
-<p><strong>Built for Claude Code, adaptable to other AI assistants.</strong> While this platform is designed for <strong>Claude Code</strong> (CLI, Desktop, Web), the prompt architecture and agent workflows can be adapted with slight modifications to work with <strong>Kiro</strong>, <strong>GitHub Copilot</strong>, <strong>Cursor</strong>, or other AI coding assistants that support context-aware code generation.</p>
+<p><strong>Built for Codex, adaptable to other AI assistants.</strong> While this platform is designed for <strong>Codex</strong> (CLI, Desktop, Web), the prompt architecture and agent workflows can be adapted with slight modifications to work with <strong>Kiro</strong>, <strong>GitHub Copilot</strong>, <strong>Cursor</strong>, or other AI coding assistants that support context-aware code generation.</p>
 <p><strong>All agents run in the Development environment only.</strong> Generated scripts and configurations are version-controlled and promoted to higher environments (QA, Staging, Production) through standard CI/CD pipelines. Agents do not run in production — only the artifacts they generate.</p>
 <hr />
 <h2 id="1-data-onboarding-agent">1. Data Onboarding Agent<a class="headerlink" href="#1-data-onboarding-agent" title="Permanent link">&para;</a></h2>
@@ -1003,7 +1003,7 @@ Output: workloads/{dataset_name}/ with config/, scripts/, dags/, sql/, tests/
 - Opus adversarial reviewer + verifier at quality chokepoints regardless of regulation
 - Multi-workload batch: onboard multiple datasets in one invocation
 - Resumable: completed phases survive disconnects</p>
-<p>See <code>.claude/commands/onboard-workflow.md</code> for the skill definition and <code>demo/sample_prompt/customer_master_workflow.md</code> for a full example.</p>
+<p>See <code>.codex/skills/command-onboard-workflow/SKILL.md</code> for the skill definition and <code>workloads/customer_master/</code> for a committed example workload.</p>
 <h3 id="workload-memory-persistent-learning">Workload Memory (Persistent Learning)<a class="headerlink" href="#workload-memory-persistent-learning" title="Permanent link">&para;</a></h3>
 <p>Each workload maintains its own memory system in <code>workloads/{name}/memory/</code> that accumulates knowledge across pipeline runs — schema quirks, quality thresholds, operator preferences, and successful patterns — enabling future runs to start with context instead of cold discovery. When the same workload is re-processed, the agent loads this memory first, pre-filling known answers and avoiding repetitive questions, while continuously learning from new failures and successes to prevent recurring issues.</p>
 <hr />
@@ -1074,7 +1074,7 @@ Output: workloads/{dataset_name}/ with config/, scripts/, dags/, sql/, tests/
 <td>Per-phase guardrails — exact tool names allowed per deploy step</td>
 </tr>
 <tr>
-<td><a href="CLAUDE.md"><code>CLAUDE.md</code></a></td>
+<td><a href="AGENTS.md"><code>AGENTS.md</code></a></td>
 <td>Architecture constraints — sub-agent limitations, MCP-first rule</td>
 </tr>
 </tbody>
@@ -1224,11 +1224,11 @@ Output: workloads/{dataset_name}/ with config/, scripts/, dags/, sql/, tests/
 </ol>
 <h3 id="when-it-runs">When It Runs<a class="headerlink" href="#when-it-runs" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Nightly (automated)</strong>: <code>evolve</code> command analyzes traces, generates patches, and auto-grafts high-confidence fixes to SKILLS.md</li>
+<li><strong>Nightly (automated)</strong>: <code>evolve</code> command analyzes traces, generates patches, and auto-grafts high-confidence fixes to ADOP_WORKFLOWS.md</li>
 <li><strong>Weekly (human review)</strong>: Review pending patches (confidence 0.60-0.79) and approve or reject</li>
 <li><strong>On-demand</strong>: After major failures or before deployments</li>
 </ul>
-<div class="highlight"><pre><span></span><code><span class="c1"># Self-healing loop: analyze → generate patches → auto-apply to SKILLS.md</span>
+<div class="highlight"><pre><span></span><code><span class="c1"># Self-healing loop: analyze → generate patches → auto-apply to ADOP_WORKFLOWS.md</span>
 python3<span class="w"> </span>-m<span class="w"> </span>shared.prompt_intelligence.cli<span class="w"> </span>evolve<span class="w"> </span>--auto-graft<span class="w"> </span>--min-confidence<span class="w"> </span><span class="m">0</span>.80
 
 <span class="c1"># Review pending patches</span>
@@ -1334,7 +1334,7 @@ Estimated Time Saved: 10-15 hours across future onboardings
 <tr>
 <td><strong>Development</strong></td>
 <td>Active agents: Data Onboarding, Ontology Staging, Environment Setup, Prompt Intelligence. DevOps Agent planned for Q2 2026.</td>
-<td>Interactive via Claude Code CLI</td>
+<td>Interactive via Codex CLI</td>
 </tr>
 <tr>
 <td><strong>QA/Staging</strong></td>
@@ -1460,7 +1460,7 @@ Estimated Time Saved: 10-15 hours across future onboardings
 - T-Box reasoning (AWS Semantic Layer, at publish time)
 - Any SPARQL/Neptune writes (future, when the AWS Semantic Layer platform deploys)</p>
 <h3 id="mcp-servers-model-context-protocol">MCP Servers (Model Context Protocol)<a class="headerlink" href="#mcp-servers-model-context-protocol" title="Permanent link">&para;</a></h3>
-<p>13 MCP servers provide Claude Code with direct AWS access — no CLI needed for most operations. Pre-configured in <code>.mcp.json</code>, auto-install via <code>uvx</code> on first use.</p>
+<p>13 MCP servers provide Codex with direct AWS access — no CLI needed for most operations. Pre-configured in <code>.mcp.json</code>, auto-install via <code>uvx</code> on first use.</p>
 <p><strong>PyPI Servers (9)</strong> — installed automatically via <code>uvx</code>:</p>
 <table>
 <thead>
@@ -1552,7 +1552,7 @@ Estimated Time Saved: 10-15 hours across future onboardings
 </table>
 <p><strong>Quick start</strong> (after cloning):</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Prerequisites: uv installed, AWS credentials configured</span>
-claude<span class="w"> </span>mcp<span class="w"> </span>list<span class="w">   </span><span class="c1"># All 13 servers auto-connect</span>
+codex<span class="w"> </span>configuration<span class="w">   </span><span class="c1"># Verify the repository's Codex configuration</span>
 </code></pre></div>
 
 <p><strong>Health check before deployment</strong>: 3 servers are REQUIRED (<code>glue-athena</code>, <code>lakeformation</code>, <code>iam</code>) -- deployment blocks if any fail. See <a href="mcp-setup.md">MCP Setup Guide</a> for full setup guide.</p>
@@ -1560,7 +1560,7 @@ claude<span class="w"> </span>mcp<span class="w"> </span>list<span class="w">   
 <p>All 13 MCP servers can be deployed to <strong>Agentcore Gateway</strong> for shared, cloud-hosted tool access -- no local Python, uv, or stdio transport needed per user. The <strong>Data Onboarding Agent</strong> can be deployed to <strong>Agentcore Runtime</strong> for API-accessible invocation, with all 13 tools connected from Gateway.</p>
 <div class="highlight"><pre><span></span><code>Local Mode (default)           Agentcore Mode
 ────────────────────           ────────────────────────
-Claude Code → stdio → 13      Claude Code / API Client
+Codex → stdio → 13      Codex / API Client
   local servers                    → Runtime (agent)
                                        → Gateway (all 13 servers)
 </code></pre></div>
@@ -1596,12 +1596,6 @@ Claude Code → stdio → 13      Claude Code / API Client
 │   ├── fixtures/                     # Shared test fixtures (CSV stubs)
 │   └── templates/                    # Templates for new workloads
 │
-├── demo/                             # Demo/testing resources (not production)
-│   ├── data_generators/              # Synthetic data scripts
-│   ├── sample_data/                  # Pre-generated CSV files
-│   ├── orchestrator_examples/        # Multi-workload DAG examples
-│   └── workflows/                    # Demo governance workflows
-│
 ├── mcp-servers/                      # Custom MCP servers (4 FastMCP servers with SSE support)
 ├── docs/                             # Reference documentation
 │   ├── prompt_intelligence/          # Generated analysis reports
@@ -1631,15 +1625,15 @@ Claude Code → stdio → 13      Claude Code / API Client
 ├── tests/unit/                       # Shared unit tests
 │   └── test_tool_registry.py         # 18 tests: server sync, stale refs, invariants
 │
-├── .claude/
+├── .codex/
 │   ├── agents/                       # Sub-agent definitions (scoped tools, no MCP)
-│   ├── rules/                        # Auto-loaded conventions (path-scoped)
+│   ├── skills/                       # On-demand workflow and engineering instructions
 │   └── hooks/                        # PreToolUse guardrails + SessionStart run-state
 │
 ├── contracts/v1/                     # JSON Schemas for every agent spec (validated by CI)
 │
-├── CLAUDE.md                         # Agent configuration and conventions
-├── SKILLS.md                         # Agent skill definitions and prompts
+├── AGENTS.md                         # Agent configuration and conventions
+├── ADOP_WORKFLOWS.md                 # Agent workflow definitions and prompts
 ├── TOOL_ROUTING.md                   # Tool selection (intent routing + code examples)
 ├── MCP_GUARDRAILS.md                 # Per-phase runtime guardrails
 ├── conftest.py                       # Pytest configuration
@@ -1684,7 +1678,7 @@ Claude Code → stdio → 13      Claude Code / API Client
 <ul>
 <li>Python 3.9+</li>
 <li>AWS account with Glue, Athena, S3, MWAA configured</li>
-<li>Claude Code CLI</li>
+<li>Codex CLI</li>
 </ul>
 <h3 id="run-tests-locally">Run Tests Locally<a class="headerlink" href="#run-tests-locally" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="c1"># Install dependencies</span>
@@ -1702,7 +1696,7 @@ pytest<span class="w"> </span>workloads/*/tests/unit/<span class="w"> </span>-v
 
 <p>See <a href="running-tests.md">Running Tests</a> for complete test guide including data generation.</p>
 <h3 id="onboard-a-new-dataset">Onboard a New Dataset<a class="headerlink" href="#onboard-a-new-dataset" title="Permanent link">&para;</a></h3>
-<p>Using Claude Code, describe your data source:</p>
+<p>Using Codex, describe your data source:</p>
 <div class="highlight"><pre><span></span><code>&quot;Onboard customer_orders from our PostgreSQL database.
  Daily refresh at 6 AM UTC. Contains PII (email, phone).
  Need star schema in Gold zone for reporting dashboards.&quot;
@@ -1785,7 +1779,7 @@ User: &quot;CRM data&quot;                       User: &quot;CRM data&quot;
 
 <h3 id="deep-agent-tracing-three-layer-observability">Deep Agent Tracing (Three-Layer Observability)<a class="headerlink" href="#deep-agent-tracing-three-layer-observability" title="Permanent link">&para;</a></h3>
 <p>Inspired by the <strong>AgentTrace</strong> research paper (Gao et al., 2025) on debugging and understanding multi-agent systems, adapted for our LLM sub-agent architecture where you cannot instrument agent reasoning externally.</p>
-<p><strong>Problem</strong>: Traditional agent tracing assumes Python classes you can wrap with decorators. Our agents are Claude Code LLM sub-agents (prompt templates in SKILLS.md) — their reasoning is a black box.</p>
+<p><strong>Problem</strong>: Traditional agent tracing assumes Python classes you can wrap with decorators. Our agents are Codex LLM sub-agents (prompt templates in ADOP_WORKFLOWS.md) — their reasoning is a black box.</p>
 <p><strong>Solution</strong>: Three instrumentable layers, linked by <code>run_id</code> + <code>parent_span_id</code>:</p>
 <table>
 <thead>
@@ -1814,7 +1808,7 @@ User: &quot;CRM data&quot;                       User: &quot;CRM data&quot;
 </tbody>
 </table>
 <p><strong>Three-surface event model</strong> (from AgentTrace): Every trace event is classified as <strong>operational</strong> (what happened), <strong>cognitive</strong> (why it happened), or <strong>contextual</strong> (what surrounded it). This lets you filter traces by concern — debugging failed pipelines vs. understanding agent decisions vs. correlating across workloads.</p>
-<p><strong>OTel-compatible fields</strong>: ~15 fields per event (slimmed from AgentTrace's 30+ to only fields we can actually populate — no token counts from Claude Code sub-agents). Output is JSONL, parseable by jq, CloudWatch, Splunk.</p>
+<p><strong>OTel-compatible fields</strong>: ~15 fields per event (slimmed from AgentTrace's 30+ to only fields we can actually populate — no token counts from Codex sub-agents). Output is JSONL, parseable by jq, CloudWatch, Splunk.</p>
 <p><strong>CLI viewer</strong> (<code>shared/logging/trace_viewer.py</code>): <code>--summary</code>, <code>--decisions</code>, <code>--timeline</code>, <code>--failures</code>, <code>--export-md</code> (narrative), <code>--export-map</code> (decision tree).</p>
 <div class="highlight"><pre><span></span><code># View agent reasoning for a pipeline run
 python3 -m shared.logging.trace_viewer trace_events.jsonl --decisions
@@ -1833,7 +1827,7 @@ python3 -m shared.logging.trace_viewer trace_events.jsonl --decisions
 <h3 id="typed-sub-agent-outputs-structured-tool-calls">Typed Sub-Agent Outputs<a class="headerlink" href="#typed-sub-agent-outputs-structured-tool-calls" title="Permanent link">&para;</a></h3>
 <p>Sub-agents do not return free-form markdown. Every sub-agent returns a structured <code>AgentOutput</code> payload, validated on arrival. Two transports, one schema:</p>
 <ul>
-<li><strong><code>from_agent_message()</code></strong>: Claude Code sub-agents (spawned via the <code>Agent</code> tool) have no tool-call channel, so they end their final message with a fenced JSON block. This extracts it — last block wins — and rejects payloads missing required fields.</li>
+<li><strong><code>from_agent_message()</code></strong>: Codex sub-agents (spawned via the <code>Agent</code> tool) have no tool-call channel, so they end their final message with a fenced JSON block. This extracts it — last block wins — and rejects payloads missing required fields.</li>
 <li><strong><code>SUBMIT_OUTPUT_TOOL</code></strong> + <strong><code>from_bedrock_tool_call()</code></strong>: For Bedrock <code>converse()</code> callers, a <code>toolSpec</code> in <code>shared/templates/agent_output_schema.py</code> forces the same JSON via <code>tool_choice</code>.</li>
 <li><strong><code>REQUIRED_OUTPUT_FIELDS</code></strong>: Derived from <code>SUBMIT_OUTPUT_TOOL</code>, so the two transports cannot drift apart.</li>
 <li><strong>Forward-compatible <code>from_dict()</code></strong>: Filters unknown keys, so old serialized data works with new fields and new data works with old code.</li>
@@ -1853,10 +1847,10 @@ Run 2: Memory loaded → Quality Agent reads the hint → test gate passes witho
 </code></pre></div>
 
 <h3 id="adaptive-prompt-evolution-self-healing-loop">Adaptive Prompt Evolution (Self-Healing Loop)<a class="headerlink" href="#adaptive-prompt-evolution-self-healing-loop" title="Permanent link">&para;</a></h3>
-<p>Closes the gap in prompt intelligence: patches were generated in reports but <strong>never applied</strong>. The new <code>PromptEvolver</code> stores, tracks, and auto-applies learned prompt patches to SKILLS.md.</p>
+<p>Closes the gap in prompt intelligence: patches were generated in reports but <strong>never applied</strong>. The new <code>PromptEvolver</code> stores, tracks, and auto-applies learned prompt patches to ADOP_WORKFLOWS.md.</p>
 <ul>
 <li><strong>Patch registry</strong>: <code>shared/prompt_intelligence/patches/</code> stores <code>.patch</code> files with YAML frontmatter (confidence, status, section). <code>PATCH_INDEX.md</code> tracks all patches.</li>
-<li><strong>Confidence gate</strong>: Patches with confidence &gt;= 0.80 are auto-grafted to SKILLS.md. Below 0.80, they're stored as "pending" for human review.</li>
+<li><strong>Confidence gate</strong>: Patches with confidence &gt;= 0.80 are auto-grafted to ADOP_WORKFLOWS.md. Below 0.80, they're stored as "pending" for human review.</li>
 <li><strong>Reversible</strong>: Every grafted patch is wrapped in <code>&lt;!-- GRAFT: {id} --&gt;</code> markers. <code>prune_patch()</code> removes it cleanly.</li>
 <li><strong>CLI</strong>: <code>evolve</code> (full self-healing cycle), <code>patches</code> (list registry), <code>prune</code> (revert a bad patch)</li>
 </ul>
@@ -2028,11 +2022,11 @@ Each agent (Router, Onboarding, Metadata, Transformation, Quality, DAG, Analysis
 </thead>
 <tbody>
 <tr>
-<td><a href="CLAUDE.md">CLAUDE.md</a></td>
+<td><a href="AGENTS.md">AGENTS.md</a></td>
 <td>Agent configuration, security rules, data zone rules</td>
 </tr>
 <tr>
-<td><a href="SKILLS.md">SKILLS.md</a></td>
+<td><a href="ADOP_WORKFLOWS.md">ADOP_WORKFLOWS.md</a></td>
 <td>Agent skill definitions, spawn prompts, workflows</td>
 </tr>
 <tr>
@@ -2194,13 +2188,13 @@ Each agent (Router, Onboarding, Metadata, Transformation, Quality, DAG, Analysis
 </thead>
 <tbody>
 <tr>
-<td><strong>Claude Opus</strong></td>
+<td><strong>Codex Opus</strong></td>
 <td>$15 / 1M tokens</td>
 <td>$75 / 1M tokens</td>
 <td>~$3.65</td>
 </tr>
 <tr>
-<td><strong>Claude Sonnet</strong></td>
+<td><strong>Codex Sonnet</strong></td>
 <td>$3 / 1M tokens</td>
 <td>$15 / 1M tokens</td>
 <td>~$0.73</td>

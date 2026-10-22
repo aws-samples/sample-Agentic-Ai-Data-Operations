@@ -4,11 +4,11 @@
 Two classes of reference rot this catches:
 
 1. **Markdown links** — `[text](relative/path.md)`, resolved against the linking file.
-2. **Bare repo paths** — `runbooks/foo.md`, `.claude/agents/dag-agent.md`, `shared/x.py`,
+2. **Bare repo paths** — `runbooks/foo.md`, `.codex/agents/dag-agent.toml`, `shared/x.py`,
    whether in prose, tables, or backticks.
 
 Class 2 is the dangerous one. The orchestrator loads a regulation control set by `Read`-ing a
-hardcoded path out of `SKILLS.md`. A wrong path fails at read time and the orchestrator carries
+hardcoded path out of `ADOP_WORKFLOWS.md`. A wrong path fails at read time and the orchestrator carries
 on *without* the compliance controls — silently. Nothing else in CI notices.
 
 Also checks that every regulation is registered in all four places that must agree.
@@ -34,7 +34,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 #   tests/      - same
 #   agentcore/  - runbook-relative, and several entries are artifacts the runbook creates
 REPO_PREFIXES = (
-    ".claude/", ".github/", "contracts/", "docs/", "mcp-servers/", "runbooks/",
+    ".codex/", ".github/", "contracts/", "docs/", "mcp-servers/", "runbooks/",
     "shared/", "tool-registry/",
 )
 
@@ -58,7 +58,7 @@ TEMPLATE_MARKERS = ("{", "}", "*", "$", "<", ">", "...", "|", "YYYY", "MM-DD")
 # does not exist. Rather than exempt them, the check is inverted below: if one of these ever
 # appears on disk the validator fails, so the prose gets corrected instead of quietly rotting.
 ASSERTED_MISSING = {
-    # Named in CLAUDE.md, README.md and SKILLS.md but never written; the check logic lives in
+    # Named in AGENTS.md, README.md and ADOP_WORKFLOWS.md but never written; the check logic lives in
     # the rendered output of shared/templates/quality_check.py.j2. Sub-agents are told not to
     # import it and not to create it as a side effect.
     "shared/utils/quality_checks.py",
@@ -70,7 +70,7 @@ BARE_PATH_RE = re.compile(
 MD_LINK_RE = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 
 REGULATIONS = {
-    # file stem -> (SKILLS.md dispatch spelling, schema enum value)
+    # file stem -> (ADOP_WORKFLOWS.md dispatch spelling, schema enum value)
     "gdpr": ("gdpr.md", "GDPR"),
     "ccpa": ("ccpa.md", "CCPA"),
     "hipaa": ("hipaa.md", "HIPAA"),
@@ -81,7 +81,11 @@ REGULATIONS = {
 
 def tracked_files() -> list[Path]:
     out = subprocess.run(
-        ["git", "ls-files"], cwd=PROJECT_ROOT, capture_output=True, text=True, check=True
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     return [PROJECT_ROOT / line for line in out.stdout.splitlines() if line]
 
@@ -137,7 +141,7 @@ def check_regulation_registry() -> list[str]:
     """A regulation must appear in all four places, or it silently never applies."""
     errors: list[str] = []
     reg_dir = PROJECT_ROOT / "runbooks/data-onboarding-agent/regulation"
-    skills = (PROJECT_ROOT / "SKILLS.md").read_text(errors="ignore")
+    skills = (PROJECT_ROOT / "ADOP_WORKFLOWS.md").read_text(errors="ignore")
     picker = (reg_dir / "README.md").read_text(errors="ignore")
     schema_path = PROJECT_ROOT / "contracts/v1/quality_spec.schema.json"
     schema_text = json.dumps(json.loads(schema_path.read_text()))
@@ -146,7 +150,7 @@ def check_regulation_registry() -> list[str]:
         if not (reg_dir / filename).exists():
             errors.append(f"regulation {stem}: missing {reg_dir.name}/{filename}")
         if filename not in skills:
-            errors.append(f"regulation {stem}: not in the SKILLS.md dispatch list")
+            errors.append(f"regulation {stem}: not in the ADOP_WORKFLOWS.md dispatch list")
         if filename not in picker:
             errors.append(f"regulation {stem}: not in regulation/README.md picker table")
         if f'"{enum_value}"' not in schema_text:
@@ -159,7 +163,7 @@ def check_regulation_registry() -> list[str]:
 def check_asserted_missing() -> list[str]:
     """Inverse check: prose claims these do not exist, so fail if one shows up."""
     return [
-        f"{rel} now exists, but prose in .claude/agents/ and docs asserts it does not — "
+        f"{rel} now exists, but prose in .codex/agents/ and docs asserts it does not — "
         f"update those references and drop it from ASSERTED_MISSING"
         for rel in sorted(ASSERTED_MISSING)
         if (PROJECT_ROOT / rel).exists()

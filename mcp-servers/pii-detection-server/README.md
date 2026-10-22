@@ -6,11 +6,11 @@
 
 ## Overview
 
-This MCP server enables Claude Code to detect PII in your data lake and automatically apply Lake Formation Tags (LF-Tags) for governance and access control.
+This MCP server enables Codex to detect PII in your data lake and automatically apply Lake Formation Tags (LF-Tags) for governance and access control.
 
 ### Key Features
 
-- **AI-Powered PII Detection**: Claude analyzes data and identifies PII patterns
+- **AI-Powered PII Detection**: Codex analyzes data and identifies PII patterns
 - **Automated LF-Tag Application**: Applies tags to columns in Lake Formation
 - **Tag-Based Access Control**: Enable fine-grained column-level security
 - **Natural Language Interface**: Use plain English to manage PII governance
@@ -20,7 +20,7 @@ This MCP server enables Claude Code to detect PII in your data lake and automati
 ## Architecture
 
 ```
-Claude Code (AI Agent)
+Codex (AI Agent)
     ↓
 PII Detection MCP Server
     ↓
@@ -35,7 +35,7 @@ AWS Lake Formation
 ### Agent-Driven Approach
 
 **1. AI Detection:**
-- Claude analyzes column names, descriptions, and sample data
+- Codex analyzes column names, descriptions, and sample data
 - Identifies PII types (EMAIL, PHONE, SSN, etc.)
 - Determines sensitivity levels (CRITICAL, HIGH, MEDIUM, LOW)
 
@@ -54,7 +54,7 @@ AWS Lake Formation
 ### Quick Setup
 
 ```bash
-cd /path/to/claude-data-operations/mcp-servers/pii-detection-server
+cd /path/to/agentic-data-onboarding/mcp-servers/pii-detection-server
 chmod +x setup.sh
 ./setup.sh
 ```
@@ -82,7 +82,7 @@ Create or edit `~/.mcp.json`:
     "pii-detection": {
       "command": "python3",
       "args": [
-        "/path/to/claude-data-operations/mcp-servers/pii-detection-server/server.py"
+        "/path/to/agentic-data-onboarding/mcp-servers/pii-detection-server/server.py"
       ],
       "env": {
         "AWS_REGION": "us-east-1",
@@ -93,7 +93,7 @@ Create or edit `~/.mcp.json`:
 }
 ```
 
-4. **Restart Claude Code:**
+4. **Restart Codex:**
 
 The MCP server will be loaded automatically.
 
@@ -101,7 +101,7 @@ The MCP server will be loaded automatically.
 
 ## Usage
 
-### From Claude Code (Natural Language)
+### From Codex (Natural Language)
 
 **Detect PII in a table:**
 ```
@@ -293,7 +293,7 @@ Generate PII report for a database or table.
 
 ### How It Works
 
-**1. Claude Analyzes Data:**
+**1. Codex Analyzes Data:**
 - Reads table schema (column names, types)
 - Optionally samples data content
 - Applies PII detection patterns
@@ -316,7 +316,7 @@ Generate PII report for a database or table.
 Analyze the finsights_silver database and protect any PII columns by tagging them appropriately. Then grant analysts access to only non-sensitive data.
 ```
 
-**Claude's Actions:**
+**Codex's Actions:**
 1. Calls `scan_database_for_pii` on finsights_silver
 2. Reviews results and confirms PII types
 3. Calls `apply_tags=true` to tag columns
@@ -334,7 +334,7 @@ import subprocess
 
 def run_pii_detection_via_mcp(**context):
     """Use MCP server to detect PII"""
-    # This would be called by Claude Code
+    # This would be called by Codex
     # For Airflow, use the Python script directly
     cmd = [
         'python3',
@@ -351,14 +351,14 @@ pii_task = PythonOperator(
 )
 ```
 
-### Option 2: Invoke via Claude Code
+### Option 2: Invoke via Codex
 
-In Claude Code, after data loads:
+In Codex, after data loads:
 ```
 The silver zone data load is complete. Please scan all tables for PII and apply appropriate tags.
 ```
 
-Claude will use the MCP server to automatically detect and tag PII.
+Codex will use the MCP server to automatically detect and tag PII.
 
 ---
 
@@ -377,7 +377,7 @@ echo '{"method":"tools/list","params":{}}' | python3 server.py
 echo '{"method":"tools/call","params":{"name":"detect_pii_in_table","arguments":{"database":"finsights_silver","table":"funds_clean","content_detection":false,"apply_tags":false}}}' | python3 server.py
 ```
 
-### Test from Claude Code
+### Test from Codex
 
 After setup, test with:
 ```
@@ -394,7 +394,7 @@ Test the PII detection MCP server by listing available tools
 1. `~/.mcp.json` exists and is valid JSON
 2. Server path is correct
 3. `server.py` is executable (`chmod +x`)
-4. Restart Claude Code
+4. Restart Codex
 
 **Verify:**
 ```bash
@@ -447,15 +447,15 @@ The MCP server runs with your AWS credentials. Ensure:
 
 | Feature | MCP Server | Direct Script |
 |---------|-----------|---------------|
-| **Integration** | Claude Code native | Command-line |
+| **Integration** | Codex native | Command-line |
 | **Natural Language** | ✅ Yes | ❌ No |
-| **AI-Driven** | ✅ Claude analyzes | ⚠️  Pattern-based |
+| **AI-Driven** | ✅ Codex analyzes | ⚠️  Pattern-based |
 | **Flexibility** | ✅ High | ⚠️  Medium |
 | **Setup** | ⚠️  Requires config | ✅ Immediate |
 | **Best For** | Interactive use | Automation/CI |
 
 **Recommendation:**
-- Use MCP server for interactive data governance in Claude Code
+- Use MCP server for interactive data governance in Codex
 - Use direct script for automated pipeline integration
 
 ---

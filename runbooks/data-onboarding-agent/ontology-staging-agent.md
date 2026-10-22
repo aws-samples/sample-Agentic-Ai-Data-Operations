@@ -1,11 +1,11 @@
 # Ontology Staging Agent — Reference Narrative
 
 > **This is not the spawn prompt.** The live prompt the harness loads is
-> [`.claude/agents/ontology-agent.md`](../../.claude/agents/ontology-agent.md), and it is the
+> [`.codex/agents/ontology-agent.toml`](../../.codex/agents/ontology-agent.toml), and it is the
 > only version that takes effect — it carries the enforced `tools:` frontmatter and is what
-> `Agent(subagent_type="ontology-agent")` resolves to. This file is the longer narrative:
+> `spawn_agent(agent_type="ontology-agent")` resolves to. This file is the longer narrative:
 > worked Turtle examples, error-handling detail, and the full artifact description. Read it to
-> understand the agent; edit `.claude/agents/ontology-agent.md` to change its behaviour.
+> understand the agent; edit `.codex/agents/ontology-agent.toml` to change its behaviour.
 
 ## Role
 

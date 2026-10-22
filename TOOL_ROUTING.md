@@ -355,7 +355,7 @@ Read pattern?
 | Publish to Neptune SPARQL | **Future — requires AWS Semantic Layer deployment** | |
 | Upload TTL to S3 knowledge-layer bucket | **Future** | |
 
-**Routing rule**: If the user says "generate ontology", "stage ontology for AWS Semantic Layer", "emit OWL", or "onboard to semantic layer", route to the Ontology Staging Agent sub-agent: `Agent(subagent_type="ontology-agent")`, defined in `.claude/agents/ontology-agent.md`.
+**Routing rule**: If the user says "generate ontology", "stage ontology for AWS Semantic Layer", "emit OWL", or "onboard to semantic layer", route to the Ontology Staging Agent sub-agent: `spawn_agent(agent_type="ontology-agent")`, defined in `.codex/agents/ontology-agent.toml`.
 
 ---
 
@@ -503,4 +503,4 @@ from airflow.providers.amazon.aws.operators.sns import SnsPublishOperator
 ---
 
 *For per-phase runtime guardrails → [MCP_GUARDRAILS.md](./MCP_GUARDRAILS.md)*
-*For agent skill definitions and spawn prompts → [SKILLS.md](./SKILLS.md)*
+*For agent skill definitions and spawn prompts → [ADOP_WORKFLOWS.md](./ADOP_WORKFLOWS.md)*

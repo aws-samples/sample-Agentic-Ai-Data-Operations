@@ -15,7 +15,7 @@ Layer 2: Generated Scripts (StructuredLogger)
 
 Layer 3: LLM Self-Reporting (AgentOutput.decisions)
     Captures: reasoning, alternatives considered, confidence levels
-    Source:   Sub-agent structured output via SKILLS.md prompts
+    Source:   Sub-agent structured output via ADOP_WORKFLOWS.md prompts
 ```
 
 All three layers link via `run_id` and `parent_span_id`.

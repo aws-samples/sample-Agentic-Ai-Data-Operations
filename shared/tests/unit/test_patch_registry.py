@@ -27,7 +27,7 @@ from shared.prompt_intelligence.schemas import CrossWorkloadPattern
 # Fixtures
 # ---------------------------------------------------------------------------
 
-MINI_SKILLS = """# SKILLS.md
+MINI_SKILLS = """# ADOP_WORKFLOWS.md
 
 ## Phase 1: Discovery
 
@@ -75,8 +75,8 @@ def _make_pattern(
 
 @pytest.fixture
 def repo(tmp_path):
-    """Set up a minimal repo structure with SKILLS.md and patches dir."""
-    (tmp_path / "SKILLS.md").write_text(MINI_SKILLS, encoding="utf-8")
+    """Set up a minimal repo structure with ADOP_WORKFLOWS.md and patches dir."""
+    (tmp_path / "ADOP_WORKFLOWS.md").write_text(MINI_SKILLS, encoding="utf-8")
     patches_dir = tmp_path / "shared" / "prompt_intelligence" / "patches"
     patches_dir.mkdir(parents=True, exist_ok=True)
     (patches_dir / "PATCH_INDEX.md").write_text(
@@ -124,8 +124,8 @@ class TestHarvestInsights:
         result = evolver.harvest_insights([pattern], auto_graft=True)
         assert result["grafted"] == 1
         assert result["pending"] == 0
-        # Verify SKILLS.md was modified
-        skills = (repo / "SKILLS.md").read_text()
+        # Verify ADOP_WORKFLOWS.md was modified
+        skills = (repo / "ADOP_WORKFLOWS.md").read_text()
         assert "<!-- GRAFT:" in skills
 
     def test_harvest_leaves_low_confidence_as_pending(self, evolver, repo):
@@ -133,8 +133,8 @@ class TestHarvestInsights:
         result = evolver.harvest_insights([pattern], auto_graft=True)
         assert result["grafted"] == 0
         assert result["pending"] == 1
-        # SKILLS.md unchanged
-        skills = (repo / "SKILLS.md").read_text()
+        # ADOP_WORKFLOWS.md unchanged
+        skills = (repo / "ADOP_WORKFLOWS.md").read_text()
         assert "<!-- GRAFT:" not in skills
 
     def test_harvest_returns_correct_counts(self, evolver):
@@ -171,9 +171,9 @@ class TestGraftPatch:
         patches = evolver.census()
         pid = patches[0]["patch_id"]
 
-        evolver.graft_patch(pid, skills_path=repo / "SKILLS.md")
+        evolver.graft_patch(pid, skills_path=repo / "ADOP_WORKFLOWS.md")
 
-        skills = (repo / "SKILLS.md").read_text()
+        skills = (repo / "ADOP_WORKFLOWS.md").read_text()
         # Graft should appear BEFORE "## Phase 4"
         graft_pos = skills.index(f"<!-- GRAFT: {pid}")
         phase4_pos = skills.index("## Phase 4")
@@ -183,9 +183,9 @@ class TestGraftPatch:
         pattern = _make_pattern(confidence=0.50)
         evolver.harvest_insights([pattern], auto_graft=False)
         pid = evolver.census()[0]["patch_id"]
-        evolver.graft_patch(pid, skills_path=repo / "SKILLS.md")
+        evolver.graft_patch(pid, skills_path=repo / "ADOP_WORKFLOWS.md")
 
-        skills = (repo / "SKILLS.md").read_text()
+        skills = (repo / "ADOP_WORKFLOWS.md").read_text()
         assert f"<!-- GRAFT: {pid}" in skills
         assert f"<!-- END GRAFT: {pid} -->" in skills
 
@@ -194,8 +194,8 @@ class TestGraftPatch:
         evolver.harvest_insights([pattern], auto_graft=False)
         pid = evolver.census()[0]["patch_id"]
 
-        first = evolver.graft_patch(pid, skills_path=repo / "SKILLS.md")
-        second = evolver.graft_patch(pid, skills_path=repo / "SKILLS.md")
+        first = evolver.graft_patch(pid, skills_path=repo / "ADOP_WORKFLOWS.md")
+        second = evolver.graft_patch(pid, skills_path=repo / "ADOP_WORKFLOWS.md")
         assert first is True
         assert second is False
 
@@ -205,14 +205,14 @@ class TestGraftPatch:
         )
         evolver.harvest_insights([pattern], auto_graft=False)
         pid = evolver.census()[0]["patch_id"]
-        result = evolver.graft_patch(pid, skills_path=repo / "SKILLS.md")
+        result = evolver.graft_patch(pid, skills_path=repo / "ADOP_WORKFLOWS.md")
         assert result is False
 
     def test_graft_updates_status(self, evolver, repo):
         pattern = _make_pattern(confidence=0.50)
         evolver.harvest_insights([pattern], auto_graft=False)
         pid = evolver.census()[0]["patch_id"]
-        evolver.graft_patch(pid, skills_path=repo / "SKILLS.md")
+        evolver.graft_patch(pid, skills_path=repo / "ADOP_WORKFLOWS.md")
 
         updated = evolver.census()
         assert updated[0]["status"] == "applied"
@@ -222,7 +222,7 @@ class TestGraftPatch:
         pattern = _make_pattern(confidence=0.50)
         evolver.harvest_insights([pattern], auto_graft=False)
         pid = evolver.census()[0]["patch_id"]
-        evolver.graft_patch(pid, skills_path=repo / "SKILLS.md")
+        evolver.graft_patch(pid, skills_path=repo / "ADOP_WORKFLOWS.md")
 
         index = (evolver.patch_dir / "PATCH_INDEX.md").read_text()
         assert "applied" in index
@@ -241,11 +241,11 @@ class TestPrunePatch:
         evolver.harvest_insights([pattern], auto_graft=True)
         pid = evolver.census()[0]["patch_id"]
 
-        skills_before = (repo / "SKILLS.md").read_text()
+        skills_before = (repo / "ADOP_WORKFLOWS.md").read_text()
         assert f"<!-- GRAFT: {pid}" in skills_before
 
-        evolver.prune_patch(pid, skills_path=repo / "SKILLS.md")
-        skills_after = (repo / "SKILLS.md").read_text()
+        evolver.prune_patch(pid, skills_path=repo / "ADOP_WORKFLOWS.md")
+        skills_after = (repo / "ADOP_WORKFLOWS.md").read_text()
         assert f"<!-- GRAFT: {pid}" not in skills_after
 
     def test_prune_resets_status(self, evolver, repo):
@@ -254,7 +254,7 @@ class TestPrunePatch:
         pid = evolver.census()[0]["patch_id"]
         assert evolver.census()[0]["status"] == "applied"
 
-        evolver.prune_patch(pid, skills_path=repo / "SKILLS.md")
+        evolver.prune_patch(pid, skills_path=repo / "ADOP_WORKFLOWS.md")
         assert evolver.census()[0]["status"] == "pending"
         assert evolver.census()[0]["applied_at"] is None
 
@@ -262,7 +262,7 @@ class TestPrunePatch:
         pattern = _make_pattern(confidence=0.50)
         evolver.harvest_insights([pattern], auto_graft=False)
         pid = evolver.census()[0]["patch_id"]
-        result = evolver.prune_patch(pid, skills_path=repo / "SKILLS.md")
+        result = evolver.prune_patch(pid, skills_path=repo / "ADOP_WORKFLOWS.md")
         assert result is False
 
 

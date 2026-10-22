@@ -154,7 +154,7 @@ class TestSaltedHashIsNotOptionalOnceChosen:
         )
 
     def test_the_spec_carries_a_secret_id_not_a_secret(self):
-        """CLAUDE.md security rule 1. A salt value in a spec is a committed credential."""
+        """AGENTS.md security rule 1. A salt value in a spec is a committed credential."""
         import json
         from pathlib import Path
 

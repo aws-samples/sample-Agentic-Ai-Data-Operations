@@ -167,7 +167,7 @@ sequenceDiagram
     H->>O: Approved
 
     Note over O,M: Phase 3: Profiling (sub-agent)
-    O->>+M: Agent(prompt="Profile sales source...")
+    O->>+M: spawn_agent(prompt="Profile sales source...")
     M->>M: Run Glue Crawler
     M->>M: Run 5% Athena profiling
     M->>M: Detect PII patterns
@@ -178,13 +178,13 @@ sequenceDiagram
     H->>O: Confirmed (email=PII, order_id=PK)
 
     Note over O,M: Phase 4.2: Formalize Metadata (sub-agent)
-    O->>+M: Agent(prompt="Register in catalog...")
+    O->>+M: spawn_agent(prompt="Register in catalog...")
     M->>FS: Write formal schema, catalog entry
     M->>M: Write & run tests
     M-->>-O: Catalog registered (5 unit ✓, 4 integration ✓)
 
     Note over O,T: Phase 4.3: Transformations (sub-agent)
-    O->>+T: Agent(prompt="Generate transform scripts...")
+    O->>+T: spawn_agent(prompt="Generate transform scripts...")
     T->>FS: Write transformations.yaml
     T->>FS: Write bronze_to_silver.py
     T->>FS: Write silver_to_gold.py
@@ -193,14 +193,14 @@ sequenceDiagram
     T-->>-O: Scripts ready (7 unit ✓, 6 integration ✓)
 
     Note over O,Q: Phase 4.4: Quality Rules (sub-agent)
-    O->>+Q: Agent(prompt="Generate quality rules...")
+    O->>+Q: spawn_agent(prompt="Generate quality rules...")
     Q->>FS: Write quality_rules.yaml
     Q->>FS: Write check_bronze.py, check_silver.py, check_gold.py
     Q->>Q: Write & run tests
     Q-->>-O: Rules ready (6 unit ✓, 6 integration ✓)
 
     Note over O,D: Phase 4.5: Airflow DAG (sub-agent)
-    O->>+D: Agent(prompt="Generate DAG...")
+    O->>+D: spawn_agent(prompt="Generate DAG...")
     D->>FS: Check shared/operators/, shared/hooks/
     D->>FS: Write sales_data_dag.py
     D->>D: Write & run tests

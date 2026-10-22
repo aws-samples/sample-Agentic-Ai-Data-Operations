@@ -5,7 +5,7 @@
 
 ## Purpose
 
-Interactive, guided setup of all AWS prerequisites using MCP tools and CLI. Run this before any other prompt (ROUTE, ONBOARD, etc.). Claude auto-detects what already exists, skips completed steps, and only creates what's missing. Safe to re-run at any time.
+Interactive, guided setup of all AWS prerequisites using MCP tools and CLI. Run this before any other prompt (ROUTE, ONBOARD, etc.). Codex auto-detects what already exists, skips completed steps, and only creates what's missing. Safe to re-run at any time.
 
 ## When to Use
 
@@ -22,7 +22,7 @@ Before running this prompt, ensure:
 1. **AWS CLI configured**: `aws sts get-caller-identity` returns your account
 2. **uv installed**: `uv --version` returns 0.9+
 3. **Python 3.12+**: `python3.12 --version` or `python3.13 --version`
-4. **Claude Code**: Running in this project directory
+4. **Codex**: Running in this project directory
 
 ## Prompt Template
 
@@ -52,9 +52,9 @@ Existing resources (skip creation):
 - Existing KMS keys: [ALIAS or "none"]
 ```
 
-## What Claude Will Do
+## What Codex Will Do
 
-Claude uses MCP tools where available, CLI fallback otherwise. Each step verifies success before proceeding. **Steps 0 and 1 always run first** to detect existing state and skip what's already done.
+Codex uses MCP tools where available, CLI fallback otherwise. Each step verifies success before proceeding. **Steps 0 and 1 always run first** to detect existing state and skip what's already done.
 
 ### Step 0: Auto-Detect Existing Resources
 
@@ -179,7 +179,7 @@ Gate:   Must succeed before proceeding.
 
 MCP:    mcp__iam__list_roles (verify IAM access)
         mcp__cloudtrail__lookup_events (verify CloudTrail access)
-CLI:    claude mcp list
+CLI:    inspect Codex MCP configuration
 
 Output:
   MCP HEALTH CHECK

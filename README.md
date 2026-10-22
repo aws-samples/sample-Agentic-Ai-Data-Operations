@@ -14,7 +14,7 @@
 
 ### Dynamic Workflows
 
-This project uses **Claude Code Dynamic Workflows** for parallel multi-agent orchestration. Two workflow commands are available:
+This project uses **Codex Dynamic Workflows** for parallel multi-agent orchestration. Two workflow commands are available:
 
 | Command | Purpose | What it does |
 |---|---|---|
@@ -23,13 +23,13 @@ This project uses **Claude Code Dynamic Workflows** for parallel multi-agent orc
 
 Both commands ask discovery questions first (human-in-the-loop), then fan out parallel agents with model routing (haiku for checks, sonnet for generation, opus for adversarial review). Progress is tracked via `/workflows` and survives disconnects.
 
-Skill definitions: `.claude/commands/onboard-workflow.md`, `.claude/commands/devops-workflow.md`
+Skill definitions: `.codex/skills/command-onboard-workflow/SKILL.md`, `.codex/skills/command-devops-workflow/SKILL.md`
 
 ---
 
 ## Starting the Agent
 
-Open Claude Code in this repo and paste a prompt describing **where the data lives, where it's going, the cadence, and any compliance requirements.** The Data Onboarding Agent asks clarifying questions, then spawns sub-agents to generate a fully tested workload under `workloads/<name>/`.
+Open Codex in this repo and paste a prompt describing **where the data lives, where it's going, the cadence, and any compliance requirements.** The Data Onboarding Agent asks clarifying questions, then spawns sub-agents to generate a fully tested workload under `workloads/<name>/`.
 
 **A good prompt includes:**
 - **Source** (S3 path / Kafka topic / Kinesis stream / JDBC)
@@ -155,9 +155,9 @@ Traditional data pipeline development is slow, manual, and error-prone:
 
 ## How It Works
 
-**Built for Claude Code, adaptable to other AI assistants.** While this platform is designed for **Claude Code** (CLI, Desktop, Web), the prompt architecture and agent workflows can be adapted with slight modifications to work with **Kiro**, **GitHub Copilot**, **Cursor**, **Amazon Q Developer CLI** or other AI coding assistants that support context-aware code generation.
+**Built for Codex, adaptable to other AI assistants.** While this platform is designed for **Codex** (CLI, Desktop, Web), the prompt architecture and agent workflows can be adapted with slight modifications to work with **Kiro**, **GitHub Copilot**, **Cursor**, **Amazon Q Developer CLI** or other AI coding assistants that support context-aware code generation.
 
-> **Amazon Q Developer CLI support** is available on the [`feat/amazon-q-support`](https://github.com/aws-samples/sample-Agentic-Ai-Data-Operations/tree/feat/amazon-q-support) branch. See `docs/getting-started-amazon-q.md` on that branch to get started.
+> **Amazon Q Developer CLI support** is available on the [`feat/amazon-q-support`](https://github.com/aws-samples/sample-Agentic-Ai-Data-Operations/tree/feat/amazon-q-support) branch. See the branch's getting-started guide there.
 
 > **Kiro support** is available on the [`feat/amazon-Kiro-support`](https://github.com/aws-samples/sample-Agentic-Ai-Data-Operations/tree/feat/amazon-Kiro-support) branch. Kiro-specific configuration lives under `.kiro/` — agents, hooks, steering and MCP servers.
 
@@ -224,7 +224,8 @@ Output: workloads/{dataset_name}/ with config/, scripts/, dags/, sql/, tests/
 - Multi-workload batch: onboard multiple datasets in one invocation
 - Resumable: completed phases survive disconnects
 
-See `.claude/commands/onboard-workflow.md` for the skill definition and `demo/sample_prompt/customer_master_workflow.md` for a full example.
+See `.codex/skills/command-onboard-workflow/SKILL.md` for the skill definition and
+`workloads/customer_master/` for a committed example workload.
 
 ### Workload Memory (Persistent Learning)
 
@@ -308,7 +309,7 @@ User Intent → Step 1: Context Check → Step 2: Server Health → Step 3: Inte
 | [`tool-registry/servers.yaml`](tool-registry/servers.yaml) | Single source of truth for 13 MCP servers — category, tools, fallbacks |
 | [`tool-registry/invariants.yaml`](tool-registry/invariants.yaml) | 11 mandatory rules (BLOCK/WARN severity) enforced regardless of phase |
 | [`MCP_GUARDRAILS.md`](MCP_GUARDRAILS.md) | Per-phase guardrails — exact tool names allowed per deploy step |
-| [`CLAUDE.md`](CLAUDE.md) | Architecture constraints — sub-agent limitations, MCP-first rule |
+| [`AGENTS.md`](AGENTS.md) | Architecture constraints — sub-agent limitations, MCP-first rule |
 
 ### Step 1 — Context Gate (Sub-Agent vs Main Conversation)
 
@@ -404,12 +405,12 @@ The system **learns from mistakes** by analyzing trace logs from failed and succ
 
 ### When It Runs
 
-- **Nightly (automated)**: `evolve` command analyzes traces, generates patches, and auto-grafts high-confidence fixes to SKILLS.md
+- **Nightly (automated)**: `evolve` command analyzes traces, generates patches, and auto-grafts high-confidence fixes to ADOP_WORKFLOWS.md
 - **Weekly (human review)**: Review pending patches (confidence 0.60-0.79) and approve or reject
 - **On-demand**: After major failures or before deployments
 
 ```bash
-# Self-healing loop: analyze → generate patches → auto-apply to SKILLS.md
+# Self-healing loop: analyze → generate patches → auto-apply to ADOP_WORKFLOWS.md
 python3 -m shared.prompt_intelligence.cli evolve --auto-graft --min-confidence 0.80
 
 # Review pending patches
@@ -486,7 +487,7 @@ Triggers a Dynamic Workflow that generates everything in parallel:
 
 | Environment | What Runs | How |
 |-------------|-----------|-----|
-| **Development** | Active agents: Data Onboarding, Ontology Staging, Environment Setup, Prompt Intelligence. DevOps Agent planned for Q2 2026. | Interactive via Claude Code CLI |
+| **Development** | Active agents: Data Onboarding, Ontology Staging, Environment Setup, Prompt Intelligence. DevOps Agent planned for Q2 2026. | Interactive via Codex CLI |
 | **QA/Staging** | Generated scripts/DAGs/configs only | Deployed via CI/CD (GitHub Actions, MWAA) |
 | **Production** | Generated scripts/DAGs/configs only | Promoted via CI/CD after QA approval |
 
@@ -561,7 +562,7 @@ By default the platform deploys to a single AWS account: Glue Data Catalog, Lake
 
 ### MCP Servers (Model Context Protocol)
 
-13 MCP servers provide Claude Code with direct AWS access — no CLI needed for most operations. Pre-configured in `.mcp.json`, auto-install via `uvx` on first use.
+13 MCP servers provide Codex with direct AWS access — no CLI needed for most operations. Pre-configured in `.mcp.json`, auto-install via `uvx` on first use.
 
 **PyPI Servers (9)** — installed automatically via `uvx`:
 
@@ -589,7 +590,7 @@ By default the platform deploys to a single AWS account: Glue Data Catalog, Lake
 **Quick start** (after cloning):
 ```bash
 # Prerequisites: uv installed, AWS credentials configured
-claude mcp list   # All 13 servers auto-connect
+inspect Codex MCP configuration   # All 13 servers auto-connect
 ```
 
 **Health check before deployment**: 3 servers are REQUIRED (`glue-athena`, `lakeformation`, `iam`) -- deployment blocks if any fail. See [MCP Setup Guide](docs/mcp-setup.md) for full setup guide.
@@ -601,7 +602,7 @@ All 13 MCP servers can be deployed to **Agentcore Gateway** for shared, cloud-ho
 ```
 Local Mode (default)           Agentcore Mode
 ────────────────────           ────────────────────────
-Claude Code → stdio → 13      Claude Code / API Client
+Codex → stdio → 13      Codex / API Client
   local servers                    → Runtime (agent)
                                        → Gateway (all 13 servers)
 ```
@@ -640,12 +641,6 @@ See [runbooks/environment-setup-agent/agentcore/README.md](runbooks/environment-
 │   ├── fixtures/                     # Shared test fixtures (CSV stubs)
 │   └── templates/                    # Templates for new workloads
 │
-├── demo/                             # Demo/testing resources (not production)
-│   ├── data_generators/              # Synthetic data scripts
-│   ├── sample_data/                  # Pre-generated CSV files
-│   ├── orchestrator_examples/        # Multi-workload DAG examples
-│   └── workflows/                    # Demo governance workflows
-│
 ├── mcp-servers/                      # Custom MCP servers (4 FastMCP servers with SSE support)
 ├── docs/                             # Reference documentation
 │   ├── prompt_intelligence/          # Generated analysis reports
@@ -675,15 +670,15 @@ See [runbooks/environment-setup-agent/agentcore/README.md](runbooks/environment-
 ├── tests/unit/                       # Shared unit tests
 │   └── test_tool_registry.py         # 18 tests: server sync, stale refs, invariants
 │
-├── .claude/
+├── .codex/
 │   ├── agents/                       # Sub-agent definitions (scoped tools, no MCP)
-│   ├── rules/                        # Auto-loaded conventions (path-scoped)
+│   ├── skills/                       # On-demand workflow and engineering instructions
 │   └── hooks/                        # PreToolUse guardrails + SessionStart run-state
 │
 ├── contracts/v1/                     # JSON Schemas for every agent spec (validated by CI)
 │
-├── CLAUDE.md                         # Agent configuration and conventions
-├── SKILLS.md                         # Agent skill definitions and prompts
+├── AGENTS.md                         # Agent configuration and conventions
+├── ADOP_WORKFLOWS.md                 # Agent workflow definitions and prompts
 ├── TOOL_ROUTING.md                   # Tool selection (intent routing + code examples)
 ├── MCP_GUARDRAILS.md                 # Per-phase runtime guardrails
 ├── conftest.py                       # Pytest configuration
@@ -732,7 +727,7 @@ workloads/{dataset_name}/
 
 - Python 3.9+
 - AWS account with Glue, Athena, S3, MWAA configured
-- Claude Code CLI
+- Codex CLI
 
 ### Run Tests Locally
 
@@ -754,7 +749,7 @@ See [Running Tests](docs/running-tests.md) for complete test guide including dat
 
 ### Onboard a New Dataset
 
-Using Claude Code, describe your data source:
+Using Codex, describe your data source:
 
 ```
 "Onboard customer_orders from our PostgreSQL database.
@@ -849,7 +844,7 @@ User: "CRM data"                       User: "CRM data"
 ### Deep Agent Tracing (Three-Layer Observability)
 Inspired by the **AgentTrace** research paper (Gao et al., 2025) on debugging and understanding multi-agent systems, adapted for our LLM sub-agent architecture where you cannot instrument agent reasoning externally.
 
-**Problem**: Traditional agent tracing assumes Python classes you can wrap with decorators. Our agents are Claude Code LLM sub-agents (prompt templates in SKILLS.md) — their reasoning is a black box.
+**Problem**: Traditional agent tracing assumes Python classes you can wrap with decorators. Our agents are Codex LLM sub-agents (prompt templates in ADOP_WORKFLOWS.md) — their reasoning is a black box.
 
 **Solution**: Three instrumentable layers, linked by `run_id` + `parent_span_id`:
 
@@ -861,7 +856,7 @@ Inspired by the **AgentTrace** research paper (Gao et al., 2025) on debugging an
 
 **Three-surface event model** (from AgentTrace): Every trace event is classified as **operational** (what happened), **cognitive** (why it happened), or **contextual** (what surrounded it). This lets you filter traces by concern — debugging failed pipelines vs. understanding agent decisions vs. correlating across workloads.
 
-**OTel-compatible fields**: ~15 fields per event (slimmed from AgentTrace's 30+ to only fields we can actually populate — no token counts from Claude Code sub-agents). Output is JSONL, parseable by jq, CloudWatch, Splunk.
+**OTel-compatible fields**: ~15 fields per event (slimmed from AgentTrace's 30+ to only fields we can actually populate — no token counts from Codex sub-agents). Output is JSONL, parseable by jq, CloudWatch, Splunk.
 
 **CLI viewer** (`shared/logging/trace_viewer.py`): `--summary`, `--decisions`, `--timeline`, `--failures`, `--export-md` (narrative), `--export-map` (decision tree).
 
@@ -883,7 +878,7 @@ python3 -m shared.logging.trace_viewer trace_events.jsonl --decisions
 ### Typed Sub-Agent Outputs
 Sub-agents do not return free-form markdown. Every sub-agent returns a structured `AgentOutput` payload, validated on arrival. Two transports, one schema:
 
-- **`from_agent_message()`**: Claude Code sub-agents (spawned via the `Agent` tool) have no tool-call channel, so they end their final message with a fenced ```json block. This extracts it — last block wins — and rejects payloads missing required fields.
+- **`from_agent_message()`**: Codex sub-agents (spawned via the `Agent` tool) have no tool-call channel, so they end their final message with a fenced ```json block. This extracts it — last block wins — and rejects payloads missing required fields.
 - **`SUBMIT_OUTPUT_TOOL`** + **`from_bedrock_tool_call()`**: For Bedrock `converse()` callers, a `toolSpec` in `shared/templates/agent_output_schema.py` forces the same JSON via `tool_choice`.
 - **`REQUIRED_OUTPUT_FIELDS`**: Derived from `SUBMIT_OUTPUT_TOOL`, so the two transports cannot drift apart.
 - **Forward-compatible `from_dict()`**: Filters unknown keys, so old serialized data works with new fields and new data works with old code.
@@ -904,10 +899,10 @@ Run 2: Memory loaded → Quality Agent reads the hint → test gate passes witho
 ```
 
 ### Adaptive Prompt Evolution (Self-Healing Loop)
-Closes the gap in prompt intelligence: patches were generated in reports but **never applied**. The new `PromptEvolver` stores, tracks, and auto-applies learned prompt patches to SKILLS.md.
+Closes the gap in prompt intelligence: patches were generated in reports but **never applied**. The new `PromptEvolver` stores, tracks, and auto-applies learned prompt patches to ADOP_WORKFLOWS.md.
 
 - **Patch registry**: `shared/prompt_intelligence/patches/` stores `.patch` files with YAML frontmatter (confidence, status, section). `PATCH_INDEX.md` tracks all patches.
-- **Confidence gate**: Patches with confidence >= 0.80 are auto-grafted to SKILLS.md. Below 0.80, they're stored as "pending" for human review.
+- **Confidence gate**: Patches with confidence >= 0.80 are auto-grafted to ADOP_WORKFLOWS.md. Below 0.80, they're stored as "pending" for human review.
 - **Reversible**: Every grafted patch is wrapped in `<!-- GRAFT: {id} -->` markers. `prune_patch()` removes it cleanly.
 - **CLI**: `evolve` (full self-healing cycle), `patches` (list registry), `prune` (revert a bad patch)
 
@@ -1027,8 +1022,8 @@ Automatically validates all generated code BEFORE deployment to catch 95% of iss
 
 | Document | Purpose |
 |----------|---------|
-| [CLAUDE.md](CLAUDE.md) | Agent configuration, security rules, data zone rules |
-| [SKILLS.md](SKILLS.md) | Agent skill definitions, spawn prompts, workflows |
+| [AGENTS.md](AGENTS.md) | Agent configuration, security rules, data zone rules |
+| [ADOP_WORKFLOWS.md](ADOP_WORKFLOWS.md) | Agent skill definitions, spawn prompts, workflows |
 | [TOOL_ROUTING.md](TOOL_ROUTING.md) | **Read first** — tool selection (intent routing, server status, code examples, mandatory rules) |
 | [MCP_GUARDRAILS.md](MCP_GUARDRAILS.md) | Per-phase runtime guardrails (exact MCP tool names per deploy step) |
 | [tool-registry/](tool-registry/) | Canonical YAML registry (servers.yaml + invariants.yaml), validated by CI |
@@ -1101,8 +1096,8 @@ See [Security](docs/security.md) and [CONTRIBUTING](CONTRIBUTING.md#security-iss
 
 | Model | Input Price | Output Price | Est. Cost/Workload |
 |-------|-------------|--------------|-------------------|
-| **Claude Opus** | $15 / 1M tokens | $75 / 1M tokens | ~$3.65 |
-| **Claude Sonnet** | $3 / 1M tokens | $15 / 1M tokens | ~$0.73 |
+| **Codex Opus** | $15 / 1M tokens | $75 / 1M tokens | ~$3.65 |
+| **Codex Sonnet** | $3 / 1M tokens | $15 / 1M tokens | ~$0.73 |
 
 *Assumes 80/20 input/output token split. Opus is used for orchestration and complex reasoning; Sonnet is a viable alternative for sub-agents (Metadata, Quality, DAG) where tasks are more structured.*
 

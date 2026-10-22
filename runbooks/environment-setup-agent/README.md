@@ -47,13 +47,13 @@ Once environment setup is complete:
 1. **Local Mode**: MCP servers run on your laptop
    ```bash
    # Already configured in .mcp.json
-   # Just start Claude Code
+   # Just start Codex
    ```
 
 2. **Gateway Mode**: MCP servers run in AWS
    ```bash
    cp .mcp.gateway.json .mcp.json
-   # Restart Claude Code
+   # Restart Codex
    ```
 
 3. **Proceed to data onboarding**:
@@ -87,7 +87,7 @@ aws glue get-databases | grep bronze_zone
 aws lakeformation list-lf-tags
 
 # Check MCP servers (local mode)
-claude mcp list
+inspect Codex MCP configuration
 
 # Check MCP Gateway (if deployed)
 python3 runbooks/environment-setup-agent/agentcore/gateway/test_gateway.py
@@ -120,5 +120,5 @@ aws bedrock-agent list-agents | grep data-onboarding
 
 - `../../docs/mcp-setup.md` - MCP server configuration guide
 - `agentcore/gateway/GATEWAY_ARCHITECTURE.md` - Gateway architecture
-- `../../CLAUDE.md` - Project-level configuration
+- `../../AGENTS.md` - Project-level configuration
 - `../data-onboarding-agent/README.md` - Next step after setup

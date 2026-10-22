@@ -15,8 +15,8 @@ agent:
     max_tokens: 8192
 
   system_prompt_files:
-    - CLAUDE.md
-    - SKILLS.md
+    - AGENTS.md
+    - ADOP_WORKFLOWS.md
     - MCP_GUARDRAILS.md
 
   tools:

@@ -114,7 +114,7 @@ Result: {N}/13 servers connected | Mode: {LOCAL/GATEWAY}
 2. If any REQUIRED server fails → BLOCK and report error. Do not proceed.
 3. WARN servers → proceed with CLI fallback, log: `Warning: MCP fallback — {server} not loaded. Using CLI.`
 4. OPTIONAL servers → proceed silently, features deferred
-5. Slow-startup servers (`core`, `pii-detection`, `sagemaker-catalog`) may timeout on `claude mcp list` — test with a simple call to confirm
+5. Slow-startup servers (`core`, `pii-detection`, `sagemaker-catalog`) may timeout on `inspect Codex MCP configuration` — test with a simple call to confirm
 6. If Gateway mode selected but Gateway not deployed → prompt user to run `runbooks/09` first, or fall back to Local mode
 
 ### Guardrail Rules — Phase 0
@@ -378,7 +378,7 @@ Gateway mode is chosen during initial setup (`runbooks/environment-setup-agent/0
 
 | Mode | Agent Location | Tools | Human-in-the-loop | Setup |
 |------|---------------|-------|-------------------|-------|
-| **Local Demo** | Claude Code (laptop) | All 13 Gateway servers via `.mcp.gateway.json` | Yes | Gateway only (prompt 09) |
+| **Local Demo** | Codex (laptop) | All 13 Gateway servers via `.mcp.gateway.json` | Yes | Gateway only (prompt 09) |
 | **Production** | Agentcore Runtime (cloud) | All 13 Gateway servers (auto-connected) | Optional | Gateway + Runtime (prompts 09 + 10) |
 
 Gateway is deployed **once** and shared by both modes. See `runbooks/environment-setup-agent/agentcore/README.md` for full details.
@@ -401,10 +401,10 @@ Gateway is deployed **once** and shared by both modes. See `runbooks/environment
 ### Agent Behavior (Both Modes)
 - Same agent behavior regardless of where it runs -- sub-agents still generate artifacts only, no MCP access
 - Phase 5 deploy operations use Gateway tools in both modes
-- In production mode, the Runtime agent uses the same CLAUDE.md + SKILLS.md instructions
+- In production mode, the Runtime agent uses the same AGENTS.md + ADOP_WORKFLOWS.md instructions
 
 ### Health Check
-- **Local demo**: `claude mcp list` (same as local mode)
+- **Local demo**: `inspect Codex MCP configuration` (same as local mode)
 - **Production**: `aws bedrock-agent get-agent --agent-id {GATEWAY_ID}` + health check per server
 - If Gateway is down, fall back to local stdio mode (`git checkout .mcp.json`)
 
@@ -467,5 +467,5 @@ See [docs/mcp-setup.md](./docs/mcp-setup.md) for full installation instructions,
 All 13 servers are configured in `.mcp.json`. Test connectivity:
 
 ```bash
-claude mcp list
+inspect Codex MCP configuration
 ```

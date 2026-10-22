@@ -415,7 +415,7 @@ write_resume_from_disk(workload_name="{workload_name}")
 …or via CLI: `python3 -m shared.utils.resume_writer --workload {workload_name}`.
 
 RESUME.md is the **durable handoff contract** when the session is
-interrupted. A human (or a future Claude Code session) reads RESUME.md
+interrupted. A human (or a future Codex session) reads RESUME.md
 to know which phases completed, what's blocking, and the exact prompt
 to paste to resume. Do NOT hand-write RESUME.md — always regenerate
 from disk so the file matches reality.
@@ -425,7 +425,7 @@ Update RESUME.md also at:
 - Phase 5 deploy dry-run started (writes a `trace_events.jsonl`).
 - Phase 5 deploy completed (writes `deployment_summary.json`).
 
-If the agent cannot call Python (e.g., Claude Code tool budget
+If the agent cannot call Python (e.g., Codex tool budget
 exhausted), instruct the user to run the CLI command shown above.
 
 ### Schema
@@ -558,7 +558,7 @@ Before starting the onboarding process, validate the prompt template inputs to c
 - Provide corrected example
 - Ask user to fix and re-submit prompt
 
-**Pass criteria**: All 5 checks pass → proceed to Phase 0 (Health Check & Auto-Detect from SKILLS.md).
+**Pass criteria**: All 5 checks pass → proceed to Phase 0 (Health Check & Auto-Detect from ADOP_WORKFLOWS.md).
 
 ## Phase 7: Deploy to AWS
 
@@ -569,7 +569,7 @@ After artifacts pass all tests and get human approval, deploy to AWS.
 Before any deployment, verify MCP servers are connected:
 
 ```bash
-claude mcp list
+inspect Codex MCP configuration
 ```
 
 **Required servers** (must be Connected — BLOCK deployment if not):
@@ -671,7 +671,7 @@ Present results to human. Do NOT proceed if any REQUIRED server fails.
    is needed — the inducer is deterministic.
 
    Full spawn prompt: `runbooks/data-onboarding-agent/ontology-staging-agent.md`.
-   Skill definition: SKILLS.md → "Skill: Ontology Staging Agent".
+   Skill definition: ADOP_WORKFLOWS.md → "Skill: Ontology Staging Agent".
 
 9. **Deploy DAG + shared utils to MWAA** (if MWAA is configured):
    ```bash

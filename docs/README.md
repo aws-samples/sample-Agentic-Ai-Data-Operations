@@ -21,12 +21,12 @@ This folder contains actively referenced documentation and diagrams for the Agen
 
 | File | Purpose | Referenced In |
 |------|---------|---------------|
-| `aws-account-setup.md` | AWS infrastructure setup guide | CLAUDE.md (5 refs) |
+| `aws-account-setup.md` | AWS infrastructure setup guide | AGENTS.md (5 refs) |
 | `getting-started.md` | Quick start guide | README.md (2 refs) |
 | `governance-framework.md` | Data governance framework | Multiple files (12 refs) |
 | `governance-integration-example.md` | Governance integration examples | Multiple files (6 refs) |
-| `mcp-integration.md` | MCP integration patterns | CLAUDE.md (1 ref) |
-| `mcp-servers.md` | MCP server architecture | CLAUDE.md (1 ref) |
+| `mcp-integration.md` | MCP integration patterns | AGENTS.md (1 ref) |
+| `mcp-servers.md` | MCP server architecture | AGENTS.md (1 ref) |
 
 ### Utilities
 

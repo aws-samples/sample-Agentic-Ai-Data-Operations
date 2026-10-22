@@ -7,7 +7,7 @@ Optionally enriches with timestamps from `logs/run_*/trace_events.jsonl`
 or `logs/*.jsonl` when present.
 
 Purpose: make an interrupted onboarding session recoverable. A human (or
-a future Claude Code session) reads `workloads/{name}/RESUME.md` to know
+a future Codex session) reads `workloads/{name}/RESUME.md` to know
 which phases completed, what's blocking, and the exact prompt to paste
 to resume.
 
@@ -563,7 +563,7 @@ def _render_resume_md(
         lines.append("None detected.")
     lines.append("")
 
-    lines.append("## Next step — paste into Claude Code")
+    lines.append("## Next step — paste into Codex")
     lines.append("")
     lines.append("```")
     lines.append(_build_next_step_prompt(workload_name, phases, warnings))

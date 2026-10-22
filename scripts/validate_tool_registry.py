@@ -21,7 +21,7 @@ MCP_JSON = ROOT / ".mcp.json"
 MARKDOWN_FILES = [
     ROOT / "TOOL_ROUTING.md",
     ROOT / "MCP_GUARDRAILS.md",
-    ROOT / "CLAUDE.md",
+    ROOT / "AGENTS.md",
 ]
 STALE_NAMES = ["aws-dataprocessing", "verified-permissions", "aws.dp-mcp"]
 

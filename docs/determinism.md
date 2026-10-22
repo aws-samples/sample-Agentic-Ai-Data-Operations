@@ -82,7 +82,7 @@ SQL files use `--` prefix instead of `#`.
 
 ## Hook Enforcement
 
-`.claude/hooks/enforce_template_codegen.py` runs as a PreToolUse hook on Write/Edit/MultiEdit:
+`.codex/hooks/enforce_template_codegen.py` runs as a PreToolUse hook on Write/Edit/MultiEdit:
 
 - If target path matches `workloads/*/(scripts|dags|sql)/**` AND `ADOP_RENDERER_TOKEN` env var is NOT set → **exit 2** (block)
 - Otherwise → exit 0 (allow)
@@ -127,5 +127,5 @@ shared/templates/
 └── iceberg_ddl.sql.j2
 
 contracts/v1/              # JSON Schema contracts (7 files)
-.claude/hooks/enforce_template_codegen.py  # PreToolUse enforcement
+.codex/hooks/enforce_template_codegen.py  # PreToolUse enforcement
 ```

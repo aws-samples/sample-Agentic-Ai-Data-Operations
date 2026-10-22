@@ -83,7 +83,7 @@ class TestDriftValidator:
         the count at two and the suite green, because verify_workload appended a report only
         `if parse_artifact_header(content) is not None` — so the directory entry point, which
         is what CI and the orchestrator call, skipped exactly the files that violate
-        CLAUDE.md:137. verify_artifact on the same file has always returned ok=False.
+        AGENTS.md:137. verify_artifact on the same file has always returned ok=False.
 
         Measured on the real tree at the time: workloads/claims is a complete hand-written
         Bronze->Silver->Gold pipeline plus DAG, and verify_workload reported it clean.

@@ -164,7 +164,7 @@ def verify_artifact(artifact_path: Path) -> DriftReport:
 # `verify_artifact` has always reported one correctly, but `verify_workload` used to append a
 # report only `if parse_artifact_header(content) is not None` — so the directory-level entry
 # point, which is what CI and the orchestrator call, skipped exactly the files that violate
-# CLAUDE.md:137. `workloads/claims` is a complete hand-written Bronze->Silver->Gold pipeline
+# AGENTS.md:137. `workloads/claims` is a complete hand-written Bronze->Silver->Gold pipeline
 # plus DAG, and this function reported it clean by finding nothing in it.
 #
 # Exact paths, never globs: a glob on `*/scripts/quality/glue_data_quality.py` would exempt a
@@ -175,7 +175,7 @@ EXEMPT_HEADERLESS = {
         "Pre-codegen. claims/config is the OLD shape (transformations.yaml, quality_rules.yaml, "
         "schedule.yaml) not the renderer's (bronze/silver/gold/quality/dag.yaml), so it cannot "
         "be re-rendered without authoring five specs — which means inventing the dedup, null, "
-        "threshold and timezone answers CLAUDE.md says only a human may supply. Superseded by "
+        "threshold and timezone answers AGENTS.md says only a human may supply. Superseded by "
         "workloads/claims_v2, which is the rendered equivalent of the same source.",
     "workloads/claims/scripts/transform/silver_to_gold_claims.py":
         "Pre-codegen, same reason as bronze_to_silver_claims.py — superseded by claims_v2.",
@@ -233,7 +233,7 @@ def verify_workload(workload_path: Path) -> WorkloadDriftReport:
                     artifact_path=str(artifact),
                     ok=False,
                     reason=(
-                        "No deterministic header. CLAUDE.md:137 — artifacts under "
+                        "No deterministic header. AGENTS.md:137 — artifacts under "
                         "workloads/*/{scripts,dags,sql}/ come only from "
                         "shared.codegen.renderer.render(); free-form generation is forbidden, "
                         "because a hand-written artifact has no spec_hash and nothing can tell "

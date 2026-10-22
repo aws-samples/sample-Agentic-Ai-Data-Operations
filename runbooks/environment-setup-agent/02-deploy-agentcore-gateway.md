@@ -17,7 +17,7 @@ This guide deploys a production-ready MCP Gateway using **Amazon Bedrock AgentCo
 ## Architecture
 
 ```
-Claude Code (.mcp.gateway.json)
+Codex (.mcp.gateway.json)
   ↓ MCP over HTTPS + AWS SigV4
   ↓
 Amazon Bedrock AgentCore Gateway (unified endpoint)
@@ -377,7 +377,7 @@ aws bedrock-agentcore-control get-gateway \
 
 ### Step 6: Generate .mcp.gateway.json
 
-Create MCP configuration file for Claude Code.
+Create MCP configuration file for Codex.
 
 ```bash
 GATEWAY_URL=$(aws bedrock-agentcore-control get-gateway \
@@ -458,17 +458,17 @@ GATEWAY STATUS: ✅ READY
 
 Next Steps:
 1. Copy .mcp.gateway.json to .mcp.json
-2. Restart Claude Code
+2. Restart Codex
 3. Test tool invocation:
    User: "List all Glue databases using the Gateway"
-   Claude: uses agentcore-gateway.get_databases
+   Codex: uses agentcore-gateway.get_databases
 
-Gateway is deployed and ready for Claude Code integration!
+Gateway is deployed and ready for Codex integration!
 ```
 
 ## Using the Gateway
 
-### From Claude Code
+### From Codex
 
 **Switch to Gateway mode**:
 ```bash
@@ -478,25 +478,25 @@ cp .mcp.json .mcp.local.json
 # Activate Gateway
 cp .mcp.gateway.json .mcp.json
 
-# Restart Claude Code
+# Restart Codex
 # All MCP tools now route through Gateway
 ```
 
 **Test tool invocation**:
 ```
 User: "List all Glue databases"
-Claude Code: *invokes agentcore-gateway.get_databases*
+Codex: *invokes agentcore-gateway.get_databases*
            → Gateway translates MCP → Lambda
            → Lambda queries Glue
            → Gateway translates result → MCP
-           → Claude receives response
+           → Codex receives response
 ```
 
 **Revert to local mode**:
 ```bash
 cp .mcp.local.json .mcp.json
 # or: git checkout .mcp.json
-# Restart Claude Code
+# Restart Codex
 ```
 
 ### From AWS CLI (Direct Lambda Test)
@@ -597,10 +597,10 @@ After successful deployment, you have:
 
 ## Next Steps
 
-1. **Test Gateway from Claude Code**:
+1. **Test Gateway from Codex**:
    ```bash
    cp .mcp.gateway.json .mcp.json
-   # Restart Claude Code
+   # Restart Codex
    # Test: "List all Glue databases"
    ```
 
@@ -640,7 +640,7 @@ After successful deployment, you have:
 - `/tmp/gateway-lambda-policy.json` - Lambda invoke permissions
 - `runbooks/environment-setup-agent/agentcore/gateway/schemas/glue-athena-tools.json` - Tool schema
 - `/tmp/glue-athena-target.json` - Target configuration
-- `.mcp.gateway.json` - MCP config for Claude Code
+- `.mcp.gateway.json` - MCP config for Codex
 - `agentcore/gateway/DEPLOYMENT_STATUS.md` - Deployment documentation (written by this runbook; not in the repo until you run it)
 - `runbooks/environment-setup-agent/agentcore/gateway/test_gateway.py` - Health check script
 

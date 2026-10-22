@@ -14,7 +14,7 @@ python3 -m shared.prompt_intelligence.cli evolve --auto-graft --min-confidence 0
 What happens:
 1. Reads trace_events.jsonl from all workloads/*/logs/
 2. Extracts failure patterns and cross-workload signatures
-3. Patches with confidence >= 0.80 -> auto-grafted to SKILLS.md
+3. Patches with confidence >= 0.80 -> auto-grafted to ADOP_WORKFLOWS.md
 4. Patches with confidence 0.60-0.79 -> stored as "pending" for human review
 5. Patches below 0.60 -> not stored
 
@@ -226,7 +226,7 @@ echo "No trace logs yet. Run some onboardings first."
 2. **Apply fix** → Add prompt patch to runbooks/
 3. **Monitor next runs** → Check if pattern stops appearing
 4. **Re-run analysis** → Verify pattern frequency decreased
-5. **Update confidence** → Document successful fix in CLAUDE.md
+5. **Update confidence** → Document successful fix in AGENTS.md
 
 ## Output Locations
 

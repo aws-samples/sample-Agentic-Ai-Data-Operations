@@ -16,7 +16,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 aws sts get-caller-identity
 
 # 3. Verify MCP servers connect
-claude mcp list
+inspect Codex MCP configuration
 ```
 
 That's it. All 13 MCP servers are pre-configured and will auto-install their dependencies via `uvx` on first use.
@@ -25,7 +25,7 @@ That's it. All 13 MCP servers are pre-configured and will auto-install their dep
 
 ## Prerequisites
 
-- **Claude Code** CLI installed
+- **Codex** CLI installed
 - **uv** (v0.9+) — `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - **Python 3.12+** — required by AWS MCP server packages
 - **AWS credentials** configured (`~/.aws/credentials` or environment variables)
@@ -35,7 +35,7 @@ That's it. All 13 MCP servers are pre-configured and will auto-install their dep
 
 ## What's Configured
 
-The `.mcp.json` in the repo root configures 13 MCP servers. Claude Code reads this automatically.
+The `.mcp.json` in the repo root configures 13 MCP servers. Codex reads this automatically.
 
 ### Connected Servers (13)
 
@@ -111,7 +111,7 @@ Add `"disabled": true` to any server entry you don't need:
 ### Health Check
 
 ```bash
-claude mcp list
+inspect Codex MCP configuration
 ```
 
 Expected: most servers show `Connected`. Some servers (`core`, `pii-detection`) have slow startup and may show `Failed to connect` on the health check but work fine during actual conversation.
@@ -128,9 +128,9 @@ uv run --no-project --with boto3 --with mcp --python 3.13 \
   mcp-servers/pii-detection-server/server.py
 ```
 
-### Test in Claude Code
+### Test in Codex
 
-After starting Claude Code in this project:
+After starting Codex in this project:
 
 ```
 "List IAM roles in my AWS account"
@@ -200,7 +200,7 @@ This project supports two MCP deployment architectures:
 **Architecture**: MCP servers run locally on your laptop via stdio transport.
 
 ```
-Claude Code (.mcp.json)
+Codex (.mcp.json)
   ↓ stdio (local processes)
   ├── 13 MCP servers (uvx / uv run)
        ↓ AWS SDK calls
@@ -227,7 +227,7 @@ Claude Code (.mcp.json)
 **Architecture**: MCP servers run on AWS Lambda, unified via Amazon Bedrock AgentCore Gateway.
 
 ```
-Claude Code (.mcp.gateway.json)
+Codex (.mcp.gateway.json)
   ↓ MCP over HTTPS + AWS SigV4
   ↓
 Amazon Bedrock AgentCore Gateway (unified endpoint)
@@ -299,12 +299,12 @@ cat runbooks/environment-setup-agent/02-deploy-agentcore-gateway.md
 ```bash
 # Activate Gateway mode
 cp .mcp.gateway.json .mcp.json
-# Restart Claude Code
+# Restart Codex
 
 # Revert to Local mode
 cp .mcp.local.json .mcp.json
 # or: git checkout .mcp.json
-# Restart Claude Code
+# Restart Codex
 ```
 
 ---
@@ -318,7 +318,7 @@ Deploy the **Data Onboarding Agent** to Agentcore Runtime for fully cloud-hosted
 **Setup**: See `runbooks/environment-setup-agent/03-deploy-agentcore-runtime.md`
 
 **Benefits**:
-- API-driven agent invocation (no local Claude Code needed)
+- API-driven agent invocation (no local Codex needed)
 - Scheduled pipelines (cron, Airflow triggers)
 - Multi-tenant (multiple agents share Gateway tools)
 
