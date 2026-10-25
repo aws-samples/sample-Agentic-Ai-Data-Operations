@@ -136,6 +136,109 @@ artifacts remain in the user's repository.
 Codex, Amazon Q, and Kiro use their native project surfaces rather than the
 Claude plugin package. Their portable snapshots are under `adapters/`.
 
+## Agent Coordination Workflow
+
+After the user prompt and discovery answers are captured, ADOP coordinates
+specialist agents around one shared run context. The agents have narrow roles,
+explicit hand-offs, and test gates; they do not independently invent the
+architecture or bypass the human approval points.
+
+![Agent Coordination Workflow](docs/diagrams/data-onboarding-workflow.png)
+
+The coordination model is:
+
+```text
+User request
+    ↓
+Router Agent → existing workload or new onboarding
+    ↓
+Human discovery + requirements ledger
+    ↓
+Metadata / Quality / Transformation / DAG / Ontology agents
+    ↓
+Renderer + tests + requirements auditor
+    ↓
+Human approval → deployment → post-deployment verification
+```
+
+The platform mappings are native, but the responsibilities are shared:
+
+| Agent responsibility | Shared outcome |
+|---|---|
+| Router | Finds an existing workload or starts a governed onboarding run |
+| Metadata | Produces the source profile, schema, semantic metadata, and PII observations |
+| Quality | Produces quality rules, thresholds, anomaly checks, and promotion gates |
+| Transformation | Produces validated Silver and Gold specifications and rendered transformations |
+| DAG/orchestration | Produces schedule, dependencies, retries, and failure handling |
+| Ontology | Stages semantic artifacts only when the human opts in |
+| Requirements auditor | Compares human Q&A with context, decisions, traces, tests, artifacts, and deployment evidence |
+| DevOps | Produces production operations only after deployment and verification gates |
+
+Claude Code and Codex use native sub-agent orchestration, Amazon Q uses
+constrained CLI agent processes, and Kiro uses its workflow driver, steering,
+and hooks. Each path must preserve the same requirements ledger, renderer,
+tests, traces, audit, and approval boundaries.
+
+## AI Clone Decision Engine
+
+The AI Clone Decision Engine is the organization’s operating philosophy encoded
+as executable routing and guardrail rules. It keeps agents on the standard
+path even when the user changes platform, MCP availability, cloud service, or
+execution backend.
+
+The engine does not replace human judgment. It applies the organization’s
+approved principles consistently:
+
+- human-approved requirements outrank agent assumptions;
+- MCP is preferred when the approved server is healthy;
+- required-server failures block instead of silently degrading;
+- optional-server failures use an explicit, audited fallback;
+- sub-agents generate and test artifacts but do not use AWS or MCP;
+- Cedar authorization and MCP guardrails apply to every operation;
+- Bronze remains immutable and quality gates cannot be bypassed;
+- credentials, account details, and provider secrets never enter artifacts;
+- every fallback, deployment action, repair, and retry is traced.
+
+### How a decision is made
+
+```text
+User intent
+    ↓
+1. Context gate: main conversation or restricted sub-agent?
+    ↓
+2. Server health: required, warning, or optional?
+    ↓
+3. Intent routing: which approved tool matches the request?
+    ↓
+4. Policy check: Cedar, MCP guardrails, and workload scope
+    ↓
+5. Fallback: approved alternative or human escalation
+    ↓
+6. Evidence: decision, tool result, trace, and requirements linkage
+```
+
+The routing decision is evaluated dynamically from:
+
+| Control | Role in the AI Clone |
+|---|---|
+| [`TOOL_ROUTING.md`](TOOL_ROUTING.md) | Maps user intent to tools and defines `not_when` disqualifiers |
+| [`tool-registry/servers.yaml`](tool-registry/servers.yaml) | Defines server capabilities, tier, tools, and fallback |
+| [`MCP_GUARDRAILS.md`](MCP_GUARDRAILS.md) | Restricts tools allowed in each workflow phase |
+| [`tool-registry/invariants.yaml`](tool-registry/invariants.yaml) | Enforces organization-wide BLOCK/WARN rules |
+| `shared/policies/agent_authorization/` | Limits what each agent role may do |
+| `shared/policies/guardrails/` | Enforces immutability, quality, PII, encryption, audit, and idempotency |
+| Requirements auditor | Verifies that the decision stayed aligned with the user’s Q&A |
+
+For example, a request to validate Silver quality first selects the approved
+quality tool if its MCP server is healthy. If the server is unavailable, the
+engine either blocks because the tool is required or uses the documented CLI
+fallback and records the reason. It never chooses an unregistered tool simply
+because it is convenient.
+
+The detailed agent coordination and decision-engine implementation sections
+later in this README explain the sub-agent contracts, health tiers, fallback
+chain, invariants, and CI validation.
+
 ## High-level workflow phases
 
 Every platform maps its native commands and hooks to these phases:
@@ -152,21 +255,48 @@ Every platform maps its native commands and hooks to these phases:
 
 ## Dynamic workflows
 
-The workflow is client-neutral. Codex exposes the richest native dynamic
-workflow commands, while Claude Code, Amazon Q, and Kiro map the same phases
-to their own commands, agents, hooks, and steering files.
+The workflow is client-neutral. Every supported platform has a native dynamic
+workflow surface; the command syntax changes, but the phases, contracts,
+requirements audit, test gates, and evidence requirements remain the same.
 
-| Command | Purpose | What it does |
-|---|---|---|
-| `$command-onboard-workflow [REGULATION]` | Build a data pipeline | Parallel sub-agents generate specs for Bronze→Silver→Gold pipeline (~15 agents, 10-20 min) |
-| `$command-devops-workflow [WORKLOAD] [FRAMEWORK]` | Production readiness | Parallel IaC + monitoring + cost tags + runbook generation (~8 agents, 5-10 min) |
+### Native dynamic workflow entry points
 
-Both commands ask discovery questions first, then fan out parallel agents.
-Progress is persisted under each workload's `run/` directory.
+| Platform | Onboarding workflow | Production-readiness workflow | Native implementation |
+|---|---|---|---|
+| **Claude Code** | `/onboard-workflow [REGULATION]` | `/devops-workflow [WORKLOAD] [FRAMEWORK]` | `.claude/commands/`, Claude sub-agents, hooks, and `Workflow` orchestration |
+| **Codex** | `$command-onboard-workflow [REGULATION]` | `$command-devops-workflow [WORKLOAD] [FRAMEWORK]` | `.codex/skills/`, TOML agent contracts, hooks, and sub-agents |
+| **Amazon Q Developer** | `q chat --agent adop-orchestrator` | `q chat --agent adop-devops` | `.amazonq/cli-agents/`, Q subprocess agents, rules, and hooks |
+| **Kiro** | `python3 scripts/kiro_workflow.py init --workload <name>` then `gate` | Run the Kiro DevOps agent after the workload gate | `.kiro/agents/`, steering, hooks, and `scripts/kiro_workflow.py` |
 
-Codex skill definitions:
-`.codex/skills/command-onboard-workflow/SKILL.md`,
-`.codex/skills/command-devops-workflow/SKILL.md`.
+Examples:
+
+```text
+Claude Code: /onboard-workflow HIPAA
+Codex:       $command-onboard-workflow HIPAA
+Amazon Q:    q chat --agent adop-orchestrator
+Kiro:        python3 scripts/kiro_workflow.py init --workload claims
+             python3 scripts/kiro_workflow.py gate --workload claims
+```
+
+Claude Code and Codex dynamically fan out specialist sub-agents during their
+build phases. Amazon Q uses the `adop-orchestrator` to spawn constrained CLI
+agent processes. Kiro uses its filesystem workflow driver, hooks, and steering
+to make the same phases deterministic and resumable.
+
+Each onboarding entry point asks discovery questions first, then executes the
+same gated build phases through its native orchestration model. Progress is
+persisted under each workload's `run/` directory.
+
+The shared workflow definitions are:
+
+- Claude Code: `.claude/commands/onboard-workflow.md` and
+  `.claude/commands/devops-workflow.md`
+- Codex: `.codex/skills/command-onboard-workflow/SKILL.md` and
+  `.codex/skills/command-devops-workflow/SKILL.md`
+- Amazon Q: `.amazonq/cli-agents/adop-orchestrator.json` and
+  `.amazonq/cli-agents/adop-devops.json`
+- Kiro: `.kiro/steering/13-workflow-orchestrator.md`,
+  `.kiro/agents/`, and `scripts/kiro_workflow.py`
 
 ## Repository map
 
@@ -663,7 +793,7 @@ deterministic renderer, trace contract, and audit behavior.
 
 A user describes their data source in natural language. The **Data Onboarding Agent** coordinates specialized sub-agents to generate a complete, tested pipeline — config files, transformation scripts, quality checks, and an Airflow DAG — without writing any code manually.
 
-### Agent Coordination Workflow
+### Detailed Agent Coordination Workflow
 
 ![Data Onboarding Agent Workflow](docs/diagrams/data-onboarding-workflow.png)
 
@@ -768,7 +898,7 @@ At Phase 7 Step 8.5 of the deploy flow, the **Ontology Staging Agent** induces a
 
 ---
 
-## 5. AI Clone Decision Engine
+## 5. Detailed AI Clone Decision Engine
 
 **Purpose:** An AI clone of you (or your organization) that makes tooling decisions the way you would — dynamically selecting the optimal tool for each operation based on your principles, available infrastructure, and real-time health status.
 
