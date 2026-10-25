@@ -136,6 +136,99 @@ artifacts remain in the user's repository.
 Codex, Amazon Q, and Kiro use their native project surfaces rather than the
 Claude plugin package. Their portable snapshots are under `adapters/`.
 
+## Prompt examples and provider-neutral extension
+
+The prompt supplies business intent and confirmed constraints. The workflow
+then converts them into versioned contracts, tests, and deployment evidence.
+The same prompt model works for AWS Glue today and future execution targets
+such as EMR Spark, dbt/Snowflake, or Databricks.
+
+### Provider-neutral ADOP changes
+
+The current bundle ships disabled native MCP connection entries for Snowflake,
+Databricks, and Teradata, but does not yet ship provider-specific deployment
+adapters. See [`mcp-profiles/third-party/README.md`](mcp-profiles/third-party/README.md).
+Provider extensions should add:
+
+- versioned execution-target contracts for `aws_glue`, `emr_spark`,
+  `dbt_snowflake`, and `databricks`;
+- provider-neutral `runtime.yaml` values for target, region/workspace,
+  database/catalog/schema, warehouse or cluster, retry policy, and tool
+  allowlist;
+- client-specific MCP registration examples without credentials in Git;
+- provider-aware Phase 0 health checks and post-deployment verification;
+- requirements-auditor evidence linking user requirements to models,
+  notebooks/jobs, tables, tests, and deployment results.
+
+### Example prompts
+
+**Batch from S3 — HIPAA**
+
+```text
+$command-onboard-workflow HIPAA
+
+Onboard claims data from s3://data-lake-<account>-us-east-1/bronze/claims/
+into Silver with deduplication on claim_id and a not-null policy_number rule.
+Create a flat Gold Iceberg table with net_paid_ratio, days_to_submission, and
+denial_category. Run daily at 03:00 UTC. Mask PHI in Silver and suppress PHI
+in Gold.
+```
+
+**Streaming from Kafka — PCI DSS**
+
+```text
+$command-onboard-workflow PCI
+
+Onboard events from Kafka topic payments.auth.v1 using Glue Streaming ETL.
+Process 60-second micro-batches, deduplicate on event_id, validate the schema,
+and aggregate fraud_score and rolling auth_rate into five-minute Gold windows.
+Tokenize PAN, drop CVV, and apply Luhn validation.
+```
+
+**Streaming from Kinesis — GDPR**
+
+```text
+$command-onboard-workflow GDPR
+
+Onboard clickstream data from Kinesis stream web-events-prod with an S3
+checkpoint. Ingest one-minute Bronze batches, sessionize Silver by user_id
+with a 30-minute inactivity gap, and publish hourly Gold rollups for page_views,
+unique_users, and bounce_rate. Apply consent filtering, 365-day retention, and
+a right-to-erasure process.
+```
+
+### Prompt depth
+
+Use a brief prompt when you want the agent to discover and ask for missing
+decisions. Use a detailed prompt when you already know the source, keys,
+transformations, PII handling, quality rules, Gold grain, schedule, timezone,
+and failure policy. Never instruct the agent to silently use defaults for
+mandatory human decisions; the discovery gate must resolve them explicitly.
+
+## Why Agentify Data Operations?
+
+Traditional pipeline development repeats the same ETL, quality, orchestration,
+security, and documentation work for every dataset. ADOP turns that work into
+a governed workflow: the user supplies intent, agents coordinate specialist
+work, the renderer produces deterministic artifacts, and the auditor verifies
+that the output still matches the request.
+
+The result is faster delivery without giving up human approval, traceability,
+quality gates, or organizational standards.
+
+## How It Works
+
+Claude Code, Codex, Amazon Q Developer, and Kiro use different configuration
+formats and hook contracts, but share the same workflow phases, contracts,
+workload structure, requirements auditor, security rules, and artifact
+evidence model. The `adapters/` directory contains portable native snapshots;
+the root files provide the combined project surface.
+
+All agents run in the Development environment. Generated scripts and
+configurations are version-controlled and promoted to higher environments
+through CI/CD. Agents do not run in production; only their approved artifacts
+are promoted.
+
 ## Agent Coordination Workflow
 
 After the user prompt and discovery answers are captured, ADOP coordinates
@@ -632,157 +725,6 @@ Authoritative references:
 
 - [Databricks custom MCP servers](https://docs.databricks.com/aws/en/agents/mcp-tools/custom-mcp)
 - [Databricks MCP API and SDK reference](https://docs.databricks.com/aws/en/ai-gateway/mcp-service-reference)
-
-### Provider-neutral ADOP changes
-
-The current bundle ships disabled native MCP connection entries for Snowflake,
-Databricks, and Teradata, but does not yet ship provider-specific deployment
-adapters. See [`mcp-profiles/third-party/README.md`](mcp-profiles/third-party/README.md).
-The next provider-neutral
-extension should add:
-
-- a versioned execution-target contract for `aws_glue`, `emr_spark`,
-  `dbt_snowflake`, and `databricks`;
-- provider-neutral `runtime.yaml` values for target, region/workspace,
-  database/catalog/schema, warehouse or cluster, retry policy, and tool
-  allowlist;
-- client-specific MCP registration examples without copying credentials into
-  the repository;
-- provider-aware Phase 0 health checks and post-deployment verification;
-- requirements-auditor evidence linking user requirements to SQL/dbt models,
-  notebooks/jobs, tables, tests, and deployment results.
-
-### Example 1 — Batch from S3 (CSV, daily) with Dynamic Workflow
-```
-$command-onboard-workflow HIPAA
-
-Onboard claims data from s3://data-lake-<account>-us-east-1/bronze/claims/ingestion_date=YYYY-MM-DD/claims.csv
-into Silver with dedup on claim_id and not-null policy_number, and into a flat denormalized
-Gold Iceberg table with derived measures (net_paid_ratio, days_to_submission, denial_category).
-Run daily at 03:00 UTC. Apply HIPAA controls with PHI masking in Silver and PHI suppression in Gold.
-```
-
-> The `$command-onboard-workflow HIPAA` prefix triggers parallel execution via Dynamic Workflow.
-> HIPAA changes the compliance controls and review requirements; it does not hard-code a model.
-
-### Example 2 — Streaming from Kafka (Glue Streaming ETL)
-```
-$command-onboard-workflow PCI
-
-Onboard transaction events from Kafka topic `payments.auth.v1` (bootstrap:
-b-1.msk-prod.kafka.us-east-1.amazonaws.com:9098, IAM auth) using AWS Glue Streaming ETL.
-Land micro-batches every 60s into Bronze Iceberg on S3, dedup on event_id in Silver
-with schema validation, and aggregate to 5-minute windows in Gold (fraud_score by merchant, rolling
-auth_rate). Apply PCI DSS — tokenize PAN, drop CVV, Luhn check as a quality rule.
-```
-
-### Example 3 — Streaming from Kinesis (Glue Streaming ETL)
-```
-$command-onboard-workflow GDPR
-
-Onboard clickstream events from Kinesis Data Stream `web-events-prod` (shard count 8,
-PutRecord enhanced fan-out consumer) using AWS Glue Streaming ETL with a checkpoint on S3.
-Write Bronze Iceberg on 1-minute triggers, Silver with session stitching on user_id + 30-min
-inactivity gap, Gold hourly rollups (page_views, unique_users, bounce_rate by traffic_source).
-Apply GDPR — consent-based filter on user_id, 365-day retention, right-to-erasure hook.
-```
-
-### Prompt Depth: Brief vs. Detailed
-
-You can be brief or detailed — the agent asks clarifying questions either way. Here's the same dataset at two levels of detail:
-
-**High-level** (agent fills in defaults, keeps moving):
-```
-Onboard e-commerce orders from s3://your-landing-bucket/ecommerce_orders/
-
-- CSV, 50 rows, GDPR, daily 09:30 UTC batch
-- Gold: flat denormalized table for ad-hoc queries (no star schema)
-- DQ: completeness > 85%, validate dates/emails/phones, quarantine bad rows
-- Transforms: mask credit cards, standardize phones, cast dates, derive order_month + days_to_ship
-
-Print a status box after each phase. Don't ask questions — use defaults and keep moving.
-```
-
-**Deep-dive** (fully specified, no questions needed):
-```
-Onboard a new e-commerce orders dataset.
-
-Source:
-- Location: s3://your-landing-bucket/ecommerce_orders/
-- Format: CSV, 50 rows, batch ingestion
-- Refresh: Daily at 09:30 UTC
-
-Compliance: GDPR
-- PII columns: customer_email, customer_phone, credit_card_number, customer_name, shipping_address
-- Require consent tracking, right-to-erasure support, 365-day retention
-
-Gold Zone: Flat denormalized table for ad-hoc analytics (NO star schema)
-
-Data Quality Rules:
-- Completeness threshold: 85% (block promotion if below)
-- Validate order_date format (reject invalid dates like month > 12)
-- Validate customer_email format (must contain @)
-- Validate customer_phone format (reject non-numeric junk)
-- Flag invalid credit_card_number values
-- Flag rows missing city/state/zip as incomplete
-- Anomaly: flag orders where total_amount != quantity × unit_price × (1 - discount_pct)
-
-Transformations (Bronze → Silver):
-- Standardize phone to E.164 format
-- Mask credit_card_number (show last 4 only: ****-****-****-1234)
-- Cast order_date and ship_date to DATE type
-- Trim whitespace on all string columns
-- Quarantine rows with invalid dates (don't drop silently)
-
-Transformations (Silver → Gold):
-- Flatten all columns into single wide table
-- Add derived columns: order_month, days_to_ship, is_returned, is_high_value (total > $100)
-- Keep only delivered + returned orders (exclude processing/cancelled)
-
-Schedule: Daily batch at 09:30 UTC, retries=3, exponential backoff, alert on failure
-```
-
-Watch the agent run, approve the plan it presents, and the artifacts land under `workloads/<name>/` (config, scripts, DAG, tests, ontology).
-
----
-
-## Why Agentify Data Operations?
-
-Traditional data pipeline development is slow, manual, and error-prone:
-- **Weeks of manual coding** for ETL scripts, quality checks, and orchestration DAGs
-- **Repetitive boilerplate** across similar data sources (CSV ingestion patterns, PII detection, quality rules)
-- **Knowledge scattered** across Confluence docs, Slack threads, and tribal knowledge
-- **Quality issues discovered in production** instead of during development
-
-**This platform agentifies the entire data operations workflow:**
-
-| Traditional Approach | Agentic Approach | Time Saved |
-|---------------------|------------------|------------|
-| Data engineer writes PySpark ETL (2-3 days) | **Data Onboarding Agent** generates Bronze→Silver→Gold scripts from natural language (15 minutes) | **95%** |
-| Manually create quality rules per column (1-2 days) | **Data Quality Agent** auto-generates column-level checks from profiling (10 minutes) | **90%** |
-| Write Airflow DAG with task dependencies (1 day) | **Orchestration Agent** generates tested DAG from schedule config (15 minutes) | **95%** |
-| Author OWL ontology + R2RML mappings by hand (1-2 weeks) | **Ontology Staging Agent** induces OWL + R2RML from `semantic.yaml` + Glue (10 minutes) | **99%** |
-| Debug recurring pipeline failures (ongoing) | **Prompt Intelligence Agent** learns from failures, prevents recurrence (automated) | **Hours per week** |
-
-**Result: Data pipeline development goes from 2-3 weeks → 2-3 hours.**
-
----
-
-## How It Works
-
-**Built as a multi-agent platform.** Claude Code, Codex, Amazon Q Developer,
-and Kiro use different configuration formats and hook contracts, but they share
-the same workflow phases, contracts, workload structure, requirements auditor,
-security rules, and artifact evidence model. The `adapters/` directory contains
-portable native snapshots; the root files provide the combined project surface.
-
-Other coding agents can be added through the same adapter pattern. An adapter
-must preserve the human discovery gate, requirements ledger, test gates,
-deterministic renderer, trace contract, and audit behavior.
-
-**All agents run in the Development environment only.** Generated scripts and configurations are version-controlled and promoted to higher environments (QA, Staging, Production) through standard CI/CD pipelines. Agents do not run in production — only the artifacts they generate.
-
----
 
 ## 1. Data Onboarding Agent
 
