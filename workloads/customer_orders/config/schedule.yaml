@@ -1,0 +1,71 @@
+dataset_name: customer_orders
+schema_version: v2
+dag_id: customer_orders_daily
+schedule:
+  cron: "0 9 * * *"
+  timezone: America/New_York
+  catchup: false
+  max_active_runs: 1
+  start_date: "2026-01-01"
+retries:
+  count: 3
+  delay_seconds: 300
+  backoff: true
+  max_delay_seconds: 3600
+tasks:
+  - task_id: ingest_bronze
+    type: glue_job
+    script_path: scripts/extract/bronze_ingestion.py
+    timeout_minutes: 15
+    params:
+      "--CUSTOMER_ORDERS_SOURCE_URI": "${CUSTOMER_ORDERS_SOURCE_URI}"
+      "--DATA_LAKE_BUCKET": "${DATA_LAKE_BUCKET}"
+  - task_id: transform_bronze_to_silver
+    type: glue_job
+    script_path: scripts/transform/bronze_to_silver.py
+    depends_on:
+      - ingest_bronze
+    timeout_minutes: 15
+    params:
+      "--CUSTOMER_ORDERS_QUARANTINE_URI": "${CUSTOMER_ORDERS_QUARANTINE_URI}"
+      "--CUSTOMER_ORDERS_TOKEN_SECRET_ID": "${CUSTOMER_ORDERS_TOKEN_SECRET_ID}"
+  - task_id: quality_check_silver
+    type: quality_check
+    script_path: scripts/quality/quality_check.py
+    depends_on:
+      - transform_bronze_to_silver
+    timeout_minutes: 15
+    params:
+      "--TABLE_NAME": "glue_catalog.customer_orders_db.silver_customer_orders"
+      "--ZONE": silver
+  - task_id: transform_silver_to_gold
+    type: glue_job
+    script_path: scripts/transform/silver_to_gold.py
+    depends_on:
+      - quality_check_silver
+    timeout_minutes: 15
+  - task_id: quality_check_gold
+    type: quality_check
+    script_path: scripts/quality/quality_check.py
+    depends_on:
+      - transform_silver_to_gold
+    timeout_minutes: 15
+    params:
+      "--TABLE_NAME": "glue_catalog.customer_orders_db.gold_customer_orders"
+      "--ZONE": gold
+failure_handling:
+  on_failure_callback: sns_alert
+  notification_channel: customer_orders_alerts
+  escalation_after_minutes: 0
+sla:
+  deadline_minutes: 15
+  critical_tasks:
+    - transform_bronze_to_silver
+    - quality_check_silver
+    - transform_silver_to_gold
+    - quality_check_gold
+tags:
+  - customer_orders
+  - data-pipeline
+  - gdpr
+  - demo-only

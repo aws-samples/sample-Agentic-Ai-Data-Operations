@@ -69,6 +69,13 @@ def _shipped_specs():
 SHIPPED = _shipped_specs()
 
 
+def _schema_version(path: Path) -> str:
+    for line in path.read_text().splitlines()[:5]:
+        if line.startswith("# schema_version:"):
+            return line.split(":", 1)[1].strip()
+    return "v1"
+
+
 def test_there_are_specs_to_check():
     """Otherwise every test below passes by iterating nothing."""
     assert len(SHIPPED) >= 5, f"only found {len(SHIPPED)} shipped specs; the glob is wrong"
@@ -76,7 +83,12 @@ def test_there_are_specs_to_check():
 
 @pytest.mark.parametrize("rel,spec_type", SHIPPED, ids=[r for r, _ in SHIPPED])
 def test_shipped_spec_validates(rel, spec_type):
-    errors = validate_spec(yaml.safe_load((WORKLOADS / rel).read_text()), spec_type)
+    path = WORKLOADS / rel
+    errors = validate_spec(
+        yaml.safe_load(path.read_text()),
+        spec_type,
+        schema_version=_schema_version(path),
+    )
     known = KNOWN_INVALID.get(rel)
 
     if known is None:

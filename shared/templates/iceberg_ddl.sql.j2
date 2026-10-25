@@ -15,7 +15,7 @@ USING iceberg
 {% if table.partition_spec is defined and table.partition_spec %}
 PARTITIONED BY ({{ table.partition_spec | join(', ') }})
 {% endif %}
-LOCATION 's3://data-lake/{{ dataset_name }}/{{ table.zone | default("silver") }}/{{ table.name }}/'
+LOCATION 's3://${DATA_LAKE_BUCKET}/{{ dataset_name }}/{{ table.zone | default("silver") }}/{{ table.name }}/'
 TBLPROPERTIES (
     'table_type' = 'ICEBERG',
     'format' = 'parquet',

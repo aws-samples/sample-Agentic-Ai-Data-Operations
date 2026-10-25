@@ -1,5 +1,5 @@
 {# template_id: quality_check #}
-{# template_version: 1.1.0 #}
+{# template_version: 1.4.0 #}
 {# required_slots: dataset_name, rules, quality_gates #}
 {# schema_version: v1 #}
 {#
@@ -48,18 +48,74 @@
         (F.col("{{ rule.column }}") >= {{ rule.params.min }}) &
         (F.col("{{ rule.column }}") <= {{ rule.params.max }})
     ).count()
+    score = valid_count / total_rows if total_rows > 0 else 0.0
 {% elif rule.check_type == "enum" %}
     valid_values = {{ rule.params["values"] | tojson }}
     valid_count = df.filter(F.col("{{ rule.column }}").isin(valid_values)).count()
+    score = valid_count / total_rows if total_rows > 0 else 0.0
 {% elif rule.check_type == "regex" %}
     valid_count = df.filter(F.col("{{ rule.column }}").rlike("{{ rule.params.pattern }}")).count()
+    score = valid_count / total_rows if total_rows > 0 else 0.0
 {% elif rule.check_type == "not_null" %}
     valid_count = df.filter(F.col("{{ rule.column }}").isNotNull()).count()
+    score = valid_count / total_rows if total_rows > 0 else 0.0
 {% elif rule.check_type == "custom_sql" %}
 {% if rule.params is not defined or rule.params.sql is not defined %}
 {{ unsupported("quality rule '" ~ rule.rule_id ~ "' (" ~ dimension ~ ") is check_type "
    ~ "custom_sql but params.sql is not set, so there is no predicate to evaluate.") }}
 {% endif %}
+{% if rule.params.source_table is defined %}
+{% if rule.params.source_column is not defined or rule.params.source_sql is not defined
+      or rule.params.join_columns is not defined or not rule.params.join_columns %}
+{{ unsupported("quality rule '" ~ rule.rule_id ~ "' (" ~ dimension ~ ") uses source_table "
+   ~ "for a conditional check but must provide source_column, source_sql and a non-empty "
+   ~ "join_columns list. Without those slots the renderer cannot prove that an optional "
+   ~ "source value is absent rather than that its derived target value failed.") }}
+{% endif %}
+{% set _source_out_of_band = ["lf_tags_present", "no_phi_literals_in_logs", "tbac_grant_exists",
+                              "kms_key_rotated", "cloudtrail_event_present"] %}
+{% for _fn in _source_out_of_band %}
+{% if _fn in rule.params.sql or _fn in rule.params.source_sql %}
+{{ unsupported("quality rule '" ~ rule.rule_id ~ "' (" ~ dimension ~ ") uses source-aware "
+   ~ "custom_sql with '" ~ _fn ~ "', which is not a Spark dataframe predicate. Rendering it "
+   ~ "would fail at runtime as an undefined function instead of safely refusing the rule.") }}
+{% endif %}
+{% endfor %}
+    # source-aware custom_sql: evaluate the target predicate only for source rows where the
+    # source predicate is true. A zero-row source population passes; every source-present key
+    # without a matching target row is a failure.
+    source_present_df = (
+        spark.table({{ rule.params.source_table | tojson }})
+        .filter(F.expr({{ rule.params.source_sql | tojson }}))
+        .select(
+{% for _join_column in rule.params.join_columns %}
+            "{{ _join_column }}"{% if not loop.last %},{% endif %}
+{% endfor %}
+        )
+        .distinct()
+    )
+    target_present_df = (
+        df.filter(F.expr({{ rule.params.sql | tojson }}))
+        .select(
+{% for _join_column in rule.params.join_columns %}
+            "{{ _join_column }}"{% if not loop.last %},{% endif %}
+{% endfor %}
+        )
+        .distinct()
+    )
+    source_present_count = source_present_df.count()
+    tokenization_failures = source_present_df.join(
+        target_present_df,
+        on=[
+{% for _join_column in rule.params.join_columns %}
+            "{{ _join_column }}"{% if not loop.last %},{% endif %}
+{% endfor %}
+        ],
+        how="left_anti",
+    ).count()
+    valid_count = source_present_count - tokenization_failures
+    score = valid_count / source_present_count if source_present_count > 0 else 1.0
+{% else %}
 {#
   Out-of-band assertions must still refuse (finding L2).
 
@@ -88,6 +144,8 @@
     # are the valid ones. This is what accuracy and consistency rules need — a comparison
     # across columns, or a condition, rather than a single-column check.
     valid_count = df.filter(F.expr({{ rule.params.sql | tojson }})).count()
+    score = valid_count / total_rows if total_rows > 0 else 0.0
+{% endif %}
 {% else %}
 {{ unsupported("quality rule '" ~ rule.rule_id ~ "' (" ~ dimension ~ ") uses check_type '"
    ~ rule.check_type ~ "', which this template has no branch for. Implemented: range, "
@@ -98,8 +156,8 @@
    ~ "such as lf_tags_present(...) or no_phi_literals_in_logs(...) is not a property of the "
    ~ "dataframe at all: verify it out of band via MCP and record it as severity info, "
    ~ "rather than declaring an unexecutable check CRITICAL and blocking.") }}
-{% endif %}
     score = valid_count / total_rows if total_rows > 0 else 0.0
+{% endif %}
 {% endif %}
     results.append({
         "rule_id": "{{ rule.rule_id }}",
@@ -118,6 +176,7 @@
 {{ _body.strip("\n") | indent(4, first=True) }}
 {% endif %}
 {%- endmacro %}
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -136,11 +195,19 @@ from shared.utils.structured_logger import StructuredLogger
 logger = StructuredLogger(
     agent="quality_check",
     workload="{{ dataset_name }}",
-    run_id="standalone",
+    run_id="local",
 )
 
 
-def check_quality(spark, table_name, zone):
+def _configure_logger(args):
+    """Use Airflow's ADOP_RUN_ID while keeping direct local calls testable."""
+    logger.context["run_id"] = (
+        args.get("ADOP_RUN_ID") or os.environ.get("ADOP_RUN_ID") or "local"
+    )
+
+
+def check_quality(spark, table_name, zone, args=None):
+    _configure_logger(args or {})
     logger.log("info", "quality_check_start", table=table_name, zone=zone)
 
     df = spark.table(table_name)
@@ -243,11 +310,21 @@ def check_quality(spark, table_name, zone):
 {% endif %}
 
     gate_passed = overall_score >= gate_threshold and critical_failures <= max_critical
+    failed_rules = [
+        {
+            "rule_id": rule["rule_id"],
+            "severity": rule["severity"],
+            "score": rule["score"],
+            "threshold": rule["threshold"],
+        }
+        for rule in results
+        if not rule["passed"]
+    ]
 
     logger.log("info", "quality_check_complete",
         total_rows=total_rows, overall_score=overall_score,
         critical_failures=critical_failures, gate_passed=gate_passed,
-        rules_checked=len(results))
+        rules_checked=len(results), failed_rules=failed_rules)
 
     return {
         "workload": "{{ dataset_name }}",
@@ -278,14 +355,14 @@ if __name__ == "__main__":
   does not stage -- the same reason silver_transform resolves logical_date conditionally.
 #}
 {% if gate_before_publish | default(false) %}
-    args = getResolvedOptions(sys.argv, ["JOB_NAME", "TABLE_NAME", "ZONE", "PROMOTE_TO"])
+    args = getResolvedOptions(sys.argv, ["JOB_NAME", "ADOP_RUN_ID", "TABLE_NAME", "ZONE", "PROMOTE_TO"])
 {% else %}
-    args = getResolvedOptions(sys.argv, ["JOB_NAME", "TABLE_NAME", "ZONE"])
+    args = getResolvedOptions(sys.argv, ["JOB_NAME", "ADOP_RUN_ID", "TABLE_NAME", "ZONE"])
 {% endif %}
     sc = SparkContext()
     glue_context = GlueContext(sc)
     spark = glue_context.spark_session
-    result = check_quality(spark, args["TABLE_NAME"], args["ZONE"])
+    result = check_quality(spark, args["TABLE_NAME"], args["ZONE"], args)
     if not result["gate_passed"]:
         raise RuntimeError(
             f"Quality gate FAILED: score={result['overall_score']:.3f}, "

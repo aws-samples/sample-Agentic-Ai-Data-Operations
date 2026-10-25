@@ -210,11 +210,20 @@ def check_stage_connectivity(workload_dir: Path) -> list[str]:
 
     problems: list[str] = []
 
+    bronze_spec = _load(config / "bronze.yaml")
+    bronze_is_iceberg = bool(
+        bronze_spec
+        and bronze_spec.get("catalog_database")
+        and bronze_spec.get("catalog_table")
+    )
+
     # --- the catalog-prefix edge -------------------------------------------------------
     for filename, (reads_zone, reads_iceberg) in READS.items():
         spec = _load(config / filename)
         if not spec:
             continue
+        if reads_zone == "bronze":
+            reads_iceberg = bronze_is_iceberg
         ref = spec.get("source_table")
         if not isinstance(ref, str) or not ref:
             continue

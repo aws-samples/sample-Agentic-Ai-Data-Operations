@@ -146,6 +146,82 @@ class OrchestratorLogger:
             payload={"attempt": attempt, "reason": reason},
         )
 
+    def deployment_failure(
+        self,
+        step: str,
+        *,
+        tool: str,
+        error_type: str,
+        error: str,
+        attempt: int = 1,
+        phase: int = 5,
+        retry_requires_approval: bool = True,
+    ):
+        """Record a deployment failure with enough context to resume safely."""
+        self.tracer.operational_event(
+            "deployment_step_failed",
+            agent_name="orchestrator",
+            phase=phase,
+            status="failed_waiting_for_approval"
+            if retry_requires_approval
+            else "failed",
+            payload={
+                "step": step,
+                "tool": tool,
+                "error_type": error_type,
+                "error": error,
+                "attempt": attempt,
+                "retry_requires_approval": retry_requires_approval,
+            },
+        )
+
+    def deployment_repair(
+        self,
+        step: str,
+        *,
+        root_cause: str,
+        repair: str,
+        verification: Optional[Dict[str, Any]] = None,
+        phase: int = 5,
+    ):
+        """Record a repair separately from the failure it addresses."""
+        self.tracer.operational_event(
+            "deployment_repair",
+            agent_name="orchestrator",
+            phase=phase,
+            status="repair_verified" if verification else "repair_applied",
+            payload={
+                "step": step,
+                "root_cause": root_cause,
+                "repair": repair,
+                "verification": verification or {},
+            },
+        )
+
+    def deployment_retry_decision(
+        self,
+        step: str,
+        *,
+        approved: bool,
+        reason: str,
+        attempt: int,
+        phase: int = 5,
+    ):
+        """Record the human decision that permits or rejects a retry."""
+        self.tracer.operational_event(
+            "deployment_retry_decision",
+            agent_name="orchestrator",
+            phase=phase,
+            status="approved" if approved else "rejected",
+            payload={
+                "step": step,
+                "attempt": attempt,
+                "approved": approved,
+                "reason": reason,
+                "decision_source": "human",
+            },
+        )
+
     def phase_escalate(self, phase: int, reason: str):
         print(
             f"  PHASE {phase} ESCALATED TO HUMAN: {reason}\n"
@@ -220,6 +296,7 @@ class OrchestratorLogger:
                 "duration_seconds": duration.total_seconds(),
             },
         )
+        self.tracer.close()
 
     # ── Conversation Flow Capture ──────────────────────────────────────
 

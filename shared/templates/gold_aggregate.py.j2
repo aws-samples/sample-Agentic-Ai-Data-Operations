@@ -1,5 +1,5 @@
 {# template_id: gold_aggregate #}
-{# template_version: 1.3.0 #}
+{# template_version: 1.5.0 #}
 {# required_slots: dataset_name, source_table, schema_type, grain, measures #}
 {# schema_version: v1 #}
 {#
@@ -119,16 +119,19 @@ F.when(F.expr({{ measure.filter | tojson }}), F.col("{{ measure.source_column }}
         F.min({{ _col }}).alias("{{ measure.name }}"),
 {% elif measure.aggregation == "max" %}
         F.max({{ _col }}).alias("{{ measure.name }}"),
+{% elif measure.aggregation == "first_value" %}
+        F.first({{ _col }}, ignorenulls=True).alias("{{ measure.name }}"),
 {% else %}
 {{ unsupported("measure '" ~ measure.name ~ "' uses aggregation '" ~ measure.aggregation
    ~ "', which this template has no branch for. Implemented: sum, avg, count, "
-   ~ "count_distinct, min, max. There was no else arm, so the measure was dropped from the "
+   ~ "count_distinct, min, max, first_value. There was no else arm, so the measure was dropped from the "
    ~ "aggregation entirely and the render still compiled — the Gold table came out missing "
    ~ "the column, with nothing reported. `percentile` additionally has no parameter in "
    ~ "gold_spec for WHICH percentile, so the contract needs extending before it can be "
    ~ "implemented.") }}
 {% endif %}
 {%- endmacro %}
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -144,15 +147,42 @@ PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from shared.utils.structured_logger import StructuredLogger
+from shared.utils.pii_detection_and_tagging import detect_pii_by_column_name
 
 logger = StructuredLogger(
     agent="gold_aggregate",
     workload="{{ dataset_name }}",
-    run_id="standalone",
+    run_id="local",
 )
 
 
+def _configure_logger(args):
+    """Use Airflow's ADOP_RUN_ID while keeping direct local calls testable."""
+    logger.context["run_id"] = (
+        args.get("ADOP_RUN_ID") or os.environ.get("ADOP_RUN_ID") or "local"
+    )
+
+
+def _log_pii_inventory(df):
+    """Log column metadata only; detection never reads values or changes the dataframe."""
+    inventory = {}
+    for column_name in df.columns:
+        detected = detect_pii_by_column_name(column_name)
+        if detected:
+            inventory[column_name] = [
+                {"pii_type": pii_type, "sensitivity": sensitivity}
+                for pii_type, sensitivity in detected
+            ]
+    logger.log(
+        "info",
+        "pii_inventory_detected",
+        detected_columns=inventory,
+        detected_column_count=len(inventory),
+    )
+
+
 def aggregate(glue_context, args):
+    _configure_logger(args)
     spark = glue_context.spark_session
     logger.log("info", "gold_transform_start", source="{{ source_table }}", schema_type="{{ schema_type }}")
 {% if _has_scd2 %}
@@ -217,6 +247,7 @@ def aggregate(glue_context, args):
 {% else %}
     table_name = "glue_catalog.{{ dataset_name }}_db.gold_{{ dataset_name }}{{ _publish_suffix }}"
 {% endif %}
+    _log_pii_inventory(fact_df)
 {% if iceberg_partition_spec is defined and iceberg_partition_spec %}
     fact_df.writeTo(table_name).using("iceberg").partitionedBy({{ partition_columns(iceberg_partition_spec) }}).createOrReplace()
 {% else %}
@@ -478,6 +509,7 @@ def aggregate(glue_context, args):
 {% else %}
     table_name = "glue_catalog.{{ dataset_name }}_db.gold_{{ dataset_name }}{{ _publish_suffix }}"
 {% endif %}
+    _log_pii_inventory(gold_df)
 {% if iceberg_partition_spec is defined and iceberg_partition_spec %}
     gold_df.writeTo(table_name).using("iceberg").partitionedBy({{ partition_columns(iceberg_partition_spec) }}).createOrReplace()
 {% else %}
@@ -512,9 +544,9 @@ if __name__ == "__main__":
     # effective_from/effective_to must be dated by the run's logical date. getResolvedOptions
     # raises if the DAG omits it, which is the correct direction — versioning history against
     # wall-clock would be silently wrong on every retry and backfill.
-    args = getResolvedOptions(sys.argv, ["JOB_NAME", "logical_date"])
+    args = getResolvedOptions(sys.argv, ["JOB_NAME", "ADOP_RUN_ID", "logical_date"])
 {% else %}
-    args = getResolvedOptions(sys.argv, ["JOB_NAME"])
+    args = getResolvedOptions(sys.argv, ["JOB_NAME", "ADOP_RUN_ID"])
 {% endif %}
     sc = SparkContext()
     glue_context = GlueContext(sc)

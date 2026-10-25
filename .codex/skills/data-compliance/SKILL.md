@@ -19,14 +19,18 @@ transformation, quality, and DAG artifacts.
 > practices and access controls before promoting artifacts to production.
 
 ## How it plugs into the workflow
-1. `$command-onboard-workflow` plus the requested regulation sets the active framework.
-2. At Phase 3 (profile), tag candidate PII/PHI/PAN columns.
-3. At Phase 4 (build), inject the framework's control block into:
+1. `shared.compliance.regulation_detector.detect_regulations()` scans the user's onboarding
+   request before discovery defaults are applied. An explicit mention such as "we follow GDPR"
+   sets the active framework; a negated mention does not.
+2. `$command-onboard-workflow` plus the detected or explicitly requested regulation sets the
+   active framework.
+3. At Phase 3 (profile), tag candidate PII/PHI/PAN columns.
+4. At Phase 4 (build), inject the framework's control block into:
    - **Silver** rules — masking/pseudonymization/tokenization of sensitive fields.
    - **Gold** rules — suppression/aggregation-only exposure of sensitive fields.
    - **Quality** rules — validity checks the regulation implies (e.g. Luhn for PCI).
    - **Retention & audit** — retention window + processing-metadata logging.
-4. Legal reviews the single prompt file, not the generated PySpark.
+5. Legal reviews the single prompt file, not the generated PySpark.
 
 ## Reasoning effort
 `HIPAA | SOX | PCI` are compliance-critical → use `high` reasoning effort for build and review.

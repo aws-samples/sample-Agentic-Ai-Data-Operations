@@ -61,7 +61,16 @@
           },
           "aggregation": {
             "type": "string",
-            "enum": ["sum", "avg", "count", "min", "max", "count_distinct", "percentile"]
+            "enum": [
+              "sum",
+              "avg",
+              "count",
+              "min",
+              "max",
+              "count_distinct",
+              "first_value",
+              "percentile"
+            ]
           },
           "filter": {
             "type": "string",

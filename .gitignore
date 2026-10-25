@@ -192,6 +192,11 @@ workloads/*/data/gold/
 workloads/*/data/quarantine/
 workloads/*/data/quality_reports/
 
+# customer_orders live-run artifacts (contain real AWS account IDs and ARNs)
+workloads/customer_orders/.discovery_complete
+workloads/customer_orders/run/
+workloads/customer_orders/logs/trace_events.jsonl
+
 # Dashboard preview files (generated)
 dashboard_preview.html
 workloads/*/dashboard_preview.html

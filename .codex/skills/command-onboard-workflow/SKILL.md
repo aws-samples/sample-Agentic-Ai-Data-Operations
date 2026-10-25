@@ -17,11 +17,32 @@ spawn any sub-agent until ALL discovery questions have explicit human answers.**
 
 ---
 
-## Step 1: Read the Request
+## Step 1: Read the Request and Detect Regulations
 
 The user explicitly invokes this skill as `$command-onboard-workflow`, or asks in natural
 language to onboard a dataset. Read the regulation and workload details from the surrounding
-request. Examples:
+request.
+
+Before applying the `NONE` default, run the deterministic detector:
+
+```python
+from shared.compliance.regulation_detector import detect_regulations
+
+detection = detect_regulations(user_request_text)
+regulation = list(detection.active)
+```
+
+Any explicit positive mention activates the matching framework immediately, including
+plain-language phrases such as "we follow GDPR" or "General Data Protection Regulation".
+Persist `detection.as_human_answer()` as `human_answers.compliance` when the new run context
+is created, and load every matching pack before asking the remaining discovery questions.
+Negated mentions (for example, "GDPR is not required") remain excluded. Do not infer a
+regulation from column names, observed values, or the presence of payment data.
+
+If an authoritative persisted `human_answers.compliance` already exists, it wins over a
+newly paraphrased request; report any conflict instead of silently replacing it.
+
+Examples:
 ```
 $command-onboard-workflow
 Onboard claims data. Regulation: HIPAA.
@@ -33,9 +54,11 @@ Onboard customer and order data. Regulations: CCPA and GDPR.
 Valid regulation values:
 - `HIPAA`, `SOX`, `PCI`, `GDPR`, `CCPA`
 - Multiple can be combined (e.g., `CCPA GDPR`)
-- If no argument, regulation = "NONE"
+- If no explicit regulation is detected, regulation = "NONE"
 
-Store the regulation(s) — they control compliance controls and review depth in Phase 4.
+Store the normalized regulation(s) — they control compliance controls and review depth in
+Phase 4. Never ask the user to repeat a regulation that was explicitly detected; confirm the
+detection and continue with only the unanswered compliance details.
 
 ---
 
@@ -48,6 +71,12 @@ before proceeding to the next group. Do NOT skip any group.
 If the user's initial prompt already contains answers (e.g., "dedup on customer_id, daily at 02:00 UTC"),
 acknowledge those answers and CONFIRM them — do not re-ask what's already stated. But still ask
 anything NOT covered in the prompt.
+
+For every user prompt and response, append a `user_turn` record to
+`workloads/{workload_name}/run/requirements.jsonl`, then append explicit
+`requirement` records with stable IDs and target artifacts. Do not mark a turn
+as satisfied merely because it was answered; the requirements auditor must
+later verify artifact evidence.
 
 ### Group 1 — Source
 ```
@@ -481,8 +510,7 @@ Specs: {metadata} {quality} {transform} {dag}
 Report: CLEAN or list violations.
 ```
 
-Store the results as `preDeployChecks`, then continue to Step 8 with every
-non-blocked workload.
+Store the results as `preDeployChecks`.
 
 ---
 
@@ -523,6 +551,27 @@ After Phase 4.5 finishes, you (the main conversation agent) write the actual fil
    - The run_id is the one you generated at the start of Step 7
 
    This is NON-NEGOTIABLE. AGENTS.md requires every workload to have `logs/` with traces.
+
+### Step 8.5: Requirements Conformance Audit (sequential, `high`)
+
+After the actual files and tests exist, spawn the `requirements-auditor`:
+
+```
+Audit workload {workload_name} against every captured user turn and explicit
+requirement in workloads/{workload_name}/run/requirements.jsonl.
+
+Read the authoritative run/context.json, decisions.jsonl, trace_events.jsonl,
+all configs/generated artifacts/tests, and deployment evidence available on disk.
+Verify that every user turn is linked to a requirement ID and every mandatory
+requirement has concrete artifact evidence. Do not infer or waive requirements.
+
+Persist run/requirements_audit.json, append the decision and trace event, and
+return BLOCKED if any mandatory requirement is missing, ambiguous, conflicting,
+or unverified.
+```
+
+Only a `PASS` audit may continue to deployment. A blocked audit must be reported
+to the human with its requirement IDs and evidence gaps.
 
 ---
 

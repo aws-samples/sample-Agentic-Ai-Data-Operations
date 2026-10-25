@@ -62,6 +62,7 @@ Ask these as normal messages to the user, one group at a time, and wait for each
 [ ] Apply mode: Manual (generate only) / CI/CD (generate + GitHub Actions workflow)
 [ ] TBAC principals: which role ARNs get Lake Formation access, and at which
     sensitivity ceiling (NONE / LOW / MEDIUM / HIGH / CRITICAL) per role?
+[ ] Query principal: which explicit role ARN will run Athena/query verification?
 ```
 
 **TBAC principals cannot be derived.** Knowing which columns hold PII tells you what to
@@ -75,6 +76,12 @@ Record the answers to Group 1 in `workloads/{name}/run/context.json` under
 `human_answers.iac_target_framework` and `human_answers.iac_tbac_principals` (see
 `contracts/v1/run_context.schema.json`) so the IaC agent reads what the human actually said
 rather than a paraphrase in a prompt string.
+
+Before any IAM, Lake Formation, Glue, or deployment mutation, run
+`shared.utils.deployment_guardrails.validate_deployment_preflight`. It must pass
+the framework, TBAC, and query-principal checks, require a workload-scoped Glue role, and reject
+wildcard IAM actions or an unbounded resource. If it fails, stop before calling
+MCP or AWS CLI.
 
 ### Group 2 — Monitoring & Alerting
 ```

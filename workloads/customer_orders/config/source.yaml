@@ -1,0 +1,176 @@
+dataset_name: customer_orders
+version: "1.0.0"
+created_date: "2026-10-22"
+compliance: GDPR
+
+source:
+  type: csv
+  location:
+    production: "${CUSTOMER_ORDERS_SOURCE_URI}"
+  format: csv
+  frequency: daily
+  credentials:
+    type: iam_role
+    connection_id: "${CUSTOMER_ORDERS_SOURCE_IAM_ROLE}"
+
+schema:
+  columns:
+    # The v1 source contract exposes confirmed personal-data classification as
+    # phi/phi_type; these flags represent the human-confirmed GDPR PII list.
+    - name: order_id
+      type: STRING
+      role: identifier
+      primary_key: true
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: customer_id
+      type: STRING
+      role: identifier
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: order_date
+      type: DATE
+      role: temporal
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: product_id
+      type: STRING
+      role: identifier
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: quantity
+      type: INTEGER
+      role: measure
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: unit_price
+      type: DECIMAL
+      role: measure
+      nullable: false
+      phi: false
+      sensitivity: LOW
+      decimal_precision: 10
+      decimal_scale: 2
+
+    - name: discount_pct
+      type: DECIMAL
+      role: measure
+      nullable: false
+      phi: false
+      sensitivity: LOW
+      decimal_precision: 5
+      decimal_scale: 2
+
+    - name: payment_method
+      type: STRING
+      role: dimension
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: order_status
+      type: STRING
+      role: dimension
+      nullable: false
+      phi: false
+      sensitivity: LOW
+
+    - name: ship_date
+      type: DATE
+      role: temporal
+      nullable: true
+      phi: false
+      sensitivity: LOW
+
+    - name: customer_email
+      type: STRING
+      role: dimension
+      nullable: true
+      phi: true
+      phi_type: EMAIL
+      sensitivity: HIGH
+
+    - name: customer_phone
+      type: STRING
+      role: dimension
+      nullable: true
+      phi: true
+      phi_type: PHONE
+      sensitivity: MEDIUM
+
+    - name: credit_card_number
+      type: STRING
+      role: dimension
+      nullable: true
+      phi: true
+      phi_type: ACCOUNT
+      sensitivity: CRITICAL
+
+    - name: customer_name
+      type: STRING
+      role: dimension
+      nullable: true
+      phi: true
+      phi_type: NAME
+      sensitivity: HIGH
+
+    - name: shipping_address
+      type: STRING
+      role: dimension
+      nullable: true
+      phi: true
+      phi_type: ADDRESS
+      sensitivity: MEDIUM
+
+    - name: city
+      type: STRING
+      role: dimension
+      nullable: true
+      phi: true
+      phi_type: ADDRESS
+      sensitivity: MEDIUM
+
+    - name: state
+      type: STRING
+      role: dimension
+      nullable: true
+      phi: true
+      phi_type: ADDRESS
+      sensitivity: MEDIUM
+
+    - name: zip_code
+      type: STRING
+      role: dimension
+      nullable: true
+      phi: true
+      phi_type: ADDRESS
+      sensitivity: MEDIUM
+
+encryption:
+  landing:
+    kms_key_alias: "alias/${CUSTOMER_ORDERS_GDPR_KMS_KEY_ALIAS}"
+    algorithm: AES-256
+    transport: TLS_1_3
+  staging:
+    kms_key_alias: "alias/${CUSTOMER_ORDERS_GDPR_KMS_KEY_ALIAS}"
+    algorithm: AES-256
+    transport: TLS_1_3
+  publish:
+    kms_key_alias: "alias/${CUSTOMER_ORDERS_GDPR_KMS_KEY_ALIAS}"
+    algorithm: AES-256
+    transport: TLS_1_3
+  glue_catalog:
+    kms_key_alias: "alias/${CUSTOMER_ORDERS_GDPR_KMS_KEY_ALIAS}"
+  key_rotation:
+    enabled: true
+    frequency: annual

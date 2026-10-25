@@ -320,6 +320,28 @@ def _scan_phases(workload_dir: Path) -> Tuple[Dict[str, PhaseResult], List[str]]
         (tests / "unit").stat().st_mtime if (tests / "unit").is_dir() else None,
     )
 
+    # Phase 4 — Requirements conformance audit. A workload may not advance to
+    # deployment until the explicit user requirements have evidence.
+    audit_report = workload_dir / "run" / "requirements_audit.json"
+    audit_status = ""
+    if _file_nonempty(audit_report):
+        try:
+            audit_status = str(json.loads(_read_text(audit_report)).get("status", ""))
+        except Exception:
+            audit_status = "invalid"
+    audit_done = audit_status == "pass"
+    if audit_done:
+        audit_ev = "requirements_audit.json status=pass"
+    elif audit_status:
+        audit_ev = f"requirements_audit.json status={audit_status}"
+        warnings.append(f"requirements audit is not passing: status={audit_status}")
+    else:
+        audit_ev = "requirements audit not run"
+    phases["phase4_requirements_audit"] = PhaseResult(
+        "phase4_requirements_audit", "Phase 4 — Requirements Auditor", audit_done,
+        audit_ev, audit_report.stat().st_mtime if audit_report.exists() else None,
+    )
+
     # Phase 7 Step 8.5 — Ontology Staging
     ont_done = _file_nonempty(ont_ttl) and _file_nonempty(map_ttl) and _file_nonempty(ont_manifest)
     if ont_done:
@@ -440,7 +462,8 @@ def _build_next_step_prompt(workload_name: str, phases: Dict[str, PhaseResult], 
     topo_done = phases["phase0_topology_chosen"].done
     tests_done = phases["phase4_tests"].done
     phase4_all = all(phases[k].done for k in
-                     ("phase4_metadata", "phase4_transformation", "phase4_quality", "phase4_dag"))
+                     ("phase4_metadata", "phase4_transformation", "phase4_quality",
+                      "phase4_dag", "phase4_requirements_audit"))
     p1_done = phases["phase1_discovery"].done
 
     if not p1_done:
@@ -452,12 +475,13 @@ def _build_next_step_prompt(workload_name: str, phases: Dict[str, PhaseResult], 
 
     if not phase4_all:
         missing = [k for k in ("phase4_metadata", "phase4_transformation",
-                               "phase4_quality", "phase4_dag") if not phases[k].done]
+                               "phase4_quality", "phase4_dag",
+                               "phase4_requirements_audit") if not phases[k].done]
         return (
             f"Resume {workload_name} onboarding. Phase 1 is complete but Phase 4 "
             f"has gaps ({', '.join(missing)}). Re-run the Data Onboarding Agent "
-            f"from Phase 4 so the missing sub-agents (Metadata, Transformation, "
-            f"Quality, DAG) generate their artifacts with test gates."
+            f"from Phase 4 so the missing sub-agents and requirements auditor "
+            f"complete their gates."
         )
 
     if not tests_done:

@@ -16,6 +16,14 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Hooks execute from their own directory in some Codex runtimes. Add the
+# repository root before importing shared packages.
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from shared.requirements.auditor import append_user_turn
+
 
 TRACE_LOG_DIR = Path("logs")
 HOOK_LOG_PATH = TRACE_LOG_DIR / "conversation_events.jsonl"
@@ -64,6 +72,21 @@ def main() -> int:
     for q in questions:
         question_text = q.get("question", "")
         options = [opt.get("label", "") for opt in q.get("options", [])]
+        answer_text = answers.get(question_text, "")
+
+        # Capture the exchange in the workload ledger as well as the existing
+        # conversation trace. Requirement linkage stays empty until the
+        # orchestrator classifies the answer explicitly.
+        if workload != "unknown":
+            run_dir = Path("workloads") / workload / "run"
+            if run_dir.is_dir():
+                append_user_turn(
+                    run_dir,
+                    prompt=question_text,
+                    response=answer_text,
+                    phase=phase,
+                    thread_id=thread_id,
+                )
 
         entries.append({
             "timestamp": ts,
@@ -80,7 +103,6 @@ def main() -> int:
             },
         })
 
-        answer_text = answers.get(question_text, "")
         if answer_text:
             selected = [answer_text] if answer_text in options else []
             entries.append({

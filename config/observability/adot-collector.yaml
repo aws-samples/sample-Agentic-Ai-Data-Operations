@@ -1,0 +1,35 @@
+# AWS ADOT Collector configuration for ADOP.
+# Deploy this configuration with an ADOT Collector task/service in the
+# workload VPC. Expose OTLP/HTTP 4318 to ADOP jobs and keep the service
+# private; the collector exports traces to AWS X-Ray.
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+
+exporters:
+  awsxray:
+    region: ${AWS_REGION}
+
+service:
+  extensions:
+    - health_check
+  pipelines:
+    traces:
+      receivers:
+        - otlp
+      processors:
+        - batch
+      exporters:
+        - awsxray

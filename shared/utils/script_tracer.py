@@ -203,7 +203,7 @@ class ScriptTracer:
         """End tracing span on context exit."""
         if exc_type is not None:
             self.log_error(str(exc_val))
-        self._end_span()
+        self.close()
 
     def _start_span(self) -> None:
         """Internal: start a span for this script."""
@@ -241,6 +241,7 @@ class ScriptTracer:
     def close(self) -> None:
         """Manually close the tracer (if not using context manager)."""
         self._end_span()
+        self._tracer.close()
 
     # -------------------------------------------------------------------------
     # High-level logging methods for ETL operations

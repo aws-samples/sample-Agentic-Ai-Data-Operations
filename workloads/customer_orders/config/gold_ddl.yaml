@@ -1,0 +1,85 @@
+# spec_hash: b53415e9719ca58d0b8986f828ce307c485ffde125c169ae6422b6672b6ca2b1
+# template_id: spec_yaml
+# template_hash: a193453cf6726f5e66fbeb0dfcd4c4a62ab711b3574853c26188fbc689472eea
+# schema_version: v1
+# rendered_at: 2026-10-22T18:18:44Z
+{
+  "dataset_name": "customer_orders",
+  "iceberg_database": "customer_orders_db",
+  "tables": [
+    {
+      "columns": [
+        {
+          "name": "order_id",
+          "type": "STRING"
+        },
+        {
+          "name": "order_count",
+          "type": "BIGINT"
+        },
+        {
+          "name": "revenue",
+          "type": "DECIMAL(22,2)"
+        },
+        {
+          "name": "customer_id",
+          "type": "STRING"
+        },
+        {
+          "name": "product_id",
+          "type": "STRING"
+        },
+        {
+          "name": "order_date",
+          "type": "DATE"
+        },
+        {
+          "name": "ship_date",
+          "type": "DATE"
+        },
+        {
+          "name": "quantity",
+          "type": "INT"
+        },
+        {
+          "name": "unit_price",
+          "type": "DECIMAL(10,2)"
+        },
+        {
+          "name": "discount_pct",
+          "type": "DECIMAL(5,2)"
+        },
+        {
+          "name": "payment_method",
+          "type": "STRING"
+        },
+        {
+          "name": "order_status",
+          "type": "STRING"
+        },
+        {
+          "name": "data_subject_id",
+          "type": "STRING"
+        },
+        {
+          "name": "consent_given",
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "consent_timestamp",
+          "type": "TIMESTAMP"
+        },
+        {
+          "name": "is_deleted",
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "deletion_requested_at",
+          "type": "TIMESTAMP"
+        }
+      ],
+      "name": "gold_customer_orders",
+      "zone": "gold"
+    }
+  ]
+}

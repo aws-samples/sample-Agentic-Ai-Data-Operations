@@ -1,0 +1,118 @@
+workload: customer_orders
+dataset_name: customer_orders
+version: v1
+domain: ecommerce_orders
+description: Order-level reporting metadata for the customer orders data product.
+compliance: GDPR
+ontology_opt_in: false
+data_minimization: true
+
+use_cases:
+  - order_level_reporting
+consumers:
+  - QuickSight
+
+tables:
+  - name: Order
+    table_type: fact
+    description: One curated order record at order_id grain for reporting.
+    physical_table: gold_customer_orders
+    grain: one row per order_id
+    primary_key: order_id
+    columns:
+      - name: order_id
+        type: string
+        description: Unique order identifier.
+        role: identifier
+      - name: order_count
+        type: integer
+        description: Count of orders at order_id grain.
+        role: measure
+      - name: revenue
+        type: decimal
+        description: Quantity times unit_price times (1 - discount_pct), rounded half-up to 2 decimals.
+        role: measure
+      - name: customer_id
+        type: string
+        description: Customer identifier used as the GDPR data subject identifier.
+        role: identifier
+      - name: product_id
+        type: string
+        description: Product identifier associated with the order.
+        role: identifier
+      - name: order_date
+        type: date
+        description: Order date interpreted in America/New_York.
+        role: temporal
+      - name: ship_date
+        type: date
+        description: Nullable shipment date; order_date must not follow it when present.
+        role: temporal
+      - name: quantity
+        type: integer
+        description: Ordered quantity.
+        role: measure
+      - name: unit_price
+        type: decimal
+        description: Unit price in USD with DECIMAL(10,2) precision and scale.
+        role: measure
+      - name: discount_pct
+        type: decimal
+        description: Discount represented as a fraction in [0,1].
+        role: measure
+      - name: payment_method
+        type: string
+        description: Payment method.
+        role: dimension
+      - name: order_status
+        type: string
+        description: Current order status.
+        role: dimension
+      - name: data_subject_id
+        type: string
+        description: GDPR data-subject link populated from customer_id.
+        role: identifier
+      - name: consent_given
+        type: boolean
+        description: Demo GDPR consent fixture; must be replaced before production.
+        role: attribute
+      - name: consent_timestamp
+        type: timestamp
+        description: Demo consent timestamp populated from ingestion time.
+        role: temporal
+      - name: is_deleted
+        type: boolean
+        description: GDPR right-to-erasure soft-delete flag.
+        role: attribute
+      - name: deletion_requested_at
+        type: timestamp
+        description: Nullable GDPR erasure-request timestamp.
+        role: temporal
+
+business_terms:
+  - term: Order Count
+    definition: Count of distinct orders at order_id grain.
+    related_columns: [order_id]
+  - term: Revenue
+    definition: Sum of derived revenue at order_id grain.
+    related_columns: [revenue]
+
+controls:
+  credit_card_number:
+    target: credit_card_token
+    method: tokenize
+    retain_pan: false
+    retain_last_four: false
+    gold_exposure: suppressed
+    suppression_reason: Tokenized payment references are not exposed in the final Gold physical table.
+  credit_card_token:
+    gold_exposure: suppressed
+    suppression_reason: Tokenized payment references are not exposed in the final Gold physical table.
+  pii_columns_not_exposed_in_gold:
+    - customer_email
+    - customer_phone
+    - customer_name
+    - shipping_address
+    - city
+    - state
+    - zip_code

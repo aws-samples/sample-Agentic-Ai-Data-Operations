@@ -376,13 +376,16 @@ class TestNoPhiColumnShipsUnmaskedBecauseOfAMissingBranch:
     """
 
     CONTRACT_ALLOWS = {"hash", "hash_salted", "mask_partial", "redact", "tokenize", "encrypt"}
-    IMPLEMENTED = {"hash", "hash_salted", "mask_partial", "redact"}
+    IMPLEMENTED = {"hash", "hash_salted", "mask_partial", "redact", "tokenize"}
 
     def _render(self, method, tmp_path):
         spec, spec_hash = load_spec(FIXTURES / "silver.yaml", "silver")
         col = {"name": "member_dob", "method": method}
         if method == "hash_salted":
             col["salt_secret_id"] = "adop/probe/phi_salt"
+        if method == "tokenize":
+            col["target_column"] = "member_token"
+            col["token_secret_id"] = "adop/probe/token_key"
         spec = {**spec, "pii_masking": {"enabled": True, "columns": [col]}}
         out = tmp_path / "s.py"
         render(spec, spec_hash, "silver_transform", "1.0.0", out, RUN_STARTED_AT)
@@ -391,8 +394,9 @@ class TestNoPhiColumnShipsUnmaskedBecauseOfAMissingBranch:
     @pytest.mark.parametrize("method", sorted(IMPLEMENTED))
     def test_implemented_methods_emit_a_masking_statement(self, method, tmp_path):
         body = self._render(method, tmp_path)
-        assert 'masked_df = masked_df.withColumn(\n        "member_dob"' in body, (
-            f"{method} rendered but member_dob was never transformed"
+        target = "member_token" if method == "tokenize" else "member_dob"
+        assert f'masked_df = masked_df.withColumn(\n        "{target}"' in body, (
+            f"{method} rendered but the expected masking target was never transformed"
         )
         compile(body, "s.py", "exec")
 
@@ -1281,7 +1285,7 @@ class TestLogicalDateIsResolvedOrTheRunFails:
 
     def test_the_token_makes_logical_date_a_required_argument(self, tmp_path):
         body = self._silver(tmp_path, [{"name": "cutoff", "expression": self.TOKEN_EXPR}])
-        assert 'getResolvedOptions(sys.argv, ["JOB_NAME", "logical_date"])' in body, (
+        assert 'getResolvedOptions(sys.argv, ["JOB_NAME", "ADOP_RUN_ID", "logical_date"])' in body, (
             "logical_date is not resolved, so the token reaches F.expr() as a literal string"
         )
 
@@ -1325,9 +1329,9 @@ class TestLogicalDateIsResolvedOrTheRunFails:
         [{"name": "upper_id", "expression": "upper(record_id)"}],
     ])
     def test_a_spec_without_the_token_is_unchanged(self, pre_pii, tmp_path):
-        """Back-compat: no import re, no extra argument, no validation block."""
+        """No logical-date argument is needed, but every Glue job still carries its run id."""
         body = self._silver(tmp_path, pre_pii)
-        assert 'getResolvedOptions(sys.argv, ["JOB_NAME"])' in body
+        assert 'getResolvedOptions(sys.argv, ["JOB_NAME", "ADOP_RUN_ID"])' in body
         assert "logical_date" not in body
         assert "import re" not in body
 
@@ -1638,7 +1642,7 @@ class TestRuntimePlaceholdersAreResolvedNotShipped:
         body = self._bronze(tmp_path, **self.PLACEHOLDER_BRONZE)
         args = next(l for l in body.splitlines() if "getResolvedOptions(sys.argv" in l)
         assert '"DATA_LAKE_BUCKET"' in args, args
-        assert args.count('"') == 4, f"expected JOB_NAME + one placeholder, got: {args}"
+        assert args.count('"') == 6, f"expected JOB_NAME + ADOP_RUN_ID + one placeholder, got: {args}"
 
     def test_bronze_substitutes_rather_than_shipping_the_literal(self, tmp_path):
         body = self._bronze(tmp_path, **self.PLACEHOLDER_BRONZE)
@@ -1697,11 +1701,11 @@ class TestRuntimePlaceholdersAreResolvedNotShipped:
         ns["check"](source_path)
 
     def test_bronze_without_placeholders_needs_no_extra_argument(self, tmp_path):
-        """Back-compat for every bronze spec that names real paths."""
+        """Every Bronze job still carries its run id even when paths are literal."""
         body = self._bronze(tmp_path)
         assert "_resolve" not in body
         args = next(l for l in body.splitlines() if "getResolvedOptions(sys.argv" in l)
-        assert args.strip() == 'args = getResolvedOptions(sys.argv, ["JOB_NAME"])', args
+        assert args.strip() == 'args = getResolvedOptions(sys.argv, ["JOB_NAME", "ADOP_RUN_ID"])', args
 
     # --- silver ------------------------------------------------------------------------
 

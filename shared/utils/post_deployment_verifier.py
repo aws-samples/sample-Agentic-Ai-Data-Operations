@@ -29,6 +29,11 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from shared.metadata.glue_fetcher import GlueFetcher
 from shared.metadata.lakeformation_fetcher import LakeFormationFetcher
+from shared.utils.deployment_guardrails import (
+    DeploymentGuardrailError,
+    require_query_principal,
+    require_tbac_principals,
+)
 from shared.utils.structured_logger import StructuredLogger
 
 
@@ -44,25 +49,29 @@ class CheckResult:
 class PostDeploymentVerifier:
 
     def __init__(self, workload: str, database: str, region: str = "us-east-1",
-                 catalog_id: Optional[str] = None, mwaa_environment: Optional[str] = None):
+                 catalog_id: Optional[str] = None, mwaa_environment: Optional[str] = None,
+                 query_principal_arn: Optional[str] = None):
         self.workload = workload
         self.database = database
         self.region = region
         self.catalog_id = catalog_id
         self.mwaa_environment = mwaa_environment
+        self.query_principal_arn = query_principal_arn
 
         self.glue_fetcher = GlueFetcher(region=region, catalog_id=catalog_id)
         self.lf_fetcher = LakeFormationFetcher(region=region, catalog_id=catalog_id)
         self.log = StructuredLogger("PostDeployVerifier", workload, f"verify-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}")
 
-        self.athena = boto3.client("athena", region_name=region)
+        # Created lazily after assuming the explicitly named query role.
+        self.athena = None
         self.kms = boto3.client("kms", region_name=region)
         self.cloudtrail = boto3.client("cloudtrail", region_name=region)
 
     def run_all(self, tables: Optional[List[str]] = None,
                 phi_columns: Optional[Dict[str, List[str]]] = None,
                 kms_key_alias: str = "alias/hipaa-phi-key",
-                dag_id: Optional[str] = None) -> List[CheckResult]:
+                dag_id: Optional[str] = None,
+                tbac_principals: Optional[List[Dict[str, Any]]] = None) -> List[CheckResult]:
         results = []
 
         if tables:
@@ -71,7 +80,7 @@ class PostDeploymentVerifier:
 
         if phi_columns:
             results.append(self.check_lf_tags(phi_columns))
-            results.append(self.check_tbac_access(phi_columns))
+            results.append(self.check_tbac_access(phi_columns, tbac_principals))
 
         results.append(self.check_kms_encryption(kms_key_alias))
 
@@ -113,6 +122,18 @@ class PostDeploymentVerifier:
     def check_athena_queries(self, tables: List[str]) -> CheckResult:
         """5.9b: Verify data is queryable with correct row counts."""
         self.log.info("Running Athena verification queries", tables=tables)
+        try:
+            query_principal = require_query_principal(
+                {"iac_query_principal_arn": self.query_principal_arn}
+            )
+        except DeploymentGuardrailError:
+            return CheckResult(
+                name="Athena Query Verification",
+                step="5.9b",
+                passed=False,
+                message="Explicit query_principal_arn is required; refusing to use the current caller",
+                details={"query_principal_arn": None},
+            )
         results_detail = {}
         all_passed = True
 
@@ -120,7 +141,11 @@ class PostDeploymentVerifier:
             query = f"SELECT COUNT(*) as cnt FROM {self.database}.{table} LIMIT 1"
             try:
                 row_count = self._run_athena_query(query)
-                results_detail[table] = {"row_count": row_count, "queryable": True}
+                results_detail[table] = {
+                    "row_count": row_count,
+                    "queryable": True,
+                    "query_principal_arn": query_principal,
+                }
                 if row_count == 0:
                     all_passed = False
                     results_detail[table]["issue"] = "Table is empty"
@@ -170,10 +195,34 @@ class PostDeploymentVerifier:
             details={"tagged": tagged, "untagged": untagged}
         )
 
-    def check_tbac_access(self, phi_columns: Dict[str, List[str]]) -> CheckResult:
+    def check_tbac_access(
+        self,
+        phi_columns: Dict[str, List[str]],
+        tbac_principals: Optional[List[Dict[str, Any]]] = None,
+    ) -> CheckResult:
         """5.9d: Verify TBAC restricts access to CRITICAL PHI columns."""
         self.log.info("Checking TBAC access control")
         try:
+            if not tbac_principals:
+                return CheckResult(
+                    name="TBAC Access Control",
+                    step="5.9d",
+                    passed=False,
+                    message="Explicit TBAC principals are required; refusing to infer the current caller",
+                    details={"tbac_principals": []},
+                )
+            normalized = require_tbac_principals(
+                {"iac_tbac_principals": tbac_principals}
+            )
+            critical_grants = self.lf_fetcher.fetch_lf_tag_policy_permissions(
+                "Data_Sensitivity", ["CRITICAL"]
+            )
+            granted_critical = {
+                item.get("Principal", {}).get("DataLakePrincipalIdentifier")
+                for item in critical_grants
+                if "SELECT" in item.get("Permissions", [])
+            }
+            critical_columns_found = False
             for table, columns in phi_columns.items():
                 tag_info = self.lf_fetcher.fetch_table_lf_tags(self.database, table)
                 column_tags = tag_info.get("column_tags", {})
@@ -185,20 +234,44 @@ class PostDeploymentVerifier:
                             critical_columns.append(col)
 
                 if critical_columns:
-                    return CheckResult(
-                        name="TBAC Access Control",
-                        step="5.9d",
-                        passed=True,
-                        message=f"CRITICAL columns protected: {critical_columns}",
-                        details={"critical_columns": critical_columns}
-                    )
+                    critical_columns_found = True
+
+            if critical_columns_found:
+                missing_critical = [
+                    p["role_arn"]
+                    for p in normalized
+                    if "CRITICAL" in p["allowed_classifications"]
+                    and p["role_arn"] not in granted_critical
+                ]
+                overexposed = [
+                    p["role_arn"]
+                    for p in normalized
+                    if "CRITICAL" not in p["allowed_classifications"]
+                    and p["role_arn"] in granted_critical
+                ]
+                passed = not missing_critical and not overexposed
+                return CheckResult(
+                    name="TBAC Access Control",
+                    step="5.9d",
+                    passed=passed,
+                    message=(
+                        "CRITICAL columns restricted to declared principals"
+                        if passed
+                        else "TBAC CRITICAL grant does not match declared principals"
+                    ),
+                    details={
+                        "critical_granted_principals": sorted(granted_critical),
+                        "missing_critical_grants": missing_critical,
+                        "overexposed_principals": overexposed,
+                    },
+                )
 
             return CheckResult(
                 name="TBAC Access Control",
                 step="5.9d",
                 passed=True,
-                message="No CRITICAL columns found — TBAC check passed (nothing to restrict)",
-                details={}
+                message="No CRITICAL columns found — declared TBAC principals recorded",
+                details={"tbac_principals": normalized}
             )
         except Exception as e:
             return CheckResult(
@@ -325,6 +398,23 @@ class PostDeploymentVerifier:
 
     def _run_athena_query(self, query: str, output_location: str = "s3://athena-query-results/") -> int:
         """Execute Athena query and return row count."""
+        if self.athena is None:
+            query_principal = require_query_principal(
+                {"iac_query_principal_arn": self.query_principal_arn}
+            )
+            sts = boto3.client("sts", region_name=self.region)
+            assumed = sts.assume_role(
+                RoleArn=query_principal,
+                RoleSessionName=f"adop-verify-{self.workload[:40]}",
+            )["Credentials"]
+            self.athena = boto3.client(
+                "athena",
+                region_name=self.region,
+                aws_access_key_id=assumed["AccessKeyId"],
+                aws_secret_access_key=assumed["SecretAccessKey"],
+                aws_session_token=assumed["SessionToken"],
+            )
+
         response = self.athena.start_query_execution(
             QueryString=query,
             ResultConfiguration={"OutputLocation": output_location}

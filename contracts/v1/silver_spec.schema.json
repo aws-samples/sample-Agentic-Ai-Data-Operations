@@ -243,6 +243,16 @@
                 "type": "string",
                 "minLength": 1,
                 "description": "AWS Secrets Manager secret ID holding the salt. Required when method is hash_salted. The ID, never the secret value \u2014 AGENTS.md security rule 1."
+              },
+              "target_column": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "description": "Output column for tokenized values. Required when method is tokenize."
+              },
+              "token_secret_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "AWS Secrets Manager secret ID holding the tokenization key. Required when method is tokenize; only the secret ID is stored in the spec."
               }
             },
             "allOf": [
@@ -262,6 +272,25 @@
                     "salt_secret_id"
                   ],
                   "$comment": "Without a salt source, hash_salted would silently degrade to hash, which is the exact failure this value exists to prevent: the spec would claim a salted digest while the pipeline emitted an enumerable one."
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "method": {
+                      "const": "tokenize"
+                    }
+                  },
+                  "required": [
+                    "method"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "target_column",
+                    "token_secret_id"
+                  ],
+                  "$comment": "Tokenization must be keyed at runtime and must name the output column. A missing key or target must fail validation rather than emit PAN or silently hash in place."
                 }
               }
             ]

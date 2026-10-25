@@ -140,6 +140,11 @@
             }
           }
         },
+        "iac_query_principal_arn": {
+          "type": "string",
+          "pattern": "^arn:(aws|aws-us-gov|aws-cn):iam::[0-9]{12}:role/[^*]+$",
+          "description": "IAM role ARN explicitly named by the human for Athena/query verification. Never defaulted to the current caller."
+        },
         "notes": {
           "type": "array",
           "items": { "type": "string" },

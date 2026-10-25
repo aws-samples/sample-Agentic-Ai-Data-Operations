@@ -13,7 +13,7 @@
     },
     "schema_version": {
       "type": "string",
-      "const": "v1"
+      "enum": ["v1", "v2"]
     },
     "source_path": {
       "type": "string",
@@ -28,6 +28,21 @@
       "type": "string",
       "minLength": 1,
       "description": "S3 path for Bronze landing"
+    },
+    "catalog_database": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Glue/Iceberg catalog database that registers the immutable Bronze table"
+    },
+    "catalog_table": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Glue/Iceberg catalog table that receives raw Bronze rows"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "enum": ["source_path"],
+      "description": "Stable logical-run identity used to replace only the same full-load partition on retry"
     },
     "partition_keys": {
       "type": "array",

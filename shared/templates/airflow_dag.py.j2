@@ -1,5 +1,5 @@
 {# template_id: airflow_dag #}
-{# template_version: 1.1.0 #}
+{# template_version: 1.4.0 #}
 {# required_slots: dataset_name, schedule, tasks #}
 {# schema_version: v1 #}
 {#
@@ -27,7 +27,9 @@
 {% endif %}
 {% endfor %}
 {% endif %}
-from datetime import datetime, timedelta
+from datetime import timedelta
+
+import pendulum
 
 from airflow import DAG
 from airflow.models import Variable
@@ -35,8 +37,8 @@ from airflow.providers.amazon.aws.operators.glue import GlueJobOperator
 from airflow.operators.python import PythonOperator
 from airflow.operators.dummy import DummyOperator
 
-GLUE_SCRIPT_S3_PATH = Variable.get("glue_script_s3_path", default_var="s3://glue-scripts/")
-GLUE_IAM_ROLE = Variable.get("glue_iam_role", default_var="AWSGlueServiceRole")
+GLUE_SCRIPT_S3_PATH = Variable.get("glue_script_s3_path", default_var="${GLUE_SCRIPT_S3_PATH}")
+GLUE_IAM_ROLE = Variable.get("glue_iam_role", default_var="${GLUE_IAM_ROLE}")
 
 {#
   failure_handling was never rendered (finding M2). default_args carried only
@@ -94,6 +96,16 @@ def _notify_failure(context):
 {% endif %}
 
 
+{% macro rendered_script_args(params) -%}
+{
+{% for key, value in (params | default({})).items() %}
+    "{{ key }}": {% if value is string and value.startswith("${") and value.endswith("}") and value[2:-1].isidentifier() and value[2:-1].isupper() %}Variable.get("{{ value[2:-1] }}", default_var=""){% else %}{{ value | tojson }}{% endif %},
+{% endfor %}
+    "--ADOP_RUN_ID": "{{ '{{ run_id }}' }}"
+}
+{%- endmacro %}
+
+
 default_args = {
     "owner": "data-engineering",
     "depends_on_past": False,
@@ -149,9 +161,14 @@ with DAG(
     dagrun_timeout=timedelta(minutes={{ sla.deadline_minutes }}),
 {% endif %}
 {% if schedule.start_date is defined %}
-    start_date=datetime.fromisoformat("{{ schedule.start_date }}"),
+    start_date=pendulum.datetime(
+        {{ schedule.start_date.split("-")[0] | int }},
+        {{ schedule.start_date.split("-")[1] | int }},
+        {{ schedule.start_date.split("-")[2] | int }},
+        tz="{{ schedule.timezone }}",
+    ),
 {% else %}
-    start_date=datetime(2026, 1, 1),
+    start_date=pendulum.datetime(2026, 1, 1, tz="{{ schedule.timezone }}"),
 {% endif %}
     catchup={{ schedule.catchup | default(false) | string | capitalize }},
     max_active_runs={{ schedule.max_active_runs | default(1) }},
@@ -169,12 +186,14 @@ with DAG(
         job_name="{{ dataset_name }}_{{ task.task_id }}",
         script_location=f"{GLUE_SCRIPT_S3_PATH}{{ task.script_path | default(task.task_id + '.py') }}",
         iam_role_name=GLUE_IAM_ROLE,
-        region_name=Variable.get("aws_region", default_var="us-east-1"),
+        region_name=Variable.get("aws_region", default_var="${AWS_REGION}"),
 {% if task.timeout_minutes is defined %}
         execution_timeout=timedelta(minutes={{ task.timeout_minutes }}),
 {% endif %}
 {% if task.params is defined %}
-        script_args={{ task.params | tojson }},
+        script_args={{ rendered_script_args(task.params) }},
+{% else %}
+        script_args={{ rendered_script_args({}) }},
 {% endif %}
     )
 {% elif task.type == "quality_check" %}
@@ -195,9 +214,11 @@ with DAG(
 #}
         script_location=f"{GLUE_SCRIPT_S3_PATH}{{ task.script_path | default('quality_check.py') }}",
         iam_role_name=GLUE_IAM_ROLE,
-        region_name=Variable.get("aws_region", default_var="us-east-1"),
+        region_name=Variable.get("aws_region", default_var="${AWS_REGION}"),
 {% if task.params is defined %}
-        script_args={{ task.params | tojson }},
+        script_args={{ rendered_script_args(task.params) }},
+{% else %}
+        script_args={{ rendered_script_args({}) }},
 {% endif %}
 {#
   The glue_job and sensor branches emitted execution_timeout; this one did not (finding M1).

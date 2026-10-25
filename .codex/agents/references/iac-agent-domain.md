@@ -28,12 +28,19 @@ inputs the runbook's "Phase 0" tells you to ask for must already be on disk:
 |---|---|---|
 | `target_framework` | `human_answers.iac_target_framework` | return `status: "blocked"` |
 | `tbac_principals` | `human_answers.iac_tbac_principals` | return `status: "blocked"` |
+| `query_principal` | `human_answers.iac_query_principal_arn` | return `status: "blocked"` |
 | `account_topology` | `config/deployment.yaml#account_topology` | default `mode: single` — a documented default, not a guess |
 
 Ignore the runbook's instruction to ask the user, and ignore its inference heuristics
 (`cdk.json` present → CDK). Inferring the framework from repo layout, or grabbing the current
 IAM caller as a TBAC principal, is a Phase 1 gate violation. An **empty**
 `iac_tbac_principals` list is a blocking issue, not permission to pick one.
+The explicit query-verification role is also required; never use the current caller implicitly.
+
+Before emitting or applying workload IAM, run
+`shared.utils.deployment_guardrails.validate_deployment_preflight`. The Glue execution
+role must be named `{workload}-glue-service-role` (with underscores converted to hyphens)
+and its policy must not contain wildcard actions or an unbounded `Resource: "*"`.
 
 Upstream `AgentOutput` JSONs under `.runs/{run_id}/` — described in the runbook's Input
 Contract — are **not written by anything in this repo**. Expect the on-disk fallback path to

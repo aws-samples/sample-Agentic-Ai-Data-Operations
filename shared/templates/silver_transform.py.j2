@@ -1,5 +1,5 @@
 {# template_id: silver_transform #}
-{# template_version: 1.3.0 #}
+{# template_version: 1.6.0 #}
 {# required_slots: dataset_name, source_table, primary_key, dedup_strategy, quality_threshold, iceberg_database, iceberg_table #}
 {# schema_version: v1 #}
 {#
@@ -47,6 +47,7 @@
 {% macro rt(value, slot) -%}
 {% if _params %}_resolve({{ value | tojson }}, args, {{ slot | tojson }}){% else %}{{ value | tojson }}{% endif %}
 {%- endmacro %}
+import os
 import sys
 import hashlib
 {% if pre_pii_derived_columns is defined and pre_pii_derived_columns
@@ -55,7 +56,8 @@ import re
 {% endif %}
 from datetime import datetime
 {% if pii_masking is defined and pii_masking.enabled
-      and pii_masking.columns | selectattr("method", "equalto", "hash_salted") | list %}
+      and (pii_masking.columns | selectattr("method", "equalto", "hash_salted") | list
+           or pii_masking.columns | selectattr("method", "equalto", "tokenize") | list) %}
 from functools import lru_cache
 {% endif %}
 from pathlib import Path
@@ -72,15 +74,43 @@ PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from shared.utils.structured_logger import StructuredLogger
+from shared.utils.pii_detection_and_tagging import detect_pii_by_column_name
 
 logger = StructuredLogger(
     agent="silver_transform",
     workload="{{ dataset_name }}",
-    run_id="standalone",
+    run_id="local",
 )
 
+
+def _configure_logger(args):
+    """Use Airflow's ADOP_RUN_ID while keeping direct local calls testable."""
+    logger.context["run_id"] = (
+        args.get("ADOP_RUN_ID") or os.environ.get("ADOP_RUN_ID") or "local"
+    )
+
+
+def _log_pii_inventory(df):
+    """Log column metadata only; detection never reads values or changes the dataframe."""
+    inventory = {}
+    for column_name in df.columns:
+        detected = detect_pii_by_column_name(column_name)
+        if detected:
+            inventory[column_name] = [
+                {"pii_type": pii_type, "sensitivity": sensitivity}
+                for pii_type, sensitivity in detected
+            ]
+    logger.log(
+        "info",
+        "pii_inventory_detected",
+        detected_columns=inventory,
+        detected_column_count=len(inventory),
+    )
+
+
 {% if pii_masking is defined and pii_masking.enabled
-      and pii_masking.columns | selectattr("method", "equalto", "hash_salted") | list %}
+      and (pii_masking.columns | selectattr("method", "equalto", "hash_salted") | list
+           or pii_masking.columns | selectattr("method", "equalto", "tokenize") | list) %}
 
 @lru_cache(maxsize=None)
 def _phi_salt(secret_id: str) -> str:
@@ -112,6 +142,22 @@ def _phi_salt(secret_id: str) -> str:
         )
     return salt
 
+
+@lru_cache(maxsize=None)
+def _token_secret(secret_id: str) -> str:
+    """Fetch the runtime tokenization key; never fall back to an unkeyed digest."""
+    import boto3
+
+    client = boto3.client("secretsmanager")
+    response = client.get_secret_value(SecretId=secret_id)
+    secret = response.get("SecretString")
+    if not secret:
+        raise RuntimeError(
+            f"Secret '{secret_id}' has no SecretString. Tokenization cannot proceed "
+            "without its runtime key."
+        )
+    return secret
+
 {% endif %}
 
 
@@ -131,6 +177,7 @@ def _resolve(value, args, slot):
 
 {% endif %}
 def transform(glue_context, args):
+    _configure_logger(args)
     spark = glue_context.spark_session
     logger.log("info", "transform_start", source="{{ source_table }}")
 
@@ -256,6 +303,28 @@ def transform(glue_context, args):
     typed_df = deduped_df
 {% for cast in type_casts %}
 {% if cast.to_type == "DATE" %}
+{% if cast.on_error | default("null") == "quarantine" %}
+    _invalid_{{ cast.column }} = (
+        F.col("{{ cast.column }}").isNotNull()
+        & F.to_date(F.col("{{ cast.column }}"), "{{ cast.format | default('yyyy-MM-dd') }}").isNull()
+    )
+    _invalid_{{ cast.column }}_count = typed_df.filter(_invalid_{{ cast.column }}).count()
+    if _invalid_{{ cast.column }}_count > 0:
+        typed_df.filter(_invalid_{{ cast.column }}).withColumn(
+            "_adop_quarantine_reason",
+            F.lit("invalid_{{ cast.column }}"),
+        ).write.mode("append").parquet(
+            {{ rt(quarantine.location, "quarantine.location") }}
+        )
+        typed_df = typed_df.filter(~_invalid_{{ cast.column }})
+        logger.log(
+            "warn",
+            "invalid_cast_rows_quarantined",
+            column="{{ cast.column }}",
+            rows=_invalid_{{ cast.column }}_count,
+            target={{ rt(quarantine.location, "quarantine.location") }},
+        )
+{% endif %}
     typed_df = typed_df.withColumn(
         "{{ cast.column }}",
         F.to_date(F.col("{{ cast.column }}"), "{{ cast.format | default('yyyy-MM-dd') }}")
@@ -356,13 +425,32 @@ def transform(glue_context, args):
         "{{ col_mask.name }}",
         F.concat(F.substring(F.col("{{ col_mask.name }}"), 1, 2), F.lit("****"))
     )
+{% elif col_mask.method == "tokenize" %}
+{% if not (col_mask.target_column is defined and col_mask.token_secret_id is defined) %}
+{{ unsupported("pii_masking column '" ~ col_mask.name ~ "' uses tokenize but must provide "
+   ~ "target_column and token_secret_id. Tokenization fails closed and never emits the PAN "
+   ~ "or an unkeyed digest.") }}
+{% endif %}
+    masked_df = masked_df.withColumn(
+        "{{ col_mask.target_column }}",
+        F.when(
+            F.col("{{ col_mask.name }}").isNull(),
+            F.lit(None),
+        ).otherwise(
+            F.sha2(
+                F.concat(
+                    F.lit(_token_secret({{ rt(col_mask.token_secret_id, "pii_masking.token_secret_id") }})),
+                    F.col("{{ col_mask.name }}").cast("string"),
+                ),
+                256,
+            )
+        )
+    )
 {% else %}
 {{ unsupported("pii_masking column '" ~ col_mask.name ~ "' asks for method '"
    ~ col_mask.method ~ "', which this template has no branch for. Implemented: hash, "
-   ~ "hash_salted, redact, mask_partial. There was no else arm here, so the column was "
-   ~ "emitted with no masking applied at all while the spec, the LF-Tags and the audit "
-   ~ "record all recorded it as protected. A PHI column shipping in clear text must fail "
-   ~ "the render, not the review.") }}
+   ~ "hash_salted, redact, mask_partial, tokenize. A PHI column shipping in clear text "
+   ~ "must fail the render, not the review.") }}
 {% endif %}
 {% endfor %}
 {% else %}
@@ -409,6 +497,7 @@ def transform(glue_context, args):
     # Write to Iceberg Silver table
     table_name = "glue_catalog.{{ iceberg_database }}.{{ iceberg_table }}"
 {% endif %}
+    _log_pii_inventory(final_df)
 {% if iceberg_partition_spec is defined and iceberg_partition_spec %}
     final_df.writeTo(table_name) \
         .using("iceberg") \
@@ -452,9 +541,9 @@ if __name__ == "__main__":
       and "${ADOP_LOGICAL_DATE}" in (pre_pii_derived_columns | map(attribute="expression") | join(" ")) %}
     # logical_date is required, not optional: getResolvedOptions raises if the DAG omits it,
     # which is the correct direction. See the ${ADOP_LOGICAL_DATE} note in transform().
-    args = getResolvedOptions(sys.argv, ["JOB_NAME", "logical_date"{% for p in _params %}, "{{ p }}"{% endfor %}])
+    args = getResolvedOptions(sys.argv, ["JOB_NAME", "ADOP_RUN_ID", "logical_date"{% for p in _params %}, "{{ p }}"{% endfor %}])
 {% else %}
-    args = getResolvedOptions(sys.argv, ["JOB_NAME"{% for p in _params %}, "{{ p }}"{% endfor %}])
+    args = getResolvedOptions(sys.argv, ["JOB_NAME", "ADOP_RUN_ID"{% for p in _params %}, "{{ p }}"{% endfor %}])
 {% endif %}
     sc = SparkContext()
     glue_context = GlueContext(sc)

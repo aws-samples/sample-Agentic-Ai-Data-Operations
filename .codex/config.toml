@@ -3,14 +3,17 @@
 # after pointing AWS_PROFILE at the intended (non-production) account.
 [agents]
 
+[shell_environment_policy]
+set = { AWS_PROFILE = "default" }
+
 [mcp_servers."glue-athena"]
-enabled = false
+enabled = true
 command = "uv"
 args = ["run", "--no-project", "--with", "fastmcp", "--with", "boto3", "--python", "3.13", "mcp-servers/glue-athena-server/server.py"]
 env = { "AWS_REGION" = "us-east-1", "AWS_PROFILE" = "default" }
 
 [mcp_servers."lakeformation"]
-enabled = false
+enabled = true
 command = "uv"
 args = ["run", "--no-project", "--with", "fastmcp", "--with", "boto3", "--python", "3.13", "mcp-servers/lakeformation-server/server.py"]
 env = { "AWS_REGION" = "us-east-1", "AWS_PROFILE" = "default" }
@@ -28,7 +31,7 @@ args = ["--from", "awslabs-core-mcp-server", "awslabs.core-mcp-server"]
 env = { "AWS_REGION" = "us-east-1", "AWS_PROFILE" = "default", "FASTMCP_LOG_LEVEL" = "ERROR" }
 
 [mcp_servers."iam"]
-enabled = false
+enabled = true
 command = "uvx"
 args = ["--from", "awslabs-iam-mcp-server", "awslabs.iam-mcp-server"]
 env = { "AWS_REGION" = "us-east-1", "AWS_PROFILE" = "default", "FASTMCP_LOG_LEVEL" = "ERROR" }
@@ -80,3 +83,7 @@ enabled = false
 command = "uv"
 args = ["run", "--no-project", "--with", "boto3", "--with", "fastmcp", "--python", "3.13", "mcp-servers/pii-detection-server/server.py"]
 env = { "AWS_REGION" = "us-east-1", "AWS_PROFILE" = "default" }
+
+# Allow outbound network (AWS CLI, S3) from sandboxed commands; file writes stay limited to the repo.
+[sandbox_workspace_write]
+network_access = true

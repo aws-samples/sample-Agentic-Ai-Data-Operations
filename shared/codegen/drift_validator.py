@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+import yaml
+
 from .renderer import render_dry_run
 from .spec_loader import compute_spec_hash, load_spec
 
@@ -105,6 +107,8 @@ def verify_artifact(artifact_path: Path) -> DriftReport:
             ok=False,
             reason=f"Unknown template_id: {header['template_id']}",
         )
+    if header["template_id"] == "iceberg_ddl":
+        spec_type = "gold_ddl" if artifact_path.parent.name == "gold" else "silver_ddl"
 
     # Load the spec
     spec_path = _find_spec_file(workload_dir, spec_type)
@@ -116,7 +120,11 @@ def verify_artifact(artifact_path: Path) -> DriftReport:
         )
 
     try:
-        spec, spec_hash = load_spec(spec_path, spec_type, header["schema_version"])
+        if spec_type.endswith("_ddl"):
+            spec = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
+            spec_hash = compute_spec_hash(spec)
+        else:
+            spec, spec_hash = load_spec(spec_path, spec_type, header["schema_version"])
     except Exception as e:
         return DriftReport(
             artifact_path=str(artifact_path),
@@ -273,11 +281,16 @@ def _template_id_to_spec_type(template_id: str) -> Optional[str]:
 def _find_spec_file(workload_dir: Path, spec_type: str) -> Optional[Path]:
     """Find the spec YAML file for a given type in the config directory."""
     config_dir = workload_dir / "config"
-    candidates = [
-        config_dir / f"{spec_type}.yaml",
-        config_dir / f"{spec_type}_spec.yaml",
-        config_dir / f"{spec_type}_rules.yaml",
-    ]
+    if spec_type == "silver_ddl":
+        candidates = [config_dir / "silver_ddl.yaml"]
+    elif spec_type == "gold_ddl":
+        candidates = [config_dir / "gold_ddl.yaml"]
+    else:
+        candidates = [
+            config_dir / f"{spec_type}.yaml",
+            config_dir / f"{spec_type}_spec.yaml",
+            config_dir / f"{spec_type}_rules.yaml",
+        ]
     # Special mappings
     if spec_type == "quality":
         candidates.insert(0, config_dir / "quality_rules.yaml")

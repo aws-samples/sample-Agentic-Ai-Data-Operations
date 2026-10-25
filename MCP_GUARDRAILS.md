@@ -294,6 +294,22 @@ See [Phase 0 Step 0.2](#step-02-mcp-health-check) for the full 3-tier server tab
 
 ### Step 5.3: IAM & Permissions
 
+Before the first IAM mutation, run the local preflight:
+
+```python
+from shared.utils.deployment_guardrails import validate_deployment_preflight
+
+validate_deployment_preflight(
+    run_context,
+    glue_role_name=glue_role_name,
+    glue_policy=glue_policy_document,
+)
+```
+
+The preflight blocks missing human-selected TBAC principals, missing query
+principal or IaC framework answers, shared Glue execution roles, wildcard IAM
+actions, and unbounded `Resource: "*"`. It performs no AWS calls.
+
 | Operation | MCP Tool | Fallback | Status |
 |---|---|---|---|
 | Find Glue execution role | `mcp__iam__list_roles` | `aws iam list-roles` CLI | **MCP** |
@@ -366,7 +382,9 @@ See [Phase 0 Step 0.2](#step-02-mcp-health-check) for the full 3-tier server tab
 4. **NEVER** skip permission verification (Step 5.3) — IAM MCP is loaded and must be used
 5. **ALWAYS** verify deployment via query (Step 5.6) — Redshift MCP is loaded, use it over Athena CLI
 6. **ALWAYS** run steps in order: S3 Upload → Glue Catalog → IAM → Lake Formation → KMS → Query Verify → Audit
-7. **If deployment fails**: Do NOT retry automatically. Report failure with full context (step, tool, error) and ask human how to proceed.
+7. **IAM role scope**: use `{workload}-glue-service-role` (underscores become hyphens); never expand a shared platform Glue role.
+8. **TBAC/query principals**: read only `human_answers.iac_tbac_principals` and `human_answers.iac_query_principal_arn`; never derive principals from PII columns or the current caller. Missing values block deployment.
+9. **If deployment fails**: Do NOT retry automatically. Record `deployment_step_failed`, apply and verify any repair as `deployment_repair`, then record the human decision as `deployment_retry_decision` before retrying.
 
 ---
 

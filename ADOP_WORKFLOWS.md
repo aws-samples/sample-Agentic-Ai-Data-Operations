@@ -195,6 +195,11 @@ Rules for sub-agents:
 Quality (4.4) may run in parallel and both depend on them. They are the human's answers from
 the Phase 1 gate — not an agent's inference — so the two agents need no mid-run coordination.
 
+The orchestrator also maintains `run/requirements.jsonl`. Every user prompt and
+response is recorded as a `user_turn`, then linked to explicit requirement
+records with stable IDs and artifact targets. The requirements auditor treats
+unlinked turns or missing target evidence as a blocking gate.
+
 ### Folder Convention
 
 Every onboarding workload gets its own workspace:
@@ -1745,6 +1750,9 @@ Step 5.2: Register tables in Glue Data Catalog
   → Audit: `mcp__cloudtrail__lookup_events` (EventName=CreateTable)
 
 Step 5.3: IAM & Permissions (MCP available)
+  → Run shared.utils.deployment_guardrails.validate_deployment_preflight first
+  → Block if iac_target_framework, iac_tbac_principals, or iac_query_principal_arn is missing/empty
+  → Require the workload-scoped role {workload}-glue-service-role
   → `mcp__iam__list_roles` — find execution role
   → `mcp__iam__simulate_principal_policy` — verify s3:GetObject, glue:*, lakeformation:*
   → `mcp__iam__list_role_policies` + `mcp__iam__get_role_policy` — inspect policies
@@ -2101,7 +2109,8 @@ also appended to `run/decisions.jsonl` so later agents can read them.
 
 The Data Onboarding Agent (main conversation) spawns sub-agents using the Codex `Agent`
 runtime with a named `agent_type` — `metadata-agent`, `transformation-agent`,
-`quality-agent`, `dag-agent`, `ontology-agent`. Each agent's prompt and tool allowlist live in
+`quality-agent`, `dag-agent`, `ontology-agent`, `requirements-auditor`. Each
+agent's prompt and tool allowlist live in
 `.codex/agents/{name}.toml` and load automatically at spawn.
 
 Each spawn call therefore includes only what the agent definition cannot know:
@@ -2153,7 +2162,12 @@ Data_Onboarding_Agent (main conversation)
 │   ├── Sub-agent returns: DAG file, tests
 │   └── TEST GATE: run tests → all pass? → proceed
 │
-└── Phase 4.6: Present all artifacts + test summary → human approves
+├── Step 8.5: agent_type="requirements-auditor" — reconcile user intent
+│   ├── Compare every captured user turn and human answer with artifacts
+│   ├── Persist run/requirements_audit.json + decisions + trace event
+│   └── GATE: every mandatory requirement has evidence → proceed or block
+│
+└── Step 8.6: Present all artifacts + audit/test summary → human approves
 ```
 
 ### Test Gate Protocol

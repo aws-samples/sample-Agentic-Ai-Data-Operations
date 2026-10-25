@@ -97,6 +97,7 @@ class TestPolicyFilesExist:
         "quality_agent",
         "dag_agent",
         "ontology_staging_agent",
+        "requirements_auditor_agent",
     ])
     def test_agent_policy_exists(self, agent):
         path = AGENT_AUTH_DIR / f"{agent}.cedar"
@@ -608,6 +609,31 @@ class TestAgentAuthorization:
     def test_transformation_cannot_invoke_mcp(self, evaluator):
         agent = AgentPrincipal("transformation", "sub_agent")
         tool = McpTool("redshift", "execute_query")
+        allowed, _ = evaluator.authorize_agent(agent, "InvokeTool", tool)
+        assert allowed is False
+
+    # -- Requirements Auditor (read evidence, write audit only) --
+    def test_requirements_auditor_can_read_files(self, evaluator):
+        agent = AgentPrincipal("requirements_auditor", "sub_agent")
+        wf = WorkloadFile("run/context.json", file_type="audit")
+        allowed, _ = evaluator.authorize_agent(agent, "ReadFile", wf)
+        assert allowed is True
+
+    def test_requirements_auditor_can_write_audit(self, evaluator):
+        agent = AgentPrincipal("requirements_auditor", "sub_agent")
+        wf = WorkloadFile("run/requirements_audit.json", file_type="audit")
+        allowed, _ = evaluator.authorize_agent(agent, "WriteFile", wf)
+        assert allowed is True
+
+    def test_requirements_auditor_cannot_write_pipeline_files(self, evaluator):
+        agent = AgentPrincipal("requirements_auditor", "sub_agent")
+        wf = WorkloadFile("config/source.yaml", file_type="config")
+        allowed, _ = evaluator.authorize_agent(agent, "WriteFile", wf)
+        assert allowed is False
+
+    def test_requirements_auditor_cannot_invoke_mcp(self, evaluator):
+        agent = AgentPrincipal("requirements_auditor", "sub_agent")
+        tool = McpTool("iam", "list_roles")
         allowed, _ = evaluator.authorize_agent(agent, "InvokeTool", tool)
         assert allowed is False
 

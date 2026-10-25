@@ -28,6 +28,12 @@ This is a human-in-the-loop gate. The HUMAN provides the rules. The agent does N
 3. **Scheduling** → cron expression, **IANA timezone** (`dag_spec.schedule.timezone` is
    required — never infer it), dependencies, failure handling
 
+**Regulation detection:** Before treating compliance as unspecified, scan the user's
+onboarding request with `shared.compliance.regulation_detector.detect_regulations()`.
+An explicit mention such as "we follow GDPR" activates that framework and must be persisted
+as `human_answers.compliance`; do not ask the user to repeat it. Negated mentions remain
+inactive, and a regulation must never be inferred from column names or observed values.
+
 **Auto-discover first** (schema, format, nulls, row count) — then ask only what you couldn't discover. Present findings before questions.
 
 ### Completion Checklist — ALL must have HUMAN-PROVIDED answers
@@ -70,6 +76,8 @@ See `.codex/skills/discovery-protocol/SKILL.md` for correct/incorrect behavior e
 6. **Quality gates block promotion** — no bypassing
 7. **Least privilege IAM** — no wildcard actions or resources
 8. **Audit logging** — who, what, when, where for all operations
+9. **Workload-scoped Glue roles** — use `shared.utils.deployment_guardrails` before IAM changes; never expand a shared Glue role
+10. **Explicit TBAC/query principals** — deploy only with human-provided `human_answers.iac_tbac_principals` and `iac_query_principal_arn`; never infer the current caller
 
 ## Agent Behavior Protocol
 
@@ -103,7 +111,7 @@ workloads/{name}/
 ├── dags/      # {name}_dag.py
 ├── sql/       # bronze/, silver/, gold/
 ├── tests/     # unit/, integration/
-├── run/       # context.json (shared run state), decisions.jsonl (append-only)
+├── run/       # context.json, requirements.jsonl, decisions.jsonl (append-only)
 ├── logs/      # Pipeline execution traces (trace_events.jsonl, run_*/)
 └── README.md
 
@@ -136,6 +144,22 @@ Every workload MUST include a `logs/` directory. Every pipeline run MUST produce
 No pipeline is complete without logging. Do not skip `logs/` when creating a workload. Do not generate ETL scripts without `StructuredLogger` wired in.
 
 Key files: `shared/logging/agent_tracer.py`, `shared/logging/trace_viewer.py`, `shared/utils/structured_logger.py`
+
+Every onboarding run MUST maintain `run/requirements.jsonl`. Each captured user
+turn must link to explicit requirement IDs, and the `requirements-auditor` must
+compare those requirements with the run context, decisions, traces, tests,
+generated artifacts, and deployment evidence before phase promotion or deploy.
+Missing, ambiguous, or conflicting mandatory evidence blocks the workflow. The
+auditor writes `run/requirements_audit.json` and a corresponding trace event.
+
+Deployment failures, repairs, and retry approvals must be separate trace events:
+`deployment_step_failed`, `deployment_repair`, and `deployment_retry_decision`.
+The retry decision must identify its source as human approval.
+
+OpenTelemetry is optional but AWS-compatible through the ADOT Collector:
+`config/observability/adot-collector.yaml` receives OTLP and exports to
+AWS X-Ray. Keep the collector private and never place its credentials in
+workload code or configuration.
 
 ## Deterministic Codegen (Non-Negotiable)
 
@@ -253,6 +277,7 @@ Where a rule says to use `AskUserQuestion`, ask the user in a normal message and
 Codex entry points: invoke `$command-onboard-workflow` for onboarding or
 `$command-devops-workflow` for production readiness, or select the skill from `/skills`.
 Specialist roles are in `.codex/agents/*.toml`; the workflow runtime spawns them using the role
-name (for example `agent_type: "iac-agent"`).
+name (for example `agent_type: "iac-agent"`). The `requirements-auditor` is
+evidence-only: it cannot use MCP/AWS or modify generated pipeline artifacts.
 
 **Deployment topology**: Default single-account. Multi-account opt-in via `docs/multi-account-deployment.md`.

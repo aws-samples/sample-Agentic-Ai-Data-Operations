@@ -193,3 +193,24 @@ class LakeFormationFetcher:
             return response.get('PrincipalResourcePermissions', [])
         except ClientError:
             return []
+
+    def fetch_lf_tag_policy_permissions(
+        self,
+        tag_key: str,
+        tag_values: List[str],
+        resource_type: str = "TABLE",
+    ) -> List[Dict[str, Any]]:
+        """Fetch grants for one LF-Tag expression."""
+        resource = {
+            "LFTagPolicy": {
+                "ResourceType": resource_type,
+                "Expression": [{"TagKey": tag_key, "TagValues": tag_values}],
+            }
+        }
+        if self.catalog_id:
+            resource["LFTagPolicy"]["CatalogId"] = self.catalog_id
+        try:
+            response = self.lf.list_permissions(Resource=resource)
+            return response.get("PrincipalResourcePermissions", [])
+        except ClientError:
+            return []

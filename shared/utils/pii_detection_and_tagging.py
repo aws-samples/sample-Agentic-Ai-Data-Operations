@@ -20,6 +20,7 @@ import argparse
 import re
 import json
 import logging
+import os
 from datetime import datetime
 from typing import List, Dict, Set, Tuple
 import boto3
@@ -32,14 +33,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# AWS clients
-glue = boto3.client('glue', region_name='us-east-1')
-athena = boto3.client('athena', region_name='us-east-1')
-lakeformation = boto3.client('lakeformation', region_name='us-east-1')
-s3 = boto3.client('s3', region_name='us-east-1')
+# AWS clients are created only by operations that need them. Importing this module is safe
+# for Glue jobs and local tests, and never contacts AWS as a side effect.
+def _aws_client(service_name: str):
+    region = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
+    if region:
+        return boto3.client(service_name, region_name=region)
+    return boto3.client(service_name)
 
-# Configuration
-ATHENA_OUTPUT_BUCKET = 's3://your-datalake-bucket/athena-results/'
+
+ATHENA_OUTPUT_BUCKET = os.environ.get("ATHENA_OUTPUT_BUCKET", "")
 SAMPLE_SIZE = 100  # Number of rows to sample for content-based detection
 
 
@@ -133,10 +136,14 @@ def detect_pii_by_content(database: str, table: str, column: str, data_type: str
     # Only check string columns
     if data_type.lower() not in ['string', 'varchar', 'char', 'text']:
         return []
+    if not ATHENA_OUTPUT_BUCKET:
+        logger.warning("ATHENA_OUTPUT_BUCKET is not configured; skipping content-based detection")
+        return []
 
     detected = []
 
     try:
+        athena = _aws_client("athena")
         # Sample data from column
         query = f"""
         SELECT "{column}"
@@ -227,6 +234,7 @@ def scan_table_for_pii(database: str, table: str, content_detection: bool = True
     pii_results = {}
 
     try:
+        glue = _aws_client("glue")
         # Get table schema
         response = glue.get_table(DatabaseName=database, Name=table)
         columns = response['Table']['StorageDescriptor']['Columns']
@@ -324,6 +332,7 @@ def ensure_lf_tags_exist():
         tag_key = tag_config['TagKey']
 
         try:
+            lakeformation = _aws_client("lakeformation")
             # Check if tag exists
             lakeformation.get_lf_tag(TagKey=tag_key)
             logger.info(f"✓ LF-Tag already exists: {tag_key}")
@@ -379,6 +388,7 @@ def apply_lf_tags_to_columns(database: str, table: str, pii_results: Dict[str, D
 
         # Apply tags
         try:
+            lakeformation = _aws_client("lakeformation")
             lakeformation.add_lf_tags_to_resource(
                 Resource={
                     'TableWithColumns': {
@@ -489,6 +499,7 @@ def main():
     tables_to_scan = []
     if args.all_tables:
         try:
+            glue = _aws_client("glue")
             response = glue.get_tables(DatabaseName=args.database)
             tables_to_scan = [table['Name'] for table in response['TableList']]
             logger.info(f"\nFound {len(tables_to_scan)} tables in database")

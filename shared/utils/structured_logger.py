@@ -19,16 +19,32 @@ import sys
 from datetime import datetime, timezone
 from typing import Any
 
+from shared.logging.otel_bridge import OpenTelemetryBridge
+
 
 class StructuredLogger:
     """JSON-line logger with agent/workload context on every entry."""
 
-    def __init__(self, agent: str, workload: str, run_id: str):
+    def __init__(
+        self,
+        agent: str,
+        workload: str,
+        run_id: str,
+        *,
+        otel_enabled: bool | None = None,
+        otel_endpoint: str | None = None,
+    ):
         self.context = {
             "agent": agent,
             "workload": workload,
             "run_id": run_id,
         }
+        self._otel = OpenTelemetryBridge(
+            run_id=run_id,
+            workload_name=workload,
+            enabled=otel_enabled,
+            endpoint=otel_endpoint,
+        )
 
     def log(self, level: str, message: str, **extra: Any):
         entry = {
@@ -39,6 +55,17 @@ class StructuredLogger:
             **extra,
         }
         print(json.dumps(entry, default=str), file=sys.stderr)
+        self._otel.event(
+            "structured_log",
+            attributes={
+                "adop.agent": self.context["agent"],
+                "adop.workload": self.context["workload"],
+                "adop.run_id": self.context["run_id"],
+                "log.level": level,
+                "log.message": message,
+                "adop.fields": extra,
+            },
+        )
 
     def info(self, msg: str, **extra: Any):
         self.log("INFO", msg, **extra)
@@ -69,3 +96,7 @@ class StructuredLogger:
             passed=passed,
             failed=failed,
         )
+
+    def close(self):
+        """Flush optional native OTel output; JSON stderr logging is unaffected."""
+        self._otel.close()

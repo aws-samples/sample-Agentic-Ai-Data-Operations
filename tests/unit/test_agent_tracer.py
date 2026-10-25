@@ -34,6 +34,7 @@ from shared.logging.trace_viewer import (
     show_timeline,
 )
 from shared.templates.agent_output_schema import AgentOutput
+from shared.utils.orchestrator_logger import OrchestratorLogger
 
 
 # ── AgentTracer ──────────────────────────────────────────────────────
@@ -51,6 +52,13 @@ class TestAgentTracerInit:
     def test_custom_trace_id(self):
         t = AgentTracer(run_id="r", workload_name="w", trace_id="custom-123")
         assert t.trace_id == "custom-123"
+
+    def test_default_ids_are_open_telemetry_shaped(self):
+        t = AgentTracer(run_id="r", workload_name="w")
+        assert len(t.trace_id) == 32
+        with t.span("work"):
+            event = t.events[-1]
+            assert len(event["span_id"]) == 16
 
 
 class TestOperationalEvents:
@@ -292,6 +300,42 @@ class TestTraceLink:
         t = AgentTracer(run_id="r", workload_name="w")
         t.ingest_agent_decisions({})
         assert len(t.events) == 0
+
+
+class TestDeploymentTraceRecords:
+    def test_failure_repair_and_retry_decision_are_distinct(self, tmp_path):
+        logger = OrchestratorLogger(
+            "orders",
+            "run-001",
+            trace_output_path=str(tmp_path / "trace.jsonl"),
+        )
+        logger.deployment_failure(
+            "quality_check_silver",
+            tool="glue-athena",
+            error_type="quality_gate",
+            error="critical rule failed",
+        )
+        logger.deployment_repair(
+            "transform_bronze_to_silver",
+            root_cause="invalid date cast was not quarantined",
+            repair="rerendered Silver template",
+            verification={"tests_passed": 29, "drift_passed": True},
+        )
+        logger.deployment_retry_decision(
+            "transform_bronze_to_silver",
+            approved=True,
+            reason="human approved rerun after repair",
+            attempt=2,
+        )
+
+        events = logger.tracer.events
+        assert [event["event_type"] for event in events[-3:]] == [
+            "deployment_step_failed",
+            "deployment_repair",
+            "deployment_retry_decision",
+        ]
+        assert events[-1]["payload"]["decision_source"] == "human"
+        assert events[-2]["payload"]["verification"]["drift_passed"] is True
 
 
 class TestConversationFlow:

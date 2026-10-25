@@ -10,7 +10,8 @@ namespace DataOnboarding {
     // -----------------------------------------------------------------------
 
     entity AgentPrincipal = {
-        // router | onboarding | metadata | transformation | quality | dag | analysis
+        // router | onboarding | metadata | transformation | quality | dag |
+        // ontology_staging | requirements_auditor | analysis
         "agentType": String,
         // main_conversation | sub_agent
         "executionContext": String,

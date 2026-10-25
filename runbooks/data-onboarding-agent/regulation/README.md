@@ -6,13 +6,16 @@ Self-contained compliance prompts for each supported regulation. Each prompt con
 
 ## When to Use
 
-These prompts are **NOT applied by default**. Load them ONLY when:
+These prompts are **NOT applied by default**. Load them when:
 
-1. User selects a regulation during Phase 1 discovery (section 6a)
-2. User asks "does this comply with {REGULATION}?"
-3. Workload config has `compliance: [{REGULATION}]` in quality_rules.yaml
+1. The onboarding request explicitly names a regulation, including natural language such as
+   "we follow GDPR" (detected before the `NONE` default is applied)
+2. User selects a regulation during Phase 1 discovery (section 6a)
+3. User asks "does this comply with {REGULATION}?"
+4. Workload config has `compliance: [{REGULATION}]` in quality_rules.yaml
 
-When a regulation is selected, its prompt is **mandatory** — apply ALL controls listed.
+When a regulation is explicitly selected or detected, its prompt is **mandatory** — apply ALL
+controls listed. Do not infer an additional framework from data columns or sampled values.
 
 ## Available Regulations
 

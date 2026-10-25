@@ -507,6 +507,14 @@ class _LocalEvaluator:
                 if resource.file_type not in ("config", "script"):
                     return False, f"{reason_prefix}: ontology staging can only write config/script"
 
+        # Requirements auditor: evidence read plus audit report write only.
+        if a == "requirements_auditor":
+            if action in ("ReadData", "WriteData", "PromoteData", "InvokeTool"):
+                return False, f"{reason_prefix}: requirements auditor is evidence-only"
+            if action == "WriteFile" and hasattr(resource, "file_type"):
+                if resource.file_type != "audit":
+                    return False, f"{reason_prefix}: requirements auditor can only write audit files"
+
         return True, f"{reason_prefix}: ALLOW"
 
 
