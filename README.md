@@ -21,7 +21,36 @@ Onboarding Platform (ADOP). Each client keeps its native configuration and
 interaction model; shared contracts and evidence rules keep the resulting
 workloads consistent.
 
-## Platform surfaces
+## What is ADOP?
+
+ADOP turns a plain-language data request into a human-approved, tested, and
+auditable data workload. It coordinates discovery, profiling, quality rules,
+transformations, orchestration, security, observability, and deployment
+evidence across a Bronze → Silver → Gold pipeline.
+
+The goal is the same regardless of which coding agent you use:
+
+```text
+Describe the data need
+        ↓
+Answer the required discovery questions
+        ↓
+Confirm the source and zone contracts
+        ↓
+Profile, design, render, test, audit
+        ↓
+Approve deployment and verify the result
+```
+
+ADOP does not make the agent the owner of business decisions. The human owns
+the requirements, the contracts preserve those decisions, and the agents
+produce evidence that the generated artifacts match them.
+
+## One goal, four platform paths
+
+Claude Code, Codex, Amazon Q Developer, and Kiro reach the same ADOP outcome.
+They differ only in how they load instructions, expose prompts, register MCP
+servers, run hooks, and display workflow progress.
 
 | Platform | Native entry point | Agent/workflow surface | Requirements capture | Renderer |
 |---|---|---|---|---|
@@ -33,6 +62,93 @@ workloads consistent.
 The adapter snapshots under `adapters/` are portable native surfaces. The
 root-level files are the combined project surface. The packaged Claude plugin
 is installable independently and vendors the shared runtime it needs.
+
+### What is shared and what is native?
+
+Shared across all platforms:
+
+- the human-in-the-loop discovery gate;
+- source, zone, quality, compliance, and schedule contracts;
+- requirements capture and the requirements auditor;
+- Cedar authorization and MCP guardrails;
+- deterministic rendering, tests, traces, and deployment evidence.
+
+Native to each platform:
+
+- Claude Code commands, plugin packaging, and hooks;
+- Codex skills, agent TOML, hooks, and the clone-safe startup wrapper;
+- Amazon Q CLI agents, rules, and capture fallback;
+- Kiro steering, agents, hooks, and workflow driver.
+
+This separation lets a team change its coding agent without changing the data
+architecture or the approval model.
+
+## Prompt, clone, and plugin usage
+
+### The prompt is the business request
+
+Start with the outcome and the facts the agent cannot safely infer:
+
+```text
+Onboard <source> into <target zones>.
+Source: <location, type, format, cadence>
+Business outcome: <what Gold must answer>
+Transformations: <confirmed rules>
+PII/compliance: <columns and framework, or none>
+Quality: <thresholds, critical rules, or "use defaults">
+Schedule: <cron and IANA timezone>
+Ontology: <opt in/out and consumers>
+```
+
+The agent may discover schema, nulls, row counts, and formats. It must present
+those observations and ask for confirmation where the prompt did not provide a
+required design decision.
+
+### Use the combined repository by cloning
+
+```bash
+git clone https://github.com/aws-samples/sample-Agentic-Ai-Data-Operations.git
+cd sample-Agentic-Ai-Data-Operations
+python3 scripts/validate_integrations.py
+python3 scripts/sync_platforms.py check
+```
+
+Then open the repository with the client you use:
+
+- **Claude Code:** start Claude Code at the repository root and run
+  `/adop:onboard-workflow`.
+- **Codex:** run `python3 scripts/start_codex.py`, then use
+  `$command-onboard-workflow [REGULATION]`.
+- **Amazon Q Developer:** start Q at the repository root and use the ADOP
+  orchestrator in `.amazonq/`.
+- **Kiro:** run
+  `python3 scripts/kiro_workflow.py init --workload <name>`, then use the Kiro
+  workflow surface.
+
+### Use the installable Claude Code plugin
+
+The Claude plugin is for using ADOP from another repository. Install the
+plugin through the configured marketplace or local plugin path, run its
+preflight, and invoke `/adop:onboard-workflow`. The plugin brings the ADOP
+commands, agents, hooks, contracts, renderer, and runbooks; generated
+artifacts remain in the user's repository.
+
+Codex, Amazon Q, and Kiro use their native project surfaces rather than the
+Claude plugin package. Their portable snapshots are under `adapters/`.
+
+## High-level workflow phases
+
+Every platform maps its native commands and hooks to these phases:
+
+| Phase | Purpose | Human checkpoint |
+|---|---|---|
+| 0. Health and discovery | Check existing workloads, credentials, tools, and source metadata | Confirm the source and available access |
+| 1. Requirements | Capture zone, source, transformations, PII, quality, schedule, and ontology decisions | Answer all mandatory questions |
+| 2. Deduplication and context | Detect overlap, create run context, and persist the requirements ledger | Resolve conflicts with existing workloads |
+| 3. Profiling | Inspect representative data and present schema, quality, and PII observations | Confirm how observations should be handled |
+| 4. Build and test | Create validated specs, render scripts/SQL/DAGs, and run test gates | Approve the implementation plan |
+| Audit | Compare Q&A with context, decisions, traces, tests, artifacts, and deployment evidence | Resolve missing or conflicting evidence |
+| 5. Deploy and verify | Deploy through approved tools, then verify catalog, queries, security, encryption, Airflow, and CloudTrail | Approve AWS changes and optional E2E/DevOps steps |
 
 ## Dynamic workflows
 
@@ -52,7 +168,7 @@ Codex skill definitions:
 `.codex/skills/command-onboard-workflow/SKILL.md`,
 `.codex/skills/command-devops-workflow/SKILL.md`.
 
-## Native integration map
+## Repository map
 
 | Surface | Repository location | Purpose |
 |---|---|---|
@@ -72,7 +188,7 @@ for the full folder and file ownership model.
 
 ---
 
-## Starting the Agent
+## Quick start by platform
 
 Open any supported client in this repo and describe **where the data lives,
 where it's going, the cadence, and any compliance requirements**. The Data
@@ -96,7 +212,7 @@ ledger, artifact evidence, and promotion audit.
 - **Target zones** (Silver quality rules, Gold transformations)
 - **Compliance** (GDPR, CCPA, HIPAA, SOX, PCI DSS — or none)
 
-## Shared workflow contract
+## Shared workflow contract (detailed)
 
 The client surface changes, but the lifecycle does not:
 
@@ -194,6 +310,40 @@ override it. See [`contracts/README.md`](contracts/README.md),
 [discovery protocol](.codex/skills/discovery-protocol/SKILL.md) for the
 enforcement details.
 
+## Dynamic tool routing and bring-your-own technology stack
+
+ADOP separates business intent from the tool or execution backend used to
+fulfill it. The decision engine evaluates intent, server health, policy,
+cost, security, and fallback rules at runtime. Routing is therefore dynamic:
+the same request can use an MCP server, a native SDK, or a CLI fallback while
+preserving the same contract and audit trail.
+
+The routing sources are:
+
+| Source | Purpose |
+|---|---|
+| [`TOOL_ROUTING.md`](TOOL_ROUTING.md) | Intent-to-tool mappings and disqualifiers |
+| [`tool-registry/servers.yaml`](tool-registry/servers.yaml) | Server capabilities, categories, and fallbacks |
+| [`MCP_GUARDRAILS.md`](MCP_GUARDRAILS.md) | Phase-specific tool permissions |
+| [`tool-registry/invariants.yaml`](tool-registry/invariants.yaml) | Rules that always apply |
+| `shared/policies/` | Cedar authorization and safety policies |
+
+You can bring your own technology stack without changing the business
+contracts. The current implementation targets AWS Glue PySpark, Iceberg,
+Athena, and Airflow/MWAA, while the contract boundary supports future
+execution targets such as EMR Spark, dbt/Snowflake, and Databricks. Keep
+business rules in the zone specifications and put backend settings—workers,
+Spark memory, warehouses, clusters, regions, retries, and tool allowlists—in
+execution-target configuration.
+
+The adapter contract for a new backend is:
+
+1. map the source and zone contracts to the backend;
+2. preserve the human discovery gate and requirements ledger;
+3. implement deterministic rendering and backend tests;
+4. expose read-only discovery separately from mutation/deployment tools;
+5. emit the same traces, audit evidence, and post-deployment verification.
+
 ## Current support and roadmap
 
 | Capability | Status |
@@ -213,7 +363,7 @@ artifacts. Runtime settings such as Spark memory, workers, warehouses, and
 threads belong in a separate execution-target configuration rather than in
 transformation business rules.
 
-## Third-party data ecosystems
+## Advanced third-party MCP integrations
 
 ADOP can use a third-party platform as a governed data source, execution
 target, or semantic/query system. The preferred integration boundary is the
