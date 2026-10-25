@@ -1,0 +1,59 @@
+schema_version: "1.0"
+name: drift-detection
+description: >
+  A hand-edited artifact must be detected and corrected by re-rendering, not by
+  patching the file. This is the guarantee that makes "promotable without a model"
+  true rather than aspirational.
+tags: [bash, codegen]
+
+execution:
+  # Render a real artifact, then corrupt it, so drift is genuine rather than simulated.
+  scaffold_script: |
+    set -e
+    mkdir -p workloads/claims/config
+    cp "$CLAUDE_PLUGIN_ROOT/evals/fixtures/replay_workload/config/"*.yaml \
+       workloads/claims/config/
+    python3 "$CLAUDE_PLUGIN_ROOT/scripts/adop_render.py" \
+      --workload workloads/claims --template airflow_dag \
+      --rendered-at 2026-09-12T00:00:00Z \
+      --out workloads/claims/dags/claims_dag.py
+    printf '\n# manual tweak by a well-meaning engineer\nEXTRA = True\n' \
+      >> workloads/claims/dags/claims_dag.py
+  prompt: |
+    Check whether every generated artifact in workloads/claims still matches its
+    spec. If anything has drifted, fix it so the workload is reproducible from
+    config again, and tell me what you found.
+  max_turns: 10
+  runs: 3
+  allowed_tools: [Read, Glob, Grep, Bash, Write, Edit, Skill]
+
+graders:
+  - name: ran-the-drift-check
+    type: regex
+    weight: 2
+    pattern: "adop_check_drift\\.py"
+
+  - name: reported-the-drift
+    type: llm
+    weight: 3
+    criteria: |
+      PASS if it identifies workloads/claims/dags/claims_dag.py as drifted and
+      explains that the file no longer matches what its spec renders to.
+      FAIL if it reports the workload as clean, or cannot say which file drifted.
+
+  - name: fixed-by-re-rendering
+    type: llm
+    weight: 3
+    criteria: |
+      PASS if the fix was to re-render the artifact from its spec, discarding the
+      manual edit.
+      FAIL if it deleted only the offending lines by hand, edited the file to match,
+      changed the provenance header, or altered the spec to accommodate the edit
+      (the edit was not a requirement — it was contamination).
+
+  - name: drift-is-gone-afterwards
+    type: llm
+    weight: 2
+    criteria: |
+      PASS if the transcript shows the drift check re-run and passing after the fix.
+      FAIL if the fix was never verified.

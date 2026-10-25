@@ -1,0 +1,84 @@
+schema_version: "1.0"
+name: hipaa-phi-controls
+description: >
+  A regulation token must produce the framework's controls at build time — PHI
+  masked in Silver, suppressed in Gold — rather than deferring compliance to a
+  downstream review. Tests the adop:data-compliance skill end to end.
+tags: [no-bash, compliance]
+
+execution:
+  prompt: |
+    I am onboarding a HIPAA claims dataset. Discovery is already complete and the
+    user confirmed all of the following:
+
+      - Source: s3://data-lake-example/bronze/claims/claims.csv, CSV, daily 03:00 UTC
+      - Primary key: claim_id; dedup keep latest by ingest_ts
+      - PHI columns (user-confirmed): member_ssn, member_dob, member_email,
+        member_name, member_address, member_mrn
+      - Silver quality threshold 0.85, Gold 0.95
+      - Gold: flat denormalized, grain = one row per claim, measures =
+        net_paid_ratio, days_to_submission
+      - Null handling: quarantine rows with an invalid service_date
+      - Ontology: no
+
+    Do not ask further questions — the gate is satisfied. Describe the Silver and
+    Gold controls you would encode, and which spec fields carry them.
+  max_turns: 6
+  runs: 3
+  allowed_tools: [Read, Glob, Grep, Skill]
+
+graders:
+  - name: phi-masked-in-silver
+    type: llm
+    weight: 3
+    criteria: |
+      PASS requires all of:
+        - Silver masks, redacts or pseudonymizes the confirmed PHI columns, and says
+          which spec field carries it (pii_masking).
+        - Pseudonymization, where used, is via a keyed hash with KMS rather than a
+          plain hash.
+        - Minimum-necessary is applied: only PHI needed for the Gold purpose is carried.
+      FAIL if PHI is passed through to Silver unmasked, or masking is described only
+      vaguely with no spec field named.
+
+  - name: phi-suppressed-in-gold
+    type: llm
+    weight: 3
+    criteria: |
+      PASS requires that Gold contains NO direct PHI — only de-identified or
+      aggregated measures. Date generalization or shifting for temporal PHI is a plus.
+      FAIL if any confirmed PHI column is described as present in Gold, even masked.
+
+  - name: quarantine-not-drop
+    type: llm
+    weight: 1
+    criteria: |
+      PASS if invalid service_date rows are quarantined with error context, as the
+      user asked. FAIL if they are dropped, or if the response is silent on what
+      happens to them.
+
+  - name: respects-the-satisfied-gate
+    type: llm
+    weight: 1
+    criteria: |
+      The gate is explicitly satisfied here, so re-interrogating the user is the
+      wrong behaviour.
+      PASS if it proceeds to describe controls without re-asking the discovery
+      questions. FAIL if it asks again for values already supplied above.
+
+  - name: compliance-skill-fired
+    type: tool_used
+    tool: Skill
+    weight: 1
+    # Under with-without ablation this is an indicator that the plugin
+    # fired at all, not a scored criterion.
+    arm: with-only
+
+  - name: addressed-both-zones
+    type: regex
+    weight: 1
+    flags: s
+    # Non-vacuity guard: every other scored grader here is an LLM judge, and those
+    # pass on an EMPTY transcript, so a failed run would score above zero. Any real
+    # answer to this prompt names both zones.
+    pattern: "Silver[\\s\\S]*Gold"

@@ -1,0 +1,556 @@
+{# template_id: gold_aggregate #}
+{# template_version: 1.5.0 #}
+{# required_slots: dataset_name, source_table, schema_type, grain, measures #}
+{# schema_version: v1 #}
+{#
+  SCD Type 2 detection, hoisted to template scope because three places need it: the
+  dimension-write branch, the `run_logical_date` binding in aggregate(), and the
+  getResolvedOptions call in __main__.
+
+  A dimension TABLE is Type 2 when one of its own columns is the source_column of a
+  dimensions[] attribute declaring scd_type 2. dimensions[] describes attributes and
+  output_tables[] describes tables, so the intersection is the only bridge between the two
+  namespaces — matching on name would silently find nothing, which is how scd_type sat inert.
+#}
+{% set _all_scd2_cols = (dimensions | default([])) | selectattr("scd_type", "defined")
+                | selectattr("scd_type", "equalto", 2) | map(attribute="source_column") | list %}
+{% set _ns = namespace(has_scd2=false) %}
+{% for _t in (output_tables | default([])) | selectattr("type", "equalto", "dimension") %}
+{% if (_t.columns | default([])) | select("in", _all_scd2_cols) | list %}
+{% set _ns.has_scd2 = true %}
+{% endif %}
+{% endfor %}
+{% set _has_scd2 = (schema_type == "star_schema") and _ns.has_scd2 %}
+{#
+  Iceberg partition columns.
+
+  DataFrameWriterV2.partitionedBy has signature (col: Column, *cols: Column) — varargs of
+  Column, not a list, and not strings. The previous emission was
+  `.partitionedBy({{ iceberg_partition_spec | tojson }})`, i.e. `.partitionedBy(["x"])`,
+  which raises at write time. Unpacking the list would not fix it either: the members have
+  to be Columns.
+
+  It was never caught because all four shipped workloads set `iceberg_partition_spec: []`,
+  which takes the else branch and emits no partitionedBy at all. The only way to reach the
+  bug is a non-empty spec, and nothing in the repo has one.
+
+  Identity partitioning only. An Iceberg transform such as days(ts) or bucket(16, id) is a
+  different call shape, and silver_spec's pattern ^[a-z][a-z0-9_]*$ forbids one anyway —
+  gold_spec's looser `type: string` does not, so an entry that is not a bare column name is
+  refused here rather than silently becoming a column literally named "days(ts)".
+#}
+{% macro partition_columns(spec) -%}
+{% for c in spec %}
+{% if not (c is string and c | length > 0 and c[0].isalpha() and c.replace("_", "").isalnum()) %}
+{{ unsupported("iceberg_partition_spec entry '" ~ c ~ "' is not a bare column name. "
+   ~ "partitionedBy here emits identity partitioning on F.col(name); an Iceberg transform "
+   ~ "like days(ts) or bucket(16, id) needs a different call and is not implemented. "
+   ~ "silver_spec's pattern already forbids it; gold_spec's type: string does not, which is "
+   ~ "how one could reach this.") }}
+{% endif %}
+{% endfor %}
+{%- for c in spec %}F.col("{{ c }}"){{ ", " if not loop.last }}{% endfor -%}
+{%- endmacro %}
+{#
+  One measure dispatch, called from both the star_schema and flat_iceberg branches.
+
+  It was two identical copies, which is how `percentile` came to be silently dropped: it is
+  in the contract's aggregation enum, neither copy had a branch for it, and there was no
+  else arm — so the measure vanished from the .agg() call and the render still compiled. A
+  Gold table asked for a p95 and got a table with that column simply absent.
+
+  `measure.filter` was likewise never rendered in either copy, so a filtered aggregation
+  silently became unfiltered. In the live run that understated an allowed-to-billed ratio,
+  because the PENDING claim's null allowed_amount was skipped by SUM while its billed_amount
+  stayed in the denominator.
+#}
+{#
+  post_aggregation_filter — the only way to suppress a published cell.
+
+  post_aggregation_columns renders as withColumn(), which can add a column but cannot remove
+  a row, and the write is an unconditional createOrReplace. So a k_anonymity_suppressed flag
+  computed there is a boolean label sitting next to the disclosed row — the row is still
+  written, still queryable, still identifying. A human who answers "suppress cells below
+  k=11" cannot have that honoured by any spec unless the rows are actually dropped.
+
+  One macro called from both write paths, taking the dataframe name, for the same reason
+  aggregated_measure below is one macro: the two identical copies this replaced are how
+  `percentile` came to be silently dropped from one branch and not the other.
+
+  Emitted after post_aggregation_columns so the predicate can reference a derived measure
+  (claim_count >= 11 works because claim_count is a measure; so does a ratio added above),
+  and before the write, because a suppression applied after createOrReplace suppresses
+  nothing. The suppressed count is logged: dropping 90% of cells to satisfy k=11 means the
+  grain is wrong, and the number is the only way anyone finds out.
+#}
+{% macro suppress_rows(df) %}
+    # Suppression: rows failing this predicate are DROPPED, not flagged.
+    _rows_before_suppression = {{ df }}.count()
+    {{ df }} = {{ df }}.filter(F.expr({{ post_aggregation_filter | tojson }}))
+    _rows_suppressed = _rows_before_suppression - {{ df }}.count()
+    logger.log("info", "post_aggregation_suppression",
+        predicate={{ post_aggregation_filter | tojson }},
+        rows_before=_rows_before_suppression,
+        rows_suppressed=_rows_suppressed)
+{% endmacro %}
+{% macro aggregated_measure(measure) -%}
+{#
+  Unfiltered measures keep the bare column-name form they have always emitted, so adding
+  filter support does not rewrite every measure line in every existing Gold artifact.
+  F.sum("x") and F.sum(F.col("x")) are equivalent in Spark; a diff for no behavioural gain
+  is noise in every future review.
+#}
+{%- set _col -%}
+{% if measure.filter is defined -%}
+F.when(F.expr({{ measure.filter | tojson }}), F.col("{{ measure.source_column }}"))
+{%- else -%}
+"{{ measure.source_column }}"
+{%- endif %}
+{%- endset -%}
+{% if measure.aggregation == "sum" %}
+        F.sum({{ _col }}).alias("{{ measure.name }}"),
+{% elif measure.aggregation == "avg" %}
+        F.avg({{ _col }}).alias("{{ measure.name }}"),
+{% elif measure.aggregation == "count" %}
+        F.count({{ _col }}).alias("{{ measure.name }}"),
+{% elif measure.aggregation == "count_distinct" %}
+        F.countDistinct({{ _col }}).alias("{{ measure.name }}"),
+{% elif measure.aggregation == "min" %}
+        F.min({{ _col }}).alias("{{ measure.name }}"),
+{% elif measure.aggregation == "max" %}
+        F.max({{ _col }}).alias("{{ measure.name }}"),
+{% elif measure.aggregation == "first_value" %}
+        F.first({{ _col }}, ignorenulls=True).alias("{{ measure.name }}"),
+{% else %}
+{{ unsupported("measure '" ~ measure.name ~ "' uses aggregation '" ~ measure.aggregation
+   ~ "', which this template has no branch for. Implemented: sum, avg, count, "
+   ~ "count_distinct, min, max, first_value. There was no else arm, so the measure was dropped from the "
+   ~ "aggregation entirely and the render still compiled — the Gold table came out missing "
+   ~ "the column, with nothing reported. `percentile` additionally has no parameter in "
+   ~ "gold_spec for WHICH percentile, so the contract needs extending before it can be "
+   ~ "implemented.") }}
+{% endif %}
+{%- endmacro %}
+import os
+import sys
+from datetime import datetime
+from pathlib import Path
+
+from pyspark.sql import functions as F
+from awsglue.context import GlueContext
+from awsglue.job import Job
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from shared.utils.structured_logger import StructuredLogger
+from shared.utils.pii_detection_and_tagging import detect_pii_by_column_name
+
+logger = StructuredLogger(
+    agent="gold_aggregate",
+    workload="{{ dataset_name }}",
+    run_id="local",
+)
+
+
+def _configure_logger(args):
+    """Use Airflow's ADOP_RUN_ID while keeping direct local calls testable."""
+    logger.context["run_id"] = (
+        args.get("ADOP_RUN_ID") or os.environ.get("ADOP_RUN_ID") or "local"
+    )
+
+
+def _log_pii_inventory(df):
+    """Log column metadata only; detection never reads values or changes the dataframe."""
+    inventory = {}
+    for column_name in df.columns:
+        detected = detect_pii_by_column_name(column_name)
+        if detected:
+            inventory[column_name] = [
+                {"pii_type": pii_type, "sensitivity": sensitivity}
+                for pii_type, sensitivity in detected
+            ]
+    logger.log(
+        "info",
+        "pii_inventory_detected",
+        detected_columns=inventory,
+        detected_column_count=len(inventory),
+    )
+
+
+def aggregate(glue_context, args):
+    _configure_logger(args)
+    spark = glue_context.spark_session
+    logger.log("info", "gold_transform_start", source="{{ source_table }}", schema_type="{{ schema_type }}")
+{% if _has_scd2 %}
+
+    # SCD Type 2 versioning is dated by the run's LOGICAL date, never by wall-clock. A retry
+    # or a backfill of the same logical date must land on the same effective_from, otherwise
+    # re-running a day opens a second version of every changed row and the history silently
+    # doubles. getResolvedOptions in __main__ makes this a required argument, so a DAG that
+    # forgets to pass it fails loudly here rather than versioning against today.
+    run_logical_date = args["logical_date"]
+{% endif %}
+
+    silver_df = spark.table("{{ source_table }}")
+    input_rows = silver_df.count()
+
+{% if derived_silver_columns is defined and derived_silver_columns %}
+    # Pre-aggregation derived columns (computed on Silver before groupBy)
+    pre_agg_df = silver_df
+{% for col_def in derived_silver_columns %}
+    pre_agg_df = pre_agg_df.withColumn(
+        "{{ col_def.name }}",
+        F.expr({{ col_def.expression | tojson }})
+    )
+{% endfor %}
+{% else %}
+    pre_agg_df = silver_df
+{% endif %}
+
+{% if schema_type == "star_schema" %}
+    # Star schema: build fact table with aggregated measures
+    fact_df = pre_agg_df.groupBy(
+{% for dim in grain.dimensions %}
+        "{{ dim }}",
+{% endfor %}
+    ).agg(
+{% for measure in measures %}
+{{ aggregated_measure(measure) -}}
+{% endfor %}
+    )
+
+{% if post_aggregation_columns is defined and post_aggregation_columns %}
+    # Post-aggregation derived columns (booleans, ratios, masked dimensions)
+{% for col_def in post_aggregation_columns %}
+    fact_df = fact_df.withColumn(
+        "{{ col_def.name }}",
+        F.expr({{ col_def.expression | tojson }})
+    )
+{% endfor %}
+{% endif %}
+
+{% if post_aggregation_filter is defined %}
+{{ suppress_rows("fact_df") }}
+{% endif %}
+{#
+  publish_via_gate — see silver_transform. quality_check_gold is the LAST task in the rendered
+  DAG, so before this branch existed the Gold gate blocked nothing at all: the table was
+  published by this script and the gate merely reported on it afterwards.
+#}
+{% set _publish_suffix = "_staging" if publish_via_gate | default(false) else "" %}
+{% if iceberg_database is defined and iceberg_table is defined %}
+    table_name = "glue_catalog.{{ iceberg_database }}.{{ iceberg_table }}{{ _publish_suffix }}"
+{% else %}
+    table_name = "glue_catalog.{{ dataset_name }}_db.gold_{{ dataset_name }}{{ _publish_suffix }}"
+{% endif %}
+    _log_pii_inventory(fact_df)
+{% if iceberg_partition_spec is defined and iceberg_partition_spec %}
+    fact_df.writeTo(table_name).using("iceberg").partitionedBy({{ partition_columns(iceberg_partition_spec) }}).createOrReplace()
+{% else %}
+    fact_df.writeTo(table_name).using("iceberg").createOrReplace()
+{% endif %}
+    output_rows = fact_df.count()
+
+{#
+  Dimension tables. `output_tables` and `dimensions` were both in the contract and neither
+  was read (finding M7), so schema_type=star_schema produced a single flat fact table: no
+  dim_member, no dim_provider, dimensions[].scd_type inert, and the semantic model's
+  "Member 1:many Claim" join with no dimension side to join to. The Lake Formation grants in
+  semantic.yaml targeted tables that were never created.
+#}
+{#
+  Atomic fact tables: one row per source row, written from pre_agg_df rather than at `grain`.
+
+  These exist for the case where the aggregate grain cannot answer a question the spec
+  otherwise claims to support — e.g. a daily (service_date, plan_type, claim_type) aggregate
+  cannot slice denial rate by provider, because provider is not in the grain, so a hashed
+  provider key kept "for provider-level analysis" would have had nothing to join to.
+#}
+{% set _atomic_facts = (output_tables | default([])) | selectattr("type", "equalto", "fact")
+                       | selectattr("atomic", "defined") | selectattr("atomic") | list %}
+{% for af in _atomic_facts %}
+{% if af.columns is not defined or not af.columns %}
+{{ unsupported("output_tables entry '" ~ af.name ~ "' is atomic but names no columns, so "
+   ~ "there is nothing to select. An atomic fact must list its columns explicitly — "
+   ~ "defaulting to every Silver column would republish the whole row-level dataset into "
+   ~ "Gold by accident.") }}
+{% endif %}
+    # ---------------------------------------------------------------------------------
+    # Atomic fact table: {{ af.name }} — ONE ROW PER CLAIM, not at the aggregate grain
+    # ---------------------------------------------------------------------------------
+    # Written from pre_agg_df, so it carries row-level detail the aggregate drops. That is
+    # the point, and also the cost: this is row-level data republished into Gold, so it
+    # inherits Silver's sensitivity and needs its own column-level grants. It is NOT a
+    # cheaper version of the aggregate.
+    {{ af.name }}_df = pre_agg_df.select(
+{% for c in af.columns %}
+        "{{ c }}",
+{% endfor %}
+    )
+{% if iceberg_database is defined %}
+    {{ af.name }}_table = "glue_catalog.{{ iceberg_database }}.{{ af.name }}"
+{% else %}
+    {{ af.name }}_table = "glue_catalog.{{ dataset_name }}_db.{{ af.name }}"
+{% endif %}
+    {{ af.name }}_df.writeTo({{ af.name }}_table).using("iceberg").createOrReplace()
+    logger.log("info", "atomic_fact_written",
+        table={{ af.name }}_table, grain="claim", rows={{ af.name }}_df.count())
+
+{% endfor %}
+{% set _dim_tables = (output_tables | default([])) | selectattr("type", "equalto", "dimension") | list %}
+{% if _dim_tables %}
+{#
+  gold_spec.dimensions lists dimension *attributes* — {name, source_column, scd_type} —
+  not tables. So the SCD check cannot match a dimensions[] entry against an output_tables
+  name; they are different namespaces. workloads/customer_master declares scd_type 2 on
+  risk_profile, employment_status and geographic_region while its single output table is
+  called dim_customer, and a name-matching check found nothing to object to.
+
+  Any attribute asking for Type 2 means the table cannot be a Type 1 overwrite.
+#}
+{#
+  Bridge the two namespaces PER TABLE rather than globally.
+
+  Previously `_scd2` was computed once over the whole dimensions[] array and any Type 2
+  attribute anywhere refused the render of EVERY dimension table — so a spec with
+  dim_member (Type 2) and dim_provider (Type 1) could not render the Type 1 table either.
+  Matching dimensions[].source_column against this table's columns[] gives the mapping the
+  contract otherwise lacks, so each table is classified on its own attributes.
+#}
+{% set _scd2_cols = (dimensions | default([])) | selectattr("scd_type", "defined")
+                | selectattr("scd_type", "equalto", 2) | map(attribute="source_column") | list %}
+{% if publish_via_gate | default(false) %}
+{{ unsupported("publish_via_gate is set and this spec also declares " ~ (_dim_tables | length)
+   ~ " dimension table(s). The gate promotes exactly one table — the one named in PROMOTE_TO — "
+   ~ "so the fact table would be gated while every dimension published straight from this "
+   ~ "script, ungated. Half a gate is worse than none: the run would report that publication "
+   ~ "was gated. Use publish_via_gate with flat_iceberg, or with star_schema once quality_check "
+   ~ "can promote a set of tables.") }}
+{% endif %}
+{% for dt in _dim_tables %}
+{% if dt.columns is not defined or not dt.columns %}
+{{ unsupported("output_tables entry '" ~ dt.name ~ "' names no columns, so there is nothing "
+   ~ "to select into the dimension. Add `columns`, or drop the entry.") }}
+{% endif %}
+{#  This table is Type 2 iff one of ITS columns is a Type 2 attribute. #}
+{% set _dt_scd2 = dt.columns | select("in", _scd2_cols) | list %}
+{% if _dt_scd2 %}
+{% if dt.business_key is not defined or not dt.business_key %}
+{{ unsupported("dimension table '" ~ dt.name ~ "' carries scd_type 2 attribute(s) "
+   ~ (_dt_scd2 | join(", ")) ~ " but declares no business_key. A Type 2 merge has to know "
+   ~ "which rows are successive versions of the same entity, and dimensions[] names "
+   ~ "attributes rather than tables, so there is nothing to infer it from. Add "
+   ~ "output_tables[].business_key naming the natural key column(s).") }}
+{% endif %}
+{% for bk in dt.business_key %}
+{% if bk not in dt.columns %}
+{{ unsupported("dimension table '" ~ dt.name ~ "' declares business_key column '" ~ bk
+   ~ "' which is not in its columns list, so the merge predicate would reference a column "
+   ~ "the dimension does not select. Add it to columns, or correct the business_key.") }}
+{% endif %}
+{% endfor %}
+{% set _bk = dt.business_key %}
+{% set _attrs = dt.columns | reject("in", _bk) | list %}
+    # ---------------------------------------------------------------------------------
+    # Dimension table: {{ dt.name }} — SCD TYPE 2
+    # ---------------------------------------------------------------------------------
+    # Type 2 attribute(s) on this table: {{ _dt_scd2 | join(", ") }}
+    # Business key: {{ _bk | join(", ") }}
+    #
+    # Versioned history, not an overwrite. A row is closed (effective_to set, is_current
+    # false) when its tracked attributes change, and a new current row opens. A Type 1
+    # createOrReplace here would discard the superseded rows irrecoverably — which is why
+    # this template used to refuse the render rather than silently downgrade.
+    #
+    # effective_from is the run's logical date, NOT wall-clock: re-running the same logical
+    # date must not open a second version. RUN_LOGICAL_DATE comes from the job arguments.
+    {{ dt.name }}_incoming = pre_agg_df.select(
+{% for c in dt.columns %}
+        "{{ c }}",
+{% endfor %}
+    ).dropDuplicates([{% for bk in _bk %}"{{ bk }}"{{ ", " if not loop.last }}{% endfor %}])
+{% if iceberg_database is defined %}
+    {{ dt.name }}_table = "glue_catalog.{{ iceberg_database }}.{{ dt.name }}"
+{% else %}
+    {{ dt.name }}_table = "glue_catalog.{{ dataset_name }}_db.{{ dt.name }}"
+{% endif %}
+
+    # First run bootstraps the table; later runs merge into it.
+    if not spark.catalog.tableExists({{ dt.name }}_table):
+        (
+            {{ dt.name }}_incoming
+            .withColumn("effective_from", F.lit(run_logical_date).cast("date"))
+            .withColumn("effective_to", F.lit(None).cast("date"))
+            .withColumn("is_current", F.lit(True))
+            .writeTo({{ dt.name }}_table)
+            .using("iceberg")
+            .create()
+        )
+        logger.log("info", "dimension_bootstrapped",
+            table={{ dt.name }}_table, scd_type=2,
+            rows={{ dt.name }}_incoming.count())
+    else:
+{% if _attrs %}
+        {{ dt.name }}_incoming.createOrReplaceTempView("{{ dt.name }}_incoming_v")
+
+        # Close any current row whose tracked attributes changed, then insert the new
+        # version. Two statements, because a single MERGE cannot both update the old row
+        # and insert its replacement for the same key.
+        #
+        # <=> is the NULL-safe equality: a plain != treats NULL as unknown, so a tracked
+        # attribute going NULL -> value (or back) would not register as a change and the
+        # version would never open.
+        spark.sql(f"""
+            MERGE INTO {{ '{' }}{{ dt.name }}_table{{ '}' }} AS tgt
+            USING {{ dt.name }}_incoming_v AS src
+              ON {% for bk in _bk %}tgt.{{ bk }} = src.{{ bk }}{{ " AND " if not loop.last }}{% endfor %}
+
+                 AND tgt.is_current = true
+            WHEN MATCHED AND ({% for a in _attrs %}NOT (tgt.{{ a }} <=> src.{{ a }}){{ " OR " if not loop.last }}{% endfor %})
+              THEN UPDATE SET
+                tgt.effective_to = date_sub(DATE '{run_logical_date}', 1),
+                tgt.is_current   = false
+        """)
+{% else %}
+        # NO ROW-CLOSING MERGE FOR THIS DIMENSION, deliberately. Its business_key
+        # ({{ _bk | join(", ") }}) is its only column, so there is no tracked attribute that
+        # can change and nothing a version could ever record. Emitting the usual
+        # `WHEN MATCHED AND (false)` merge here would be dead SQL that reads as though
+        # versioning were active.
+        #
+        # What this dimension CAN still version is membership of the key set: a key appearing
+        # for the first time opens a row via the append below. A key that stops appearing is
+        # NOT closed — doing so would need a full-set comparison and would misread an empty
+        # or partial batch as every entity being retired.
+{% endif %}
+
+        # Insert rows that are new, or whose previous version was just closed. The
+        # anti-join against current rows is what makes a re-run idempotent.
+        {{ dt.name }}_current = (
+            spark.table({{ dt.name }}_table)
+            .filter(F.col("is_current") == True)  # noqa: E712 — Spark Column, not a bool
+            .select({% for c in dt.columns %}"{{ c }}"{{ ", " if not loop.last }}{% endfor %})
+        )
+        {{ dt.name }}_new = {{ dt.name }}_incoming.join(
+            {{ dt.name }}_current,
+            on=[{% for c in dt.columns %}"{{ c }}"{{ ", " if not loop.last }}{% endfor %}],
+            how="left_anti",
+        )
+        (
+            {{ dt.name }}_new
+            .withColumn("effective_from", F.lit(run_logical_date).cast("date"))
+            .withColumn("effective_to", F.lit(None).cast("date"))
+            .withColumn("is_current", F.lit(True))
+            .writeTo({{ dt.name }}_table)
+            .append()
+        )
+        logger.log("info", "dimension_merged",
+            table={{ dt.name }}_table, scd_type=2,
+            new_versions={{ dt.name }}_new.count())
+
+{% else %}
+    # Dimension table: {{ dt.name }} — SCD Type 1 (createOrReplace overwrites in place).
+    # No attribute on this table declares scd_type 2. A table that does takes the Type 2
+    # merge branch above instead.
+    {{ dt.name }}_df = pre_agg_df.select(
+{% for c in dt.columns %}
+        "{{ c }}",
+{% endfor %}
+    ).dropDuplicates()
+{% if iceberg_database is defined %}
+    {{ dt.name }}_table = "glue_catalog.{{ iceberg_database }}.{{ dt.name }}"
+{% else %}
+    {{ dt.name }}_table = "glue_catalog.{{ dataset_name }}_db.{{ dt.name }}"
+{% endif %}
+    {{ dt.name }}_df.writeTo({{ dt.name }}_table).using("iceberg").createOrReplace()
+    logger.log("info", "dimension_written",
+        table={{ dt.name }}_table, scd_type=1, rows={{ dt.name }}_df.count())
+
+{% endif %}
+{% endfor %}
+{% endif %}
+{% elif schema_type == "flat_iceberg" %}
+    # Flat Iceberg: denormalized table with all measures
+    gold_df = pre_agg_df.groupBy(
+{% for dim in grain.dimensions %}
+        "{{ dim }}",
+{% endfor %}
+    ).agg(
+{% for measure in measures %}
+{{ aggregated_measure(measure) -}}
+{% endfor %}
+    )
+
+{% if post_aggregation_columns is defined and post_aggregation_columns %}
+    # Post-aggregation derived columns (booleans, ratios, masked dimensions)
+{% for col_def in post_aggregation_columns %}
+    gold_df = gold_df.withColumn(
+        "{{ col_def.name }}",
+        F.expr({{ col_def.expression | tojson }})
+    )
+{% endfor %}
+{% endif %}
+
+{% if post_aggregation_filter is defined %}
+{{ suppress_rows("gold_df") }}
+{% endif %}
+{#
+  publish_via_gate — see silver_transform. quality_check_gold is the LAST task in the rendered
+  DAG, so before this branch existed the Gold gate blocked nothing at all: the table was
+  published by this script and the gate merely reported on it afterwards.
+#}
+{% set _publish_suffix = "_staging" if publish_via_gate | default(false) else "" %}
+{% if iceberg_database is defined and iceberg_table is defined %}
+    table_name = "glue_catalog.{{ iceberg_database }}.{{ iceberg_table }}{{ _publish_suffix }}"
+{% else %}
+    table_name = "glue_catalog.{{ dataset_name }}_db.gold_{{ dataset_name }}{{ _publish_suffix }}"
+{% endif %}
+    _log_pii_inventory(gold_df)
+{% if iceberg_partition_spec is defined and iceberg_partition_spec %}
+    gold_df.writeTo(table_name).using("iceberg").partitionedBy({{ partition_columns(iceberg_partition_spec) }}).createOrReplace()
+{% else %}
+    gold_df.writeTo(table_name).using("iceberg").createOrReplace()
+{% endif %}
+    output_rows = gold_df.count()
+{% else %}
+{{ unsupported("schema_type '" ~ schema_type ~ "' has no branch in this template. "
+   ~ "Implemented: star_schema, flat_iceberg. There was no else arm, so this rendered a "
+   ~ "script with no groupBy, no aggregation and no table write at all — and it compiled. "
+   ~ "A Gold zone was produced that silently contained nothing. iceberg_dynamodb is one of "
+   ~ "the three options the discovery wizard offers and AGENTS.md documents, so the branch "
+   ~ "needs writing before it can be chosen.") }}
+{% endif %}
+
+    logger.log("info", "gold_transform_complete",
+        input_rows=input_rows, output_rows=output_rows, target_table=table_name)
+
+    return {
+        "workload": "{{ dataset_name }}",
+        "transformation": "silver_to_gold",
+        "source": "{{ source_table }}",
+        "target": table_name,
+        "input_rows": input_rows,
+        "output_rows": output_rows,
+    }
+
+
+if __name__ == "__main__":
+{% if _has_scd2 %}
+    # logical_date is REQUIRED, not optional: this spec declares SCD Type 2 dimension(s) and
+    # effective_from/effective_to must be dated by the run's logical date. getResolvedOptions
+    # raises if the DAG omits it, which is the correct direction — versioning history against
+    # wall-clock would be silently wrong on every retry and backfill.
+    args = getResolvedOptions(sys.argv, ["JOB_NAME", "ADOP_RUN_ID", "logical_date"])
+{% else %}
+    args = getResolvedOptions(sys.argv, ["JOB_NAME", "ADOP_RUN_ID"])
+{% endif %}
+    sc = SparkContext()
+    glue_context = GlueContext(sc)
+    job = Job(glue_context)
+    job.init(args["JOB_NAME"], args)
+    result = aggregate(glue_context, args)
+    job.commit()

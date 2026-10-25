@@ -1,0 +1,30 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "RedshiftDataAPI",
+      "Effect": "Allow",
+      "Action": [
+        "redshift-data:ExecuteStatement",
+        "redshift-data:GetStatementResult",
+        "redshift-data:DescribeStatement",
+        "redshift-data:ListStatements",
+        "redshift-data:ListDatabases",
+        "redshift-data:ListSchemas",
+        "redshift-data:ListTables"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "RedshiftDescribe",
+      "Effect": "Allow",
+      "Action": [
+        "redshift:DescribeClusters",
+        "redshift:GetClusterCredentials",
+        "redshift-serverless:ListWorkgroups",
+        "redshift-serverless:GetWorkgroup"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

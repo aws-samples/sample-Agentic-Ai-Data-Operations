@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://adop.internal/contracts/v1/gold_spec.schema.json",
+  "title": "Gold Aggregation Spec",
+  "description": "Defines Silver-to-Gold transformation: KPIs, grain, schema type, aggregations.",
+  "type": "object",
+  "required": ["dataset_name", "schema_version", "source_table", "schema_type", "grain", "measures"],
+  "additionalProperties": false,
+  "properties": {
+    "dataset_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,40}$"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "v1"
+    },
+    "source_table": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Silver Iceberg table to read from"
+    },
+    "schema_type": {
+      "type": "string",
+      "enum": ["star_schema", "flat_iceberg", "iceberg_dynamodb"],
+      "description": "Gold schema layout determined during discovery"
+    },
+    "grain": {
+      "type": "object",
+      "required": ["dimensions", "temporal"],
+      "additionalProperties": false,
+      "properties": {
+        "dimensions": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "minItems": 1,
+          "description": "Dimension columns defining the aggregation grain"
+        },
+        "temporal": {
+          "type": "string",
+          "enum": ["daily", "weekly", "monthly", "quarterly", "yearly", "none"],
+          "description": "Time grain for aggregation"
+        }
+      }
+    },
+    "measures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "source_column", "aggregation"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "description": "Output measure column name"
+          },
+          "source_column": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "aggregation": {
+            "type": "string",
+            "enum": [
+              "sum",
+              "avg",
+              "count",
+              "min",
+              "max",
+              "count_distinct",
+              "first_value",
+              "percentile"
+            ]
+          },
+          "filter": {
+            "type": "string",
+            "description": "Optional SQL WHERE clause for filtered aggregation"
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "dimensions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "source_column"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "source_column": { "type": "string" },
+          "scd_type": {
+            "type": "integer",
+            "enum": [1, 2],
+            "description": "Slowly Changing Dimension type (star schema only)"
+          }
+        }
+      },
+      "default": []
+    },
+    "quality_threshold": {
+      "type": "number",
+      "minimum": 0.95,
+      "maximum": 1.00,
+      "default": 0.95,
+      "description": "Minimum quality score for Gold gate"
+    },
+    "iceberg_database": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "iceberg_table": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "publish_via_gate": {
+      "type": "boolean",
+      "default": false,
+      "description": "When true this template writes to {iceberg_table}_staging instead of the real table, leaving publication to the quality gate. iceberg_table stays the real name so semantic.yaml, the LF-Tag grants and gold_spec.source_table keep pointing at it. Requires gate_before_publish on the workload's quality_spec and PROMOTE_TO on the quality task -- without both, the data is staged and never published."
+    },
+    "iceberg_partition_spec": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "output_tables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "type": { "type": "string", "enum": ["fact", "dimension", "flat"] },
+          "columns": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "atomic": {
+            "type": "boolean",
+            "default": false,
+            "description": "For a `fact` table only: write one row per SOURCE row, straight from the pre-aggregation dataframe, instead of at the spec's `grain`. Use it to publish an atomic fact alongside the aggregate when a consumer needs a dimension that the aggregate grain does not carry — provider-level slicing off a daily plan/claim-type aggregate, for instance, which is otherwise impossible. An atomic fact republishes row-level detail into Gold, so under HIPAA it inherits the source zone's sensitivity and needs its own column-level controls; it is not a cheaper aggregate. Ignored for dimension and flat tables."
+          },
+          "business_key": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string" },
+            "description": "Natural key identifying one entity in this dimension. Used as the MERGE predicate when the table is written as SCD Type 2. REQUIRED when any dimensions[] attribute whose source_column appears in this table's columns declares scd_type 2: a Type 2 merge must know which rows are successive versions of the same entity, and because dimensions[] names attributes rather than tables there is nothing to infer it from. Every listed column must also appear in columns. Ignored for Type 1 dimensions and for fact/flat tables."
+          }
+        }
+      },
+      "description": "For star_schema: list of fact + dimension tables. A dimension table is written as SCD Type 2 when any dimensions[] attribute whose source_column is among its columns declares scd_type 2; otherwise Type 1 (overwrite)."
+    },
+    "freshness_sla_hours": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Maximum acceptable data staleness in hours"
+    },
+    "derived_silver_columns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "expression"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "expression": { "type": "string", "minLength": 1, "description": "Spark SQL expression (passed to F.expr) added to the Silver dataframe BEFORE aggregation. Used as input to measures or as additional grouping dimensions." },
+          "description": { "type": "string" }
+        }
+      },
+      "default": [],
+      "description": "Pre-aggregation derived columns computed from Silver before groupBy (e.g., late_arrival_int, attendance_score, overtime_calc)."
+    },
+    "post_aggregation_columns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "expression"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "expression": { "type": "string", "minLength": 1, "description": "Spark SQL expression evaluated AFTER groupBy/agg (e.g., late_arrival_flag = late_count > 0)." },
+          "description": { "type": "string" }
+        }
+      },
+      "default": [],
+      "description": "Columns derived from aggregated measures (booleans, ratios, masking expressions over Gold dimensions)."
+    },
+    "post_aggregation_filter": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Spark SQL predicate applied to the aggregated rows immediately before the write. Rows not satisfying it are dropped, not labelled. This is the only way to suppress a published cell: post_aggregation_columns can add a column but cannot remove a row, so a k-anonymity flag computed there is a boolean sitting next to the disclosed row rather than a suppression. Example for k=11: claim_count >= 11."
+    }
+  }
+}

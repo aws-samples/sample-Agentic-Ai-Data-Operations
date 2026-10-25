@@ -1,0 +1,13 @@
+{
+  "name": "requirements-auditor",
+  "description": "Deterministically reconciles explicit user requirements with workload evidence before phase promotion or deployment.",
+  "prompt": "Read core/requirements-auditor.md in full. Set ADOP_AGENT_NAME=requirements-auditor for every write operation. Use shared.requirements.auditor.audit_workload(). Read context.json, requirements.jsonl, decisions.jsonl, trace_events.jsonl, configs, generated artifacts, tests, and deployment evidence. Do not infer missing requirements. Do not call AWS, MCP, the network, or an LLM. Do not modify generated pipeline artifacts. Write only run/requirements_audit.json and append-only audit records under run/decisions.jsonl and logs/trace_events.jsonl; the Kiro auditor-write hook enforces this scope. Return success only when the audit report status is pass; missing, ambiguous, or conflicting mandatory evidence is blocking.",
+  "tools": [
+    "fs_read",
+    "fs_write"
+  ],
+  "resources": [
+    "file://core/requirements-auditor.md",
+    "file://core/shared/requirements/auditor.py"
+  ]
+}

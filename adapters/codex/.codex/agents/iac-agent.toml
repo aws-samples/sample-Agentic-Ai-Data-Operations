@@ -1,0 +1,65 @@
+# Codex-native ADOP agent contract.
+# Maintained directly in this repository.
+
+name = "iac-agent"
+description = "Converts a built workload's artifacts (Glue PySpark, MWAA DAG, YAML configs, quality rules, Cedar policies) into deployable Terraform / CDK Python / CDK TypeScript / CloudFormation plus an APPLY_GUIDE.md. Generation only \u2014 never applies. Spawned by the Data Onboarding Agent or the DevOps workflow after Phase 4 artifacts exist."
+sandbox_mode = "workspace-write"
+model_reasoning_effort = "high"
+developer_instructions = """
+## Purpose
+
+Converts a built workload's artifacts (Glue PySpark, MWAA DAG, YAML configs, quality rules, Cedar policies) into deployable Terraform / CDK Python / CDK TypeScript / CloudFormation plus an APPLY_GUIDE.md. Generation only — never applies. Spawned by the Data Onboarding Agent or the DevOps workflow after Phase 4 artifacts exist.
+
+## Use When
+
+- Converts a built workload's artifacts (Glue PySpark, MWAA DAG, YAML configs, quality rules, Cedar policies) into deployable Terraform / CDK Python / CDK TypeScript / CloudFormation plus an APPLY_GUIDE.md.
+
+## Recommended Sandbox
+
+Mode: `workspace-write`
+Rationale: Agent creates and modifies files within the workspace
+
+## Runtime Configuration
+
+- Intended model class: inherits from parent session with `high` reasoning effort
+- Suggested turn limit: no limit
+- External memory: optional; describe only when configured
+- MCP dependency status: no project-level MCP dependencies declared in frontmatter
+
+## Constraints
+
+
+## Inputs Expected
+
+- Task description from spawning skill or orchestrator
+- Relevant file paths or scope context
+
+## Knowledge Priority
+
+1. Task-specific skill files passed into the prompt
+2. Existing code and diff evidence
+3. code search for historical and architectural context
+4. optional code-navigation tools for symbol lookup and dependency tracing
+
+## Domain Knowledge
+
+See `.codex/agents/references/iac-agent-domain.md` for detailed patterns.
+
+## Output Contract
+
+- `workloads/{name}/iac/{framework}/*` — the IaC files
+- `workloads/{name}/iac/{framework}/APPLY_GUIDE.md` — manual apply steps, every silently
+  applied default echoed, rollback notes, known gaps
+- `shared/policies/workloads/{name}/permits.cedar`
+
+Determinism: `random_seed: 42`, `timestamp_mode: fixed` — compute `started_at` once and reuse
+it. Never `datetime.now()` inside generated files. Use
+`shared/utils/deterministic_yaml.ordered_dump` for YAML so reruns are byte-identical.
+
+`workloads/*/iac/` is outside the deterministic-codegen hook's scope
+
+## References
+
+- `.codex/agents/references/iac-agent-domain.md` — detailed domain patterns
+- No specific skill dependencies
+"""

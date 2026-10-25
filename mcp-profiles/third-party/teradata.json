@@ -1,0 +1,14 @@
+{
+  "name": "teradata",
+  "enabled": false,
+  "description": "Optional Teradata MCP server.",
+  "mcpServers": {
+    "teradata": {
+      "command": "uvx",
+      "args": ["teradata-mcp-server"],
+      "env": {
+        "DATABASE_URI": "${TERADATA_DATABASE_URI}"
+      }
+    }
+  }
+}

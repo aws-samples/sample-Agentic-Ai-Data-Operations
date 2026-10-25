@@ -1,0 +1,154 @@
+# spec_hash: e6752176e4d492ffd3c292691fc506739b65a2f54733568470cdbb38f7e0098e
+# template_id: spec_yaml
+# template_hash: a193453cf6726f5e66fbeb0dfcd4c4a62ab711b3574853c26188fbc689472eea
+# schema_version: v1
+# rendered_at: 2026-10-22T18:18:44Z
+{
+  "dataset_name": "customer_orders",
+  "dedup_strategy": "none",
+  "derived_columns": [
+    {
+      "description": "USD revenue, half-up rounded to DECIMAL(12,2).",
+      "expression": "CAST(ROUND(quantity * unit_price * (1 - discount_pct), 2) AS DECIMAL(12,2))",
+      "name": "revenue"
+    },
+    {
+      "description": "GDPR demo data-subject identifier.",
+      "expression": "customer_id",
+      "name": "data_subject_id"
+    },
+    {
+      "description": "GDPR demo fixture; replace before production.",
+      "expression": "CAST(true AS BOOLEAN)",
+      "name": "consent_given"
+    },
+    {
+      "description": "GDPR demo ingestion timestamp fixed to the persisted run start; replace with source ingestion time before production.",
+      "expression": "CAST(\u00272026-10-22 18:18:44\u0027 AS TIMESTAMP)",
+      "name": "consent_timestamp"
+    },
+    {
+      "description": "GDPR right-to-erasure soft-delete flag.",
+      "expression": "CAST(false AS BOOLEAN)",
+      "name": "is_deleted"
+    },
+    {
+      "description": "GDPR demo erasure-request timestamp.",
+      "expression": "CAST(NULL AS TIMESTAMP)",
+      "name": "deletion_requested_at"
+    }
+  ],
+  "drop_columns": [
+    "credit_card_number"
+  ],
+  "iceberg_database": "customer_orders_db",
+  "iceberg_partition_spec": [],
+  "iceberg_table": "silver_customer_orders",
+  "null_handling": {
+    "critical_columns": [
+      "order_id",
+      "customer_id",
+      "order_date",
+      "product_id",
+      "quantity",
+      "unit_price",
+      "discount_pct",
+      "payment_method",
+      "order_status"
+    ],
+    "fill_values": {},
+    "strategy": "quarantine"
+  },
+  "pii_masking": {
+    "columns": [
+      {
+        "method": "hash",
+        "name": "customer_email"
+      },
+      {
+        "method": "mask_partial",
+        "name": "customer_phone"
+      },
+      {
+        "method": "tokenize",
+        "name": "credit_card_number",
+        "target_column": "credit_card_token",
+        "token_secret_id": "${CUSTOMER_ORDERS_TOKEN_SECRET_ID}"
+      },
+      {
+        "method": "mask_partial",
+        "name": "customer_name"
+      },
+      {
+        "method": "redact",
+        "name": "shipping_address"
+      },
+      {
+        "method": "redact",
+        "name": "city"
+      },
+      {
+        "method": "redact",
+        "name": "state"
+      },
+      {
+        "method": "redact",
+        "name": "zip_code"
+      }
+    ],
+    "enabled": true
+  },
+  "primary_key": [
+    "order_id"
+  ],
+  "quality_threshold": 0.8,
+  "quarantine": {
+    "enabled": true,
+    "location": "${CUSTOMER_ORDERS_QUARANTINE_URI}",
+    "retention_days": 365
+  },
+  "schema_version": "v1",
+  "source_table": "glue_catalog.customer_orders_db.bronze_customer_orders",
+  "type_casts": [
+    {
+      "column": "order_date",
+      "format": "yyyy-MM-dd",
+      "from_type": "STRING",
+      "on_error": "quarantine",
+      "to_type": "DATE"
+    },
+    {
+      "column": "ship_date",
+      "format": "yyyy-MM-dd",
+      "from_type": "STRING",
+      "on_error": "quarantine",
+      "to_type": "DATE"
+    },
+    {
+      "column": "quantity",
+      "from_type": "STRING",
+      "on_error": "quarantine",
+      "to_type": "INTEGER"
+    },
+    {
+      "column": "unit_price",
+      "from_type": "STRING",
+      "on_error": "quarantine",
+      "params": {
+        "precision": 10,
+        "scale": 2
+      },
+      "to_type": "DECIMAL"
+    },
+    {
+      "column": "discount_pct",
+      "from_type": "STRING",
+      "on_error": "quarantine",
+      "params": {
+        "precision": 5,
+        "scale": 2
+      },
+      "to_type": "DECIMAL"
+    }
+  ]
+}

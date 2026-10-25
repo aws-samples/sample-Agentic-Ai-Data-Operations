@@ -1,0 +1,25 @@
+{# template_id: iceberg_ddl #}
+{# template_version: 1.0.0 #}
+{# required_slots: dataset_name, iceberg_database, tables #}
+{# schema_version: v1 #}
+CREATE DATABASE IF NOT EXISTS {{ iceberg_database }};
+
+{% for table in tables %}
+CREATE TABLE IF NOT EXISTS {{ iceberg_database }}.{{ table.name }} (
+{% for col in table.columns %}
+    {{ col.name }} {{ col.type }}{% if not loop.last %},{% endif %}
+
+{% endfor %}
+)
+USING iceberg
+{% if table.partition_spec is defined and table.partition_spec %}
+PARTITIONED BY ({{ table.partition_spec | join(', ') }})
+{% endif %}
+LOCATION 's3://data-lake/{{ dataset_name }}/{{ table.zone | default("silver") }}/{{ table.name }}/'
+TBLPROPERTIES (
+    'table_type' = 'ICEBERG',
+    'format' = 'parquet',
+    'write.format.default' = 'parquet'
+);
+
+{% endfor %}

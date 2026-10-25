@@ -1,0 +1,95 @@
+version: 1
+name: adop-multi-agent-integrations
+purpose: >
+  Keep Claude Code, Codex, Amazon Q Developer, and Kiro native entry points
+  aligned with one shared requirements-auditing contract.
+
+adapters:
+  claude-code:
+    root: adapters/claude-code
+    entrypoints:
+      - CLAUDE.md
+      - .claude/settings.json
+      - .claude/agents/requirements-auditor.md
+      - .claude-plugin/marketplace.json
+  codex:
+    root: adapters/codex
+    entrypoints:
+      - AGENTS.md
+      - .codex/config.toml
+      - .codex/agents/requirements-auditor.toml
+      - .codex/hooks.json
+  amazon-q:
+    root: adapters/amazon-q
+    entrypoints:
+      - AmazonQ.md
+      - .amazonq/mcp.json
+      - .amazonq/cli-agents/adop-requirements-auditor.json
+  kiro:
+    root: adapters/kiro
+    entrypoints:
+      - .kiro/settings/mcp.json
+      - .kiro/agents/requirements-auditor.json
+      - .kiro/hooks/adop-gates.json
+
+shared:
+  contract: core/requirements-auditor.md
+  implementation: core/shared/requirements/auditor.py
+  capture_helper: core/shared/requirements/capture.py
+  cli_capture: scripts/capture_user_turn.py
+  kiro_workflow: scripts/kiro_workflow.py
+  kiro_renderer: adapters/kiro/.kiro/adop/render.sh
+  kiro_phase_gate: adapters/kiro/.kiro/hooks/phase_gate.py
+  tests:
+    - core/tests/test_requirements_auditor.py
+
+platform_surfaces:
+  checker: scripts/sync_platforms.py
+  documentation: docs/platform-integration.md
+  clone_ready:
+    - CLAUDE.md
+    - AGENTS.md
+    - AmazonQ.md
+    - .claude/
+    - .codex/
+    - .amazonq/
+    - .kiro/
+
+mcp_profiles:
+  default:
+    name: aws-mcp
+    package: mcp-proxy-for-aws==1.6.0
+    endpoint: https://aws-mcp.us-east-1.api.aws/mcp
+    enabled_for:
+      - claude-code
+      - codex
+      - amazon-q
+      - kiro
+  demo:
+    profile: mcp-profiles/demo/profile.json
+    launcher: scripts/mcp_demo.py
+    purpose: live end-to-end demo in an existing AWS account
+    servers:
+      - aws-mcp
+      - glue-athena
+      - lakeformation
+      - iam
+      - pii-detection
+      - cloudtrail
+  optional_profiles:
+    - .mcp.optional.json
+    - .codex/config.optional.toml
+    - .amazonq/mcp.optional.json
+    - .kiro/settings/mcp.optional.json
+    - plugins/claude-code/.mcp.optional.json
+
+requirements_auditor:
+  mandatory_outputs:
+    - run/requirements_audit.json
+    - run/decisions.jsonl
+    - logs/trace_events.jsonl
+  forbidden_capabilities:
+    - aws
+    - mcp
+    - network
+    - modification_of_generated_pipeline_artifacts

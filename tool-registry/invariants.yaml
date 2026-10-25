@@ -1,0 +1,48 @@
+# tool-registry/invariants.yaml
+# Mandatory rules enforced regardless of phase.
+# Run: python scripts/validate_tool_registry.py
+
+rules:
+  - id: lineage-always
+    rule: "--enable-data-lineage: true on every Glue ETL job"
+    severity: BLOCK
+
+  - id: no-credentials-in-code
+    rule: "Credentials via Secrets Manager or Airflow Connections only"
+    severity: BLOCK
+
+  - id: bronze-immutable
+    rule: "Bronze zone data never modified after ingestion"
+    severity: BLOCK
+
+  - id: quality-gates
+    rule: "Silver >= 80%, Gold >= 95%; critical failures block promotion"
+    severity: BLOCK
+
+  - id: sub-agent-no-mcp
+    rule: "Sub-agents generate artifacts only; no MCP, no AWS execution"
+    severity: BLOCK
+
+  - id: iam-simulate-first
+    rule: "mcp__iam__simulate_principal_policy must return allowed before source access"
+    severity: BLOCK
+
+  - id: verify-deployment
+    rule: "Use Redshift MCP or Athena to confirm tables queryable after deploy"
+    severity: BLOCK
+
+  - id: audit-after-deploy
+    rule: "Run mcp__cloudtrail__lookup_events after deploy"
+    severity: BLOCK
+
+  - id: log-cli-fallback
+    rule: "Print Warning: MCP fallback -- {server} not loaded for {operation}. Using CLI."
+    severity: WARN
+
+  - id: zone-scoped-kms
+    rule: "Separate CMK for Bronze, Silver, Gold per workload"
+    severity: BLOCK
+
+  - id: mcp-first
+    rule: "Use MCP server tools FIRST for all AWS operations; CLI only when unavailable or errored"
+    severity: BLOCK

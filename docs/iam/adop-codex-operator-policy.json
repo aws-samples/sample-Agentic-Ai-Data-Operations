@@ -1,0 +1,170 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DataCatalogReadOnly",
+      "Effect": "Allow",
+      "Action": [
+        "glue:GetCatalogImportStatus",
+        "glue:GetCrawler",
+        "glue:GetCrawlers",
+        "glue:GetDatabase",
+        "glue:GetDatabases",
+        "glue:GetDataCatalogEncryptionSettings",
+        "glue:GetJob",
+        "glue:GetJobs",
+        "glue:GetJobRun",
+        "glue:GetJobRuns",
+        "glue:GetPartition",
+        "glue:GetPartitions",
+        "glue:GetTable",
+        "glue:GetTables",
+        "athena:BatchGetQueryExecution",
+        "athena:GetDataCatalog",
+        "athena:GetNamedQuery",
+        "athena:GetQueryExecution",
+        "athena:GetQueryResults",
+        "athena:GetWorkGroup",
+        "athena:ListDataCatalogs",
+        "athena:ListNamedQueries",
+        "athena:ListQueryExecutions",
+        "athena:ListWorkGroups",
+        "lakeformation:GetDataLakeSettings",
+        "lakeformation:GetLFTag",
+        "lakeformation:GetResourceLFTags",
+        "lakeformation:ListLFTags",
+        "lakeformation:ListPermissions"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "TaggedBucketMetadataReadOnly",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetBucketLocation",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::adop-*",
+        "arn:aws:s3:::data-onboarding-landing-*"
+      ]
+    },
+    {
+      "Sid": "SecurityMetadataReadOnly",
+      "Effect": "Allow",
+      "Action": [
+        "kms:DescribeKey",
+        "kms:GetKeyRotationStatus",
+        "kms:ListAliases",
+        "kms:ListKeys",
+        "secretsmanager:DescribeSecret",
+        "secretsmanager:ListSecrets",
+        "s3:GetAccountPublicAccessBlock",
+        "cloudtrail:DescribeTrails",
+        "cloudtrail:GetEventDataStore",
+        "cloudtrail:GetTrailStatus",
+        "cloudtrail:ListEventDataStores",
+        "cloudtrail:LookupEvents",
+        "ec2:DescribeVpcEndpoints"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ServiceMetadataReadOnly",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:GetFunction",
+        "lambda:GetFunctionConfiguration",
+        "lambda:ListFunctions",
+        "logs:DescribeLogGroups",
+        "logs:DescribeLogStreams",
+        "logs:FilterLogEvents",
+        "dynamodb:DescribeTable",
+        "dynamodb:ListTables",
+        "redshift:Describe*",
+        "redshift-serverless:GetWorkgroup",
+        "redshift-serverless:ListWorkgroups",
+        "airflow:GetEnvironment",
+        "airflow:ListEnvironments",
+        "quicksight:DescribeAnalysis",
+        "quicksight:DescribeDataSet",
+        "quicksight:DescribeDataSource",
+        "quicksight:DescribeDashboard",
+        "quicksight:ListAnalyses",
+        "quicksight:ListDashboards",
+        "quicksight:ListDataSets",
+        "quicksight:ListDataSources",
+        "ce:GetCostAndUsage",
+        "ce:GetCostForecast",
+        "ce:GetDimensionValues",
+        "ce:GetTags",
+        "ce:GetUsageForecast"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "IamToolAndDeploymentAccess",
+      "Effect": "Allow",
+      "Action": [
+        "iam:ListRoles",
+        "iam:ListUsers",
+        "iam:GetRole",
+        "iam:GetUser",
+        "iam:ListRolePolicies",
+        "iam:GetRolePolicy",
+        "iam:ListAttachedRolePolicies",
+        "iam:ListGroupsForUser",
+        "iam:ListUserPolicies",
+        "iam:SimulatePrincipalPolicy"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudFormationReadOnly",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:ValidateTemplate",
+        "cloudformation:DescribeStacks",
+        "cloudformation:DescribeStackEvents",
+        "cloudformation:DescribeStackResources",
+        "cloudformation:GetTemplate",
+        "cloudformation:ListStacks",
+        "cloudformation:ListStackResources",
+        "cloudformation:DescribeChangeSet"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "BedrockAndAgentCore",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:GetFoundationModel",
+        "bedrock:ListFoundationModels"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "VerifiedPermissions",
+      "Effect": "Allow",
+      "Action": [
+        "verifiedpermissions:GetIdentitySource",
+        "verifiedpermissions:GetPolicy",
+        "verifiedpermissions:GetPolicyStore",
+        "verifiedpermissions:GetPolicyTemplate",
+        "verifiedpermissions:ListIdentitySources",
+        "verifiedpermissions:ListPolicies",
+        "verifiedpermissions:ListPolicyStores",
+        "verifiedpermissions:ListPolicyTemplates"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CallerIdentity",
+      "Effect": "Allow",
+      "Action": [
+        "sts:GetCallerIdentity"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

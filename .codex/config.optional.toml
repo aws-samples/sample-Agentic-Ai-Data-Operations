@@ -1,0 +1,105 @@
+# Translated from .mcp.json for Codex CLI.
+# Servers ship disabled: they call AWS with AWS_PROFILE=default. Enable per server
+# after pointing AWS_PROFILE at the intended (non-production) account.
+[agents]
+
+[shell_environment_policy]
+set = { AWS_PROFILE = "default" }
+
+[mcp_servers."glue-athena"]
+enabled = true
+command = "uv"
+args = ["run", "--no-project", "--with", "fastmcp", "--with", "boto3", "--python", "3.13", "mcp-servers/glue-athena-server/server.py"]
+env = { "AWS_REGION" = "us-east-1", "AWS_PROFILE" = "default" }
+
+[mcp_servers."lakeformation"]
+enabled = true
+command = "uv"
+args = ["run", "--no-project", "--with", "fastmcp", "--with", "boto3", "--python", "3.13", "mcp-servers/lakeformation-server/server.py"]
+env = { "AWS_REGION" = "us-east-1", "AWS_PROFILE" = "default" }
+
+[mcp_servers."sagemaker-catalog"]
+enabled = false
+command = "uv"
+args = ["run", "--no-project", "--with", "fastmcp", "--with", "boto3", "--python", "3.13", "mcp-servers/sagemaker-catalog-server/server.py"]
+env = { "AWS_REGION" = "us-east-1", "AWS_PROFILE" = "default" }
+
+[mcp_servers."core"]
+enabled = false
+command = "uvx"
+args = ["--from", "awslabs-aws-api-mcp-server", "awslabs.aws-api-mcp-server"]
+env = { "AWS_REGION" = "us-east-1", "AWS_PROFILE" = "default", "FASTMCP_LOG_LEVEL" = "ERROR" }
+
+[mcp_servers."iam"]
+enabled = true
+command = "uvx"
+args = ["--from", "awslabs-iam-mcp-server", "awslabs.iam-mcp-server"]
+env = { "AWS_REGION" = "us-east-1", "AWS_PROFILE" = "default", "FASTMCP_LOG_LEVEL" = "ERROR" }
+
+[mcp_servers."lambda"]
+enabled = false
+command = "uvx"
+args = ["--from", "awslabs-lambda-tool-mcp-server", "awslabs.lambda-tool-mcp-server"]
+env = { "AWS_REGION" = "us-east-1", "AWS_PROFILE" = "default", "FASTMCP_LOG_LEVEL" = "ERROR" }
+
+[mcp_servers."s3-tables"]
+enabled = false
+command = "uvx"
+args = ["--from", "awslabs-s3-tables-mcp-server", "awslabs.s3-tables-mcp-server"]
+env = { "AWS_REGION" = "us-east-1", "AWS_PROFILE" = "default", "FASTMCP_LOG_LEVEL" = "ERROR" }
+
+[mcp_servers."cloudtrail"]
+enabled = false
+command = "uvx"
+args = ["--from", "awslabs-cloudtrail-mcp-server", "awslabs.cloudtrail-mcp-server"]
+env = { "AWS_REGION" = "us-east-1", "AWS_PROFILE" = "default", "FASTMCP_LOG_LEVEL" = "ERROR" }
+
+[mcp_servers."redshift"]
+enabled = false
+command = "uvx"
+args = ["--from", "awslabs-redshift-mcp-server", "awslabs.redshift-mcp-server"]
+env = { "AWS_REGION" = "us-east-1", "AWS_PROFILE" = "default", "FASTMCP_LOG_LEVEL" = "ERROR" }
+
+[mcp_servers."cloudwatch"]
+enabled = false
+command = "uvx"
+args = ["--from", "awslabs-cloudwatch-mcp-server", "awslabs.cloudwatch-mcp-server"]
+env = { "AWS_REGION" = "us-east-1", "AWS_PROFILE" = "default", "FASTMCP_LOG_LEVEL" = "ERROR" }
+
+[mcp_servers."cost-explorer"]
+enabled = false
+command = "uvx"
+args = ["--from", "awslabs-billing-cost-management-mcp-server", "awslabs.billing-cost-management-mcp-server"]
+env = { "AWS_REGION" = "us-east-1", "AWS_PROFILE" = "default", "FASTMCP_LOG_LEVEL" = "ERROR" }
+
+[mcp_servers."dynamodb"]
+enabled = false
+command = "uvx"
+args = ["--from", "awslabs-dynamodb-mcp-server", "awslabs.dynamodb-mcp-server"]
+env = { "AWS_REGION" = "us-east-1", "AWS_PROFILE" = "default", "FASTMCP_LOG_LEVEL" = "ERROR" }
+
+[mcp_servers."pii-detection"]
+enabled = false
+command = "uv"
+args = ["run", "--no-project", "--with", "boto3", "--with", "fastmcp", "--python", "3.13", "mcp-servers/pii-detection-server/server.py"]
+env = { "AWS_REGION" = "us-east-1", "AWS_PROFILE" = "default" }
+
+[mcp_servers."snowflake-native"]
+enabled = false
+url = "${SNOWFLAKE_MCP_URL}"
+http_headers = { Authorization = "Bearer ${SNOWFLAKE_MCP_TOKEN}" }
+
+[mcp_servers."databricks-native"]
+enabled = false
+url = "${DATABRICKS_MCP_URL}"
+http_headers = { Authorization = "Bearer ${DATABRICKS_MCP_TOKEN}" }
+
+[mcp_servers."teradata"]
+enabled = false
+command = "uvx"
+args = ["teradata-mcp-server"]
+env = { DATABASE_URI = "${TERADATA_DATABASE_URI}" }
+
+# Allow outbound network (AWS CLI, S3) from sandboxed commands; file writes stay limited to the repo.
+[sandbox_workspace_write]
+network_access = true

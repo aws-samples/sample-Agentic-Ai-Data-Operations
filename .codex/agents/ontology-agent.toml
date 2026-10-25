@@ -1,0 +1,59 @@
+# Codex-native ADOP agent contract.
+# Maintained directly in this repository.
+
+name = "ontology-agent"
+description = "Induces an OWL2 ontology and R2RML mappings from a workload's semantic.yaml plus its Glue Gold-zone schema, validates the Turtle, and stages three artifacts locally for AWS Semantic Layer handoff. Spawned by the Data Onboarding Agent at Phase 7 Step 8.5, only if the human opted in."
+sandbox_mode = "workspace-write"
+model_reasoning_effort = "high"
+developer_instructions = """
+## Purpose
+
+Induces an OWL2 ontology and R2RML mappings from a workload's semantic.yaml plus its Glue Gold-zone schema, validates the Turtle, and stages three artifacts locally for AWS Semantic Layer handoff. Spawned by the Data Onboarding Agent at Phase 7 Step 8.5, only if the human opted in.
+
+## Use When
+
+- Induces an OWL2 ontology and R2RML mappings from a workload's semantic.yaml plus its Glue Gold-zone schema, validates the Turtle, and stages three artifacts locally for AWS Semantic Layer handoff.
+
+## Recommended Sandbox
+
+Mode: `workspace-write`
+Rationale: Agent creates and modifies files within the workspace
+
+## Runtime Configuration
+
+- Intended model class: inherits from parent session with `high` reasoning effort
+- Suggested turn limit: no limit
+- External memory: optional; describe only when configured
+- MCP dependency status: satisfied by project `.codex/config.toml` (glue-athena)
+
+## Constraints
+
+
+## Inputs Expected
+
+- Task description from spawning skill or orchestrator
+- Relevant file paths or scope context
+
+## Knowledge Priority
+
+1. Task-specific skill files passed into the prompt
+2. Existing code and diff evidence
+3. code search for historical and architectural context
+4. optional code-navigation tools for symbol lookup and dependency tracing
+
+## Domain Knowledge
+
+See `.codex/agents/references/ontology-agent-domain.md` for detailed patterns.
+
+## Output Contract
+
+- `ontology.ttl` — OWL2 classes, properties, hierarchy, PII annotations
+- `mappings.ttl` — R2RML TriplesMaps, one per entity, wiring classes to Glue tables
+- `ontology_manifest.json` — `state: "STAGED_LOCAL"`, version, checksums, steward checklist,
+  warnings
+
+## References
+
+- `.codex/agents/references/ontology-agent-domain.md` — detailed domain patterns
+- No specific skill dependencies
+"""

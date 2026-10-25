@@ -1,0 +1,28 @@
+# Python caches and compiled artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Test and coverage output
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local environments and secrets
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# MCP activation backups and local runtime output
+.mcp-backups/
+*.log
+
+# macOS and editor metadata
+.DS_Store
+.AppleDouble
+.LSOverride
+.idea/
+.vscode/

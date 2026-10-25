@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://adop.internal/contracts/v2/gold_spec.schema.json",
+  "title": "Gold Aggregation Spec",
+  "description": "Defines Silver-to-Gold transformation: KPIs, grain, schema type, aggregations, and approved passthrough controls.",
+  "type": "object",
+  "required": [
+    "dataset_name",
+    "schema_version",
+    "source_table",
+    "schema_type",
+    "grain",
+    "measures"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "dataset_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,40}$"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "v2"
+    },
+    "source_table": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schema_type": {
+      "type": "string",
+      "enum": ["star_schema", "flat_iceberg", "iceberg_dynamodb"]
+    },
+    "grain": {
+      "type": "object",
+      "required": ["dimensions", "temporal"],
+      "additionalProperties": false,
+      "properties": {
+        "dimensions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "minItems": 1
+        },
+        "temporal": {
+          "type": "string",
+          "enum": ["daily", "weekly", "monthly", "quarterly", "yearly", "none"]
+        }
+      }
+    },
+    "measures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "source_column", "aggregation"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "source_column": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "aggregation": {
+            "type": "string",
+            "enum": [
+              "sum",
+              "avg",
+              "count",
+              "min",
+              "max",
+              "count_distinct",
+              "first_value",
+              "percentile"
+            ]
+          },
+          "filter": { "type": "string" }
+        }
+      }
+    },
+    "dimensions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "source_column"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "source_column": { "type": "string" },
+          "scd_type": {
+            "type": "integer",
+            "enum": [1, 2]
+          }
+        }
+      },
+      "default": []
+    },
+    "quality_threshold": {
+      "type": "number",
+      "minimum": 0.95,
+      "maximum": 1.0,
+      "default": 0.95
+    },
+    "iceberg_database": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "iceberg_table": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "publish_via_gate": { "type": "boolean", "default": false },
+    "iceberg_partition_spec": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "output_tables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["fact", "dimension", "flat"]
+          },
+          "columns": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "atomic": { "type": "boolean" },
+          "business_key": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "freshness_sla_hours": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "derived_silver_columns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "expression"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "expression": { "type": "string", "minLength": 1 },
+          "description": { "type": "string" }
+        }
+      },
+      "default": []
+    },
+    "post_aggregation_columns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "expression"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "expression": { "type": "string", "minLength": 1 },
+          "description": { "type": "string" }
+        }
+      },
+      "default": []
+    },
+    "post_aggregation_filter": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

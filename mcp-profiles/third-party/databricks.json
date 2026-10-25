@@ -1,0 +1,14 @@
+{
+  "name": "databricks-native",
+  "enabled": false,
+  "description": "Optional Databricks native MCP service.",
+  "mcpServers": {
+    "databricks-native": {
+      "type": "http",
+      "url": "${DATABRICKS_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${DATABRICKS_MCP_TOKEN}"
+      }
+    }
+  }
+}

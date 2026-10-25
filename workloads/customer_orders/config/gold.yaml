@@ -1,0 +1,103 @@
+# spec_hash: f22e8e282cc1434dd007fe07f5a298de226d768039ed4e8b041b172731cc45cd
+# template_id: spec_yaml
+# template_hash: a193453cf6726f5e66fbeb0dfcd4c4a62ab711b3574853c26188fbc689472eea
+# schema_version: v2
+# rendered_at: 2026-10-22T18:18:44Z
+{
+  "dataset_name": "customer_orders",
+  "grain": {
+    "dimensions": [
+      "order_id"
+    ],
+    "temporal": "none"
+  },
+  "iceberg_database": "customer_orders_db",
+  "iceberg_partition_spec": [],
+  "iceberg_table": "gold_customer_orders",
+  "measures": [
+    {
+      "aggregation": "count",
+      "name": "order_count",
+      "source_column": "order_id"
+    },
+    {
+      "aggregation": "sum",
+      "name": "revenue",
+      "source_column": "revenue"
+    },
+    {
+      "aggregation": "first_value",
+      "name": "customer_id",
+      "source_column": "customer_id"
+    },
+    {
+      "aggregation": "first_value",
+      "name": "product_id",
+      "source_column": "product_id"
+    },
+    {
+      "aggregation": "first_value",
+      "name": "order_date",
+      "source_column": "order_date"
+    },
+    {
+      "aggregation": "first_value",
+      "name": "ship_date",
+      "source_column": "ship_date"
+    },
+    {
+      "aggregation": "first_value",
+      "name": "quantity",
+      "source_column": "quantity"
+    },
+    {
+      "aggregation": "first_value",
+      "name": "unit_price",
+      "source_column": "unit_price"
+    },
+    {
+      "aggregation": "first_value",
+      "name": "discount_pct",
+      "source_column": "discount_pct"
+    },
+    {
+      "aggregation": "first_value",
+      "name": "payment_method",
+      "source_column": "payment_method"
+    },
+    {
+      "aggregation": "first_value",
+      "name": "order_status",
+      "source_column": "order_status"
+    },
+    {
+      "aggregation": "first_value",
+      "name": "data_subject_id",
+      "source_column": "data_subject_id"
+    },
+    {
+      "aggregation": "first_value",
+      "name": "consent_given",
+      "source_column": "consent_given"
+    },
+    {
+      "aggregation": "first_value",
+      "name": "consent_timestamp",
+      "source_column": "consent_timestamp"
+    },
+    {
+      "aggregation": "first_value",
+      "name": "is_deleted",
+      "source_column": "is_deleted"
+    },
+    {
+      "aggregation": "first_value",
+      "name": "deletion_requested_at",
+      "source_column": "deletion_requested_at"
+    }
+  ],
+  "quality_threshold": 0.95,
+  "schema_type": "flat_iceberg",
+  "schema_version": "v2",
+  "source_table": "glue_catalog.customer_orders_db.silver_customer_orders"
+}

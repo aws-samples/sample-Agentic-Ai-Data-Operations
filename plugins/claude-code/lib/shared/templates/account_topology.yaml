@@ -1,0 +1,83 @@
+# Account Topology — shared contract for single-vs-multi AWS account deployments
+#
+# This file is both a schema reference and an example. Every prompt that
+# needs to know whether the platform / workload runs in one AWS account or
+# two produces or consumes an `account_topology` block matching the shape
+# below.
+#
+# Where this block lives:
+#   - Per workload: workloads/{name}/config/deployment.yaml#account_topology
+#   - Per platform: Airflow Variables:
+#       * glue_catalog_account_id
+#       * glue_catalog_assume_role_arn
+#       * glue_catalog_external_id   (optional)
+#   - In IaC generator run context: decisions[] entry with
+#     category="account_scope", plus Terraform/CDK variables.
+#
+# Rules enforced by downstream agents:
+#   * mode == "single"  -> jobs_account_id == catalog_account_id,
+#                          catalog_assume_role_arn is null. No provider
+#                          aliases, no CatalogId in generated Glue calls.
+#   * mode == "multi"   -> jobs_account_id MUST differ from
+#                          catalog_account_id; catalog_assume_role_arn
+#                          MUST be set. Every cross-account resource
+#                          references `provider = aws.catalog` (Terraform)
+#                          or equivalent, and generated PySpark + DAG +
+#                          deploy_to_aws.py carry catalog_account_id
+#                          through as a job arg / CLI flag / Airflow
+#                          Variable.
+#
+# Read-only to Account A catalog is supported. Write-back from Account B
+# jobs to Account A catalog is NOT supported by this topology today — see
+# docs/multi-account-deployment.md "Known Limits" for the RAM-share path
+# required if you need write-back.
+
+# -----------------------------------------------------------------------------
+# Example 1 — Single account (default)
+# -----------------------------------------------------------------------------
+account_topology:
+  mode: single
+  jobs_account_id: "123456789012"          # runs Glue jobs, MWAA, owns S3 + KMS
+  catalog_account_id: "123456789012"       # same as jobs_account_id
+  catalog_assume_role_arn: null
+  catalog_external_id: null
+  region: us-east-1
+
+# -----------------------------------------------------------------------------
+# Example 2 — Multi-account: jobs in B, catalog + Lake Formation in A
+# -----------------------------------------------------------------------------
+# account_topology:
+#   mode: multi
+#   jobs_account_id: "222222222222"        # Account B: Glue jobs, MWAA, S3, KMS
+#   catalog_account_id: "111111111111"     # Account A: Glue databases, LF-Tags
+#   catalog_assume_role_arn: "arn:aws:iam::111111111111:role/adop-catalog-reader"
+#   catalog_external_id: "adop-b-to-a"     # optional external ID for sts:AssumeRole
+#   region: us-east-1
+#
+# Pre-requisites (must be set up manually in AWS — see
+# docs/multi-account-deployment.md):
+#   1. Account A: IAM role `adop-catalog-reader` trusts Account B's Glue
+#      service role for sts:AssumeRole with the external ID.
+#   2. Account A: Lake Formation grants on target databases/tables to that
+#      role (DESCRIBE + SELECT at minimum).
+#   3. Account B: Glue service role has inline policy allowing sts:AssumeRole
+#      on the Account A role ARN.
+
+# -----------------------------------------------------------------------------
+# Fields
+# -----------------------------------------------------------------------------
+#   mode                       "single" | "multi"
+#   jobs_account_id            12-digit AWS account ID where Glue jobs, MWAA,
+#                              S3 buckets, KMS keys, and platform IAM roles
+#                              live. Always required.
+#   catalog_account_id         12-digit AWS account ID that owns the Glue
+#                              Data Catalog + Lake Formation. Equals
+#                              jobs_account_id in single mode.
+#   catalog_assume_role_arn    IAM role ARN in the catalog account that the
+#                              jobs account's Glue service role assumes to
+#                              read Glue + LF. Null in single mode.
+#   catalog_external_id        Optional external ID matching the trust
+#                              policy on catalog_assume_role_arn. Null or
+#                              omitted if the role doesn't require one.
+#   region                     AWS region. Both accounts must be in the
+#                              same region for Glue cross-account reads.

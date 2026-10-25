@@ -1,0 +1,14 @@
+{
+  "name": "snowflake-native",
+  "enabled": false,
+  "description": "Optional Snowflake native MCP endpoint.",
+  "mcpServers": {
+    "snowflake-native": {
+      "type": "http",
+      "url": "${SNOWFLAKE_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${SNOWFLAKE_MCP_TOKEN}"
+      }
+    }
+  }
+}

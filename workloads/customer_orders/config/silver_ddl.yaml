@@ -1,0 +1,113 @@
+# spec_hash: c8d97233ce1806d125a31e2efce0c1565479815f11c36aac9eb19116e9b51462
+# template_id: spec_yaml
+# template_hash: a193453cf6726f5e66fbeb0dfcd4c4a62ab711b3574853c26188fbc689472eea
+# schema_version: v1
+# rendered_at: 2026-10-22T18:18:44Z
+{
+  "dataset_name": "customer_orders",
+  "iceberg_database": "customer_orders_db",
+  "tables": [
+    {
+      "columns": [
+        {
+          "name": "order_id",
+          "type": "STRING"
+        },
+        {
+          "name": "customer_id",
+          "type": "STRING"
+        },
+        {
+          "name": "order_date",
+          "type": "DATE"
+        },
+        {
+          "name": "product_id",
+          "type": "STRING"
+        },
+        {
+          "name": "quantity",
+          "type": "INT"
+        },
+        {
+          "name": "unit_price",
+          "type": "DECIMAL(10,2)"
+        },
+        {
+          "name": "discount_pct",
+          "type": "DECIMAL(5,2)"
+        },
+        {
+          "name": "payment_method",
+          "type": "STRING"
+        },
+        {
+          "name": "order_status",
+          "type": "STRING"
+        },
+        {
+          "name": "ship_date",
+          "type": "DATE"
+        },
+        {
+          "name": "customer_email",
+          "type": "STRING"
+        },
+        {
+          "name": "customer_phone",
+          "type": "STRING"
+        },
+        {
+          "name": "customer_name",
+          "type": "STRING"
+        },
+        {
+          "name": "shipping_address",
+          "type": "STRING"
+        },
+        {
+          "name": "city",
+          "type": "STRING"
+        },
+        {
+          "name": "state",
+          "type": "STRING"
+        },
+        {
+          "name": "zip_code",
+          "type": "STRING"
+        },
+        {
+          "name": "credit_card_token",
+          "type": "STRING"
+        },
+        {
+          "name": "revenue",
+          "type": "DECIMAL(12,2)"
+        },
+        {
+          "name": "data_subject_id",
+          "type": "STRING"
+        },
+        {
+          "name": "consent_given",
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "consent_timestamp",
+          "type": "TIMESTAMP"
+        },
+        {
+          "name": "is_deleted",
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "deletion_requested_at",
+          "type": "TIMESTAMP"
+        }
+      ],
+      "name": "silver_customer_orders",
+      "zone": "silver"
+    }
+  ]
+}

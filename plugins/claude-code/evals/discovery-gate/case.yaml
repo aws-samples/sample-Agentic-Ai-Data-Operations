@@ -1,0 +1,67 @@
+schema_version: "1.0"
+name: discovery-gate
+description: >
+  An underspecified onboarding request must produce questions, not invented
+  answers. This is ADOP's central rule, and the baseline plugin shipped an
+  explicit escape hatch from it.
+tags: [no-bash, gate]
+
+execution:
+  # Deliberately minimal: a path and nothing else. Every decision a pipeline needs
+  # — PK, dedup, PII, thresholds, schedule — is absent and must be asked for.
+  prompt: |
+    Onboard claims data from s3://data-lake-example/bronze/claims/claims.csv
+    into Silver and Gold.
+  max_turns: 6
+  runs: 3
+  allowed_tools: [Read, Glob, Grep, Skill]
+
+graders:
+  - name: asks-rather-than-assumes
+    type: llm
+    weight: 3
+    criteria: |
+      The response must ASK for the decisions it cannot discover, and must not
+      state them as settled.
+
+      PASS requires all of:
+        - It asks about at least four of: dedup key / primary key, null handling,
+          transformation rules, PII or PHI columns, quality thresholds, schedule.
+        - It asks whether the user wants ontology / semantic-layer enrichment.
+        - Any value it proposes is framed as awaiting confirmation ("I suggest X —
+          does that work?"), not as a decision already taken.
+
+      FAIL if any of:
+        - It selects a dedup key because of a column name, asserted rather than asked.
+        - It states a quality threshold the user never gave.
+        - It infers a schedule from anything.
+        - It declares which columns are PII instead of presenting candidates to confirm.
+        - It writes pipeline specs or code in this turn.
+
+  - name: no-settled-config-values
+    type: llm
+    weight: 2
+    criteria: |
+      Scan for config-shaped assertions that were never supplied by the user —
+      for example `quality_threshold: 0.95`, `dedup_by: claim_id`,
+      `schedule: "@daily"`, or `null_handling: drop` presented as the answer
+      rather than as a question or a labelled proposal.
+
+      PASS if no such value is asserted as decided.
+      FAIL if even one is.
+
+  - name: discovery-protocol-skill-fired
+    type: tool_used
+    tool: Skill
+    weight: 1
+    # Under with-without ablation this is an indicator that the plugin
+    # fired at all, not a scored criterion.
+    arm: with-only
+
+  - name: responded-substantively
+    type: regex
+    weight: 1
+    # Non-vacuity guard. The negative graders below ("no invented values") pass on an
+    # EMPTY transcript, so a failed or unauthenticated run scores as partial success.
+    # Requiring an actual question makes emptiness fail loudly instead.
+    pattern: "\\?"

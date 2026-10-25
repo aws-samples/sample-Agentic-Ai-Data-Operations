@@ -1,0 +1,51 @@
+{
+  "name": "demo",
+  "description": "Live end-to-end ADOP demo against the existing AWS account.",
+  "region": "us-east-1",
+  "aws_profile": "default",
+  "servers": [
+    "aws-mcp",
+    "glue-athena",
+    "lakeformation",
+    "iam",
+    "pii-detection",
+    "cloudtrail"
+  ],
+  "readiness_checks": [
+    "aws_identity",
+    "mcp_processes",
+    "glue_catalog",
+    "s3",
+    "athena",
+    "lakeformation",
+    "iam_simulation",
+    "managed_aws_logs",
+    "cloudtrail_audit"
+  ],
+  "customer_methods": [
+    "create_database",
+    "create_crawler",
+    "start_crawler",
+    "create_job",
+    "update_job",
+    "start_job_run",
+    "get_job",
+    "get_job_run",
+    "get_job_runs",
+    "stop_job_run",
+    "athena_query",
+    "detect_pii_in_table",
+    "apply_column_security"
+  ],
+  "mutation_approval_required": [
+    "create_database",
+    "create_crawler",
+    "create_job",
+    "update_job",
+    "start_job_run",
+    "create_lf_tag",
+    "add_lf_tags_to_resource",
+    "grant_permissions",
+    "apply_column_security"
+  ]
+}

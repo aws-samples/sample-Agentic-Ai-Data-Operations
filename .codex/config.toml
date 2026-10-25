@@ -1,0 +1,17 @@
+# Default profile: AWS managed MCP through Agent Toolkit.
+# Specific AWS, provider-native, and ADOP custom servers remain opt-in in
+# .codex/config.optional.toml.
+
+[agents]
+
+[shell_environment_policy]
+set = { AWS_PROFILE = "default" }
+
+[mcp_servers."aws-mcp"]
+enabled = true
+command = "uvx"
+args = ["mcp-proxy-for-aws==1.6.0", "https://aws-mcp.us-east-1.api.aws/mcp", "--metadata", "AWS_REGION=us-east-1"]
+
+# Keep network access explicit; credentials come from the normal AWS chain.
+[sandbox_workspace_write]
+network_access = true

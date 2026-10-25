@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://adop.internal/contracts/v1/run_context.schema.json",
+  "title": "Run Context",
+  "description": "Authoritative per-run state shared by the orchestrator and every sub-agent. Written once by the orchestrator at the end of Phase 2 to workloads/{name}/run/context.json, then read-only. human_answers holds the Phase 1 gate answers verbatim and outranks anything a sub-agent receives in its prompt.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "workload_name",
+    "started_at",
+    "template_version",
+    "timestamp_mode",
+    "human_answers"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Correlates context.json, decisions.jsonl and trace_events.jsonl for this run"
+    },
+    "workload_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,40}$"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Run start. Generated artifacts use this, never datetime.now()"
+    },
+    "template_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "current_phase": {
+      "type": "string",
+      "pattern": "^([0-5](\\.[0-9]{1,2})?|complete)$",
+      "description": "Furthest phase or step the orchestrator has entered, e.g. \"4.3\". Read by the SessionStart hook to restore place after a compaction; a value of 5 or above (or \"complete\") means the run is no longer in flight."
+    },
+    "input_hash": {
+      "$ref": "#/$defs/short_hash"
+    },
+    "random_seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "timestamp_mode": {
+      "type": "string",
+      "enum": ["fixed"],
+      "description": "Only 'fixed' is valid — wall-clock timestamps break determinism"
+    },
+    "human_answers": {
+      "type": "object",
+      "description": "Phase 1 gate answers, recorded verbatim as the human stated them. Authoritative: a sub-agent MUST prefer these over any value interpolated into its prompt.",
+      "required": ["zones", "recorded_at"],
+      "additionalProperties": false,
+      "properties": {
+        "zones": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "enum": ["bronze", "silver", "gold"] }
+        },
+        "recorded_at": { "type": "string", "format": "date-time" },
+        "primary_key": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Columns the human named as the PK — never inferred"
+        },
+        "dedup_strategy": {
+          "type": "string",
+          "description": "Verbatim. Read by both Transformation (4.3) and Quality (4.4), which may run in parallel."
+        },
+        "null_handling": {
+          "type": "string",
+          "description": "Verbatim. Read by both Transformation (4.3) and Quality (4.4), which may run in parallel."
+        },
+        "transformations": {
+          "type": "string",
+          "description": "Derived columns, calculations, custom logic. Empty string only if the human explicitly said none."
+        },
+        "pii_columns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Confirmed by the human, not inferred from column names"
+        },
+        "compliance": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["GDPR", "CCPA", "HIPAA", "SOX", "PCI", "none"] }
+        },
+        "quality_thresholds": {
+          "type": "object",
+          "additionalProperties": { "type": "number", "minimum": 0, "maximum": 1 },
+          "description": "Per-zone or per-dimension thresholds as stated by the human"
+        },
+        "schedule": {
+          "type": "string",
+          "description": "Cron expression or preset, explicitly stated by the human"
+        },
+        "schedule_timezone": {
+          "type": "string",
+          "description": "IANA timezone for the schedule, stated by the human. dag_spec.schedule.timezone is required, so without this the DAG agent would have to invent one — ask instead."
+        },
+        "retention": { "type": "string" },
+        "gold_schema_choice": {
+          "type": "string",
+          "enum": ["star_schema", "flat_iceberg", "iceberg_dynamodb"]
+        },
+        "ontology_opt_in": { "type": "boolean" },
+        "ontology_use_cases": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "iac_target_framework": {
+          "type": "string",
+          "enum": ["terraform", "cdk_python", "cdk_typescript", "cloudformation"],
+          "description": "Asked by the orchestrator before spawning iac-agent. The agent has no AskUserQuestion, so if this is absent it must return status \"blocked\" rather than default to terraform."
+        },
+        "iac_tbac_principals": {
+          "type": "array",
+          "description": "Lake Formation tag-based grants, named by the human. Never defaulted, and never silently set to the current IAM caller — an empty list is a blocking issue, not permission to guess.",
+          "items": {
+            "type": "object",
+            "required": ["role_arn", "allowed_classifications"],
+            "additionalProperties": false,
+            "properties": {
+              "role_arn": { "type": "string" },
+              "allowed_classifications": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "enum": ["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
+                }
+              }
+            }
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Anything else the human said that a downstream agent should not lose"
+        }
+      }
+    },
+    "previous_phases": {
+      "type": "array",
+      "description": "Append-only record of completed phases. A sub-agent validates these checksums before trusting upstream artifacts.",
+      "items": {
+        "type": "object",
+        "required": ["phase", "agent", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "phase": { "type": "number" },
+          "agent": {
+            "type": "string",
+            "enum": ["data_onboarding", "metadata", "transformation", "quality", "dag", "ontology", "orchestrator"]
+          },
+          "output_hash": { "$ref": "#/$defs/short_hash" },
+          "status": { "type": "string", "enum": ["success", "failed", "partial"] },
+          "completed_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "short_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{16,64}$",
+      "description": "SHA-256 hex digest, truncated to 16 chars by compute_input_hash() or full 64"
+    }
+  }
+}

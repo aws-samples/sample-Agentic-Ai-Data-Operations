@@ -1,0 +1,58 @@
+schema_version: "1.0"
+name: quality-dimensions
+description: >
+  Quality rules must be classified under ADOP's five dimensions. The baseline
+  plugin substituted its own set, dropping Accuracy and Consistency, which makes
+  scores incomparable between workloads — the exact fragmentation ADOP exists to
+  prevent.
+tags: [no-bash, doctrine]
+
+execution:
+  prompt: |
+    I have a Silver table `orders` with columns: order_id, customer_email,
+    order_date, quantity, unit_price, discount_pct, total_amount, ship_state.
+
+    What data quality dimensions does ADOP use, and which dimension does each of
+    these checks belong to?
+      a) order_id is unique
+      b) customer_email contains an @
+      c) total_amount equals quantity * unit_price * (1 - discount_pct)
+      d) ship_state is a valid state code and agrees with the postal code
+      e) order_date is never null
+  max_turns: 5
+  runs: 3
+  allowed_tools: [Read, Glob, Grep, Skill]
+
+graders:
+  - name: names-adops-five-dimensions
+    type: regex
+    weight: 2
+    flags: s
+    pattern: "Completeness[\\s\\S]*Accuracy[\\s\\S]*Consistency[\\s\\S]*Validity[\\s\\S]*Uniqueness"
+
+  - name: classifies-each-check-correctly
+    type: llm
+    weight: 3
+    criteria: |
+      PASS requires the five dimensions to be exactly Completeness, Accuracy,
+      Consistency, Validity, Uniqueness — no substitutions, and no presenting
+      "Referential integrity" or "Anomaly" as one of the five.
+
+      Expected classification:
+        a) order_id unique            -> Uniqueness
+        b) email contains @           -> Validity
+        c) total = qty*price*(1-disc) -> Accuracy
+        d) state code agrees w/ postal-> Consistency
+        e) order_date never null      -> Completeness
+
+      Allow reasonable disagreement on (d) between Consistency and Validity, and on
+      (c) between Accuracy and Consistency, provided the dimension NAMES are ADOP's
+      five. FAIL if the five are wrong regardless of how the checks are mapped.
+
+  - name: states-the-zone-gates
+    type: llm
+    weight: 1
+    criteria: |
+      PASS if it states the Silver gate as 0.80 (80%) and the Gold gate as 0.95
+      (95%), and that a critical failure blocks promotion regardless of score.
+      FAIL if it gives different thresholds or omits the critical-failure rule.

@@ -1,0 +1,100 @@
+# spec_hash: 5a21ed46e316a70382e9981292ad9f5dcdba1775a3310b116fcdccbaaf8788c7
+# template_id: spec_yaml
+# template_hash: a193453cf6726f5e66fbeb0dfcd4c4a62ab711b3574853c26188fbc689472eea
+# schema_version: v2
+# rendered_at: 2026-10-22T18:18:44Z
+{
+  "catalog_database": "customer_orders_db",
+  "catalog_table": "bronze_customer_orders",
+  "compression": "snappy",
+  "dataset_name": "customer_orders",
+  "file_pattern": "*.csv",
+  "format_options": {
+    "delimiter": ",",
+    "header": true
+  },
+  "idempotency_key": "source_path",
+  "ingestion_mode": "full_load",
+  "landing_zone": "s3://${DATA_LAKE_BUCKET}/bronze/customer_orders/",
+  "partition_keys": [],
+  "retention": {
+    "days": 365
+  },
+  "schema_columns": [
+    {
+      "name": "order_id",
+      "type": "STRING"
+    },
+    {
+      "name": "customer_id",
+      "type": "STRING"
+    },
+    {
+      "name": "order_date",
+      "type": "DATE"
+    },
+    {
+      "name": "product_id",
+      "type": "STRING"
+    },
+    {
+      "name": "quantity",
+      "type": "INTEGER"
+    },
+    {
+      "name": "unit_price",
+      "type": "DECIMAL"
+    },
+    {
+      "name": "discount_pct",
+      "type": "DECIMAL"
+    },
+    {
+      "name": "payment_method",
+      "type": "STRING"
+    },
+    {
+      "name": "order_status",
+      "type": "STRING"
+    },
+    {
+      "name": "ship_date",
+      "type": "DATE"
+    },
+    {
+      "name": "customer_email",
+      "type": "STRING"
+    },
+    {
+      "name": "customer_phone",
+      "type": "STRING"
+    },
+    {
+      "name": "credit_card_number",
+      "type": "STRING"
+    },
+    {
+      "name": "customer_name",
+      "type": "STRING"
+    },
+    {
+      "name": "shipping_address",
+      "type": "STRING"
+    },
+    {
+      "name": "city",
+      "type": "STRING"
+    },
+    {
+      "name": "state",
+      "type": "STRING"
+    },
+    {
+      "name": "zip_code",
+      "type": "STRING"
+    }
+  ],
+  "schema_version": "v2",
+  "source_format": "csv",
+  "source_path": "${CUSTOMER_ORDERS_SOURCE_URI}"
+}

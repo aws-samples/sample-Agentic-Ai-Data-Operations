@@ -1,0 +1,11 @@
+dataset_name: replay_test
+schema_version: v1
+source_path: s3://raw-data/replay_test/
+source_format: csv
+landing_zone: s3://data-lake/replay_test/bronze/
+partition_keys: []
+compression: snappy
+format_options:
+  header: true
+  delimiter: ","
+ingestion_mode: full_load

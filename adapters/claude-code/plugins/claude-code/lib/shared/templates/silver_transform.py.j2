@@ -1,0 +1,464 @@
+{# template_id: silver_transform #}
+{# template_version: 1.3.0 #}
+{# required_slots: dataset_name, source_table, primary_key, dedup_strategy, quality_threshold, iceberg_database, iceberg_table #}
+{# schema_version: v1 #}
+{#
+  Iceberg partition columns.
+
+  DataFrameWriterV2.partitionedBy has signature (col: Column, *cols: Column) — varargs of
+  Column, not a list, and not strings. The previous emission was
+  `.partitionedBy({{ iceberg_partition_spec | tojson }})`, i.e. `.partitionedBy(["x"])`,
+  which raises at write time. Unpacking the list would not fix it either: the members have
+  to be Columns.
+
+  It was never caught because all four shipped workloads set `iceberg_partition_spec: []`,
+  which takes the else branch and emits no partitionedBy at all. The only way to reach the
+  bug is a non-empty spec, and nothing in the repo has one.
+
+  Identity partitioning only. An Iceberg transform such as days(ts) or bucket(16, id) is a
+  different call shape, and silver_spec's pattern ^[a-z][a-z0-9_]*$ forbids one anyway —
+  gold_spec's looser `type: string` does not, so an entry that is not a bare column name is
+  refused here rather than silently becoming a column literally named "days(ts)".
+#}
+{% macro partition_columns(spec) -%}
+{% for c in spec %}
+{% if not (c is string and c | length > 0 and c[0].isalpha() and c.replace("_", "").isalnum()) %}
+{{ unsupported("iceberg_partition_spec entry '" ~ c ~ "' is not a bare column name. "
+   ~ "partitionedBy here emits identity partitioning on F.col(name); an Iceberg transform "
+   ~ "like days(ts) or bucket(16, id) needs a different call and is not implemented. "
+   ~ "silver_spec's pattern already forbids it; gold_spec's type: string does not, which is "
+   ~ "how one could reach this.") }}
+{% endif %}
+{% endfor %}
+{%- for c in spec %}F.col("{{ c }}"){{ ", " if not loop.last }}{% endfor -%}
+{%- endmacro %}
+{#
+  Runtime parameters. CLAUDE.md security rule 2 keeps bucket names and secret IDs out of
+  source, so specs carry ${DATA_LAKE_BUCKET} and ${PHI_HASH_SALT_SECRET_ID}. Only
+  ${ADOP_LOGICAL_DATE} ever had a substitution step, so the rest reached rendered artifacts
+  as literal text: the quarantine prefix -- where cleartext PHI lands -- became a path named
+  after the placeholder, and _phi_salt() was handed "${PHI_HASH_SALT_SECRET_ID}" as a secret
+  ID, which no Secrets Manager lookup can resolve.
+
+  rt() emits either a plain literal or a _resolve() call, so a spec with no placeholders
+  renders byte-identically to before.
+#}
+{% set _params = runtime_placeholders(quarantine | default({}), pii_masking | default({})) %}
+{% macro rt(value, slot) -%}
+{% if _params %}_resolve({{ value | tojson }}, args, {{ slot | tojson }}){% else %}{{ value | tojson }}{% endif %}
+{%- endmacro %}
+import sys
+import hashlib
+{% if pre_pii_derived_columns is defined and pre_pii_derived_columns
+      and "${ADOP_LOGICAL_DATE}" in (pre_pii_derived_columns | map(attribute="expression") | join(" ")) %}
+import re
+{% endif %}
+from datetime import datetime
+{% if pii_masking is defined and pii_masking.enabled
+      and pii_masking.columns | selectattr("method", "equalto", "hash_salted") | list %}
+from functools import lru_cache
+{% endif %}
+from pathlib import Path
+
+from pyspark.sql import functions as F
+from pyspark.sql.window import Window
+from awsglue.context import GlueContext
+from awsglue.job import Job
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from shared.utils.structured_logger import StructuredLogger
+
+logger = StructuredLogger(
+    agent="silver_transform",
+    workload="{{ dataset_name }}",
+    run_id="standalone",
+)
+
+{% if pii_masking is defined and pii_masking.enabled
+      and pii_masking.columns | selectattr("method", "equalto", "hash_salted") | list %}
+
+@lru_cache(maxsize=None)
+def _phi_salt(secret_id: str) -> str:
+    """Fetch a hashing salt from Secrets Manager. Cached: one call per secret per run.
+
+    An unsalted SHA-256 of a low-cardinality identifier is not a one-way function in any
+    useful sense. A date of birth is roughly 40,000 candidate values, so the digest can be
+    reversed by enumerating them — and a plan member-id space is often smaller still. The
+    salt is what makes the digest irreversible without it.
+
+    Raises rather than falling back. A masking step that silently degrades to an
+    enumerable digest is worse than one that fails, because the spec, the LF-Tags and the
+    audit record would all still claim the column was protected.
+
+    The salt reaches Spark via F.lit(), so it is present in the query plan for the life of
+    the job. That is the accepted trade against a per-row UDF; it is never written to the
+    output, and only the secret ID appears in the spec.
+    """
+    import boto3
+
+    client = boto3.client("secretsmanager")
+    response = client.get_secret_value(SecretId=secret_id)
+    salt = response.get("SecretString")
+    if not salt:
+        raise RuntimeError(
+            f"Secret '{secret_id}' has no SecretString. PHI masking cannot proceed "
+            f"unsalted — that would emit an enumerable digest while the spec records a "
+            f"salted one."
+        )
+    return salt
+
+{% endif %}
+
+
+{% if _params %}
+def _resolve(value, args, slot):
+    """Substitute ${NAME} job arguments, and refuse to proceed if any survive."""
+    for name in ({% for p in _params %}"{{ p }}", {% endfor %}):
+        value = value.replace("${" + name + "}", args[name])
+    if "${" in value:
+        raise ValueError(
+            f"{slot} still holds an unresolved placeholder after substitution: {value!r}. "
+            f"Pass it as a Glue job argument. For quarantine this would write PHI to a "
+            f"prefix named after the placeholder; for a salt secret ID the lookup fails."
+        )
+    return value
+
+
+{% endif %}
+def transform(glue_context, args):
+    spark = glue_context.spark_session
+    logger.log("info", "transform_start", source="{{ source_table }}")
+
+    bronze_df = spark.table("{{ source_table }}")
+    input_rows = bronze_df.count()
+    logger.log("info", "input_count", rows=input_rows)
+
+{#
+  Null handling. Previously this step dropped rows with a null primary key
+  unconditionally and never read null_handling at all, so a human who answered
+  "allow" or "quarantine" got silent drops either way (finding M3). Worse, it made the
+  critical rule not_null_<pk> unfalsifiable: the offending rows were gone before the rule
+  could measure them, so it always scored 1.0 — a guardrail that cannot fail.
+
+  The checked set is primary_key plus null_handling.critical_columns. The primary key is
+  implicitly critical: a row without one cannot be deduped or joined to anything.
+#}
+{% set _nh = null_handling | default({}) %}
+{% set _strategy = _nh.strategy | default("drop_row") %}
+{% set _checked = (primary_key + (_nh.critical_columns | default([]))) | unique | list %}
+    # Null handling: {{ _strategy }} over {{ _checked | join(", ") }}
+    _null_in_checked = ({% for c in _checked %}F.col("{{ c }}").isNull(){{ " | " if not loop.last }}{% endfor %})
+    null_rows = bronze_df.filter(_null_in_checked).count()
+
+{% if _strategy == "drop_row" %}
+    bronze_df = bronze_df.filter(~_null_in_checked)
+    null_rows_dropped, null_rows_retained, null_rows_quarantined = null_rows, 0, 0
+{% elif _strategy == "quarantine" %}
+{% if not (quarantine is defined and quarantine.location is defined) %}
+{{ unsupported("null_handling.strategy is 'quarantine' but no quarantine.location is set, "
+   ~ "so the offending rows have nowhere to go. Without this the template would have to "
+   ~ "choose between dropping a row the human asked to keep for review and failing the "
+   ~ "run; it fails the render instead.") }}
+{% endif %}
+    if null_rows > 0:
+        # Appended, and written before the count is logged: a later run must not erase rows
+        # awaiting review, and a failed write must not read as "no offending rows".
+        bronze_df.filter(_null_in_checked).write.mode("append").parquet(
+            {{ rt(quarantine.location, "quarantine.location") }}
+        )
+    bronze_df = bronze_df.filter(~_null_in_checked)
+    null_rows_dropped, null_rows_retained, null_rows_quarantined = 0, 0, null_rows
+{% elif _strategy == "fill_default" %}
+{% for c in _checked %}
+{% if c not in (_nh.fill_values | default({})) %}
+{{ unsupported("null_handling.strategy is 'fill_default' but fill_values has no entry for "
+   ~ "'" ~ c ~ "'. The contract permits this — there is no conditional tying fill_default "
+   ~ "to fill_values (gap G-1) — so the spec validates while naming no default. Inventing "
+   ~ "one would put a value into a PHI-adjacent column that no human chose.") }}
+{% endif %}
+    bronze_df = bronze_df.withColumn(
+        "{{ c }}",
+        F.coalesce(F.col("{{ c }}"), F.lit({{ _nh.fill_values[c] | tojson }})),
+    )
+{% endfor %}
+    null_rows_dropped, null_rows_retained, null_rows_quarantined = 0, 0, 0
+{% elif _strategy == "allow" %}
+    # Nulls kept, as answered. not_null_<column> can now genuinely fail, which is the
+    # point — previously the rows were removed before any rule could measure them.
+    #
+    # Note for whoever reads the log: a null primary key here partitions with every other
+    # null under an ordered dedup strategy, so keep_latest/keep_first would collapse
+    # unrelated rows into one. null_rows_retained is reported so that is visible.
+    null_rows_dropped, null_rows_retained, null_rows_quarantined = 0, null_rows, 0
+{% else %}
+{{ unsupported("null_handling.strategy '" ~ _strategy ~ "' has no branch in this template. "
+   ~ "Implemented: drop_row, quarantine, fill_default, allow. Silently falling back to a "
+   ~ "drop is what this block used to do, and it overrode the one category of decision "
+   ~ "CLAUDE.md says the agent must never make for the human.") }}
+{% endif %}
+    after_pk_filter = bronze_df.count()
+
+{% if dedup_strategy == "drop_exact_duplicates_only" %}
+    # Deduplication: drop_exact_duplicates_only
+    #
+    # Two distinct things share the name "duplicate", and collapsing them loses
+    # information. A byte-identical row is redundant and safe to drop. Two rows sharing a
+    # primary key but differing in content are a genuine conflict: picking one by
+    # timestamp would silently discard a value nobody reviewed. So the first are dropped
+    # and the second are quarantined for a human.
+    exact_deduped_df = bronze_df.dropDuplicates()
+    exact_duplicates_removed = after_pk_filter - exact_deduped_df.count()
+
+    _pk_window = Window.partitionBy(
+{% for pk_col in primary_key %}
+        "{{ pk_col }}",
+{% endfor %}
+    )
+    _with_pk_count = exact_deduped_df.withColumn(
+        "_pk_occurrences", F.count(F.lit(1)).over(_pk_window)
+    )
+
+    conflicting_df = _with_pk_count.filter(F.col("_pk_occurrences") > 1).drop("_pk_occurrences")
+    deduped_df = _with_pk_count.filter(F.col("_pk_occurrences") == 1).drop("_pk_occurrences")
+
+    pk_conflicts_quarantined = conflicting_df.count()
+    if pk_conflicts_quarantined > 0:
+        # Written before the count is logged, so a write failure cannot be mistaken for
+        # "no conflicts". Append: a later run must not erase an unreviewed conflict.
+        conflicting_df.write.mode("append").parquet({{ rt(quarantine.location, "quarantine.location") }})
+{% elif dedup_strategy != "none" %}
+    # Deduplication: {{ dedup_strategy }}
+    window = Window.partitionBy(
+{% for pk_col in primary_key %}
+        "{{ pk_col }}",
+{% endfor %}
+{% if dedup_order_by is defined %}
+    ).orderBy(F.desc("{{ dedup_order_by }}"))
+{% else %}
+    ).orderBy(F.monotonically_increasing_id())
+{% endif %}
+    deduped_df = bronze_df \
+        .withColumn("_row_num", F.row_number().over(window)) \
+        .filter(F.col("_row_num") == 1) \
+        .drop("_row_num")
+{% else %}
+    deduped_df = bronze_df
+{% endif %}
+    dedup_rows = deduped_df.count()
+
+{% if type_casts is defined and type_casts %}
+    # Type casting
+    typed_df = deduped_df
+{% for cast in type_casts %}
+{% if cast.to_type == "DATE" %}
+    typed_df = typed_df.withColumn(
+        "{{ cast.column }}",
+        F.to_date(F.col("{{ cast.column }}"), "{{ cast.format | default('yyyy-MM-dd') }}")
+    )
+{% elif cast.to_type == "TIMESTAMP" %}
+    typed_df = typed_df.withColumn(
+        "{{ cast.column }}",
+        F.to_timestamp(F.col("{{ cast.column }}"), "{{ cast.format | default('yyyy-MM-dd HH:mm:ss') }}")
+    )
+{% elif cast.to_type == "DECIMAL" %}
+    typed_df = typed_df.withColumn(
+        "{{ cast.column }}",
+        F.col("{{ cast.column }}").cast("decimal({{ cast.params.precision | default(10) }},{{ cast.params.scale | default(2) }})")
+    )
+{% elif cast.to_type == "INTEGER" %}
+    typed_df = typed_df.withColumn(
+        "{{ cast.column }}",
+        F.col("{{ cast.column }}").cast("int")
+    )
+{% else %}
+    typed_df = typed_df.withColumn(
+        "{{ cast.column }}",
+        F.col("{{ cast.column }}").cast("{{ cast.to_type | lower }}")
+    )
+{% endif %}
+{% endfor %}
+{% else %}
+    typed_df = deduped_df
+{% endif %}
+
+{% if pre_pii_derived_columns is defined and pre_pii_derived_columns %}
+{% set _pre_pii_src = pre_pii_derived_columns | map(attribute="expression") | join(" ") %}
+{% if "${ADOP_LOGICAL_DATE}" in _pre_pii_src %}
+    #
+    # ${ADOP_LOGICAL_DATE} substitution.
+    #
+    # A pre-PII expression below is written against the run's logical date, not wall clock, so
+    # that a backfill of an old partition recomputes to the same value. The DAG passes it as
+    # --logical_date "{{ '{{ ds }}' }}". Resolve it here and fail loudly if it is absent or
+    # malformed: an unresolved token reaches F.expr() as the literal string
+    # '${ADOP_LOGICAL_DATE}', and with Glue's default ANSI mode off to_date() returns NULL
+    # rather than raising -- so the derived column silently becomes NULL on every row and any
+    # downstream age bucketing or date arithmetic is inert. The table still commits. That is
+    # the failure this guard exists to convert into a crash.
+    logical_date = (args.get("logical_date") or "").strip()
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", logical_date):
+        raise ValueError(
+            "silver_transform requires --logical_date as YYYY-MM-DD because a pre-PII derived "
+            "column references ${ADOP_LOGICAL_DATE}; got "
+            + repr(logical_date)
+            + ". Do NOT substitute current_date() -- that breaks backfill reproducibility."
+        )
+    logger.log("info", "logical_date_resolved", logical_date=logical_date)
+{% endif %}
+    # Pre-PII derived columns (computed before masking, e.g. extract domain from raw email)
+    pre_pii_df = typed_df
+{% for col_def in pre_pii_derived_columns %}
+    pre_pii_df = pre_pii_df.withColumn(
+        "{{ col_def.name }}",
+{% if "${ADOP_LOGICAL_DATE}" in col_def.expression %}
+        F.expr({{ col_def.expression | tojson }}.replace("${ADOP_LOGICAL_DATE}", logical_date))
+{% else %}
+        F.expr({{ col_def.expression | tojson }})
+{% endif %}
+    )
+{% endfor %}
+{% else %}
+    pre_pii_df = typed_df
+{% endif %}
+
+{% if pii_masking is defined and pii_masking.enabled %}
+    # PII masking
+    masked_df = pre_pii_df
+{% for col_mask in pii_masking.columns %}
+{% if col_mask.method == "hash" %}
+    masked_df = masked_df.withColumn(
+        "{{ col_mask.name }}",
+        F.sha2(F.col("{{ col_mask.name }}").cast("string"), 256)
+    )
+{% elif col_mask.method == "hash_salted" %}
+    masked_df = masked_df.withColumn(
+        "{{ col_mask.name }}",
+        F.sha2(
+            F.concat(
+                F.lit(_phi_salt({{ rt(col_mask.salt_secret_id, "pii_masking.salt_secret_id") }})),
+                F.col("{{ col_mask.name }}").cast("string"),
+            ),
+            256,
+        )
+    )
+{% elif col_mask.method == "redact" %}
+    masked_df = masked_df.withColumn(
+        "{{ col_mask.name }}",
+        F.lit("***REDACTED***")
+    )
+{% elif col_mask.method == "mask_partial" %}
+    masked_df = masked_df.withColumn(
+        "{{ col_mask.name }}",
+        F.concat(F.substring(F.col("{{ col_mask.name }}"), 1, 2), F.lit("****"))
+    )
+{% else %}
+{{ unsupported("pii_masking column '" ~ col_mask.name ~ "' asks for method '"
+   ~ col_mask.method ~ "', which this template has no branch for. Implemented: hash, "
+   ~ "hash_salted, redact, mask_partial. There was no else arm here, so the column was "
+   ~ "emitted with no masking applied at all while the spec, the LF-Tags and the audit "
+   ~ "record all recorded it as protected. A PHI column shipping in clear text must fail "
+   ~ "the render, not the review.") }}
+{% endif %}
+{% endfor %}
+{% else %}
+    masked_df = pre_pii_df
+{% endif %}
+
+{% if derived_columns is defined and derived_columns %}
+    # Derived columns (computed AFTER PII masking — sentinel cleanup, literals, partition keys)
+    derived_df = masked_df
+{% for col_def in derived_columns %}
+    derived_df = derived_df.withColumn(
+        "{{ col_def.name }}",
+        F.expr({{ col_def.expression | tojson }})
+    )
+{% endfor %}
+{% else %}
+    derived_df = masked_df
+{% endif %}
+
+{% if drop_columns is defined and drop_columns %}
+    # Drop original columns superseded by hashes / derived columns
+    final_df = derived_df.drop({% for c in drop_columns %}"{{ c }}"{% if not loop.last %}, {% endif %}{% endfor %})
+{% else %}
+    final_df = derived_df
+{% endif %}
+
+{#
+  publish_via_gate. Write to staging; the quality gate publishes.
+
+  This write used to be createOrReplace() on the real Silver table, immediately followed by
+  job.commit(), and only then did quality_check_silver start. So a masking rule marked CRITICAL
+  and blocking could not prevent unmasked PHI from being committed and queryable -- it could
+  only stop Gold from being built afterwards.
+
+  iceberg_table stays the real name: semantic.yaml, the LF-Tag grants and gold_spec.source_table
+  all reference it, and renaming it here would silently repoint them at staging.
+#}
+{% if publish_via_gate | default(false) %}
+    # Staging write. Publication is quality_check's job (quality_spec.gate_before_publish),
+    # which reads this table as TABLE_NAME and writes PROMOTE_TO only if the gate passes.
+    # Nothing publishes if that is not wired up — staged and unpublished is the safe failure.
+    table_name = "glue_catalog.{{ iceberg_database }}.{{ iceberg_table }}_staging"
+{% else %}
+    # Write to Iceberg Silver table
+    table_name = "glue_catalog.{{ iceberg_database }}.{{ iceberg_table }}"
+{% endif %}
+{% if iceberg_partition_spec is defined and iceberg_partition_spec %}
+    final_df.writeTo(table_name) \
+        .using("iceberg") \
+        .partitionedBy({{ partition_columns(iceberg_partition_spec) }}) \
+        .createOrReplace()
+{% else %}
+    final_df.writeTo(table_name) \
+        .using("iceberg") \
+        .createOrReplace()
+{% endif %}
+
+    output_rows = final_df.count()
+    logger.log("info", "transform_complete",
+        input_rows=input_rows,
+        pk_null_dropped=input_rows - after_pk_filter,
+        duplicates_removed=after_pk_filter - dedup_rows,
+{% if dedup_strategy == "drop_exact_duplicates_only" %}
+        # Split out, because one number cannot carry both meanings: the first are rows
+        # safely discarded, the second are rows a human still has to rule on. A single
+        # "duplicates_removed" would make an unreviewed conflict look like a clean drop.
+        exact_duplicates_removed=exact_duplicates_removed,
+        pk_conflicts_quarantined=pk_conflicts_quarantined,
+        quarantine_location={{ rt(quarantine.location, "quarantine.location") }},
+{% endif %}
+        output_rows=output_rows,
+        target_table=table_name,
+        quality_threshold={{ quality_threshold }})
+
+    return {
+        "workload": "{{ dataset_name }}",
+        "transformation": "bronze_to_silver",
+        "source": "{{ source_table }}",
+        "target": table_name,
+        "input_rows": input_rows,
+        "output_rows": output_rows,
+    }
+
+
+if __name__ == "__main__":
+{% if pre_pii_derived_columns is defined and pre_pii_derived_columns
+      and "${ADOP_LOGICAL_DATE}" in (pre_pii_derived_columns | map(attribute="expression") | join(" ")) %}
+    # logical_date is required, not optional: getResolvedOptions raises if the DAG omits it,
+    # which is the correct direction. See the ${ADOP_LOGICAL_DATE} note in transform().
+    args = getResolvedOptions(sys.argv, ["JOB_NAME", "logical_date"{% for p in _params %}, "{{ p }}"{% endfor %}])
+{% else %}
+    args = getResolvedOptions(sys.argv, ["JOB_NAME"{% for p in _params %}, "{{ p }}"{% endfor %}])
+{% endif %}
+    sc = SparkContext()
+    glue_context = GlueContext(sc)
+    job = Job(glue_context)
+    job.init(args["JOB_NAME"], args)
+    result = transform(glue_context, args)
+    job.commit()

@@ -1,0 +1,44 @@
+dataset_name: replay_test
+schema_version: v1
+rules:
+  completeness:
+    - rule_id: comp_record_id
+      column: record_id
+      check_type: not_null
+      threshold: 1.0
+      severity: critical
+    - rule_id: comp_amount
+      column: amount
+      check_type: not_null
+      threshold: 0.95
+      severity: warning
+  uniqueness:
+    - rule_id: uniq_record_id
+      column: record_id
+      check_type: unique
+      threshold: 1.0
+      severity: critical
+  validity:
+    - rule_id: valid_amount_range
+      column: amount
+      check_type: range
+      threshold: 0.90
+      severity: warning
+      params:
+        min: 0
+        max: 1000000
+quality_gates:
+  bronze_to_silver:
+    overall_score: 0.80
+    critical_failures: 0
+    action_on_failure: block
+  silver_to_gold:
+    overall_score: 0.95
+    critical_failures: 0
+    action_on_failure: block
+anomaly_detection:
+  enabled: true
+  methods:
+    - z_score
+    - volume_change
+  volume_threshold_pct: 20
