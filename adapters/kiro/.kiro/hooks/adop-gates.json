@@ -9,90 +9,113 @@
         "type": "command",
         "command": ".kiro/hooks/adop-hook.sh capture_user_turn.py"
       },
-      "timeout": 10,
+      "timeout_ms": 10000,
       "enabled": true
     },
     {
-      "name": "adop-inject-run-context",
-      "description": "Injects in-flight run state at session start so a resumed or compacted orchestrator recovers from disk instead of re-asking the human. Read-only, never blocks. NOTE: SessionStart was not observed firing during testing on Kiro IDE -- verify before relying on it.",
+      "name": "adop-inject-run-context-session",
+      "description": "Injects in-flight run state at session start so a resumed or compacted orchestrator recovers from disk instead of re-asking the human. Read-only, never blocks. SessionStart is the IDE-side activation trigger; the CLI equivalent is AgentSpawn, wired separately below. Whichever trigger the running surface does not implement is inert, so both are declared.",
       "trigger": "SessionStart",
       "action": {
         "type": "command",
         "command": ".kiro/hooks/adop-hook.sh inject_run_context.py"
       },
-      "timeout": 10,
+      "timeout_ms": 10000,
+      "enabled": true
+    },
+    {
+      "name": "adop-inject-run-context-spawn",
+      "description": "CLI counterpart of adop-inject-run-context-session. AgentSpawn fires when an agent is activated and carries no tool context; stdout is added to context on exit 0. Identical payload-free read of workloads/*/run/context.json.",
+      "trigger": "AgentSpawn",
+      "action": {
+        "type": "command",
+        "command": ".kiro/hooks/adop-hook.sh inject_run_context.py"
+      },
+      "timeout_ms": 10000,
       "enabled": true
     },
     {
       "name": "adop-block-credentials",
       "description": "Denies writes containing hardcoded credentials or infrastructure identifiers.",
       "trigger": "PreToolUse",
-      "matcher": "fs_write|write",
+      "matcher": "fs_write|write|fsWrite|str_replace|strReplace|fs_append|fsAppend",
       "action": {
         "type": "command",
         "command": ".kiro/hooks/adop-hook.sh block_credentials.py"
       },
-      "timeout": 10,
+      "timeout_ms": 10000,
       "enabled": true
     },
     {
       "name": "adop-enforce-template-codegen",
-      "description": "Denies hand-written pipeline artifacts under workloads/*/scripts/; those are rendered from schema-validated specs only.",
+      "description": "Denies hand-written pipeline artifacts under workloads/*/{scripts,dags,sql}/; those are rendered from schema-validated specs only. config/ stays writable because specs live there.",
       "trigger": "PreToolUse",
-      "matcher": "fs_write|write",
+      "matcher": "fs_write|write|fsWrite|str_replace|strReplace|fs_append|fsAppend",
       "action": {
         "type": "command",
         "command": ".kiro/hooks/adop-hook.sh enforce_template_codegen.py"
       },
-      "timeout": 10,
+      "timeout_ms": 10000,
       "enabled": true
     },
     {
       "name": "adop-phase-1-gate",
-      "description": "ENFORCING. Denies Kiro agent spawning until context.json and the explicit human discovery answers are complete.",
+      "description": "ENFORCING. Denies subagent spawning until context.json and the explicit human discovery answers are complete. 'subagent' is Kiro's built-in spawn tool; the regex also covers the camelCase and snake_case spellings other surfaces use.",
       "trigger": "PreToolUse",
-      "matcher": "Agent|agent|spawn_agent",
+      "matcher": "subagent|subAgent|spawn_agent|spawnAgent",
       "action": {
         "type": "command",
         "command": ".kiro/hooks/adop-hook.sh phase_gate.py"
       },
-      "timeout": 10,
+      "timeout_ms": 10000,
       "enabled": true
     },
     {
       "name": "adop-auditor-write-scope",
-      "description": "ENFORCING. Restricts the requirements-auditor to its report and append-only audit trace outputs.",
+      "description": "DEFENCE IN DEPTH. Restricts the requirements-auditor to its report and append-only audit trace outputs. Primary enforcement is the permissions.rules block in .kiro/agents/requirements-auditor.json, because Kiro does not put the calling agent's identity in the PreToolUse payload; this hook only adds a second layer when ADOP_AGENT_NAME is exported by the spawning process.",
       "trigger": "PreToolUse",
-      "matcher": "fs_write|write",
+      "matcher": "fs_write|write|fsWrite|str_replace|strReplace|fs_append|fsAppend|delete_file|deleteFile",
       "action": {
         "type": "command",
         "command": ".kiro/hooks/adop-hook.sh auditor_write_gate.py"
       },
-      "timeout": 10,
+      "timeout_ms": 10000,
       "enabled": true
     },
     {
       "name": "adop-validate-artifacts",
       "description": "ENFORCING. Syntax errors and credentials in a pending artifact are denied before the write. Every check runs on the payload content, so it does not need the file on disk.",
       "trigger": "PreToolUse",
-      "matcher": "fs_write|write",
+      "matcher": "fs_write|write|fsWrite|str_replace|strReplace|fs_append|fsAppend",
       "action": {
         "type": "command",
         "command": ".kiro/hooks/adop-hook.sh validate_artifacts.py"
       },
-      "timeout": 15,
+      "timeout_ms": 15000,
       "enabled": true
     },
     {
       "name": "adop-validate-artifacts-post",
-      "description": "ADVISORY. Second pass on the file as written, covering content that reached disk by a route with no tool_input (a bash heredoc, say). Kiro's PostToolUse cannot block, so findings are reported only.",
+      "description": "ADVISORY. Second pass on the file as written, for content that reached disk through the write tool. Kiro does not treat a non-zero exit on PostToolUse as a block, so findings are reported only.",
       "trigger": "PostToolUse",
-      "matcher": "fs_write|write",
+      "matcher": "fs_write|write|fsWrite|str_replace|strReplace|fs_append|fsAppend",
       "action": {
         "type": "command",
         "command": ".kiro/hooks/adop-hook.sh validate_artifacts.py"
       },
-      "timeout": 15,
+      "timeout_ms": 15000,
+      "enabled": true
+    },
+    {
+      "name": "adop-validate-artifacts-on-save",
+      "description": "ADVISORY. Covers content that reached disk by a route with no tool_input -- a shell heredoc, say -- which no PreToolUse write matcher can see. PostFileSave matches on the FILE PATH, and validate_artifacts falls back to reading the file, so this pass works without a tool payload. Advisory only: PostFileSave cannot block.",
+      "trigger": "PostFileSave",
+      "matcher": "workloads/.*\\.(py|sql|yaml|yml|json)$",
+      "action": {
+        "type": "command",
+        "command": ".kiro/hooks/adop-hook.sh validate_artifacts.py"
+      },
+      "timeout_ms": 15000,
       "enabled": true
     }
   ]

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">ADOP Strands</title>
+  <desc id="desc">A layered data pipeline symbol with an AWS-inspired orange accent.</desc>
+  <rect width="256" height="256" rx="48" fill="#16202a"/>
+  <path d="M48 72h160M48 128h160M48 184h160" stroke="#ff9900" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="72" cy="72" r="18" fill="#fff"/>
+  <circle cx="128" cy="128" r="18" fill="#fff"/>
+  <circle cx="184" cy="184" r="18" fill="#fff"/>
+  <path d="M72 90v20m56 36v20m56-56v20" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+</svg>

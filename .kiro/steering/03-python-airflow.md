@@ -1,11 +1,11 @@
 ---
-paths:
+inclusion: fileMatch
+fileMatchPattern:
   - "workloads/**/*.py"
   - "shared/**/*.py"
   - "dags/**/*.py"
   - "scripts/**/*.py"
 ---
-
 # Python & Airflow Conventions
 
 ## Python (DAGs & Scripts)

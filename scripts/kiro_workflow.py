@@ -164,7 +164,10 @@ def discovery_gate(workload: str) -> int:
                 if not _nonempty(answers.get(field)):
                     blockers.append(f"human_answers.{field} is missing for {zone}")
     for field in COMMON:
-        if not _nonempty(answers.get(field)):
+        if field == "ontology_opt_in":
+            if not isinstance(answers.get(field), bool):
+                blockers.append("human_answers.ontology_opt_in is required and must be boolean")
+        elif not _nonempty(answers.get(field)):
             blockers.append(f"human_answers.{field} is required")
     if answers.get("ontology_opt_in") is True and not _nonempty(
         answers.get("ontology_use_cases")
@@ -211,9 +214,20 @@ def status(workload: str) -> int:
 
 
 def render(args: list[str]) -> int:
-    renderer = ROOT / "adapters" / "kiro" / ".kiro" / "adop" / "render.sh"
-    if not renderer.is_file():
-        print(f"error: missing Kiro renderer: {renderer}", file=sys.stderr)
+    # The live Kiro surface comes first: it is the path the codegen gate's denial message
+    # tells the agent to run, so the driver and the gate must not disagree about which
+    # renderer is "the" renderer. adapters/ is the portable snapshot and only a fallback.
+    candidates = (
+        ROOT / ".kiro" / "adop" / "render.sh",
+        ROOT / "adapters" / "kiro" / ".kiro" / "adop" / "render.sh",
+    )
+    renderer = next((path for path in candidates if path.is_file()), None)
+    if renderer is None:
+        print(
+            "error: missing Kiro renderer; looked for "
+            + ", ".join(str(path.relative_to(ROOT)) for path in candidates),
+            file=sys.stderr,
+        )
         return 2
     return subprocess.call([str(renderer), *args], cwd=ROOT)
 

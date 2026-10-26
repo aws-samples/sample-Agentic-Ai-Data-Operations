@@ -1,0 +1,20 @@
+{
+  "name": "adop-local-plugins",
+  "interface": {
+    "displayName": "ADOP Local Plugins"
+  },
+  "plugins": [
+    {
+      "name": "adop-strands",
+      "source": {
+        "source": "local",
+        "path": "./plugins/adop-strands"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer tools"
+    }
+  ]
+}

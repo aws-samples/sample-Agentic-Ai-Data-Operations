@@ -1,9 +1,9 @@
 ---
-paths:
+inclusion: fileMatch
+fileMatchPattern:
   - "**/*.sql"
   - "workloads/**/sql/**"
 ---
-
 # SQL Conventions
 
 - Place SQL files in `workloads/{name}/sql/{zone}/`

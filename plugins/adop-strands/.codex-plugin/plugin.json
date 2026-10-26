@@ -1,0 +1,35 @@
+{
+  "name": "adop-strands",
+  "version": "0.1.0",
+  "description": "Run ADOP data-onboarding orchestration through AWS Strands Agents and Amazon Bedrock.",
+  "author": {
+    "name": "AWS Samples",
+    "url": "https://github.com/aws-samples"
+  },
+  "homepage": "https://github.com/aws-samples/sample-Agentic-Ai-Data-Operations",
+  "repository": "https://github.com/aws-samples/sample-Agentic-Ai-Data-Operations",
+  "license": "Apache-2.0",
+  "keywords": ["aws", "bedrock", "strands", "data-onboarding", "adop"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "ADOP Strands",
+    "shortDescription": "Run ADOP through AWS Strands and Bedrock",
+    "longDescription": "Provides the ADOP Strands runtime workflow, including discovery gates, Bedrock model selection, deterministic code generation, test gates, and trace verification.",
+    "developerName": "ADOP",
+    "category": "Developer tools",
+    "capabilities": ["Read", "Write"],
+    "logo": "./assets/adop-strands.svg",
+    "composerIcon": "./assets/adop-strands.svg",
+    "defaultPrompt": [
+      "Run the ADOP workload through the AWS Strands runtime.",
+      "Test the ADOP Strands integration with a real Amazon Bedrock call."
+    ]
+  },
+  "extensions": {
+    "com.openai": {
+      "publication": {
+        "release_notes": "Initial AWS Samples release of the ADOP Strands runtime plugin."
+      }
+    }
+  }
+}

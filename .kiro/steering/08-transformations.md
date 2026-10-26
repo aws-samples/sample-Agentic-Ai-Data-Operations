@@ -1,10 +1,10 @@
 ---
-paths:
+inclusion: fileMatch
+fileMatchPattern:
   - "workloads/**/scripts/**"
   - "workloads/**/sql/**"
   - "workloads/**/config/transformations.yaml"
 ---
-
 # Transformation Rules
 
 - Transformations MUST be **idempotent** — running twice produces identical output

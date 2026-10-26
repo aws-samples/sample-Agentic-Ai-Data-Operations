@@ -1,12 +1,14 @@
 # spec_hash: 5a21ed46e316a70382e9981292ad9f5dcdba1775a3310b116fcdccbaaf8788c7
 # template_id: bronze_ingestion
-# template_hash: c8bd1f930d39e436a46e76eb15ebf080b1be2f920e6a163d87d862d36e1c9a2e
+# template_hash: 42d1e36ed8a013289c6fc574ac7043df2c08d45d9062f937f218f5c7bde9a858
 # schema_version: v2
 # rendered_at: 2026-10-22T18:18:44Z
 import os
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 from awsglue.context import GlueContext
 from awsglue.job import Job
@@ -50,6 +52,27 @@ def _resolve(value, args, slot):
     return value
 
 
+# S3 bucket naming rules: 3-63 chars, lowercase letters, digits, dots and hyphens, starting
+# and ending with a letter or digit.
+_S3_BUCKET = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
+
+
+def _require_s3_uri(uri, slot):
+    """Refuse anything but a well-formed S3 URI once job arguments are substituted.
+
+    A prefix check alone accepts "s3://\nfile:///etc/passwd" or "s3://../x": the value
+    comes from a Glue job argument, so its shape is only known at runtime.
+    """
+    if any(ch in uri for ch in "\r\n\t\0"):
+        raise ValueError(f"{slot} contains control characters; refusing to read or write it.")
+    parsed = urlparse(uri)
+    if parsed.scheme not in ("s3", "s3a") or not _S3_BUCKET.match(parsed.netloc):
+        raise ValueError(f"{slot} must be s3://<valid-bucket>/<key>, got {uri!r}.")
+    if ".." in parsed.path.split("/"):
+        raise ValueError(f"{slot} contains a '..' path segment: {uri!r}.")
+    return uri
+
+
 def ingest(glue_context, args):
     _configure_logger(args)
     spark = glue_context.spark_session
@@ -78,6 +101,8 @@ def ingest(glue_context, args):
             f"a path under a home directory also leaks a username into the spec). Stage the "
             f"data in S3 and use s3:// or s3a://."
         )
+    _require_s3_uri(source_path, "source_path")
+    _require_s3_uri(landing_zone, "landing_zone")
 
     logger.log("info", "ingestion_start", source=source_path, format="csv")
 

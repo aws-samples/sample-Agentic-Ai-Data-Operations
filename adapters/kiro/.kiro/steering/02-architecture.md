@@ -25,12 +25,23 @@ MAIN CONVERSATION
 ## Key Rules
 
 - **MCP-First**: All AWS operations use MCP server tools first. Sub-agents do NOT have MCP
-  access — enforced by the `tools` list in `.kiro/agents/*.json`, not by convention.
-  The ontology agent is file-only and has no MCP/AWS access; the orchestrator must profile or
-  otherwise stage the confirmed Gold schema before invoking it.
+  access — enforced by `includeMcpJson: false` plus a `permissions.rules` deny on the `mcp`
+  capability in `.kiro/agents/*.json`, not by convention. A `deny` rule wins over any `allow`,
+  so this holds even if the `tools` list is later widened.
+  The ontology agent is file-only and has no MCP/AWS/shell access; the orchestrator must
+  profile or otherwise stage the confirmed Gold schema before invoking it.
+- **Demo profile**: Run `python3 scripts/mcp_demo.py check --profile demo` before
+  a live demonstration. Do not block on the unused 13-server inventory.
+- **Enabling a specialized server**: Kiro reads `.kiro/settings/mcp.json` only. The entries in
+  `.kiro/settings/mcp.optional.json` are inert until you copy the one you need into
+  `mcp.json`; there is no merge step and no profile switch. Third-party providers
+  (Snowflake, Databricks, Teradata) carry `"disabled": true` and require provider
+  authentication, a tool allowlist, and a Phase 0 health check before use.
 - **Agent model**: Data Onboarding Agent = main conversation. Metadata, Transformation,
-  Quality, DAG, Ontology = sub-agents defined in `.kiro/agents/` and spawned by name via the
-  `Agent` tool. Sub-agents cannot spawn peers (no `Agent`/`SendMessage` in their toolset).
+  Quality, DAG, Ontology = sub-agents defined in `.kiro/agents/` and spawned by name via
+  Kiro's built-in `subagent` tool. Sub-agents cannot spawn peers — a `permissions.rules` deny
+  on the `subagent` capability enforces that, so peer spawning fails at the harness rather
+  than relying on the prompt.
 - **Shared state**: sub-agents get a fresh context window; the run's shared state lives on
   disk in `workloads/{name}/run/`. See `.kiro/steering/11-shared-run-context.md`.
 - **Test gates**: Every sub-agent writes + passes tests before proceeding.

@@ -105,7 +105,32 @@
           "type": "string",
           "description": "IANA timezone for the schedule, stated by the human. dag_spec.schedule.timezone is required, so without this the DAG agent would have to invent one — ask instead."
         },
+        "source_path": {
+          "type": "string",
+          "description": "Bronze source location, explicitly confirmed by the human."
+        },
+        "credentials": {
+          "type": "string",
+          "description": "Bronze source credential reference, explicitly confirmed by the human; never a secret value."
+        },
+        "ingestion_pattern": {
+          "type": "string",
+          "description": "Bronze ingestion pattern, explicitly confirmed by the human."
+        },
         "retention": { "type": "string" },
+        "business_outcome": {
+          "type": "string",
+          "description": "Gold business outcome, explicitly confirmed by the human."
+        },
+        "kpis": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Gold KPIs, explicitly confirmed by the human."
+        },
+        "aggregation_grain": {
+          "type": "string",
+          "description": "Gold aggregation grain, explicitly confirmed by the human."
+        },
         "gold_schema_choice": {
           "type": "string",
           "enum": ["star_schema", "flat_iceberg", "iceberg_dynamodb"]

@@ -1,10 +1,10 @@
 ---
-paths:
+inclusion: fileMatch
+fileMatchPattern:
   - "**/*.yaml"
   - "**/*.yml"
   - "workloads/**/config/**"
 ---
-
 # YAML Configuration Conventions
 
 - Use the config schemas from `SKILLS.md` for `source.yaml`, `transformations.yaml`, `quality_rules.yaml`, and `schedule.yaml`

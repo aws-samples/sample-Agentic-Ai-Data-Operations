@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """ADOP enforce-template-codegen hook (deterministic codegen, non-negotiable).
 
-PreToolUse on Write/Edit/MultiEdit. Denies any direct write to generated artifact
-directories — workloads/*/scripts/, dags/, sql/ — so those files can only be
-produced by .kiro/adop/render.sh from a schema-validated spec.
+PreToolUse on Kiro's write tools (fs_write and its str_replace / fs_append forms).
+Denies any direct write to generated artifact directories — workloads/*/scripts/,
+dags/, sql/ — so those files can only be produced by .kiro/adop/render.sh from a
+schema-validated spec.
 
 Why this is unconditional
 -------------------------

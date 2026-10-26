@@ -1,6 +1,6 @@
 # Zone-Specific Discovery Questions
 
-When the user mentions Bronze/Silver/Gold work, identify the zone from their prompt and ask TARGETED questions for that zone. Use `AskUserQuestion` tool when possible.
+When the user mentions Bronze/Silver/Gold work, identify the zone from their prompt and ask TARGETED questions for that zone. Ask them in the conversation — Kiro has no structured question tool, so put the questions in your reply and wait for the human's answer before continuing. Record each answer with `python3 scripts/capture_user_turn.py` (see `12-requirements-audit.md`); nothing captures the Q&A for you.
 
 ## Protocol
 

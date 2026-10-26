@@ -68,11 +68,18 @@ def _nonempty(value: Any) -> bool:
 def _workload(payload: Mapping[str, Any]) -> str | None:
     tool_input = payload.get("tool_input")
     tool_input = tool_input if isinstance(tool_input, Mapping) else {}
+    # Kiro's built-in spawn tool is `subagent`; its tool_input carries the target agent
+    # name and the task prompt. The workload is not a first-class field, so it is read
+    # from an explicit key when the orchestrator supplies one, then from the environment,
+    # then recovered from the prompt text as a last resort.
     for value in (
         tool_input.get("workload_name"),
+        tool_input.get("workloadName"),
         payload.get("workload_name"),
         os.environ.get("ADOP_WORKLOAD"),
         tool_input.get("prompt"),
+        tool_input.get("message"),
+        tool_input.get("task"),
         payload.get("prompt"),
     ):
         if not isinstance(value, str):
@@ -111,7 +118,17 @@ def _blockers(workload: str) -> list[str]:
                 if not _nonempty(answers.get(field)):
                     blockers.append(f"human_answers.{field} is missing for {zone}")
     for field in COMMON:
-        if not _nonempty(answers.get(field)):
+        # ontology_opt_in is a boolean, so a legitimate opt-out (`false`) must satisfy the
+        # gate. Running it through _nonempty() treats false as "unanswered" and deadlocks
+        # every workload that declined the ontology step. Kept identical to the same
+        # branch in scripts/kiro_workflow.py: the two must agree or the hook blocks runs
+        # the driver passes.
+        if field == "ontology_opt_in":
+            if not isinstance(answers.get(field), bool):
+                blockers.append(
+                    "human_answers.ontology_opt_in is missing and must be boolean"
+                )
+        elif not _nonempty(answers.get(field)):
             blockers.append(f"human_answers.{field} is missing")
     if answers.get("ontology_opt_in") is True and not _nonempty(
         answers.get("ontology_use_cases")

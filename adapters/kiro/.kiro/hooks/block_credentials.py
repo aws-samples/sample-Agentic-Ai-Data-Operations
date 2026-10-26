@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """ADOP block-credentials hook (invariant: no-credentials-in-code).
 
-PreToolUse on Write/Edit/MultiEdit. Inspects the content the model is ABOUT to
-write and denies the tool call if it carries a hardcoded credential, so the
-secret never reaches disk.
+PreToolUse on Kiro's write tools (fs_write and its str_replace / fs_append
+forms). Inspects the content the model is ABOUT to write and denies the tool
+call if it carries a hardcoded credential, so the secret never reaches disk.
 
-This exists separately from validate_artifacts.py because that hook is
-PostToolUse: by the time it runs, the file has already been written, and a
-"block" there only informs the model — it does not prevent the leak. For
-syntax and best-practice findings that is fine; for a credential it is not.
+This exists separately from validate_artifacts.py because that gate also runs
+on PostToolUse and PostFileSave, where the file has already been written and a
+"block" only informs the model — it does not prevent the leak. For syntax and
+best-practice findings that is fine; for a credential it is not.
 
 validate_artifacts.py still carries the same credential check as defence in
 depth, since content can reach disk by routes this hook does not see (a
-heredoc via Bash, for example).
+heredoc via the shell tool, for example, which no write matcher matches).
 
 Scope: files under workloads/ only. The plugin's remit is ADOP-generated
 artifacts, and a PreToolUse deny is disruptive — policing every file in the

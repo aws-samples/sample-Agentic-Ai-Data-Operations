@@ -107,6 +107,7 @@ class AgentResult:
 # A runner takes (argv, timeout_s) and returns (returncode, stdout, stderr).
 # Injectable so the driver can be unit-tested / dry-run without the real q CLI.
 RunnerFn = Callable[[List[str], int], "tuple[int, str, str]"]
+AgentBackendFn = Callable[[AgentInvocation], AgentOutput]
 
 
 def _subprocess_runner(argv: List[str], timeout_s: int) -> "tuple[int, str, str]":
@@ -128,6 +129,7 @@ class WorkflowDriver:
         q_bin: str = "q",
         model_map: Optional[Dict[str, str]] = None,
         runner: RunnerFn = _subprocess_runner,
+        agent_backend: Optional[AgentBackendFn] = None,
         logger: Optional[OrchestratorLogger] = None,
         max_attempts: int = 3,
     ):
@@ -137,6 +139,7 @@ class WorkflowDriver:
         self.q_bin = q_bin
         self.model_map = model_map or {}
         self.runner = runner
+        self.agent_backend = agent_backend
         self.max_attempts = max_attempts
         self.logger = logger or OrchestratorLogger(workload, run_id)
         self.handoff_dir = self.repo_root / "workloads" / workload / ".handoffs"
@@ -181,6 +184,28 @@ class WorkflowDriver:
         # Remove any stale handoff so we never read a previous run's result.
         if handoff_path.exists():
             handoff_path.unlink()
+
+        if self.agent_backend is not None:
+            try:
+                output = self.agent_backend(inv)
+                handoff_path.write_text(output.to_json(), encoding="utf-8")
+            except Exception as exc:
+                return AgentResult(
+                    agent=inv.agent,
+                    ok=False,
+                    reason=f"agent backend failed: {exc}",
+                    handoff_path=str(handoff_path),
+                )
+            return AgentResult(
+                agent=inv.agent,
+                ok=output.status != "failed",
+                reason="" if output.status != "failed" else (
+                    f"agent status={output.status}, blocking={output.blocking_issues}"
+                ),
+                output=output,
+                returncode=0,
+                handoff_path=str(handoff_path),
+            )
 
         argv = self.build_command(inv, handoff_path)
         try:
@@ -311,6 +336,39 @@ class WorkflowDriver:
         target = (self.repo_root / success_file) if not Path(success_file).is_absolute() else Path(success_file)
         if target.exists():
             target.unlink()
+        if self.agent_backend is not None:
+            try:
+                output = self.agent_backend(inv)
+            except Exception as exc:
+                return AgentResult(
+                    agent=inv.agent,
+                    ok=False,
+                    reason=f"agent backend failed: {exc}",
+                )
+            if not target.exists():
+                return AgentResult(
+                    agent=inv.agent,
+                    ok=False,
+                    reason=f"expected artifact '{success_file}' not written",
+                    output=output,
+                )
+            ok, reason = True, ""
+            if reject_if_contains:
+                content = target.read_text(errors="replace")
+                hit = _blocking_markers(content, reject_if_contains)
+                if hit:
+                    ok, reason = False, f"artifact contains blocking markers: {hit}"
+            return AgentResult(
+                agent=inv.agent,
+                ok=ok and output.status != "failed",
+                reason=reason or (
+                    f"agent status={output.status}, blocking={output.blocking_issues}"
+                    if output.status == "failed" else ""
+                ),
+                output=output,
+                returncode=0,
+                handoff_path=str(target),
+            )
         argv = self.build_command(inv, None)
         try:
             returncode, stdout, stderr = self.runner(argv, inv.timeout_s)
@@ -323,7 +381,7 @@ class WorkflowDriver:
         ok, reason = True, ""
         if reject_if_contains:
             content = target.read_text(errors="replace")
-            hit = [m for m in reject_if_contains if m in content]
+            hit = _blocking_markers(content, reject_if_contains)
             if hit:
                 ok, reason = False, f"artifact contains blocking markers: {hit}"
         return AgentResult(agent=inv.agent, ok=ok, reason=reason,
@@ -416,6 +474,18 @@ class WorkflowDriver:
 
 
 # ── module-level helpers ────────────────────────────────────────────────
+
+def _blocking_markers(content: str, markers: Sequence[str]) -> List[str]:
+    """Markers present in content, ignoring markdown emphasis and case.
+
+    Reviewers write `**Severity:** HIGH`; a raw substring check for
+    `Severity: HIGH` misses it and would let a HIGH finding through.
+    """
+    import re
+
+    plain = re.sub(r"[*_`]", "", content).lower()
+    return [m for m in markers if re.sub(r"[*_`]", "", m).lower() in plain]
+
 
 def _parse_pytest_counts(stdout: str) -> Dict[str, int]:
     """Best-effort parse of pytest's summary line for REPORTING only.
@@ -541,6 +611,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     p.add_argument("--repo-root", default=".", help="Repo root (default: cwd).")
     p.add_argument("--run-id", default=None, help="Run id (default: random UUID).")
     p.add_argument("--q-bin", default="q", help="q CLI binary (default: q).")
+    p.add_argument("--runtime", choices=("q", "strands"), default="q",
+                   help="agent runtime backend (default: q).")
+    p.add_argument("--region", default=None, help="AWS region for the Strands Bedrock model.")
+    p.add_argument("--model", default=None, help="Bedrock model ID for the Strands runtime.")
     p.add_argument("--ontology", action="store_true", help="Run the ontology stage.")
     p.add_argument("--no-review", action="store_true", help="Skip the adversarial review stage.")
     p.add_argument("--model-top", default=None, help="Model ID for HIPAA/SOX/PCI builds.")
@@ -562,10 +636,21 @@ def main(argv: Optional[List[str]] = None) -> int:
     model = build_model_for_regulation(args_obj.get("regulation"), model_map)
     tasks = build_default_tasks(args_obj, model=model)
     runner = make_dry_run_runner(repo_root) if ns.dry_run else _subprocess_runner
+    agent_backend = None
+    if ns.runtime == "strands":
+        from runtimes.strands.adop_strands.runner import StrandsRunner
+        agent_backend = StrandsRunner(
+            repo_root,
+            region=ns.region,
+            model_id=ns.model,
+            dry_run=ns.dry_run,
+            workload=workload,
+            run_id=run_id,
+        ).invoke
 
     driver = WorkflowDriver(
         workload, run_id, repo_root=repo_root, q_bin=ns.q_bin,
-        model_map=model_map, runner=runner,
+        model_map=model_map, runner=runner, agent_backend=agent_backend,
     )
     results = driver.run_build(
         tasks,

@@ -10,7 +10,7 @@ artifacts and evidence.
 
 ![ADOP overview](docs/diagrams/adop-overview.png)
 
-## One goal, four platform paths
+## One goal, four client paths plus optional Strands
 
 Claude Code, Codex, Amazon Q Developer, and Kiro use different native
 interfaces but follow the same contracts, phases, guardrails, tests, and audit
@@ -22,6 +22,7 @@ model.
 | Codex | `AGENTS.md`, `.codex/` | `$command-onboard-workflow [REGULATION]` |
 | Amazon Q Developer | `AmazonQ.md`, `.amazonq/` | `q chat --agent adop-orchestrator` |
 | Kiro | `.kiro/` | `python3 scripts/kiro_workflow.py init --workload <name>` |
+| Headless AWS Strands | `scripts/run_strands.py` | `python3 scripts/run_strands.py run --args <args.json> --region <region> --model <model-id>` |
 
 Shared behavior:
 
@@ -34,6 +35,13 @@ Shared behavior:
 Platform-specific behavior is kept in the native root folders and portable
 snapshots under [`adapters/`](adapters/). The Claude Code plugin is separately
 installable for use from another repository.
+
+The platforms coexist in one checkout. Each has its own hook wiring
+(`.claude/settings.json`, `.codex/hooks.json`, `.kiro/hooks/adop-gates.json`,
+`.amazonq/cli-agents/`), and all of them call the same `shared/` renderer,
+contracts, and auditor. When you change a root surface such as `.kiro/hooks/`,
+copy the change to its `adapters/` snapshot. `sync_platforms.py check` verifies
+that required files exist, not that their contents match.
 
 ## Quick start
 
@@ -54,6 +62,10 @@ Open the repository with one supported client:
   `q chat --agent adop-orchestrator`.
 - Kiro: initialize with
   `python3 scripts/kiro_workflow.py init --workload <name>`.
+- Headless Strands: install the optional dependency with
+  `pip install -e '.[strands]'`, then run
+  `python3 scripts/run_strands.py status` followed by the `run` command above.
+  See [Headless AWS Strands runtime](#headless-aws-strands-runtime).
 
 ### Claude Code plugin
 
@@ -63,6 +75,39 @@ preflight, and invoke `/adop:onboard-workflow`.
 
 Codex, Amazon Q, and Kiro use their native project surfaces; they do not
 require the Claude plugin.
+
+### Headless AWS Strands runtime
+
+[`runtimes/strands/`](runtimes/strands/) runs the Phase 4 build sub-agents
+in-process with the [AWS Strands Agents SDK](https://strandsagents.com) on
+Amazon Bedrock. It plugs into the same `WorkflowDriver` as the Amazon Q path
+(`shared/orchestration/workflow_driver.py`, `--runtime strands`), so the
+build order, pytest test gates, retries, and traces are identical.
+
+| Aspect | Behavior |
+|---|---|
+| Scope | Phase 4 only: metadata ‖ quality → transform → DAG → optional ontology → reviewer. Phases 0–2 and 5 stay in a human-facing client, so discovery must be complete first. |
+| Agent definitions | Loaded from `.amazonq/cli-agents/adop-*.json` (prompt, resources, `fs_write` allowlist) |
+| Tools | `fs_read`, `fs_write`, `run_pytest_gate`, `render_artifact`. There is no shell tool and no MCP. |
+| Write guards | No writes to `scripts/`, `dags/`, `sql/` (use `render_artifact`); no `.py` outside `workloads/*/tests/`; orchestrator-owned run state (`run/context.json`, `run/requirements.jsonl`, discovery markers) is read-only |
+| Handoff | Strands structured output validated as `AgentOutput`. The runner stamps `agent_name`, `workload_name`, `run_id`, and timestamps itself rather than trusting the model. |
+| Review gate | Blocks on `Severity: HIGH` in `reviews/security-findings.md`, ignoring markdown emphasis and case |
+| Dependency | Optional extra `strands` (`strands-agents==1.62.0`); nothing else imports it |
+
+```bash
+pip install -e '.[strands]'
+python3 scripts/run_strands.py status                       # list loadable agents
+python3 scripts/run_strands.py run --args args.json --dry-run   # offline contract check
+python3 scripts/run_strands.py run --args args.json \
+  --region us-east-1 --model <bedrock-model-id> --run-id <id>    # live Bedrock run
+```
+
+`args.json` is the onboarding args object produced after discovery (see
+`.claude/commands/onboard-workflow.md`). A live run makes Bedrock calls and
+writes workload artifacts, so run it on a workload whose files you can
+review and revert. The ontology agent's Glue `get_table` tool is not yet
+wired through Strands, and AgentCore Runtime deployment is not implemented.
+The `strands-agentcore` extra is reserved for that.
 
 ## Prompt format
 
@@ -129,7 +174,8 @@ Human approval → deployment → verification
 ```
 
 Specialist agents have narrow responsibilities and cannot bypass the human
-gate. Sub-agents generate and test artifacts; they do not use AWS or MCP.
+gate. Sub-agents generate and test artifacts. They do not use AWS or MCP, with
+one exception: the ontology agent has read-only Glue `get_table`.
 
 ## AI Clone Decision Engine
 
@@ -212,6 +258,120 @@ Each workload records the source contract in
 Contracts are created and confirmed before artifact generation. Generated
 artifacts are evidence of the contract; they cannot override it.
 
+Implementation status: the source contract accepts `jdbc`, `kafka`, and
+`kinesis`, but the `bronze_ingestion` template reads only file sources
+(`csv`, `parquet`, `json`, `avro`, `orc`) from S3. Those three types are
+contract-level only until an ingestion template exists for them.
+
+### How contracts are wired
+
+One chain connects each contract to the code that enforces it. Extending a
+contract means extending every link in it.
+
+```text
+contracts/vN/<type>.schema.json    shape of the spec (JSON Schema 2020-12)
+  ↓ SPEC_TYPE_TO_SCHEMA            shared/codegen/spec_loader.py: spec type → schema file
+  ↓ workloads/<wl>/config/*.yaml   spec instance; its "schema_version" picks vN
+  ↓ shared/templates/<id>.j2       header declares template_id, version,
+  ↓                                required_slots, schema_version
+  ↓ renderer.render()              validates slots, refuses unsupported values,
+  ↓                                writes artifact + 5-line provenance header
+  ↓ drift_validator                template_id → spec type → spec file; re-renders
+                                   and compares bytes
+```
+
+| Contract | Schema | Spec file | Template(s) | Produced by |
+|---|---|---|---|---|
+| Source | `source_profile` | `config/source.yaml` | none (input to Bronze) | metadata agent |
+| Bronze zone | `bronze_spec` (v1, v2) | `config/bronze.yaml` | `bronze_ingestion` | transformation agent |
+| Silver zone | `silver_spec` | `config/silver.yaml` | `silver_transform`, `iceberg_ddl` | transformation agent |
+| Gold zone / target | `gold_spec` (v1, v2) | `config/gold.yaml` | `gold_aggregate`, `iceberg_ddl` | transformation agent |
+| Quality | `quality_spec` | `config/quality_rules.yaml` | `quality_check` | quality agent |
+| Orchestration | `dag_spec` (v1, v2) | `config/schedule.yaml` | `airflow_dag`, `glue_job_config` | DAG agent |
+| Run state | `run_context` | `run/context.json` | none | orchestrator only |
+
+### Extending contracts
+
+Versioning rule (see [`contracts/README.md`](contracts/README.md)): a
+published schema is immutable. Adding an optional field with a default is
+allowed in place. Adding or removing a required field means a new version
+directory (`v2` added required catalog and idempotency fields to
+`bronze_spec`). Specs choose their version through `schema_version`.
+
+**New data source** (for example, JDBC ingestion or a SaaS API):
+
+1. Add the type to `source.type` (and `format` if needed) in
+   `source_profile.schema.json`, plus any source-specific fields. Credentials
+   are always a reference (`credentials.type` + `connection_id`), never a value.
+2. Add the source's discovery questions to
+   `.claude/rules/00-zone-questions.md` and its copies in
+   `.kiro/steering/` and `.amazonq/rules/`. Codex has no copy of this file;
+   update `AGENTS.md` and `.codex/skills/command-onboard-workflow/`. List the
+   source's required decisions in the source table above.
+3. Add an ingestion branch to `bronze_ingestion.py.j2`, or a new template,
+   behind a version bump. Use `unsupported()` for any value the branch can't
+   implement. Keep the runtime input guard: the S3 check applies only to
+   file sources.
+4. If discovery needs a provider MCP server, add it to
+   `tool-registry/servers.yaml` and a profile under `mcp-profiles/`
+   (disabled by default) with a Phase 0 health check.
+5. Add tests: schema accept/reject cases, a render test, and a refusal test
+   for unsupported values.
+
+**New zone or zone capability** (for example, a new Silver dedup mode or an
+extra curated layer):
+
+1. A new enum value or optional field goes into the zone's schema. For
+   example, `silver_spec.dedup_strategy` is currently `keep_latest`,
+   `keep_first`, `drop_exact_duplicates_only` or `none`. A new required field
+   means a new version.
+2. A new zone gets its own `<zone>_spec.schema.json`, an entry in
+   `SPEC_TYPE_TO_SCHEMA`, a template with header metadata, and an entry in
+   `drift_validator._template_id_to_spec_type` and `_find_spec_file`.
+3. Define its quality gate (Silver ≥ 0.80 and Gold ≥ 0.95 today) in
+   `quality_spec` and the Cedar policies under `shared/policies/`. Gates can't
+   be bypassed.
+4. Add the zone's questions to the discovery rules and its fields to
+   `run_context.human_answers`. The human supplies them, and sub-agents only
+   translate them.
+5. Update the sub-agent that produces the spec. Its definition exists once per
+   platform: `.claude/agents/`, `.codex/agents/`, `.amazonq/cli-agents/`, and
+   `.kiro/agents/`.
+
+**New data target** (for example, a new Gold serving shape or a non-Glue backend):
+
+1. A new Gold serving shape is a new `gold_spec.schema_type` value (today
+   `star_schema`, `flat_iceberg`, `iceberg_dynamodb`) plus a branch in
+   `gold_aggregate.py.j2` and the DDL template.
+2. A new execution backend (EMR Spark, dbt/Snowflake, Databricks) should keep
+   the zone specs unchanged. Put backend settings in a separate,
+   versioned execution-target contract and add backend-specific templates.
+   Neither exists yet. See
+   [Dynamic routing and BYO technology stack](#dynamic-routing-and-byo-technology-stack).
+3. Extend post-deployment verification
+   (`shared/utils/post_deployment_verifier.py`) and the requirements auditor
+   so the target's tables, jobs and grants show up as evidence.
+
+After any template change, re-render the affected artifacts, then run
+`python3 -m shared.codegen.drift_validator workloads/<wl>` and the test suites.
+
+### Generated-code guardrails
+
+Everything under `workloads/*/scripts/`, `dags/`, and `sql/` is rendered by
+`shared.codegen.renderer.render()` and checked by
+`shared.codegen.drift_validator`. A template edit therefore requires
+re-rendering the affected artifacts. The templates refuse unsafe spec values
+at render time rather than emitting them:
+
+- `quality_check`: a `custom_sql` predicate containing `;`, `--`, `/*`, or a
+  DDL/DML/DCL keyword (DROP, CREATE, ALTER, TRUNCATE, INSERT, UPDATE, DELETE,
+  MERGE, GRANT, REVOKE) is rejected; `F.expr()` takes one boolean expression.
+- `bronze_ingestion`: after Glue job arguments are substituted, `source_path`
+  and `landing_zone` must be well-formed S3 URIs. Control characters, other
+  schemes, invalid bucket names, and `..` segments are rejected.
+
+Tests: `shared/tests/unit/test_codegen_security_guards.py`.
+
 ## Dynamic workflows
 
 | Platform | Onboarding | Production readiness |
@@ -220,6 +380,7 @@ artifacts are evidence of the contract; they cannot override it.
 | Codex | `$command-onboard-workflow [REGULATION]` | `$command-devops-workflow [WORKLOAD] [FRAMEWORK]` |
 | Amazon Q | `q chat --agent adop-orchestrator` | `q chat --agent adop-devops` |
 | Kiro | `kiro_workflow.py init`, `gate`, `audit` | Kiro DevOps agent after workload gates |
+| Headless Strands | `run_strands.py run` (Phase 4 build after discovery) | Not covered |
 
 The native definitions are under `.claude/commands/`,
 `.codex/skills/`, `.amazonq/cli-agents/`, and `.kiro/`.
@@ -259,6 +420,7 @@ for the disabled profiles and provider-specific setup references.
 adapters/                           Portable platform snapshots
 contracts/                          Versioned workload schemas
 shared/                             Renderer, audit, logging, policies, utilities
+runtimes/strands/                   Optional headless AWS Strands build runtime
 mcp-profiles/                       Default, demo, and disabled provider profiles
 mcp-servers/                        Repository-owned FastMCP servers
 tool-registry/                      MCP capabilities and invariants
@@ -275,6 +437,9 @@ python3 scripts/run_tests.py
 python3 scripts/validate_integrations.py
 python3 scripts/sync_platforms.py check
 python3 scripts/mcp_demo.py check --profile demo
+
+# optional Strands runtime (needs the strands extra)
+python3 -m pytest runtimes/strands/tests -q
 ```
 
 The demo check is read-only. AWS deployment requires the discovery gate,

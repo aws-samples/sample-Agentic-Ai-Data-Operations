@@ -1,3 +1,9 @@
+---
+inclusion: auto
+name: adop-glossary
+description: >-
+  ADOP vocabulary: data zones (Bronze/Silver/Gold), run context, spec, artifact, invariant, discovery gate, requirements ledger. Load when a term in an ADOP document or prompt needs defining.
+---
 # Glossary
 
 | Term | Meaning |

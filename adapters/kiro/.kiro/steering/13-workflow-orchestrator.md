@@ -21,6 +21,12 @@ python3 scripts/kiro_workflow.py audit --workload <name>
 
 The driver never guesses a business answer, creates pipeline code, or calls AWS.
 `context.json` is authoritative and must contain the human's verbatim answers.
-The phase hook denies `Agent` calls until the context and completion marker pass
-the same checks as the driver. The requirements auditor hook limits that agent's
-writes to its report and append-only audit records.
+The phase hook denies `subagent` calls until the context and completion marker
+pass the same checks as the driver — `phase_gate.py` and `kiro_workflow.py gate`
+share one rule set and must stay in agreement. The requirements auditor's writes
+are limited to its report and append-only audit records by the `permissions.rules`
+block in its agent definition.
+
+There is no `.kiro/workflows/` definition for this flow and none is needed: the
+driver above *is* the workflow, and keeping it a script is what makes the gate
+reproducible outside a chat session (CI can run `gate` and `audit` directly).

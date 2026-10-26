@@ -160,21 +160,26 @@
       "url": "${SNOWFLAKE_MCP_URL}",
       "headers": {
         "Authorization": "Bearer ${SNOWFLAKE_MCP_TOKEN}"
-      }
+      },
+      "disabled": true
     },
     "databricks-native": {
       "type": "http",
       "url": "${DATABRICKS_MCP_URL}",
       "headers": {
         "Authorization": "Bearer ${DATABRICKS_MCP_TOKEN}"
-      }
+      },
+      "disabled": true
     },
     "teradata": {
       "command": "uvx",
-      "args": ["teradata-mcp-server"],
+      "args": [
+        "teradata-mcp-server"
+      ],
       "env": {
         "DATABASE_URI": "${TERADATA_DATABASE_URI}"
-      }
+      },
+      "disabled": true
     }
   }
 }

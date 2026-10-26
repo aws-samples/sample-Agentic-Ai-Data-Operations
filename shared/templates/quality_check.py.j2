@@ -1,5 +1,5 @@
 {# template_id: quality_check #}
-{# template_version: 1.4.0 #}
+{# template_version: 1.5.0 #}
 {# required_slots: dataset_name, rules, quality_gates #}
 {# schema_version: v1 #}
 {#
@@ -64,6 +64,15 @@
 {{ unsupported("quality rule '" ~ rule.rule_id ~ "' (" ~ dimension ~ ") is check_type "
    ~ "custom_sql but params.sql is not set, so there is no predicate to evaluate.") }}
 {% endif %}
+{% for _sql in [rule.params.sql, rule.params.source_sql | default("")] %}
+{% set _stmt = sql_statement_tokens(_sql) %}
+{% if _stmt %}
+{{ unsupported("quality rule '" ~ rule.rule_id ~ "' (" ~ dimension ~ ") has custom_sql "
+   ~ "containing " ~ (_stmt | join(", ")) ~ ". F.expr() takes one boolean predicate; a "
+   ~ "statement separator, comment or DDL/DML keyword means the spec carries a statement, "
+   ~ "so the rule is refused rather than rendered.") }}
+{% endif %}
+{% endfor %}
 {% if rule.params.source_table is defined %}
 {% if rule.params.source_column is not defined or rule.params.source_sql is not defined
       or rule.params.join_columns is not defined or not rule.params.join_columns %}

@@ -1,6 +1,6 @@
 # spec_hash: d2d13e37a361bcf549f7365578ce6184339ff937c5cf75bbf952ec75debb75a1
 # template_id: quality_check
-# template_hash: c064a324d4450d9873495a4198698bd865847f13a8db39ffa53dd32ecd8746ef
+# template_hash: 594489fc03a353b4f53ef543f8e9c44f6333d79232929f34d1327b7e926787b4
 # schema_version: v1
 # rendered_at: 2026-10-22T18:18:44Z
 import os

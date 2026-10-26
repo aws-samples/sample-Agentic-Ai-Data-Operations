@@ -106,6 +106,29 @@ def _make_env(template_id: str) -> "jinja2.Environment":
 
     env.globals["unsupported"] = unsupported
 
+    def sql_statement_tokens(expr: object) -> list[str]:
+        """Tokens that make a spec SQL string more than one boolean predicate.
+
+        custom_sql rules reach F.expr(), which takes a single expression. A `;`, a comment
+        opener or a DDL/DML/DCL keyword means the spec is carrying a statement, so the
+        template refuses the rule at render time rather than emitting it.
+        """
+        import re
+
+        text = str(expr)
+        found = [tok for tok in (";", "--", "/*") if tok in text]
+        found += sorted({
+            m.group(0).upper()
+            for m in re.finditer(
+                r"\b(?:DROP|CREATE|ALTER|TRUNCATE|INSERT|UPDATE|DELETE|MERGE|GRANT|REVOKE)\b",
+                text,
+                re.IGNORECASE,
+            )
+        })
+        return found
+
+    env.globals["sql_statement_tokens"] = sql_statement_tokens
+
     def runtime_placeholders(*values: object) -> list[str]:
         """The ${NAME} parameters appearing anywhere in `values`, sorted.
 

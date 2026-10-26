@@ -1,14 +1,26 @@
 #!/usr/bin/env python3
 """ADOP validate-artifacts hook (Phase 4.5).
 
-Runs after Write/Edit. Validates generated pipeline artifacts under workloads/<name>/ so bad
-code is caught at build time, before promotion. Non-blocking by default: it surfaces findings
-to the model via a JSON decision so it can self-correct, and only BLOCKs on hard failures
-(unparseable Python, credential leaks).
+Validates generated pipeline artifacts under workloads/<name>/ so bad code is caught at
+build time, before promotion. Non-blocking for style findings: it surfaces those to the
+model so it can self-correct, and BLOCKs only on hard failures (unparseable Python,
+credential leaks, a run/context.json that violates its contract).
 
-Reads the PostToolUse payload from stdin. Emits a JSON object on stdout:
-  {"decision": "block", "reason": "..."}  -> feeds reason back to the model
-  {}                                        -> allow, nothing to say
+Wired three times in .kiro/hooks/adop-gates.json, because each placement reaches content
+the others cannot:
+
+  PreToolUse    the pending write. This is the only placement that can actually deny,
+                so it is where enforcement happens. Every check runs on payload content
+                rather than on the file, which is what makes a pre-write pass possible.
+  PostToolUse   the file as written, for anything the payload did not expose.
+  PostFileSave  content that reached disk with no tool_input at all -- a shell heredoc,
+                say. Matches on the file path and falls back to reading the file.
+                Advisory: Kiro does not treat a non-zero exit here as a block.
+
+Emits a JSON object on stdout:
+  {"decision": "block", "reason": "..."}   -> adop_launcher.py turns this into exit 2
+  {"systemMessage": "..."}                 -> advisory, forwarded to the agent on exit 0
+  {}                                       -> allow, nothing to say
 """
 import ast
 import json
@@ -25,8 +37,23 @@ def _read_payload():
 
 
 def _edited_path(payload):
+    """The file this event concerns.
+
+    PreToolUse / PostToolUse carry it under tool_input. The file triggers
+    (PostFileSave and friends) carry a bare path at the top level and no tool_input;
+    adop_launcher.py synthesises one, but this falls back to the top-level keys too so
+    the gate behaves the same when invoked directly.
+    """
     ti = payload.get("tool_input") or {}
-    return ti.get("file_path") or ti.get("path") or ""
+    for key in ("file_path", "path", "filePath"):
+        value = ti.get(key)
+        if isinstance(value, str) and value:
+            return value
+    for key in ("file_path", "path", "filePath", "filepath"):
+        value = payload.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return ""
 
 
 # Credentials that must never be committed (invariant: no-credentials-in-code).
