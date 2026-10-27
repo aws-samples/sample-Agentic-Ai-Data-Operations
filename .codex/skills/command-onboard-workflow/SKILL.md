@@ -280,9 +280,13 @@ start time of each phase for the Step 8 trace log.
 - **Parallel** means: call `spawn_agent` once per prompt in the group, then call
   `wait_agent` with every returned id, then `close_agent` each id once you have its result.
 - **Sequential** means: spawn, wait, and close one agent before the next phase starts.
-- Spawn with `agent_type: "default"` and pass the prompt as `message`. Fill every
-  `{placeholder}` from the Step 4 args object, or from earlier phase results, as noted.
-  Serialize objects as JSON.
+- Spawn with the named specialist from the routing table below whenever the task has a
+  matching contract. Pass the prompt as `message`. Fill every `{placeholder}` from the
+  Step 4 args object, or from earlier phase results, as noted. Serialize objects as JSON.
+- Use `agent_type: "default"` only for control-plane work that has no corresponding
+  specialist contract (for example, health checks, source reachability, adversarial
+  verification, and generic security scans). Never use `default` for metadata,
+  quality, transformation, DAG, ontology, infrastructure, or requirements auditing.
 - Do not set `model`. Sub-agents inherit the session model, which works on every
   provider, including Amazon Bedrock. Route capability with `reasoning_effort` instead:
 
@@ -292,6 +296,26 @@ start time of each phase for the Step 8 trace log.
   | `medium` | Standard artifact generation |
   | `high` | Complex reasoning and adversarial review |
   | `BUILD_MODEL` | `BUILD_EFFORT` from Step 6 |
+
+### Named specialist routing
+
+The agent type is part of the workflow contract and must be visible in the operational
+trace. The corresponding `.codex/agents/*.toml` contract is authoritative for the
+specialist's behavior; the task prompt supplies only workload-specific inputs.
+
+| Responsibility | `agent_type` |
+|---|---|
+| Source metadata, profiling, and catalog formalization | `metadata-agent` |
+| Quality profiling and quality-rule generation | `quality-agent` |
+| Bronze/Silver/Gold transformation specs and rendering | `transformation-agent` |
+| Airflow DAG specification and rendering | `dag-agent` |
+| Ontology and semantic-layer staging | `ontology-agent` |
+| Infrastructure-as-code generation | `iac-agent` |
+| Requirements conformance auditing | `requirements-auditor` |
+
+When a phase has two responsibilities, use the specialist matching each responsibility
+independently. A generic reviewer may remain `default` only when there is no named
+reviewer contract.
 
 - **Multi-workload batch:** if the user gave several datasets, run Phases 0–4.5
   independently for each workload. Different workloads may run concurrently. Phases
@@ -338,7 +362,7 @@ Store the results as `dedup` and `sourceCheck`.
 
 ### Phase 3: Profile (parallel)
 
-Agent A, profiler (`medium`):
+Agent A, profiler (`metadata-agent`, `medium`):
 
 ```
 You are the Metadata Profiler.
@@ -383,7 +407,7 @@ Set `{regNote}` as follows:
 
 **Stage 1 (parallel):**
 
-Metadata:
+Metadata (`metadata-agent`):
 
 ```
 You are the Metadata Agent. Generate config specs for workload: {workload_name}
@@ -401,7 +425,7 @@ Generate these specs as JSON:
 Return JSON: { source_yaml: {...}, semantic_yaml: {...} }
 ```
 
-Quality:
+Quality (`quality-agent`):
 
 ```
 You are the Quality Agent. Generate quality rules for workload: {workload_name}
@@ -422,7 +446,7 @@ Generate quality.yaml content as JSON:
 Return JSON: { quality_yaml: {...} }
 ```
 
-**Stage 2 (sequential, after Stage 1):** Transformation
+**Stage 2 (sequential, after Stage 1): Transformation (`transformation-agent`)
 
 ```
 You are the Transformation Agent. Generate transform specs for workload: {workload_name}
@@ -445,7 +469,7 @@ Generate these specs as JSON:
 Return JSON: { silver_spec: {...}, gold_spec: {...} }
 ```
 
-**Stage 3 (sequential, after Stage 2):** DAG
+**Stage 3 (sequential, after Stage 2): DAG (`dag-agent`)
 
 ```
 You are the DAG Agent. Generate Airflow DAG spec for workload: {workload_name}
@@ -463,7 +487,26 @@ Generate the DAG configuration as JSON:
 Return JSON: { dag_spec: {...} }
 ```
 
-Store the results as `metadata`, `quality`, `transform`, and `dag`.
+**Stage 4 (conditional, sequential, after Stage 3): Ontology (`ontology-agent`)**
+
+Run this stage only when the human-approved `ontology.enabled` value is `true`.
+
+```
+You are the Ontology Agent for workload: {workload_name}.
+
+Read the approved config/semantic.yaml and Gold schema/spec. The human has opted
+into semantic-layer enrichment with these confirmed consumers and use cases:
+{ontology}
+
+Stage OWL2 and R2RML artifacts locally. Do not invent entities, relationships,
+cardinality, business terms, or consumers beyond the approved inputs.
+Validate the Turtle and return the artifact paths, checksums, warnings, and
+steward checklist in the AgentOutput.
+```
+
+Store the results as `metadata`, `quality`, `transform`, `dag`, and, when enabled,
+`ontology`. The ontology specialist writes only its staged semantic artifacts;
+the orchestrator must still validate the handoff and test gate before promotion.
 
 ### Phase 4 Verify (sequential, `high`)
 
@@ -542,7 +585,9 @@ After Phase 4.5 finishes, you (the main conversation agent) write the actual fil
 
 4. **DAG file** — write `dags/{name}_pipeline.py` (not template-gated)
 
-5. **Ontology** (if enabled) — write `config/ontology.ttl` + `config/mappings.ttl`
+5. **Ontology** (if enabled) — verify the `ontology-agent` handoff and its staged
+   `ontology.ttl`, `mappings.ttl`, and `ontology_manifest.json`; do not hand-write
+   semantic artifacts in the orchestrator.
 
 6. **Tests** — write unit tests to `tests/unit/`
 
@@ -556,7 +601,7 @@ After Phase 4.5 finishes, you (the main conversation agent) write the actual fil
 
    This is NON-NEGOTIABLE. AGENTS.md requires every workload to have `logs/` with traces.
 
-### Step 8.5: Requirements Conformance Audit (sequential, `high`)
+### Step 8.5: Requirements Conformance Audit (`requirements-auditor`, sequential, `high`)
 
 After the actual files and tests exist, spawn the `requirements-auditor`:
 

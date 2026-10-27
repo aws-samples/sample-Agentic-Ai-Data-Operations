@@ -57,7 +57,9 @@ Open the repository with one supported client:
 
 - Claude Code: start at the repository root and run `/onboard-workflow`.
 - Codex: run `python3 scripts/start_codex.py`, then use
-  `$command-onboard-workflow`.
+  `$command-onboard-workflow`. For a clean customer project, install the
+  named specialist contracts using
+  [`docs/codex-specialist-setup.md`](docs/codex-specialist-setup.md).
 - Amazon Q: start Q at the repository root and use
   `q chat --agent adop-orchestrator`.
 - Kiro: initialize with

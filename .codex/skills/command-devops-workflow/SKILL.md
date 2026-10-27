@@ -135,7 +135,8 @@ start time of each phase for the Step 6 trace log.
   returned ids, then `close_agent` each one once you have its result.
 - **Sequential** means: spawn, wait, and close before the next phase starts.
 - Unless a phase names a role, spawn with `agent_type: "default"`. Always pass the prompt
-  as `message`.
+  as `message`. The named role is mandatory when a phase has a matching specialist
+  contract; do not replace it with `default`.
 - Do not set `model`. Sub-agents inherit the session model, which works on every
   provider, including Amazon Bedrock. Use Step 4's tiers as `reasoning_effort`:
   `low`, `medium`, and `high` are Codex reasoning-effort settings. The active model is selected
