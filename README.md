@@ -33,8 +33,8 @@ Shared behavior:
 - deterministic rendering, tests, traces, and deployment evidence.
 
 Platform-specific behavior is kept in the native root folders and portable
-snapshots under [`adapters/`](adapters/). The Claude Code plugin is separately
-installable for use from another repository.
+snapshots under [`adapters/`](adapters/). The Claude Code and Codex plugins are
+separately installable for use from another repository.
 
 The platforms coexist in one checkout. Each has its own hook wiring
 (`.claude/settings.json`, `.codex/hooks.json`, `.kiro/hooks/adop-gates.json`,
@@ -53,9 +53,6 @@ activate hook-level blocking of deploy mutations after the requirements audit.
 ```bash
 git clone https://github.com/aws-samples/sample-Agentic-Ai-Data-Operations.git
 cd sample-Agentic-Ai-Data-Operations
-
-python3 scripts/validate_integrations.py
-python3 scripts/sync_platforms.py check
 ```
 
 Open the repository with one supported client:
@@ -82,18 +79,32 @@ preflight, and invoke `/adop:onboard-workflow`.
 
 ### Codex plugin
 
-The installable ADOP Codex plugin is under `plugins/adop/`. From the repository
-root, register the local marketplace:
+The installable ADOP Codex plugin is under `plugins/adop/`. Its manifest is
+`plugins/adop/.codex-plugin/plugin.json`, and the repository marketplace is
+defined in `.agents/plugins/marketplace.json`. The marketplace source tracks
+the `main` branch and loads `plugins/adop`, so the same plugin can be installed
+from the repository checkout or from its published GitHub source.
+
+From the repository root, register the marketplace and open the Codex plugin
+browser:
 
 ```bash
 codex plugin marketplace add .
 codex
 ```
 
-Open `/plugins` and install `adop`. The plugin provides setup, onboarding,
-DevOps, and security-review skills. Keep the repository's `AGENTS.md` and
-`.codex/` surfaces active because they provide the native hooks, policies, MCP
-configuration, and enforcement controls.
+In Codex, open `/plugins` and install `adop`, then start a new session. The
+plugin provides these entry points:
+
+- `setup` — verify the ADOP checkout and required enforcement surfaces;
+- `command-onboard-workflow` — run human-approved Bronze-to-Silver-to-Gold onboarding;
+- `command-devops-workflow` — prepare a completed workload for production;
+- `security-review` — review changes for security and policy-bypass risks.
+
+The plugin is an entry point, not a replacement for the repository controls.
+Keep `AGENTS.md` and `.codex/` active: they provide the native hooks, Cedar
+policies, MCP configuration, deterministic renderer, and deployment checks.
+The plugin contains no credentials or production MCP endpoints.
 
 Amazon Q and Kiro use their native project surfaces; they do not require the
 Claude or Codex plugin.
@@ -148,6 +159,32 @@ PII/compliance: <columns and framework, or none>
 Quality: <thresholds and critical rules, or "use defaults">
 Schedule: <cron and IANA timezone>
 Ontology: <opt in/out and consumers>
+```
+
+### Example: `customer_orders`
+
+This example shows the shape of a complete, human-approved Codex request:
+
+```text
+$command-onboard-workflow GDPR
+
+Onboard customer_orders from ${CUSTOMER_ORDERS_SOURCE_URI} into Bronze, Silver,
+and Gold using a daily full-load batch. Use IAM role
+${CUSTOMER_ORDERS_SOURCE_IAM_ROLE} for access and retain data for 365 days.
+
+Use order_id as the primary key and do not deduplicate. Quarantine rows with
+null values in order_id, customer_id, order_date, product_id, quantity,
+unit_price, discount_pct, payment_method, or order_status.
+
+Apply the approved transformations in
+workloads/customer_orders/config/transformations.yaml. Treat customer_email,
+customer_phone, credit_card_number, customer_name, shipping_address, city,
+state, and zip_code as PII and apply GDPR controls.
+
+Use Silver quality threshold 0.80 and Gold quality threshold 0.95. Produce a
+flat Iceberg Gold table at order_id grain for order-level sales reporting,
+including order_count and revenue KPIs. Run at 09:00 America/New_York.
+Ontology enrichment is opt-out.
 ```
 
 The agent may profile schema, nulls, row counts, and formats, but it must ask
