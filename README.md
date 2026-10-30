@@ -238,16 +238,14 @@ defined in `.agents/plugins/marketplace.json`. The marketplace source tracks
 the `main` branch and loads `plugins/adop`, so the same plugin can be installed
 from the repository checkout or from its published GitHub source.
 
-From the repository root, register the marketplace and open the Codex plugin
-browser:
+From the repository root, start Codex and open the plugin browser:
 
 ```bash
-codex plugin marketplace add .
 codex
 ```
 
-In Codex, open `/plugins` and install `adop`, then start a new session. The
-plugin provides these entry points:
+In Codex, open `/plugins`, select the `adop` plugin from the ADOP marketplace,
+install it, and start a new session. The plugin provides these entry points:
 
 - `setup` — verify the ADOP checkout and required enforcement surfaces;
 - `command-onboard-workflow` — run human-approved Bronze-to-Silver-to-Gold onboarding;
@@ -258,6 +256,10 @@ The plugin is an entry point, not a replacement for the repository controls.
 Keep `AGENTS.md` and `.codex/` active: they provide the native hooks, Cedar
 policies, MCP configuration, deterministic renderer, and deployment checks.
 The plugin contains no credentials or production MCP endpoints.
+
+The explicit `codex plugin marketplace add ...` command is only needed when
+adding this marketplace from a different checkout or when the repository
+marketplace is not already configured in the current Codex workspace.
 
 Amazon Q and Kiro use their native project surfaces; they do not require the
 Claude or Codex plugin.
