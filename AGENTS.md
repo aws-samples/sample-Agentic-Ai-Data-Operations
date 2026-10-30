@@ -152,6 +152,13 @@ generated artifacts, and deployment evidence before phase promotion or deploy.
 Missing, ambiguous, or conflicting mandatory evidence blocks the workflow. The
 auditor writes `run/requirements_audit.json` and a corresponding trace event.
 
+The audit is enforced, not advisory: `shared.utils.deployment_checks preflight`
+refuses to run unless the report passes, matches the current `run_id`, and is
+newer than `context.json` and every file under `config/`, `scripts/`, `dags/`
+and `sql/`. Only then does it write `run/deploy_gate.json`, which the
+`deploy_gate.py` PreToolUse hook requires before any Glue job/table, IAM policy,
+Lake Formation grant, job start or DAG upload. Never hand-write that file.
+
 Deployment failures, repairs, and retry approvals must be separate trace events:
 `deployment_step_failed`, `deployment_repair`, and `deployment_retry_decision`.
 The retry decision must identify its source as human approval.
@@ -182,15 +189,20 @@ bump template_version.
 
 ## Mandatory: Post-Deployment Verification (Step 5.9)
 
-After deploying ANY workload to AWS, you MUST run `shared/utils/post_deployment_verifier.py` with 7 checks:
+After deploying ANY workload to AWS, you MUST run `shared/utils/post_deployment_verifier.py` with 9 checks:
 
 1. **Glue tables exist** — all Silver + Gold tables registered in catalog
 2. **Athena queries work** — tables are queryable, not empty
 3. **LF-Tags applied** — PHI columns tagged (PII_Classification, PII_Type, Data_Sensitivity)
 4. **TBAC access control** — CRITICAL columns restricted to authorized roles
 5. **KMS encryption** — key exists, rotation enabled
-6. **MWAA DAG loaded** — no import errors, visible in Airflow
+6. **MWAA DAG loaded** — visible in Airflow and no `dags list-import-errors` entry for the workload
 7. **CloudTrail events** — deployment operations logged (CreateTable, GrantPermissions)
+8. **MWAA role permissions** — IAM simulation: `glue:GetJob`, `glue:StartJobRun`, `glue:GetJobRun` on each job, `iam:PassRole` on the Glue role
+9. **Glue role permissions** — IAM simulation: catalog calls on the workload databases and `default`, KMS decrypt/generate on the key
+
+The Deploy phase itself (S3, catalog, IAM, role simulation gate, Glue jobs, MWAA DAG) is
+`MCP_GUARDRAILS.md` Phase 5, gated by `python3 -m shared.utils.deployment_checks`.
 
 Deployment is NOT complete until all checks PASS. If any fail, fix and re-verify.
 
@@ -221,7 +233,7 @@ Ask the user:
 ```
 
 Options:
-- **Yes, run E2E** → Trigger each Glue job in sequence, verify row counts, query Gold via Athena
+- **Yes, run E2E** → Run `python3 -m shared.utils.deployment_checks active-runs` first (exit 2 = a run is in flight; wait), then trigger each Glue job in sequence, verify row counts, query Gold via Athena
 - **No, skip** → Pipeline will run on next scheduled trigger
 
 ### Step 5.11 — DevOps Agent Offer (ask AFTER E2E completes OR after user skips E2E)

@@ -150,6 +150,10 @@ copy:
     source: shared/utils/orchestrator_logger.py
   - target: lib/shared/utils/pii_detection_and_tagging.py
     source: shared/utils/pii_detection_and_tagging.py
+  - target: lib/shared/utils/deployment_checks.py
+    source: shared/utils/deployment_checks.py
+  - target: lib/shared/utils/deployment_guardrails.py
+    source: shared/utils/deployment_guardrails.py
   - target: lib/shared/utils/post_deployment_verifier.py
     source: shared/utils/post_deployment_verifier.py
   - target: lib/shared/utils/script_tracer.py

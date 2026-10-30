@@ -23,6 +23,14 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/deploy_gate.py"
+          }
+        ]
       }
     ],
     "SessionStart": [

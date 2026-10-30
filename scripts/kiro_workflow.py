@@ -24,6 +24,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from shared.requirements.auditor import audit_workload  # noqa: E402
+from shared.utils import deployment_checks  # noqa: E402
 
 
 WORKLOAD_RE = re.compile(r"^[a-z][a-z0-9_]{1,40}$")
@@ -53,6 +54,9 @@ def _run_dir(workload: str) -> Path:
 
 def _append_trace(run_dir: Path, event_type: str, payload: Mapping[str, Any]) -> None:
     path = run_dir.parent / "logs" / "trace_events.jsonl"
+    if not run_dir.parent.is_dir():
+        # Never materialise a workload tree from a trace write; `init` owns that.
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     current = 0
     if path.exists():
@@ -213,6 +217,66 @@ def status(workload: str) -> int:
     return 0
 
 
+def deploy_check(workload: str, check_args: list[str]) -> int:
+    """Phase 5 gates: the same shared checks Claude Code and Codex run.
+
+    ``preflight`` and ``simulate`` require a passing, current requirements audit
+    (enforced inside ``deployment_checks``); ``active-runs`` is allowed at any
+    time because every manual Glue job start must pass it first.
+    """
+    workload = _require_workload(workload)
+    run_dir = _run_dir(workload)
+    if not check_args:
+        print("error: deploy-check needs one of: preflight, simulate, active-runs", file=sys.stderr)
+        return 2
+    check = check_args[0]
+    if check == "preflight" and "--context" not in check_args:
+        check_args = [*check_args, "--context", str(run_dir / "context.json")]
+    if check == "simulate" and "--workload-dir" not in check_args:
+        check_args = [*check_args, "--workload-dir", str(run_dir.parent)]
+    code = deployment_checks.main(check_args)
+    _append_trace(
+        run_dir,
+        "deployment_step",
+        {
+            "run_id": _run_id(run_dir),
+            "phase": "deploy",
+            "check": check,
+            "status": "pass" if code == 0 else "blocked",
+        },
+    )
+    return code
+
+
+def verify(workload: str, verifier_args: list[str]) -> int:
+    """Step 5.9: run the shared post-deployment verifier and trace the outcome."""
+    workload = _require_workload(workload)
+    run_dir = _run_dir(workload)
+    code = subprocess.call(
+        [
+            sys.executable,
+            str(ROOT / "shared" / "utils" / "post_deployment_verifier.py"),
+            "--workload",
+            workload,
+            *verifier_args,
+        ],
+        cwd=ROOT,
+    )
+    _append_trace(
+        run_dir,
+        "deployment_verification",
+        {"run_id": _run_id(run_dir), "phase": "deploy", "status": "pass" if code == 0 else "failed"},
+    )
+    return code
+
+
+def _run_id(run_dir: Path) -> str:
+    try:
+        return str(json.loads((run_dir / "context.json").read_text(encoding="utf-8")).get("run_id", ""))
+    except (OSError, json.JSONDecodeError):
+        return ""
+
+
 def render(args: list[str]) -> int:
     # The live Kiro surface comes first: it is the path the codegen gate's denial message
     # tells the agent to run, so the driver and the gate must not disagree about which
@@ -246,6 +310,12 @@ def main() -> int:
     status_parser.add_argument("--workload", required=True)
     render_parser = sub.add_parser("render")
     render_parser.add_argument("renderer_args", nargs=argparse.REMAINDER)
+    deploy_parser = sub.add_parser("deploy-check")
+    deploy_parser.add_argument("--workload", required=True)
+    deploy_parser.add_argument("check_args", nargs=argparse.REMAINDER)
+    verify_parser = sub.add_parser("verify")
+    verify_parser.add_argument("--workload", required=True)
+    verify_parser.add_argument("verifier_args", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.command == "init":
         return init_run(args.workload, args.run_id)
@@ -255,6 +325,10 @@ def main() -> int:
         return audit(args.workload)
     if args.command == "status":
         return status(args.workload)
+    if args.command == "deploy-check":
+        return deploy_check(args.workload, args.check_args)
+    if args.command == "verify":
+        return verify(args.workload, args.verifier_args)
     return render(args.renderer_args)
 
 

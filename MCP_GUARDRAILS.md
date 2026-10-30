@@ -308,7 +308,8 @@ See [Phase 0 Step 0.2](#step-02-mcp-health-check) for the full 3-tier server tab
 
 ### Step 5.3: IAM & Permissions
 
-Before the first IAM mutation, run the local preflight:
+Before the first IAM mutation, run the local preflight (or the CLI form
+`python3 -m shared.utils.deployment_checks preflight --context workloads/{name}/run/context.json --glue-role {workload}-glue-service-role`):
 
 ```python
 from shared.utils.deployment_guardrails import validate_deployment_preflight
@@ -331,6 +332,28 @@ actions, and unbounded `Resource: "*"`. It performs no AWS calls.
 | Inspect inline policies | `mcp__iam__list_role_policies` + `mcp__iam__get_role_policy` | `aws iam list-role-policies` CLI | **MCP** |
 | Add inline policy | `mcp__iam__put_role_policy` | `aws iam put-role-policy` CLI | **MCP** |
 | Create new role | `mcp__iam__create_role` | `aws iam create-role` CLI | **MCP** |
+
+### Step 5.3a: Role Simulation Gate (MANDATORY, read-only)
+
+Run after the Glue role policy is in place and **before** Step 5.8a creates jobs.
+IAM simulation does not need the jobs to exist; it evaluates the job ARNs.
+
+```bash
+python3 -m shared.utils.deployment_checks simulate --region {region} \
+  --mwaa-role-arn {mwaa_execution_role_arn} --glue-role-arn {glue_role_arn} \
+  --jobs {glue_job_names...} --databases {glue_databases...} --kms-key-arn {kms_key_arn}
+```
+
+| Role | Actions simulated | Resources |
+|---|---|---|
+| MWAA execution role | `glue:GetJob`, `glue:StartJobRun`, `glue:GetJobRun` | each workload job ARN |
+| MWAA execution role | `iam:PassRole` (context `iam:PassedToService=glue.amazonaws.com`) | the workload Glue role |
+| Workload Glue role | `glue:GetDatabase/GetTable/GetTables/CreateTable/UpdateTable` | catalog, workload databases **and `default`** |
+| Workload Glue role | `kms:Decrypt`, `kms:GenerateDataKey` | the catalog/data KMS key |
+
+Exit code 2 = a required action is denied. Fix the policy (Step 5.3) and re-run;
+do not create jobs or upload the DAG until this passes. The same simulations run
+again as Step 5.9i/5.9j.
 
 ### Step 5.4: Lake Formation Grants
 
@@ -370,7 +393,7 @@ actions, and unbounded `Resource: "*"`. It performs no AWS calls.
 
 ### Step 5.8: Ontology Staging (AWS Semantic Layer handoff, Phase 7 Step 8.5)
 
-> Optional sub-agent runs between Step 8 (TBAC grants) and Step 9 (MWAA deploy). File-emission only in this iteration.
+> Optional sub-agent runs after Step 5.4 (TBAC grants) and before Step 5.8a (Glue jobs). File-emission only in this iteration.
 
 | Operation | MCP Tool | Fallback | Status |
 |---|---|---|---|
@@ -389,16 +412,54 @@ actions, and unbounded `Resource: "*"`. It performs no AWS calls.
 3. If the `glue-athena` MCP is down, fall back to `aws glue get-table` CLI — the function accepts a plain dict.
 4. If Turtle validation fails after 2 auto-fix retries, STOP and surface the error. Do not commit invalid TTL files.
 
+### Step 5.8a: Glue Jobs
+
+Upload the rendered scripts, then create or update one job per script.
+
+| Operation | MCP Tool | Fallback | Status |
+|---|---|---|---|
+| Upload `scripts/**` to the artifact prefix | `core` MCP (S3 operations) | `aws s3 cp` CLI | **MCP** |
+| Create job | `mcp__glue-athena__create_job` | `aws glue create-job` CLI | **MCP** |
+| Update existing job | `mcp__glue-athena__update_job` | `aws glue update-job` CLI | **MCP** |
+| Confirm job definition | `mcp__glue-athena__get_job` | `aws glue get-job` CLI | **MCP** |
+
+Every job uses `{workload}-glue-service-role` and the job names passed to Step 5.3a.
+
+### Step 5.8b: MWAA DAG Deploy
+
+| Operation | MCP Tool | Fallback | Status |
+|---|---|---|---|
+| Upload `dags/{name}_dag.py` to the MWAA DAG prefix | `core` MCP (S3 operations) | `aws s3 cp` CLI | **MCP** |
+| Confirm environment | — | `aws mwaa get-environment` CLI | **CLI required** (no MWAA MCP) |
+
+Then run Step 5.9 (`shared/utils/post_deployment_verifier.py`) with `--mwaa-env`,
+`--dag-id`, `--mwaa-role-arn`, `--glue-role-arn`, `--glue-jobs` and `--kms-key-arn`.
+5.9f fails on any `dags list-import-errors` entry for the workload, and 5.9i/5.9j
+re-simulate both roles against the deployed state.
+
+### Step 5.8c: No Overlapping Runs (MANDATORY before any manual job start)
+
+Before starting any Glue job by hand — the Step 5.10 E2E test, a re-run after a
+fix, a backfill — run:
+
+```bash
+python3 -m shared.utils.deployment_checks active-runs --region {region} --jobs {glue_job_names...}
+```
+
+Exit code 2 = a scheduled or catch-up run is still in flight. Wait for it; never
+start a second run on top of it (Glue `ConcurrentRunsExceededException`).
+
 ### Guardrail Rules — Phase 5
 1. **MCP-FIRST**: For every operation, check the table above. If MCP Tool column has a value, use it. CLI only for "CLI required" rows.
 2. **Log every fallback**: When using CLI instead of MCP, print: `Warning: MCP fallback — {server} not loaded for {operation}. Using CLI.`
 3. **NEVER** skip audit trail (Step 5.7) — CloudTrail MCP is loaded and must be used
 4. **NEVER** skip permission verification (Step 5.3) — IAM MCP is loaded and must be used
 5. **ALWAYS** verify deployment via query (Step 5.6) — Redshift MCP is loaded, use it over Athena CLI
-6. **ALWAYS** run steps in order: S3 Upload → Glue Catalog → IAM → Lake Formation → KMS → Query Verify → Audit
+6. **ALWAYS** run steps in order: S3 Upload → Glue Catalog → IAM → Role Simulation (5.3a) → Lake Formation → KMS → Query Verify → Audit → Glue Jobs (5.8a) → MWAA DAG (5.8b) → Verify (5.9)
 7. **IAM role scope**: use `{workload}-glue-service-role` (underscores become hyphens); never expand a shared platform Glue role.
 8. **TBAC/query principals**: read only `human_answers.iac_tbac_principals` and `human_answers.iac_query_principal_arn`; never derive principals from PII columns or the current caller. Missing values block deployment.
 9. **If deployment fails**: Do NOT retry automatically. Record `deployment_step_failed`, apply and verify any repair as `deployment_repair`, then record the human decision as `deployment_retry_decision` before retrying.
+10. **NEVER** start a Glue job manually without a passing `active-runs` check (Step 5.8c)
 
 ---
 

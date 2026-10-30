@@ -106,6 +106,8 @@ REQUIRED_SHARED_PATHS = (
     "shared/codegen/renderer.py",
     "shared/logging/agent_tracer.py",
     "shared/utils/structured_logger.py",
+    "shared/utils/deployment_checks.py",
+    "shared/utils/post_deployment_verifier.py",
     "shared/policies/schema.cedarschema",
     "contracts/v1/run_context.schema.json",
     "runbooks/data-onboarding-agent",
@@ -113,6 +115,36 @@ REQUIRED_SHARED_PATHS = (
     "mcp-servers/README.md",
     "tool-registry/servers.yaml",
     "scripts/start_codex.py",
+)
+
+# Every platform's onboarding flow must carry the Phase 5 Deploy gates.  The
+# workflow text is hand-maintained per platform, so this is what stops one of
+# them silently losing the deploy step again.
+DEPLOY_PHASE_SURFACES = {
+    ".claude/commands/onboard-workflow.md": ("simulate", "active-runs", "Step 5.9"),
+    "plugins/claude-code/commands/onboard-workflow.md": ("simulate", "active-runs", "Step 5.9"),
+    "adapters/claude-code/plugins/claude-code/commands/onboard-workflow.md": (
+        "simulate", "active-runs", "Step 5.9",
+    ),
+    ".codex/skills/command-onboard-workflow/SKILL.md": ("simulate", "active-runs", "Step 5.9"),
+    "adapters/codex/.codex/skills/command-onboard-workflow/SKILL.md": (
+        "simulate", "active-runs", "Step 5.9",
+    ),
+    ".kiro/steering/13-workflow-orchestrator.md": ("deploy-check", "simulate", "active-runs", "verify"),
+    "adapters/kiro/.kiro/steering/13-workflow-orchestrator.md": (
+        "deploy-check", "simulate", "active-runs", "verify",
+    ),
+}
+
+# The audit-before-deploy hook. One implementation, copied per platform; the
+# copies must stay byte-identical and each platform must register it.
+DEPLOY_GATE_HOOK = ".claude/hooks/deploy_gate.py"
+DEPLOY_GATE_COPIES = (
+    ".codex/hooks/deploy_gate.py",
+    ".kiro/hooks/deploy_gate.py",
+    "adapters/codex/.codex/hooks/deploy_gate.py",
+    "adapters/kiro/.kiro/hooks/deploy_gate.py",
+    "adapters/claude-code/.claude/hooks/deploy_gate.py",
 )
 
 THIRD_PARTY_PROFILES = {
@@ -220,9 +252,56 @@ def check_workloads(errors: list[str]) -> None:
                 errors.append(f"{workload.name}: missing workload surface {name}")
 
 
+def check_deploy_phase(errors: list[str]) -> None:
+    for relative, anchors in DEPLOY_PHASE_SURFACES.items():
+        path = ROOT / relative
+        if not path.is_file():
+            errors.append(f"deploy phase: missing {relative}")
+            continue
+        text = path.read_text(encoding="utf-8")
+        if "deployment_checks" not in text and "deploy-check" not in text:
+            errors.append(f"deploy phase: {relative} does not call shared.utils.deployment_checks")
+        for anchor in anchors:
+            if anchor not in text:
+                errors.append(f"deploy phase: {relative} is missing {anchor!r}")
+
+
+def check_deploy_gate_hook(errors: list[str]) -> None:
+    source = ROOT / DEPLOY_GATE_HOOK
+    if not source.is_file():
+        errors.append(f"deploy gate: missing {DEPLOY_GATE_HOOK}")
+        return
+    expected = source.read_bytes()
+    for relative in DEPLOY_GATE_COPIES:
+        path = ROOT / relative
+        if not path.is_file():
+            errors.append(f"deploy gate: missing {relative}")
+        elif path.read_bytes() != expected:
+            errors.append(f"deploy gate: {relative} has drifted from {DEPLOY_GATE_HOOK}")
+
+    registrations = {
+        ".claude/settings.json": lambda d: any(
+            "deploy_gate.py" in str(e) for e in d.get("hooks", {}).get("PreToolUse", [])
+        ),
+        ".codex/hooks.json": lambda d: any(
+            "deploy_gate.py" in str(e) for e in d.get("hooks", {}).get("PreToolUse", [])
+        ),
+        ".kiro/hooks/adop-gates.json": lambda d: any(
+            "deploy_gate.py" in str(h.get("action", {})) and h.get("enabled") is True
+            for h in d.get("hooks", [])
+        ),
+    }
+    for relative, registered in registrations.items():
+        config = load_json(Path(relative), errors)
+        if config and not registered(config):
+            errors.append(f"deploy gate: {relative} does not register deploy_gate.py")
+
+
 def check() -> list[str]:
     errors: list[str] = []
     check_paths(errors)
+    check_deploy_phase(errors)
+    check_deploy_gate_hook(errors)
     check_active_mcp_profiles(errors)
     check_optional_profiles(errors)
     check_workloads(errors)

@@ -1,0 +1,142 @@
+#!/usr/bin/env python3
+"""Deny Phase 5 deploy mutations until the requirements audit has passed.
+
+One file, byte-identical in .claude/hooks, .codex/hooks and .kiro/hooks (and the
+adapter copies); `scripts/sync_platforms.py check` enforces that.
+
+A tool call is a deploy mutation if it creates or changes Glue jobs/tables,
+IAM role policies, Lake Formation grants/tags, starts a Glue job, or uploads a
+DAG — whether through an MCP tool, the AWS CLI in a shell, or a generic AWS
+tool (aws-mcp `call_aws`/`run_script`, Kiro `use_aws`). Everything else exits 0
+immediately without importing anything.
+
+For a deploy mutation the hook requires `run/deploy_gate.json`, written by
+`python3 -m shared.utils.deployment_checks preflight` only after a passing,
+current `run/requirements_audit.json`. If the call names a workload, that
+workload's gate is checked; otherwise at least one workload must be gated.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import sys
+from pathlib import Path
+from typing import Any, Optional
+
+_MCP_DEPLOY_TOOLS = re.compile(
+    r"(?:^|[_/.@-])(create_job|update_job|start_job_run|create_table|update_table|"
+    r"put_role_policy|create_role|attach_role_policy|grant_permissions|"
+    r"batch_grant_permissions|add_lf_tags_to_resource|apply_column_security)$"
+)
+# Anchored at a command position so a deploy string merely *mentioned* in a
+# shell command -- written into a file, grepped for, echoed -- is not a deploy.
+_CLI_DEPLOY = re.compile(
+    r"(?:\A|[\n;&|(]|\$\()\s*(?:[A-Za-z_][\w]*=\S*\s+)*"
+    r"aws\s+(?:glue\s+(?:create-job|update-job|start-job-run|create-table|update-table)"
+    r"|iam\s+(?:put-role-policy|create-role|attach-role-policy)"
+    r"|lakeformation\s+(?:grant-permissions|batch-grant-permissions|add-lf-tags-to-resource)"
+    r"|s3\s+(?:cp|sync)\b[^\n;|&]*\bdags/)"
+)
+# A heredoc body is data being written, never a command the shell will run.
+_HEREDOC = re.compile(
+    r"<<-?\s*(['\"]?)([A-Za-z_]\w*)\1.*?^\s*\2\s*$",
+    re.DOTALL | re.MULTILINE,
+)
+_GENERIC_AWS_TOOLS = re.compile(r"(call_aws|run_script|use_aws|useaws)$")
+_GENERIC_DEPLOY = re.compile(
+    r"\b(?:create[_-]job|update[_-]job|start[_-]job[_-]run|create[_-]table|update[_-]table|"
+    r"put[_-]role[_-]policy|create[_-]role|attach[_-]role[_-]policy|grant[_-]permissions|"
+    r"add[_-]lf[_-]tags[_-]to[_-]resource)\b",
+    re.IGNORECASE,
+)
+_SHELL_TOOLS = {"bash", "shell", "exec_command", "execute_bash", "executebash", "local_shell"}
+
+
+def _deploy_operation(tool_name: str, tool_input: Any) -> Optional[str]:
+    name = tool_name.strip().lower()
+    text = json.dumps(tool_input, sort_keys=True) if not isinstance(tool_input, str) else tool_input
+    if name in _SHELL_TOOLS:
+        command = tool_input.get("command") if isinstance(tool_input, dict) else text
+        if isinstance(command, list):
+            command = " ".join(str(part) for part in command)
+        match = _CLI_DEPLOY.search(_HEREDOC.sub("\n", str(command or "")))
+        return match.group(0).strip() if match else None
+    if _GENERIC_AWS_TOOLS.search(name):
+        match = _GENERIC_DEPLOY.search(text) or _CLI_DEPLOY.search(text)
+        return f"{name}: {match.group(0)}" if match else None
+    match = _MCP_DEPLOY_TOOLS.search(name)
+    return name if match else None
+
+
+def _project_root(event: dict) -> Optional[Path]:
+    starts = [Path(event.get("cwd") or os.getcwd()).resolve(), Path(__file__).resolve()]
+    for start in starts:
+        for candidate in (start, *start.parents):
+            if (candidate / "shared" / "utils" / "deployment_checks.py").is_file():
+                return candidate
+    return None
+
+
+def _deny(reason: str) -> int:
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": reason,
+                }
+            }
+        )
+    )
+    print(reason, file=sys.stderr)
+    return 2
+
+
+def main() -> int:
+    try:
+        event = json.loads(sys.stdin.read() or "{}")
+    except (json.JSONDecodeError, OSError):
+        return 0
+    tool_name = str(event.get("tool_name") or event.get("toolName") or "")
+    tool_input = event.get("tool_input") or event.get("toolInput") or {}
+    operation = _deploy_operation(tool_name, tool_input)
+    if not operation:
+        return 0
+
+    root = _project_root(event)
+    if root is None:
+        return _deny(
+            f"Deploy call blocked ({operation}): cannot locate shared/utils/deployment_checks.py "
+            "to verify the requirements audit."
+        )
+    sys.path.insert(0, str(root))
+    try:
+        from shared.utils.deployment_checks import deploy_gate_open
+    except Exception as exc:  # a gate that cannot load must deny, never allow
+        return _deny(
+            f"Deploy call blocked ({operation}): cannot load the deploy gate "
+            f"({type(exc).__name__}: {exc})."
+        )
+
+    workloads = sorted(p for p in (root / "workloads").glob("*") if (p / "run").is_dir())
+    text = json.dumps(tool_input, sort_keys=True).lower()
+    named = [w for w in workloads if w.name.lower() in text or w.name.replace("_", "-") in text]
+    candidates = named or workloads
+    reasons = []
+    for workload_dir in candidates:
+        reason = deploy_gate_open(workload_dir)
+        if reason is None:
+            return 0
+        reasons.append(f"{workload_dir.name}: {reason}")
+    detail = "; ".join(reasons) or "no workload has a run/ directory"
+    return _deny(
+        f"Deploy call blocked ({operation}). The requirements audit must pass before "
+        f"deployment. {detail}"
+    )
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

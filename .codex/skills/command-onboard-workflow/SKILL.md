@@ -624,9 +624,45 @@ to the human with its requirement IDs and evidence gaps.
 
 ---
 
+## Step 8.6: Deploy (Phase 5 — main conversation, MANDATORY)
+
+Phase 4.5 Pre-Deploy only validates specs; deployment runs here, in the main
+conversation (the only party with MCP tools), after the audit passes. Follow `MCP_GUARDRAILS.md`
+Phase 5 step by step. Every gate below exits 2 on failure — stop, show the JSON
+output to the user, and do not continue until it passes.
+
+1. **Health check** (Step 5.0) — re-run or confirm reuse of Phase 0 results.
+2. **Audit + local preflight** (Step 5.3, no AWS calls):
+   `python3 -m shared.utils.deployment_checks preflight --context workloads/{name}/run/context.json --glue-role {workload}-glue-service-role`
+   This refuses to run unless `run/requirements_audit.json` has `status: pass`, matches the
+   current `run_id`, and is newer than `context.json` and everything under
+   `config/`, `scripts/`, `dags/` and `sql/`. On pass it writes `run/deploy_gate.json`.
+   **The `deploy_gate.py` PreToolUse hook denies every deploy mutation until that file
+   exists**, so this step cannot be skipped — not by you, and not by a sub-agent.
+   If the audit is missing, stale or blocked, re-run the `requirements-auditor` and fix
+   what it reports. Never hand-write `deploy_gate.json`.
+3. **S3 upload, Glue catalog, IAM** (Steps 5.1–5.3) via MCP.
+4. **Role simulation gate** (Step 5.3a, read-only) — before any job or DAG exists:
+   `python3 -m shared.utils.deployment_checks simulate --workload-dir workloads/{name} --region {region} --mwaa-role-arn {mwaa_role_arn} --glue-role-arn {glue_role_arn} --jobs {jobs...} --databases {dbs...} --kms-key-arn {kms_key_arn}`
+   Covers MWAA `glue:GetJob`/`StartJobRun`/`GetJobRun` + `iam:PassRole`, and the Glue
+   role's catalog (including `default`) and KMS calls.
+5. **Lake Formation, KMS, query verify, audit trail** (Steps 5.4–5.7).
+6. **Glue jobs** (Step 5.8a) — upload `scripts/**`, `create_job`/`update_job` via MCP.
+7. **MWAA DAG** (Step 5.8b) — upload `dags/{name}_dag.py` to the environment's DAG prefix.
+8. **Verify** (Step 5.9) — `python3 shared/utils/post_deployment_verifier.py --workload {name} --database {db} --tables {tables...}
+   --query-principal-arn {arn} --mwaa-env {env} --dag-id {dag_id} --mwaa-role-arn {arn}
+   --glue-role-arn {arn} --glue-jobs {jobs...} --kms-key-arn {arn}`. All checks must PASS,
+   including 5.9f (no `dags list-import-errors` for the workload) and 5.9i/5.9j (role simulation).
+9. **Before any manual job start** (Step 5.8c) — `python3 -m shared.utils.deployment_checks active-runs --region {region} --jobs {jobs...}`.
+   A run already in flight blocks the start; wait for it.
+
+Record each gate result as a `deployment_step` event in `logs/trace_events.jsonl`.
+
+---
+
 ## Step 9: Post-Deployment Sequence
 
-After files are written and tests pass, follow AGENTS.md Steps 5.10 and 5.11:
+After Step 8.6 deploys and Step 5.9 verification passes, follow AGENTS.md Steps 5.10 and 5.11:
 
 1. **Offer E2E pipeline test** (Step 5.10)
 2. **Offer DevOps Agent** (Step 5.11)
@@ -642,5 +678,6 @@ NEVER skip asking these questions.
 | Phase 0 returns "BLOCKED" | Tell user which MCP servers are down. Do not proceed. |
 | Phase 2 finds exact duplicate | Show overlap. Ask user: rename, merge, or cancel. |
 | Phase 4 Verifier finds issues | Present issues list. Ask user to resolve. Re-run affected phase. |
+| Step 8.6 gate exits 2 (preflight / simulate / active-runs / 5.9) | Show the JSON. Fix the cause (policy, DAG import, wait for run). Re-run the gate. Never skip it. |
 | A sub-agent fails, errors, or times out | Show the error. Offer a fallback: "Want me to run this phase sequentially in this conversation instead?" |
 | User wants to abort mid-workflow | Respect immediately. Partial results are preserved. |

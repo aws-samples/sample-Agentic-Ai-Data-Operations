@@ -29,6 +29,15 @@
           }
         ],
         "matcher": "apply_patch"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .codex/hooks/deploy_gate.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "SessionStart": [

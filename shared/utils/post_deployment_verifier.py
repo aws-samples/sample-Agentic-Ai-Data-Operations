@@ -1,7 +1,8 @@
 """
 Post-Deployment Verifier (Step 5.9)
 
-Runs 9 smoke tests against deployed AWS resources after pipeline deployment.
+Runs up to 10 smoke tests (5.9a-5.9j) against deployed AWS resources after
+pipeline deployment, including IAM simulation of the MWAA and Glue roles.
 Reports PASS/FAIL summary. Deployment is NOT complete until all checks pass.
 
 Usage:
@@ -29,6 +30,11 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from shared.metadata.glue_fetcher import GlueFetcher
 from shared.metadata.lakeformation_fetcher import LakeFormationFetcher
+from shared.utils.deployment_checks import (
+    glue_role_requirements,
+    mwaa_role_requirements,
+    simulate_role,
+)
 from shared.utils.deployment_guardrails import (
     DeploymentGuardrailError,
     require_query_principal,
@@ -71,7 +77,11 @@ class PostDeploymentVerifier:
                 phi_columns: Optional[Dict[str, List[str]]] = None,
                 kms_key_alias: str = "alias/hipaa-phi-key",
                 dag_id: Optional[str] = None,
-                tbac_principals: Optional[List[Dict[str, Any]]] = None) -> List[CheckResult]:
+                tbac_principals: Optional[List[Dict[str, Any]]] = None,
+                mwaa_role_arn: Optional[str] = None,
+                glue_role_arn: Optional[str] = None,
+                glue_job_names: Optional[List[str]] = None,
+                kms_key_arn: Optional[str] = None) -> List[CheckResult]:
         results = []
 
         if tables:
@@ -84,8 +94,14 @@ class PostDeploymentVerifier:
 
         results.append(self.check_kms_encryption(kms_key_alias))
 
-        if dag_id and self.mwaa_environment:
+        if dag_id:
+            # A DAG with no environment to check is a failure, not a skip.
             results.append(self.check_mwaa_dag(dag_id))
+            results.append(self.check_mwaa_role_permissions(
+                mwaa_role_arn, glue_role_arn, glue_job_names or []))
+
+        if glue_role_arn:
+            results.append(self.check_glue_role_permissions(glue_role_arn, kms_key_arn))
 
         results.append(self.check_cloudtrail_events())
 
@@ -310,49 +326,71 @@ class PostDeploymentVerifier:
                 details={"error": str(e)}
             )
 
+    def _mwaa_cli(self, command: str) -> Any:
+        """Run an Airflow CLI command through the MWAA CLI endpoint; return parsed JSON stdout."""
+        mwaa = boto3.client("mwaa", region_name=self.region)
+        token_response = mwaa.create_cli_token(Name=self.mwaa_environment)
+
+        import urllib.request
+        url = f"https://{token_response['WebServerHostname']}/aws_mwaa/cli"
+        headers = {
+            "Authorization": f"Bearer {token_response['CliToken']}",
+            "Content-Type": "text/plain"
+        }
+        req = urllib.request.Request(url, data=command.encode(), headers=headers, method="POST")
+        # B310: the scheme is the literal "https://" above and the host
+        # comes from an authenticated mwaa.create_cli_token() response, so the
+        # file:/ and custom-scheme cases B310 guards against cannot arise.
+        response = urllib.request.urlopen(req)  # nosec B310
+        import base64
+        output = base64.b64decode(json.loads(response.read())["stdout"]).decode().strip()
+        return json.loads(output) if output else []
+
     def check_mwaa_dag(self, dag_id: str) -> CheckResult:
-        """5.9f: Verify DAG loaded without import errors in MWAA."""
+        """5.9f: Verify DAG loaded in MWAA and has no import errors."""
         self.log.info("Checking MWAA DAG", dag_id=dag_id)
+        if not self.mwaa_environment:
+            return CheckResult(
+                name="MWAA DAG Health",
+                step="5.9f",
+                passed=False,
+                message="mwaa_environment is required to verify the DAG; refusing to skip",
+                details={"dag_id": dag_id},
+            )
         try:
-            mwaa = boto3.client("mwaa", region_name=self.region)
-            token_response = mwaa.create_cli_token(Name=self.mwaa_environment)
+            # A DAG that fails to import can still be listed from an earlier
+            # good parse, so check import errors as well as presence.
+            import_errors = [
+                e for e in self._mwaa_cli("dags list-import-errors -o json")
+                if dag_id in str(e.get("filepath", "")) or self.workload in str(e.get("filepath", ""))
+            ]
+            dags = self._mwaa_cli("dags list -o json")
+            dag_entry = next((d for d in dags if d.get("dag_id") == dag_id), None)
 
-            import urllib.request
-            url = f"https://{token_response['WebServerHostname']}/aws_mwaa/cli"
-            headers = {
-                "Authorization": f"Bearer {token_response['CliToken']}",
-                "Content-Type": "text/plain"
-            }
-            data = f"dags list -o json".encode()
-            req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-            # B310: the scheme is the literal "https://" above and the host
-            # comes from an authenticated mwaa.create_cli_token() response, so the
-            # file:/ and custom-scheme cases B310 guards against cannot arise.
-            response = urllib.request.urlopen(req)  # nosec B310
-            import base64
-            output = base64.b64decode(json.loads(response.read())["stdout"]).decode()
-
-            dags = json.loads(output)
-            dag_found = any(d.get("dag_id") == dag_id for d in dags)
-
-            if dag_found:
-                dag_entry = next(d for d in dags if d.get("dag_id") == dag_id)
+            if import_errors:
+                return CheckResult(
+                    name="MWAA DAG Health",
+                    step="5.9f",
+                    passed=False,
+                    message=f"DAG '{dag_id}' has {len(import_errors)} import error(s)",
+                    details={"dag_id": dag_id, "import_errors": import_errors}
+                )
+            if dag_entry:
                 is_paused = dag_entry.get("is_paused", True)
                 return CheckResult(
                     name="MWAA DAG Health",
                     step="5.9f",
                     passed=True,
-                    message=f"DAG '{dag_id}' loaded successfully (paused={is_paused})",
+                    message=f"DAG '{dag_id}' loaded without import errors (paused={is_paused})",
                     details={"dag_id": dag_id, "paused": is_paused}
                 )
-            else:
-                return CheckResult(
-                    name="MWAA DAG Health",
-                    step="5.9f",
-                    passed=False,
-                    message=f"DAG '{dag_id}' not found in MWAA environment",
-                    details={"dag_id": dag_id, "available_dags": [d.get("dag_id") for d in dags[:10]]}
-                )
+            return CheckResult(
+                name="MWAA DAG Health",
+                step="5.9f",
+                passed=False,
+                message=f"DAG '{dag_id}' not found in MWAA environment",
+                details={"dag_id": dag_id, "available_dags": [d.get("dag_id") for d in dags[:10]]}
+            )
         except Exception as e:
             return CheckResult(
                 name="MWAA DAG Health",
@@ -361,6 +399,61 @@ class PostDeploymentVerifier:
                 message=f"MWAA check failed: {e}",
                 details={"error": str(e)}
             )
+
+    def _simulation_result(self, name: str, step: str, role_arn: str,
+                           requirements: List[Dict[str, Any]]) -> CheckResult:
+        try:
+            iam = boto3.client("iam", region_name=self.region)
+            denied = simulate_role(iam, role_arn, requirements)
+        except Exception as e:
+            return CheckResult(name=name, step=step, passed=False,
+                               message=f"IAM simulation failed: {e}",
+                               details={"role_arn": role_arn, "error": str(e)})
+        return CheckResult(
+            name=name,
+            step=step,
+            passed=not denied,
+            message="All required actions allowed" if not denied
+            else f"{len(denied)} required action(s) denied",
+            details={"role_arn": role_arn, "denied": denied},
+        )
+
+    def check_mwaa_role_permissions(self, mwaa_role_arn: Optional[str],
+                                    glue_role_arn: Optional[str],
+                                    glue_job_names: List[str]) -> CheckResult:
+        """5.9i: Simulate the MWAA execution role's GetJob/StartJobRun/GetJobRun + PassRole."""
+        self.log.info("Simulating MWAA execution role", role=mwaa_role_arn, jobs=glue_job_names)
+        if not (mwaa_role_arn and glue_role_arn and glue_job_names):
+            return CheckResult(
+                name="MWAA Role Permissions",
+                step="5.9i",
+                passed=False,
+                message="mwaa_role_arn, glue_role_arn and glue_job_names are required",
+                details={"mwaa_role_arn": mwaa_role_arn, "glue_role_arn": glue_role_arn,
+                         "glue_job_names": glue_job_names},
+            )
+        try:
+            requirements = mwaa_role_requirements(
+                region=self.region, glue_role_arn=glue_role_arn, job_names=glue_job_names)
+        except DeploymentGuardrailError as e:
+            return CheckResult(name="MWAA Role Permissions", step="5.9i", passed=False,
+                               message=str(e), details={})
+        return self._simulation_result("MWAA Role Permissions", "5.9i",
+                                       mwaa_role_arn, requirements)
+
+    def check_glue_role_permissions(self, glue_role_arn: str,
+                                    kms_key_arn: Optional[str]) -> CheckResult:
+        """5.9j: Simulate the Glue role's catalog (incl. `default` db) and KMS calls."""
+        self.log.info("Simulating Glue execution role", role=glue_role_arn)
+        try:
+            requirements = glue_role_requirements(
+                region=self.region, glue_role_arn=glue_role_arn,
+                databases=[self.database], kms_key_arn=kms_key_arn)
+        except DeploymentGuardrailError as e:
+            return CheckResult(name="Glue Role Permissions", step="5.9j", passed=False,
+                               message=str(e), details={})
+        return self._simulation_result("Glue Role Permissions", "5.9j",
+                                       glue_role_arn, requirements)
 
     def check_cloudtrail_events(self) -> CheckResult:
         """5.9h: Verify deployment events logged in CloudTrail."""
@@ -476,19 +569,29 @@ if __name__ == "__main__":
     parser.add_argument("--kms-key", default="alias/hipaa-phi-key")
     parser.add_argument("--mwaa-env", default=None)
     parser.add_argument("--dag-id", default=None)
+    parser.add_argument("--query-principal-arn", default=None)
+    parser.add_argument("--mwaa-role-arn", default=None)
+    parser.add_argument("--glue-role-arn", default=None)
+    parser.add_argument("--glue-jobs", nargs="+", default=None)
+    parser.add_argument("--kms-key-arn", default=None)
     args = parser.parse_args()
 
     verifier = PostDeploymentVerifier(
         workload=args.workload,
         database=args.database,
         region=args.region,
-        mwaa_environment=args.mwaa_env
+        mwaa_environment=args.mwaa_env,
+        query_principal_arn=args.query_principal_arn,
     )
 
     results = verifier.run_all(
         tables=args.tables,
         kms_key_alias=args.kms_key,
-        dag_id=args.dag_id
+        dag_id=args.dag_id,
+        mwaa_role_arn=args.mwaa_role_arn,
+        glue_role_arn=args.glue_role_arn,
+        glue_job_names=args.glue_jobs,
+        kms_key_arn=args.kms_key_arn,
     )
 
     all_passed = PostDeploymentVerifier.print_summary(results)

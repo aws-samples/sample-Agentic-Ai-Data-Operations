@@ -354,13 +354,25 @@ class RequirementAuditor:
                 )
         return sorted(paths)
 
+    def _workload_relative(self, raw_path: str) -> str:
+        """Accept both ``config/x.yaml`` and repo-relative ``workloads/{name}/config/x.yaml``.
+
+        The contract stores workload-relative targets, but orchestrators commonly
+        record the repo-relative path they wrote to; both name the same file.
+        """
+        prefix = f"workloads/{self.workload_name}/"
+        value = str(raw_path).replace("\\", "/")
+        if value.startswith("./"):
+            value = value[2:]
+        return value[len(prefix):] if value.startswith(prefix) else value
+
     def _path_evidence(
         self, target_paths: Iterable[str], acceptance: Iterable[str]
     ) -> tuple[list[str], str | None]:
         evidence: list[str] = []
         missing: list[str] = []
         for raw_path in sorted(set(target_paths)):
-            path = self.workload_dir / raw_path
+            path = self.workload_dir / self._workload_relative(raw_path)
             if not path.is_file():
                 missing.append(raw_path)
                 continue
