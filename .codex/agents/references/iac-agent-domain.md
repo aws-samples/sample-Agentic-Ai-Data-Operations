@@ -26,7 +26,9 @@ inputs the runbook's "Phase 0" tells you to ask for must already be on disk:
 
 | Input | Where it comes from | If absent |
 |---|---|---|
-| `target_framework` | `human_answers.iac_target_framework` | return `status: "blocked"` |
+| `target_framework` | explicit format selected by the orchestrator from `human_answers.iac_target_frameworks` | return `status: "blocked"` |
+| `target_products` | `human_answers.deployment_target_products` plus the confirmed requirements-audit inventory | return `status: "blocked"` |
+| `artifact_inventory` | `workloads/{name}/run/requirements_audit.json` | return `status: "blocked"` |
 | `tbac_principals` | `human_answers.iac_tbac_principals` | return `status: "blocked"` |
 | `query_principal` | `human_answers.iac_query_principal_arn` | return `status: "blocked"` |
 | `account_topology` | `config/deployment.yaml#account_topology` | default `mode: single` — a documented default, not a guess |
@@ -36,6 +38,9 @@ Ignore the runbook's instruction to ask the user, and ignore its inference heuri
 IAM caller as a TBAC principal, is a Phase 1 gate violation. An **empty**
 `iac_tbac_principals` list is a blocking issue, not permission to pick one.
 The explicit query-verification role is also required; never use the current caller implicitly.
+The IaC agent must not create products outside the confirmed target list or the artifacts
+listed by the requirements auditor. Missing product details are a blocking issue, not a
+reason to invent a Snowflake object, AWS service, bucket, table, database, role, or grant.
 
 Before emitting or applying workload IAM, run
 `shared.utils.deployment_guardrails.validate_deployment_preflight`. The Glue execution

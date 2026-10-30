@@ -160,11 +160,23 @@ def validate_deployment_preflight(
     if not isinstance(answers, Mapping):
         raise DeploymentGuardrailError("run context is missing human_answers")
 
-    framework = answers.get("iac_target_framework")
-    if framework not in _FRAMEWORKS:
+    selected = answers.get("iac_target_frameworks")
+    if selected is None:
+        legacy = answers.get("iac_target_framework")
+        selected = [legacy] if legacy in _FRAMEWORKS else []
+    if (
+        not isinstance(selected, list)
+        or not selected
+        or len(set(selected)) != len(selected)
+        or any(framework not in _FRAMEWORKS for framework in selected)
+    ):
         raise DeploymentGuardrailError(
-            "human_answers.iac_target_framework is required before deployment"
+            "human_answers.iac_target_frameworks is required before deployment "
+            "(or a valid legacy iac_target_framework)"
         )
+    framework = answers.get("iac_target_framework")
+    if framework not in selected:
+        framework = selected[0]
 
     principals = require_tbac_principals(answers)
     query_principal = require_query_principal(answers)
@@ -172,6 +184,7 @@ def validate_deployment_preflight(
     result: Dict[str, Any] = {
         "workload_name": workload_name,
         "iac_target_framework": framework,
+        "iac_target_frameworks": list(selected),
         "iac_tbac_principals": principals,
         "iac_query_principal_arn": query_principal,
     }

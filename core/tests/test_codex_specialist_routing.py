@@ -55,4 +55,15 @@ def test_devops_preserves_named_iac_routing() -> None:
     text = DEVOPS.read_text(encoding="utf-8")
 
     assert "The named role is mandatory" in text
-    assert '**IaC Generator** — spawn with `agent_type: "iac-agent"`' in text
+    assert '**IaC Generator(s)** — after the audit passes' in text
+    assert 'spawn one `iac-agent` per selected format' in text
+
+
+def test_devops_gates_iac_on_audit_and_human_format_selection() -> None:
+    text = DEVOPS.read_text(encoding="utf-8")
+
+    assert "Step 2.1: Requirements Audit and Product Inventory" in text
+    assert "If the audit is not `pass`, stop" in text
+    assert "iac_target_frameworks" in text
+    assert "deployment_target_products" in text
+    assert "Do not create resources for products outside target_products" in text

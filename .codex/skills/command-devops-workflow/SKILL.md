@@ -22,12 +22,13 @@ completes.**
 
 ```
 $command-devops-workflow
-Make customer_master production-ready with Terraform.
+Make customer_master production-ready.
 ```
 
 Arguments:
 - Arg 1: workload name (optional — if omitted, list available workloads and ask)
-- Arg 2: IaC framework (optional — `terraform` / `cdk` / `cloudformation` — if omitted, ask)
+- Arg 2: optional initial IaC format hint. The workflow must still ask the human
+  to confirm the format before starting any IaC agent.
 
 ---
 
@@ -49,16 +50,42 @@ If ANY check fails:
 └────────────────────────────────────────────────────────────────┘
 ```
 
+### Step 2.1: Requirements Audit and Product Inventory
+
+Before asking for an IaC format, run the read-only `requirements-auditor` against the
+workload. It must reconcile `human_answers`, the requirements ledger, decisions, traces,
+tests, and generated pipeline artifacts.
+
+If the audit is not `pass`, stop. Do not ask the IaC agent to fill gaps and do not infer
+products from filenames or PII columns.
+
+When the audit passes, present the human with an evidence-backed inventory:
+
+| Inventory | Evidence source | Examples |
+|---|---|---|
+| Pipeline artifacts | `requirements_audit.json` and workload files | S3 paths, Glue scripts, DAGs, SQL, tests |
+| Data products | confirmed configs and deployment requirements | Iceberg tables, Snowflake tables |
+| AWS services | source/config and approved target decisions | S3, Glue, Lake Formation, KMS |
+| Missing decisions | auditor blocking or ambiguous items | target database, Snowflake role, LF principals |
+
+The inventory is a candidate list, not authorization. The customer must confirm which
+products and services are in scope before the IaC agent starts.
+
 ---
 
 ## Step 3: Discovery Questions
 
 Ask these as normal messages to the user, one group at a time, and wait for each answer (in Plan mode, use `request_user_input`):
 
-### Group 1 — IaC Framework
+### Group 1 — IaC Format and Target Products
 ```
-[ ] Framework: Terraform / AWS CDK (Python) / AWS CDK (TypeScript) / CloudFormation
-[ ] Backend: S3 + DynamoDB (Terraform) / cdk.context.json / S3 (CFN)
+[ ] Output format: Terraform / CloudFormation / AWS CDK Python / AWS CDK TypeScript
+    (the human may select one or more; "all" means generate each selected format)
+[ ] Target products confirmed from the requirements-auditor inventory:
+    S3 / Iceberg tables / Glue / Lake Formation / Snowflake
+[ ] For Snowflake: account, database/schema, warehouse, role, and secret/key reference
+[ ] For AWS: account/region, Glue catalog/database, Lake Formation tag/grant scope,
+    and KMS key references
 [ ] Apply mode: Manual (generate only) / CI/CD (generate + GitHub Actions workflow)
 [ ] TBAC principals: which role ARNs get Lake Formation access, and at which
     sensitivity ceiling (NONE / LOW / MEDIUM / HIGH / CRITICAL) per role?
@@ -73,15 +100,24 @@ name any, stop: an empty list is a blocking issue, and defaulting to the current
 would silently grant that caller access to every classification.
 
 Record the answers to Group 1 in `workloads/{name}/run/context.json` under
-`human_answers.iac_target_framework` and `human_answers.iac_tbac_principals` (see
-`contracts/v1/run_context.schema.json`) so the IaC agent reads what the human actually said
-rather than a paraphrase in a prompt string.
+`human_answers.iac_target_frameworks`, `human_answers.deployment_target_products`,
+and `human_answers.iac_tbac_principals` (see `contracts/v1/run_context.schema.json`) so
+the IaC agents read what the human actually said rather than a paraphrase in a prompt
+string. Keep `iac_target_framework` for backward compatibility when exactly one format
+is selected.
 
 Before any IAM, Lake Formation, Glue, or deployment mutation, run
 `shared.utils.deployment_guardrails.validate_deployment_preflight`. It must pass
 the framework, TBAC, and query-principal checks, require a workload-scoped Glue role, and reject
 wildcard IAM actions or an unbounded resource. If it fails, stop before calling
 MCP or AWS CLI.
+
+No IaC agent may start unless all of these are true:
+
+1. The requirements audit has status `pass`.
+2. The customer confirmed one or more IaC output formats.
+3. The customer confirmed the target products from the auditor inventory.
+4. TBAC principals and the query principal are explicit.
 
 ### Group 2 — Monitoring & Alerting
 ```
@@ -143,6 +179,9 @@ start time of each phase for the Step 6 trace log.
   by the Codex session or project configuration.
 - Placeholders:
   - `{workload_name}` and `{framework}` come from Step 1 or Step 3.
+  - `{artifact_inventory}` comes only from the passing requirements audit and confirmed
+    customer selections.
+  - `{target_products}` comes from the customer's confirmed product selection.
   - `{monitoring}`, `{cost}`, and `{runbook}` are the Step 3 Group 2, 3, and 4 answers,
     serialized as JSON.
   - `{x, default 'y'}` means use the answer `x` if the user gave one, otherwise `y`.
@@ -170,11 +209,36 @@ Report: READY (with extracted config) or NOT_READY (with missing items).
 If the result contains `NOT_READY`, stop and report `not_ready` with the result as the
 reason.
 
+### Phase 0.1: Requirements Audit (sequential, `high`)
+
+```
+Run the requirements-auditor for workload '{workload_name}'.
+
+Read all authoritative evidence:
+- workloads/{workload_name}/run/context.json#human_answers
+- workloads/{workload_name}/run/requirements.jsonl
+- workloads/{workload_name}/run/decisions.jsonl
+- workloads/{workload_name}/logs/trace_events.jsonl
+- workload configs, generated artifacts, tests, and deployment evidence
+
+Write requirements_audit.json, append the audit decision and trace event, and return:
+- status: pass, partial, or failed
+- blocking issues
+- artifact inventory with paths and checksums
+- candidate data products and AWS/Snowflake services evidenced by the workload
+
+Do not infer missing target products or authorize IaC generation.
+```
+
+If the audit is not `pass`, stop before asking the IaC agent to generate anything.
+Present the blocking evidence to the human.
+
 ### Phase 1: IaC + Monitoring + Cost + Runbook (parallel, all `medium`)
 
-**IaC Generator** — spawn with `agent_type: "iac-agent"`. This delegates to the migrated
-role rather than restating its rules inline. A second hand-written IaC prompt here would
-drift from the role, and the divergent copy is the one that would actually run.
+**IaC Generator(s)** — after the audit passes and the human confirms the format and target
+products, spawn one `iac-agent` per selected format. If the human selects all formats,
+run Terraform, CloudFormation, and the approved AWS CDK language as separate generation
+jobs. This delegates to the migrated role rather than restating its rules inline.
 
 ```
 You are the IaC Generator for workload: {workload_name}, framework: {framework}.
@@ -185,7 +249,10 @@ in full — it is your prompt, including the hard scope boundary — then
 layout, APPLY_GUIDE.md template and Cedar permit shape.
 Follow both. Do not substitute your own plan for theirs.
 
-Inputs: target_framework is '{framework}' (supplied by the human via this command).
+Inputs:
+- target_framework is '{framework}' (selected explicitly by the human)
+- target_products are {target_products} (confirmed from the requirements-auditor inventory)
+- artifact_inventory is {artifact_inventory} (from the passing requirements audit)
 Read tbac_principals from workloads/{workload_name}/run/context.json under
 human_answers.iac_tbac_principals. If it is missing or empty, stop and return
 status "blocked" — do NOT derive grants from the PII columns in source.yaml and do
@@ -194,6 +261,10 @@ NOT grant to the current IAM caller.
 Write files under workloads/{workload_name}/iac/{framework}/ plus
 workloads/{workload_name}/iac/policies/permits.cedar. Generation only — no apply, no
 deploy, no AWS calls.
+
+Do not create resources for products outside target_products. Do not invent Snowflake
+objects, AWS services, databases, roles, buckets, tables, or grants absent from the
+artifact inventory or explicit human answers.
 
 End your final message with a single fenced json block conforming to AgentOutput
 (shared/templates/agent_output_schema.py) with a non-empty decisions array; each
