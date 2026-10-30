@@ -327,8 +327,9 @@ reviewer contract.
 ```
 Verify MCP server connectivity for data onboarding.
 DEFAULT profile: verify aws-mcp and use its exposed AWS capabilities.
-DEMO profile: verify glue-athena, lakeformation, iam, pii-detection, and
-cloudtrail. Use the managed aws-mcp surface for S3, KMS, and CloudWatch.
+DEMO profile: verify lakeformation, iam, pii-detection, and cloudtrail. Use the
+managed aws-mcp surface for Glue, Athena, S3, KMS, and CloudWatch (the custom
+glue-athena MCP is excluded for now).
 Use `python3 scripts/mcp_demo.py check --profile demo`
 for deterministic preflight. Block only when a capability required by the
 current phase is unavailable; do not require all 13 optional servers.

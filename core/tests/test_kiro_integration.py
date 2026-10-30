@@ -614,7 +614,13 @@ def test_steering_documents_the_gates_it_claims_to():
 
 def test_kiro_mcp_profiles_are_valid():
     active = json.loads((KIRO / "settings" / "mcp.json").read_text())
-    assert list(active["mcpServers"]) == ["aws-mcp"]
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from mcp_demo import active_profile_mode
+
+    if active_profile_mode() != "demo":
+        assert list(active["mcpServers"]) == ["aws-mcp"]
+    else:
+        assert active == json.loads((ROOT / ".mcp.json").read_text())
 
     optional = json.loads((KIRO / "settings" / "mcp.optional.json").read_text())
     servers = optional["mcpServers"]

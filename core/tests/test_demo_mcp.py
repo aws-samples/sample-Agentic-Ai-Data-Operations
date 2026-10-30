@@ -16,12 +16,31 @@ def test_demo_profile_has_complete_server_set() -> None:
     )
     assert profile["servers"] == [
         "aws-mcp",
-        "glue-athena",
         "lakeformation",
         "iam",
         "pii-detection",
         "cloudtrail",
     ]
+
+
+def test_glue_athena_custom_mcp_is_excluded_everywhere() -> None:
+    """Excluded for now: Glue/Athena go through aws-mcp until it is re-enabled."""
+    profile = json.loads(
+        (ROOT / "mcp-profiles/demo/profile.json").read_text(encoding="utf-8")
+    )
+    assert "glue-athena" not in profile["servers"]
+    assert "glue-athena" in profile["excluded_servers"]
+    json_clients = (
+        ".mcp.json", ".amazonq/mcp.json", ".kiro/settings/mcp.json",
+        "plugins/claude-code/.mcp.json", "adapters/amazon-q/.amazonq/mcp.json",
+        "adapters/kiro/.kiro/settings/mcp.json",
+        "adapters/claude-code/plugins/claude-code/.mcp.json",
+    )
+    for relative in json_clients:
+        servers = json.loads((ROOT / relative).read_text(encoding="utf-8"))["mcpServers"]
+        assert "glue-athena" not in servers, relative
+    for relative in (".codex/config.toml", "adapters/codex/.codex/config.toml"):
+        assert 'mcp_servers."glue-athena"' not in (ROOT / relative).read_text(encoding="utf-8")
 
 
 def test_glue_server_exposes_customer_demo_methods() -> None:

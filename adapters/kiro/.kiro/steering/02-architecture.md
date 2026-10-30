@@ -6,7 +6,7 @@
 │                                                                             │
 │  aws-mcp by default                       full inventory on Gateway          │
 │                                                                             │
-│  REQUIRED: glue-athena, lakeformation, iam  (block if down)                 │
+│  REQUIRED: aws-mcp, lakeformation, iam  (block if down)                     │
 │  WARN:     cloudtrail, redshift, core, s3-tables, pii-detection             │
 │  OPTIONAL: sagemaker-catalog, lambda, cloudwatch, cost-explorer, dynamodb   │
 └────────────────────────────────┬────────────────────────────────────────────┘

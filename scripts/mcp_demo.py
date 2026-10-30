@@ -135,6 +135,41 @@ def target_contents(region: str, aws_profile: str) -> dict[Path, str]:
     return contents
 
 
+def active_profile_mode() -> str:
+    """Return ``"demo"`` when every client file is an exact demo activation, else ``"default"``.
+
+    Validators use this so a profile produced by ``activate --apply`` is not
+    reported as drift. Only an exact match counts: a partial activation or a
+    hand-edited server list is still ``"default"`` and still fails validation.
+    """
+    try:
+        canonical = load_json(DEFAULT_CONFIG).get("mcpServers", {})
+        args = canonical.get("aws-mcp", {}).get("args", [])
+        region = next(
+            (a.split("=", 1)[1] for a in args if str(a).startswith("AWS_REGION=")), None
+        )
+        aws_profile = next(
+            (
+                server.get("env", {}).get("AWS_PROFILE")
+                for name, server in canonical.items()
+                if name != "aws-mcp" and server.get("env", {}).get("AWS_PROFILE")
+            ),
+            None,
+        )
+        if not region or not aws_profile:
+            return "default"
+        expected = target_contents(region, aws_profile)
+    except (OSError, ValueError, KeyError, json.JSONDecodeError):
+        return "default"
+    for relative, content in expected.items():
+        try:
+            if (ROOT / relative).read_text(encoding="utf-8") != content:
+                return "default"
+        except OSError:
+            return "default"
+    return "demo"
+
+
 def check_local_prerequisites(errors: list[str]) -> None:
     for executable in ("uv", "uvx"):
         if shutil.which(executable) is None:

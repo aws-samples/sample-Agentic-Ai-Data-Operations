@@ -9,6 +9,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+
+from mcp_demo import active_profile_mode  # noqa: E402
 
 REQUIRED = {
     "claude-code": (
@@ -68,7 +71,12 @@ def check_json(path: Path, errors: list[str]) -> None:
 
 
 def check_default_mcp_profiles(errors: list[str]) -> None:
-    """Keep the low-noise AWS MCP profile enabled across every client."""
+    """Keep the low-noise AWS MCP profile enabled across every client.
+
+    An exact ``scripts/mcp_demo.py activate`` result is also accepted; the
+    proxy pin below is still enforced in that mode.
+    """
+    demo = active_profile_mode() == "demo"
 
     json_profiles = (
         ".mcp.json",
@@ -87,7 +95,7 @@ def check_default_mcp_profiles(errors: list[str]) -> None:
         except (OSError, json.JSONDecodeError) as exc:
             errors.append(f"cannot inspect active MCP profile {relative}: {exc}")
             continue
-        if names != ["aws-mcp"]:
+        if names != ["aws-mcp"] and not demo:
             errors.append(
                 f"{relative} must enable only aws-mcp by default; found {names}"
             )
@@ -109,7 +117,7 @@ def check_default_mcp_profiles(errors: list[str]) -> None:
         except (OSError, tomllib.TOMLDecodeError) as exc:
             errors.append(f"cannot inspect active Codex MCP profile {relative}: {exc}")
             continue
-        if enabled != ["aws-mcp"]:
+        if enabled != ["aws-mcp"] and not demo:
             errors.append(
                 f"{relative} must enable only aws-mcp by default; found {enabled}"
             )
@@ -170,7 +178,7 @@ def check_demo_profile(errors: list[str]) -> None:
     except json.JSONDecodeError as exc:
         errors.append(f"invalid demo profile JSON: {exc}")
         return
-    expected = {
+    known = {
         "aws-mcp",
         "glue-athena",
         "lakeformation",
@@ -178,6 +186,15 @@ def check_demo_profile(errors: list[str]) -> None:
         "pii-detection",
         "cloudtrail",
     }
+    # A server may be switched off only by naming it, with a reason, in
+    # `excluded_servers`; anything else missing from `servers` is drift.
+    excluded = profile.get("excluded_servers", {})
+    for name, reason in excluded.items():
+        if name not in known or name == "aws-mcp":
+            errors.append(f"demo profile cannot exclude {name!r}")
+        elif not str(reason).strip():
+            errors.append(f"demo profile excludes {name!r} without a reason")
+    expected = known - set(excluded)
     actual = set(profile.get("servers", []))
     if actual != expected:
         errors.append(

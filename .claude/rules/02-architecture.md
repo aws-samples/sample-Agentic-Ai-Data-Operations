@@ -4,7 +4,7 @@
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  MCP SERVERS (set up FIRST — before any phase)                              │
 │                                                                             │
-│  Default: aws-mcp (.mcp.json)       Demo: six specialized servers            │
+│  Default: aws-mcp (.mcp.json)       Demo: aws-mcp + 4 specialized servers    │
 │  Optional: specialized profiles     Gateway: full inventory when deployed   │
 │                                                                             │
 │  Block only when a capability required by the current phase is unavailable.  │

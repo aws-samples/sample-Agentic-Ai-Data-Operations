@@ -302,7 +302,7 @@ start time of each phase for the Step 8 trace log.
 
 ```
 Verify MCP server connectivity for data onboarding.
-REQUIRED (block if down): glue-athena, lakeformation, iam
+REQUIRED (block if down): aws-mcp (serves Glue + Athena; the custom glue-athena MCP is excluded for now), lakeformation, iam
 WARN (log but continue): cloudtrail, redshift, core, s3-tables, pii-detection
 OPTIONAL (skip): sagemaker-catalog, lambda, cloudwatch, cost-explorer, dynamodb
 Report: status per server (UP/DOWN/SKIP). If any REQUIRED is DOWN, say BLOCKED.

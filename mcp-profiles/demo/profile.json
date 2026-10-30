@@ -5,12 +5,14 @@
   "aws_profile": "default",
   "servers": [
     "aws-mcp",
-    "glue-athena",
     "lakeformation",
     "iam",
     "pii-detection",
     "cloudtrail"
   ],
+  "excluded_servers": {
+    "glue-athena": "Custom Glue/Athena MCP excluded for now. Glue and Athena calls go through aws-mcp (call_aws / run_script), with the AWS CLI as fallback. Server code stays in mcp-servers/glue-athena-server; add it back to servers to re-enable."
+  },
   "readiness_checks": [
     "aws_identity",
     "mcp_processes",

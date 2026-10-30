@@ -24,7 +24,7 @@ Rationale: Agent creates and modifies files within the workspace
 - Intended model class: inherits from parent session with `high` reasoning effort
 - Suggested turn limit: no limit
 - External memory: optional; describe only when configured
-- MCP dependency status: satisfied by project `.codex/config.toml` (glue-athena)
+- MCP dependency status: none required. The custom glue-athena MCP is excluded for now; read the Gold schema from `workloads/{name}/run/gold_schema.json`, which the orchestrator writes via aws-mcp. If it is missing, return status blocked.
 
 ## Constraints
 

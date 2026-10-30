@@ -62,15 +62,21 @@ python3 scripts/mcp_demo.py check --profile demo
 python3 scripts/mcp_demo.py activate --profile demo --apply
 ```
 
-The demo profile checks `aws-mcp`, `glue-athena`, `lakeformation`, `iam`,
-`pii-detection`, and `cloudtrail`. S3, KMS, and CloudWatch checks use the
-managed `aws-mcp` surface. The complete 13-server
+The demo profile checks `aws-mcp`, `lakeformation`, `iam`, `pii-detection`, and
+`cloudtrail`. Glue, Athena, S3, KMS, and CloudWatch use the managed `aws-mcp`
+surface.
+
+> **The custom `glue-athena` MCP is excluded for now** (`mcp-profiles/demo/profile.json`
+> `excluded_servers`). Wherever a table below names a `glue-athena` tool, use `aws-mcp`
+> (`call_aws` / `run_script`) for the same Glue or Athena API, or the CLI in the Fallback
+> column. Re-enable it by adding `glue-athena` back to the profile's `servers` and running
+> `python3 scripts/mcp_demo.py activate --profile demo --apply`. The complete 13-server
 inventory is relevant only when explicitly using the optional catalog or
 AgentCore Gateway deployment.
 
 **Hosting modes:**
 - **Default local mode** (`.mcp.json`): `aws-mcp` via stdio transport
-- **Demo local mode**: the six-server demo profile via stdio transport
+- **Demo local mode**: the five-server demo profile via stdio transport
 - **Gateway mode** (`.mcp.gateway.json`): optional server inventory via SSE transport
 
 If using Gateway mode, deploy the Gateway FIRST via `runbooks/environment-setup-agent/02-deploy-agentcore-gateway.md` before running health check.
@@ -79,7 +85,8 @@ If using Gateway mode, deploy the Gateway FIRST via `runbooks/environment-setup-
 
 | Server | Category | If Failed |
 |--------|----------|-----------|
-| `glue-athena` | **REQUIRED** | BLOCK — cannot register tables, run crawlers, or query Athena |
+| `aws-mcp` | **REQUIRED** | BLOCK — serves Glue and Athena while the custom `glue-athena` MCP is excluded |
+| `glue-athena` | EXCLUDED (for now) | Not loaded; use `aws-mcp` for Glue/Athena |
 | `lakeformation` | **REQUIRED** | BLOCK — cannot apply LF-Tags or TBAC grants |
 | `iam` | **REQUIRED** | BLOCK — cannot verify or create permissions |
 | `cloudtrail` | WARN | Proceed, defer audit verification |
@@ -281,7 +288,7 @@ Re-run the **Phase 0 Step 0.2 health check** before any deployment. If Phase 0 w
 See [Phase 0 Step 0.2](#step-02-mcp-health-check) for the full 3-tier server table (REQUIRED / WARN / OPTIONAL).
 
 **Rules:**
-1. Do NOT proceed with deployment if any REQUIRED server (`glue-athena`, `lakeformation`, `iam`) fails
+1. Do NOT proceed with deployment if any REQUIRED server (`aws-mcp`, `lakeformation`, `iam`) fails
 2. Slow-startup servers (`core`, `pii-detection`, `sagemaker-catalog`) may timeout on health check — test with a simple call to confirm
 3. Present health check results to human before deploying
 4. If health check was already run in Phase 0, report: `"MCP health check: reusing Phase 0 results ({N}/13 connected). Re-run? [y/N]"`
@@ -409,7 +416,7 @@ again as Step 5.9i/5.9j.
 **Rules for Step 5.8**:
 1. Sub-agent has ONE MCP permission: `mcp__glue-athena__get_table`. Everything else is local.
 2. `shared.semantic_layer.induce_and_stage(mode="aws_semantic_layer", ...)` currently raises `NotImplementedError`. Do not call it with that mode until AWS Semantic Layer ships.
-3. If the `glue-athena` MCP is down, fall back to `aws glue get-table` CLI — the function accepts a plain dict.
+3. The `glue-athena` MCP is excluded for now: before spawning the ontology agent, the orchestrator fetches the Gold table with `aws-mcp` (`glue get-table`, or the CLI) and writes the response to `workloads/{name}/run/gold_schema.json`. The agent reads that file; `induce_and_stage` accepts a plain dict.
 4. If Turtle validation fails after 2 auto-fix retries, STOP and surface the error. Do not commit invalid TTL files.
 
 ### Step 5.8a: Glue Jobs

@@ -268,7 +268,7 @@ const results = await pipeline(
     phase('Health Check')
     const health = await agent(
       `Verify MCP server connectivity for data onboarding.\n` +
-      `REQUIRED (block if down): glue-athena, lakeformation, iam\n` +
+      `REQUIRED (block if down): aws-mcp (serves Glue + Athena; the custom glue-athena MCP is excluded for now), lakeformation, iam\n` +
       `WARN (log but continue): cloudtrail, redshift, core, s3-tables, pii-detection\n` +
       `OPTIONAL (skip): sagemaker-catalog, lambda, cloudwatch, cost-explorer, dynamodb\n` +
       `Report: status per server (UP/DOWN/SKIP). If any REQUIRED is DOWN, say BLOCKED.`,

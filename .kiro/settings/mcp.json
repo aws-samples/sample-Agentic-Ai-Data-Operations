@@ -8,6 +8,68 @@
         "--metadata",
         "AWS_REGION=us-east-1"
       ]
+    },
+    "lakeformation": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--no-project",
+        "--with",
+        "fastmcp",
+        "--with",
+        "boto3",
+        "--python",
+        "3.13",
+        "mcp-servers/lakeformation-server/server.py"
+      ],
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "AWS_PROFILE": "default"
+      }
+    },
+    "iam": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "awslabs-iam-mcp-server",
+        "awslabs.iam-mcp-server"
+      ],
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "AWS_PROFILE": "default",
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      }
+    },
+    "pii-detection": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--no-project",
+        "--with",
+        "boto3",
+        "--with",
+        "fastmcp",
+        "--python",
+        "3.13",
+        "mcp-servers/pii-detection-server/server.py"
+      ],
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "AWS_PROFILE": "default"
+      }
+    },
+    "cloudtrail": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "awslabs-cloudtrail-mcp-server",
+        "awslabs.cloudtrail-mcp-server"
+      ],
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "AWS_PROFILE": "default",
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      }
     }
   }
 }

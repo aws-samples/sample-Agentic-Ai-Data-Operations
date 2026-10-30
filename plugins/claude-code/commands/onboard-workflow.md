@@ -314,7 +314,7 @@ const results = await pipeline(
     phase('Health Check')
     const health = await agent(
       `Verify MCP server connectivity for data onboarding.\n` +
-      `DEFAULT profile: aws-mcp. DEMO profile: glue-athena, lakeformation, iam, pii-detection, cloudtrail; managed aws-mcp handles S3, KMS, and CloudWatch.\n` +
+      `DEFAULT profile: aws-mcp. DEMO profile: lakeformation, iam, pii-detection, cloudtrail; managed aws-mcp handles Glue, Athena, S3, KMS, and CloudWatch (the custom glue-athena MCP is excluded for now).\n` +
       `Use python3 scripts/mcp_demo.py check --profile demo for deterministic live-demo preflight.\n` +
       `Block only when a capability required by the current phase is unavailable; do not require all 13 servers.\n` +
       `Report: active profile, status per server (UP/DOWN/SKIP), and any fallback.`,

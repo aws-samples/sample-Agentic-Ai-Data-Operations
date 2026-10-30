@@ -7,7 +7,7 @@
 │  aws-mcp by default                       full inventory on Gateway          │
 │                                                                             │
 │  DEFAULT:  aws-mcp                                                         │
-│  DEMO:     glue-athena, lakeformation, iam, pii-detection, cloudtrail       │
+│  DEMO:     lakeformation, iam, pii-detection, cloudtrail (+ aws-mcp)        │
 │  OPTIONAL: remaining specialized servers                                   │
 └────────────────────────────────┬────────────────────────────────────────────┘
                                  │ all phases use MCP tools

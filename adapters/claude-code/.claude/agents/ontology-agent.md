@@ -23,13 +23,19 @@ business term from column names.**
 
 ## Boundaries — MCP access is one tool only
 
-You may call `mcp__glue-athena__get_table` to read the Gold-zone schema. That is your only
-AWS access; you have **no write access to AWS**. Emission is file-only to
+You may call `mcp__glue-athena__get_table` to read the Gold-zone schema **when that server is
+loaded**. The custom `glue-athena` MCP is excluded for now, so normally the orchestrator fetches
+the schema (via `aws-mcp` `glue get-table`) and saves the response to
+`workloads/{name}/run/gold_schema.json` before spawning you. That is your only AWS input; you
+have **no write access to AWS** and no other AWS read path. Emission is file-only to
 `workloads/{name}/config/`. You do not spawn other agents.
 
 ## Workflow
 
-1. Fetch the Glue Gold-zone schema via `mcp__glue-athena__get_table`.
+1. Get the Glue Gold-zone schema: call `mcp__glue-athena__get_table` if it is available,
+   otherwise read `workloads/{name}/run/gold_schema.json`. If neither exists, return
+   `status: "blocked"` asking the orchestrator to write that file — do not run the AWS CLI
+   yourself and do not reconstruct the schema from `semantic.yaml`.
 2. Call:
    ```python
    shared.semantic_layer.induce_and_stage(

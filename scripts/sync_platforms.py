@@ -24,6 +24,9 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+
+from mcp_demo import active_profile_mode  # noqa: E402
 
 ACTIVE_JSON_PROFILES = (
     Path(".mcp.json"),
@@ -122,6 +125,7 @@ REQUIRED_SHARED_PATHS = (
 # them silently losing the deploy step again.
 DEPLOY_PHASE_SURFACES = {
     ".claude/commands/onboard-workflow.md": ("simulate", "active-runs", "Step 5.9"),
+    "adapters/claude-code/.claude/commands/onboard-workflow.md": ("simulate", "active-runs", "Step 5.9"),
     "plugins/claude-code/commands/onboard-workflow.md": ("simulate", "active-runs", "Step 5.9"),
     "adapters/claude-code/plugins/claude-code/commands/onboard-workflow.md": (
         "simulate", "active-runs", "Step 5.9",
@@ -190,7 +194,10 @@ def check_paths(errors: list[str]) -> None:
 def check_active_mcp_profiles(errors: list[str]) -> None:
     canonical = load_json(Path(".mcp.json"), errors)
     servers = canonical.get("mcpServers", {})
-    if list(servers) != ["aws-mcp"]:
+    # An exact `mcp_demo.py activate` result is a supported mode; drift checks
+    # below still require every client file to agree with .mcp.json.
+    demo = active_profile_mode() == "demo"
+    if list(servers) != ["aws-mcp"] and not demo:
         errors.append(f".mcp.json must enable only aws-mcp; found {list(servers)}")
 
     for relative in ACTIVE_JSON_PROFILES:
@@ -205,7 +212,7 @@ def check_active_mcp_profiles(errors: list[str]) -> None:
         enabled = [
             name for name, value in mcp_servers.items() if value.get("enabled") is True
         ]
-        if enabled != ["aws-mcp"]:
+        if enabled != (list(servers) if demo else ["aws-mcp"]):
             errors.append(f"{relative} must enable only aws-mcp; found {enabled}")
         aws_mcp = mcp_servers.get("aws-mcp", {})
         expected_args = canonical_server.get("args", [])
