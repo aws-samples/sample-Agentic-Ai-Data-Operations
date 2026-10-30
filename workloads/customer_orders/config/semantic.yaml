@@ -1,118 +1,298 @@
-workload: customer_orders
-dataset_name: customer_orders
-version: v1
-domain: ecommerce_orders
-description: Order-level reporting metadata for the customer orders data product.
-compliance: GDPR
-ontology_opt_in: false
-data_minimization: true
+# spec_hash: generated_by_metadata_agent
+# template_id: semantic_metadata
+# schema_version: v1
+# rendered_at: 2026-10-22T18:18:44Z
 
-use_cases:
-  - order_level_reporting
-consumers:
-  - QuickSight
+dataset:
+  name: customer_orders
+  description: "E-commerce customer order transactions with GDPR-compliant PII handling"
+  domain: sales
+  owner: Sales Analytics Team
+  sensitivity: Internal
+  source: "${CUSTOMER_ORDERS_SOURCE_URI}"
+  format: csv
+  grain: "one row per order"
+  compliance: GDPR
 
-tables:
-  - name: Order
-    table_type: fact
-    description: One curated order record at order_id grain for reporting.
-    physical_table: gold_customer_orders
-    grain: one row per order_id
-    primary_key: order_id
-    columns:
-      - name: order_id
-        type: string
-        description: Unique order identifier.
-        role: identifier
-      - name: order_count
-        type: integer
-        description: Count of orders at order_id grain.
-        role: measure
-      - name: revenue
-        type: decimal
-        description: Quantity times unit_price times (1 - discount_pct), rounded half-up to 2 decimals.
-        role: measure
-      - name: customer_id
-        type: string
-        description: Customer identifier used as the GDPR data subject identifier.
-        role: identifier
-      - name: product_id
-        type: string
-        description: Product identifier associated with the order.
-        role: identifier
-      - name: order_date
-        type: date
-        description: Order date interpreted in America/New_York.
-        role: temporal
-      - name: ship_date
-        type: date
-        description: Nullable shipment date; order_date must not follow it when present.
-        role: temporal
-      - name: quantity
-        type: integer
-        description: Ordered quantity.
-        role: measure
-      - name: unit_price
-        type: decimal
-        description: Unit price in USD with DECIMAL(10,2) precision and scale.
-        role: measure
-      - name: discount_pct
-        type: decimal
-        description: Discount represented as a fraction in [0,1].
-        role: measure
-      - name: payment_method
-        type: string
-        description: Payment method.
-        role: dimension
-      - name: order_status
-        type: string
-        description: Current order status.
-        role: dimension
-      - name: data_subject_id
-        type: string
-        description: GDPR data-subject link populated from customer_id.
-        role: identifier
-      - name: consent_given
-        type: boolean
-        description: Demo GDPR consent fixture; must be replaced before production.
-        role: attribute
-      - name: consent_timestamp
-        type: timestamp
-        description: Demo consent timestamp populated from ingestion time.
-        role: temporal
-      - name: is_deleted
-        type: boolean
-        description: GDPR right-to-erasure soft-delete flag.
-        role: attribute
-      - name: deletion_requested_at
-        type: timestamp
-        description: Nullable GDPR erasure-request timestamp.
-        role: temporal
+# Column metadata combining technical profiling + business context
+columns:
+  measures:
+    - name: revenue
+      data_type: DECIMAL(12,2)
+      nullable: false
+      description: "Net revenue after discount, half-up rounded to 2 decimals"
+      unit: USD
+      default_aggregation: SUM
+      derived_from: "quantity * unit_price * (1 - discount_pct)"
+      
+    - name: quantity
+      data_type: INTEGER
+      nullable: false
+      description: "Number of units ordered"
+      unit: count
+      default_aggregation: SUM
+      
+    - name: unit_price
+      data_type: DECIMAL(10,2)
+      nullable: false
+      description: "Price per unit before discount"
+      unit: USD
+      default_aggregation: AVG
+      
+    - name: discount_pct
+      data_type: DECIMAL(5,2)
+      nullable: false
+      description: "Discount percentage as fraction [0,1]"
+      unit: fraction
+      default_aggregation: AVG
 
+  dimensions:
+    - name: payment_method
+      data_type: STRING
+      nullable: false
+      description: "Payment type"
+      cardinality: low
+      
+    - name: order_status
+      data_type: STRING
+      nullable: false
+      description: "Order fulfillment status"
+      cardinality: low
+      default_filter: "completed"
+
+  temporal:
+    - name: order_date
+      data_type: DATE
+      nullable: false
+      description: "Date the order was placed"
+      grain: day
+      is_primary_temporal: true
+      timezone: "America/New_York"
+      
+    - name: ship_date
+      data_type: DATE
+      nullable: true
+      description: "Date the order was shipped (null if pending)"
+      grain: day
+      is_primary_temporal: false
+
+  identifiers:
+    - name: order_id
+      data_type: STRING
+      nullable: false
+      description: "Unique order identifier"
+      role: primary_key
+      
+    - name: customer_id
+      data_type: STRING
+      nullable: false
+      description: "Customer identifier"
+      role: foreign_key
+      
+    - name: product_id
+      data_type: STRING
+      nullable: false
+      description: "Product identifier"
+      role: foreign_key
+
+  pii:
+    - name: customer_email
+      data_type: STRING
+      nullable: true
+      classification: PII
+      phi_type: EMAIL
+      sensitivity: HIGH
+      confidence: 0.98
+      masking: hash
+      gdpr_lawful_basis: consent
+      
+    - name: customer_phone
+      data_type: STRING
+      nullable: true
+      classification: PII
+      phi_type: PHONE
+      sensitivity: MEDIUM
+      confidence: 0.95
+      masking: mask_partial
+      gdpr_lawful_basis: consent
+      
+    - name: credit_card_number
+      data_type: STRING
+      nullable: true
+      classification: PII
+      phi_type: ACCOUNT
+      sensitivity: CRITICAL
+      confidence: 0.99
+      masking: tokenize
+      token_output_column: credit_card_token
+      gdpr_lawful_basis: consent
+      pci_dss: true
+      
+    - name: customer_name
+      data_type: STRING
+      nullable: true
+      classification: PII
+      phi_type: NAME
+      sensitivity: HIGH
+      confidence: 0.97
+      masking: mask_partial
+      gdpr_lawful_basis: consent
+      
+    - name: shipping_address
+      data_type: STRING
+      nullable: true
+      classification: PII
+      phi_type: ADDRESS
+      sensitivity: MEDIUM
+      confidence: 0.92
+      masking: redact
+      gdpr_lawful_basis: consent
+      
+    - name: city
+      data_type: STRING
+      nullable: true
+      classification: PII
+      phi_type: ADDRESS
+      sensitivity: MEDIUM
+      confidence: 0.90
+      masking: redact
+      gdpr_lawful_basis: consent
+      
+    - name: state
+      data_type: STRING
+      nullable: true
+      classification: PII
+      phi_type: ADDRESS
+      sensitivity: MEDIUM
+      confidence: 0.90
+      masking: redact
+      gdpr_lawful_basis: consent
+      
+    - name: zip_code
+      data_type: STRING
+      nullable: true
+      classification: PII
+      phi_type: ADDRESS
+      sensitivity: MEDIUM
+      confidence: 0.91
+      masking: redact
+      gdpr_lawful_basis: consent
+
+# GDPR-specific compliance columns
+  gdpr_compliance:
+    - name: data_subject_id
+      data_type: STRING
+      nullable: false
+      description: "GDPR data subject identifier (maps to customer_id)"
+      derived_from: customer_id
+      
+    - name: consent_given
+      data_type: BOOLEAN
+      nullable: false
+      description: "GDPR consent flag (demo fixture - replace before production)"
+      default_value: true
+      
+    - name: consent_timestamp
+      data_type: TIMESTAMP
+      nullable: false
+      description: "GDPR consent timestamp (demo uses fixed run start)"
+      
+    - name: is_deleted
+      data_type: BOOLEAN
+      nullable: false
+      description: "GDPR right-to-erasure soft delete flag"
+      default_value: false
+      
+    - name: deletion_requested_at
+      data_type: TIMESTAMP
+      nullable: true
+      description: "GDPR erasure request timestamp"
+
+# Dimension hierarchies
+dimension_hierarchies:
+  - name: time_hierarchy
+    levels: ["year", "quarter", "month", "week", "day"]
+    source_column: order_date
+    description: "Standard calendar time hierarchy in America/New_York timezone"
+
+# Default filters
+default_filters:
+  revenue_queries:
+    condition: "order_status = 'completed'"
+    reason: "Revenue should only include completed orders"
+  active_records:
+    condition: "is_deleted = false"
+    reason: "GDPR: exclude soft-deleted records from analytics"
+
+# Business terms
 business_terms:
-  - term: Order Count
-    definition: Count of distinct orders at order_id grain.
-    related_columns: [order_id]
-  - term: Revenue
-    definition: Sum of derived revenue at order_id grain.
-    related_columns: [revenue]
+  - term: revenue
+    synonyms: ["sales", "turnover", "income"]
+    definition: "Final order amount after applying discount"
+    sql_expression: "SUM(revenue)"
+    default_filter: "order_status = 'completed' AND is_deleted = false"
+    
+  - term: order count
+    synonyms: ["number of orders", "volume", "transactions"]
+    definition: "Count of distinct orders"
+    sql_expression: "COUNT(DISTINCT order_id)"
+    
+  - term: AOV
+    synonyms: ["average order value", "basket size"]
+    definition: "Average revenue per order"
+    sql_expression: "SUM(revenue) / COUNT(DISTINCT order_id)"
+    default_filter: "order_status = 'completed' AND is_deleted = false"
 
-controls:
-  credit_card_number:
-    target: credit_card_token
-    method: tokenize
-    retain_pan: false
-    retain_last_four: false
-    gold_exposure: suppressed
-    suppression_reason: Tokenized payment references are not exposed in the final Gold physical table.
-  credit_card_token:
-    gold_exposure: suppressed
-    suppression_reason: Tokenized payment references are not exposed in the final Gold physical table.
-  pii_columns_not_exposed_in_gold:
-    - customer_email
-    - customer_phone
-    - customer_name
-    - shipping_address
-    - city
-    - state
-    - zip_code
+# Time intelligence
+time_intelligence:
+  fiscal_year_start: 1  # January
+  week_starts_on: Monday
+  timezone: "America/New_York"
+  common_comparisons: ["MoM", "QoQ", "YoY", "WoW", "YTD", "MTD"]
+  data_freshness:
+    refresh_frequency: daily
+    latest_data: "T-1"
+    schedule_cron: "0 9 * * *"
+    schedule_timezone: "America/New_York"
+    note: "Data loads at 9am ET daily. Latest available data is previous day."
+
+# Relationships
+relationships: []
+
+# GDPR compliance metadata
+gdpr_compliance:
+  lawful_basis: consent
+  data_subject_identifier: customer_id
+  retention_period_days: 365
+  audit_retention_days: 2555
+  right_to_erasure: true
+  right_to_access: true
+  consent_mechanism: "At ingestion (demo fixture - replace before production)"
+  privacy_notice_url: "https://example.com/privacy"
+  dpo_contact: "dpo@example.com"
+  
+# Encryption configuration
+encryption:
+  zones:
+    landing:
+      kms_key_alias: "alias/${CUSTOMER_ORDERS_GDPR_KMS_KEY_ALIAS}"
+      algorithm: AES-256
+      transport: TLS_1_3
+    staging:
+      kms_key_alias: "alias/${CUSTOMER_ORDERS_GDPR_KMS_KEY_ALIAS}"
+      algorithm: AES-256
+      transport: TLS_1_3
+    publish:
+      kms_key_alias: "alias/${CUSTOMER_ORDERS_GDPR_KMS_KEY_ALIAS}"
+      algorithm: AES-256
+      transport: TLS_1_3
+  key_rotation:
+    enabled: true
+    frequency: annual
+
+# Data stewardship
+data_steward:
+  owner: Sales Analytics Team
+  domain: sales
+  sensitivity: Internal
+  contact: sales-analytics@example.com

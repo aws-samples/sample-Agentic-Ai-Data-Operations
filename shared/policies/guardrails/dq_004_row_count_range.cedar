@@ -6,5 +6,6 @@ forbid (
 )
 when {
     context.guardrailCode == "DQ-004" &&
+    context has rowCountAboveZero &&
     context.rowCountAboveZero == false
 };

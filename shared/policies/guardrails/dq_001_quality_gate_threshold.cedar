@@ -7,5 +7,7 @@ forbid (
 )
 when {
     context.guardrailCode == "DQ-001" &&
+    context has qualityScore &&
+    context has qualityThreshold &&
     context.qualityScore < context.qualityThreshold
 };

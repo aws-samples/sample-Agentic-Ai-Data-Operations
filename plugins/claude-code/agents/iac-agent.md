@@ -64,7 +64,7 @@ for.
 - `workloads/{name}/iac/{framework}/*` — the IaC files
 - `workloads/{name}/iac/{framework}/APPLY_GUIDE.md` — manual apply steps, every silently
   applied default echoed, rollback notes, known gaps
-- `shared/policies/workloads/{name}/permits.cedar`
+- `workloads/{name}/iac/policies/permits.cedar` (staged draft: agents cannot write shared/policies/; a human reviews it and copies it to shared/policies/workloads/{name}/permits.cedar)
 
 Determinism: `random_seed: 42`, `timestamp_mode: fixed` — compute `started_at` once and reuse
 it. Never `datetime.now()` inside generated files. Use

@@ -31,6 +31,15 @@
             "command": "python3 .claude/hooks/deploy_gate.py"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/cedar_gate.py",
+            "timeout": 25
+          }
+        ]
       }
     ],
     "SessionStart": [

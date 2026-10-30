@@ -6,5 +6,6 @@ forbid (
 )
 when {
     context.guardrailCode == "INT-004" &&
+    context has schemaMatches &&
     context.schemaMatches == false
 };

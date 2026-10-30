@@ -26,3 +26,6 @@ env/
 .LSOverride
 .idea/
 .vscode/
+
+# Cedar gate decision log (local, per machine)
+logs/cedar_decisions.jsonl

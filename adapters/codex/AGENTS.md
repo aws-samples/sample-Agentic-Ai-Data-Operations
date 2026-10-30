@@ -79,6 +79,27 @@ See `.codex/skills/discovery-protocol/SKILL.md` for correct/incorrect behavior e
 9. **Workload-scoped Glue roles** — use `shared.utils.deployment_guardrails` before IAM changes; never expand a shared Glue role
 10. **Explicit TBAC/query principals** — deploy only with human-provided `human_answers.iac_tbac_principals` and `iac_query_principal_arn`; never infer the current caller
 
+## Cedar Policy Enforcement
+
+Every tool call on Claude Code, Codex and Kiro is evaluated against the Cedar
+policies in `shared/policies/` by the `cedar_gate.py` PreToolUse hook
+(engine: `shared/utils/cedar_gate.py`, real cedarpy, fails closed).
+
+- **Principal:** the subagent's `agent_type` (Claude Code, Codex) or the
+  agent's own `--principal` hook argument (Kiro). Main conversation =
+  `onboarding`. Any non-ADOP agent = `general`.
+- **Agents** may write only their documented outputs
+  (`shared/policies/agent_authorization/*.cedar`). Sub-agents cannot call
+  MCP/AWS tools or the `aws` CLI (the ontology agent keeps `get_table`).
+- **No agent, including the main conversation, may write `shared/policies/**`
+  or `run/deploy_gate.json`.** Policy changes are made by a human.
+- **SEC-001:** writing a hardcoded secret is denied for everyone.
+- **Mode:** `shared/policies/enforcement.json` — `audit` logs to
+  `logs/cedar_decisions.jsonl` and blocks nothing; `enforce` blocks. Only a
+  human switches it.
+- Pipeline guardrails (DQ/INT/OPS, SEC-002..004) are evaluated by the pipeline
+  at run time, not at tool-call time.
+
 ## Agent Behavior Protocol
 
 1. **Route First** → check `workloads/` for existing data (found/not-found/partial)

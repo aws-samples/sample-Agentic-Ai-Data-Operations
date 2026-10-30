@@ -58,7 +58,7 @@ Code sub-agent's toolset.
 4. Assemble a deterministic resource manifest.
 5. Generate IaC files to `workloads/{workload_name}/iac/{framework}/`.
 6. Generate a per-workload Cedar permit file at
-   `shared/policies/workloads/{workload_name}/permits.cedar`.
+   `workloads/{workload_name}/iac/policies/permits.cedar`.
 7. Run self-validation (`terraform fmt/validate/tflint/checkov`, `cdk synth`,
    `cfn-lint`, `cedar validate`) with auto-fix up to 2 attempts.
 8. Write `workloads/{workload_name}/iac/{framework}/APPLY_GUIDE.md` with
@@ -351,7 +351,7 @@ resources:
 
   - kind: cedar_policy
     logical_name: permits_{workload_name}
-    target_path: shared/policies/workloads/{workload_name}/permits.cedar
+    target_path: workloads/{workload_name}/iac/policies/permits.cedar
     source: derived
 ```
 
@@ -651,7 +651,7 @@ Cedar is not optional. The platform's guardrail policies live in
 
 ### 5.1 Per-workload permits
 
-Generate `shared/policies/workloads/{workload_name}/permits.cedar` with one
+Generate `workloads/{workload_name}/iac/policies/permits.cedar` with one
 permit per agent that needs to operate on this workload's resources:
 
 ```cedar
@@ -791,7 +791,7 @@ the human-facing companion to the JSON `AgentOutput`. It is **not** optional.
    - [ ] Target region matches workload expectation: `{region}`
    - [ ] Platform resources exist (MWAA env, Glue service role, Lake Formation admin)
    - [ ] `shared/iac/modules/` exists if required (record: `true`/`false`)
-   - [ ] Cedar permit file at `shared/policies/workloads/{workload_name}/permits.cedar`
+   - [ ] Cedar permit file at `workloads/{workload_name}/iac/policies/permits.cedar`
          committed to git
    - [ ] No conflicting workload with the same names in the target account
 
@@ -888,7 +888,7 @@ AgentOutput(
          "type": "tf",    "checksum": "<sha256>"},
         {"path": "workloads/{name}/iac/terraform/APPLY_GUIDE.md",
          "type": "md",    "checksum": "<sha256>"},
-        {"path": "shared/policies/workloads/{name}/permits.cedar",
+        {"path": "workloads/{name}/iac/policies/permits.cedar",
          "type": "cedar", "checksum": "<sha256>"},
         ...
     ],

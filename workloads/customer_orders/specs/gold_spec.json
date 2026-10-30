@@ -1,0 +1,71 @@
+{
+  "dataset_name": "customer_orders",
+  "schema_version": "v1",
+  "source_table": "glue_catalog.customer_orders_db.silver_customer_orders",
+  "schema_type": "flat_iceberg",
+  "grain": {
+    "dimensions": ["order_id"],
+    "temporal": "none"
+  },
+  "measures": [
+    {
+      "name": "order_count",
+      "source_column": "order_id",
+      "aggregation": "count"
+    },
+    {
+      "name": "revenue",
+      "source_column": "revenue",
+      "aggregation": "sum"
+    },
+    {
+      "name": "data_subject_id",
+      "source_column": "data_subject_id",
+      "aggregation": "first_value"
+    },
+    {
+      "name": "consent_given",
+      "source_column": "consent_given",
+      "aggregation": "first_value"
+    },
+    {
+      "name": "consent_timestamp",
+      "source_column": "consent_timestamp",
+      "aggregation": "first_value"
+    },
+    {
+      "name": "is_deleted",
+      "source_column": "is_deleted",
+      "aggregation": "first_value"
+    },
+    {
+      "name": "deletion_requested_at",
+      "source_column": "deletion_requested_at",
+      "aggregation": "first_value"
+    }
+  ],
+  "dimensions": [],
+  "quality_threshold": 0.95,
+  "iceberg_database": "customer_orders_db",
+  "iceberg_table": "gold_customer_orders",
+  "publish_via_gate": false,
+  "iceberg_partition_spec": [],
+  "output_tables": [
+    {
+      "name": "gold_customer_orders",
+      "type": "flat",
+      "columns": [
+        "order_id",
+        "order_count",
+        "revenue",
+        "data_subject_id",
+        "consent_given",
+        "consent_timestamp",
+        "is_deleted",
+        "deletion_requested_at"
+      ]
+    }
+  ],
+  "derived_silver_columns": [],
+  "post_aggregation_columns": []
+}

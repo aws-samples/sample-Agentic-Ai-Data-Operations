@@ -41,7 +41,9 @@ The platforms coexist in one checkout. Each has its own hook wiring
 `.amazonq/cli-agents/`), and all of them call the same `shared/` renderer,
 contracts, and auditor. When you change a root surface such as `.kiro/hooks/`,
 copy the change to its `adapters/` snapshot. `sync_platforms.py check` verifies
-that required files exist, not that their contents match.
+that required files exist and that the security hooks (`cedar_gate.py`,
+`deploy_gate.py`) are identical and registered on every platform; it does not
+compare other file contents.
 
 ## Quick start
 
@@ -80,18 +82,20 @@ require the Claude plugin.
 
 ### Headless AWS Strands runtime
 
-[`runtimes/strands/`](runtimes/strands/) runs the Phase 4 build sub-agents
-in-process with the [AWS Strands Agents SDK](https://strandsagents.com) on
+[`runtimes/strands/`](runtimes/strands/) runs Phase 3 profiling and the Phase 4 build
+sub-agents in-process with the [AWS Strands Agents SDK](https://strandsagents.com) on
 Amazon Bedrock. It plugs into the same `WorkflowDriver` as the Amazon Q path
 (`shared/orchestration/workflow_driver.py`, `--runtime strands`), so the
 build order, pytest test gates, retries, and traces are identical.
 
 | Aspect | Behavior |
 |---|---|
-| Scope | Phase 4 only: metadata ‖ quality → transform → DAG → optional ontology → reviewer. Phases 0–2 and 5 stay in a human-facing client, so discovery must be complete first. |
+| Scope | Phase 3 `profile` (read-only) and Phase 4 `run`: metadata ‖ quality → transform → DAG → optional ontology → reviewer. Discovery questions (0–2) and deploy (5) stay in a human-facing client. |
+| Phase 3 AWS access | Fixed read-only `aws_ro_*` tools only: Glue `get_*`, S3 list (≤100 keys) and sample (≤256 KiB), Athena single row-capped `SELECT`. Output is candidates in `run/source_profile.json` for the human to confirm. |
 | Agent definitions | Loaded from `.amazonq/cli-agents/adop-*.json` (prompt, resources, `fs_write` allowlist) |
 | Tools | `fs_read`, `fs_write`, `run_pytest_gate`, `render_artifact`. There is no shell tool and no MCP. |
 | Write guards | No writes to `scripts/`, `dags/`, `sql/` (use `render_artifact`); no `.py` outside `workloads/*/tests/`; orchestrator-owned run state (`run/context.json`, `run/requirements.jsonl`, discovery markers) is read-only |
+| Cedar policies | Every tool call passes a Strands `BeforeToolCallEvent` hook that applies the same `shared/policies/` as Claude Code, Codex and Kiro (`adop_strands/cedar_hook.py`) |
 | Handoff | Strands structured output validated as `AgentOutput`. The runner stamps `agent_name`, `workload_name`, `run_id`, and timestamps itself rather than trusting the model. |
 | Review gate | Blocks on `Severity: HIGH` in `reviews/security-findings.md`, ignoring markdown emphasis and case |
 | Dependency | Optional extra `strands` (`strands-agents==1.62.0`); nothing else imports it |
@@ -100,6 +104,8 @@ build order, pytest test gates, retries, and traces are identical.
 pip install -e '.[strands]'
 python3 scripts/run_strands.py status                       # list loadable agents
 python3 scripts/run_strands.py run --args args.json --dry-run   # offline contract check
+python3 scripts/run_strands.py profile --args args.json \
+  --region us-east-1 --model <bedrock-model-id> --athena-output s3://<results>/  # Phase 3
 python3 scripts/run_strands.py run --args args.json \
   --region us-east-1 --model <bedrock-model-id> --run-id <id>    # live Bedrock run
 ```
@@ -373,6 +379,84 @@ at render time rather than emitting them:
   schemes, invalid bucket names, and `..` segments are rejected.
 
 Tests: `shared/tests/unit/test_codegen_security_guards.py`.
+
+## Security and policy enforcement
+
+Claude Code, Codex, and Kiro enforce the same rules with the same code. Each
+platform registers thin `PreToolUse` hooks; the hooks are byte-identical across
+platforms and call one shared engine, so a policy change applies everywhere.
+`scripts/sync_platforms.py check` fails if a hook copy drifts or a platform
+stops registering it.
+
+| Control | What it enforces | Claude Code | Codex | Kiro |
+|---|---|---|---|---|
+| Cedar authorization | Every tool call checked against `shared/policies/` | `cedar_gate.py` | `cedar_gate.py` | `cedar_gate.py`, plus one per agent |
+| SEC-001 secrets | No hardcoded keys, private keys, or password literals in any write | Cedar | Cedar | Cedar + `block_credentials.py` |
+| Discovery gate | No pipeline artifacts before the human answers Phase 1 | `check-discovery-gate.sh` | `discovery_gate.py` | `phase_gate.py` |
+| Template codegen | `scripts/`, `dags/`, `sql/` written only by the renderer | `enforce_template_codegen.py` | `enforce_template_codegen.py` | `enforce_template_codegen.py` |
+| Audit before deploy | No Glue/IAM/Lake Formation/DAG mutation until the requirements audit passes | `deploy_gate.py` | `deploy_gate.py` | `deploy_gate.py` + `kiro_workflow.py deploy-check` |
+
+The optional headless Strands runtime (Phase 4, started from any of the three
+clients) applies the same Cedar policies through a Strands `BeforeToolCallEvent`
+hook, so a tool call gets the same verdict on all four runtimes.
+
+### Cedar policies
+
+The engine is `shared/utils/cedar_gate.py`. It uses the real Cedar evaluator
+(`cedarpy`, a required dependency) and loads every policy under
+`shared/policies/` except templates.
+
+- **Who is calling.** Claude Code and Codex send the subagent's `agent_type` in
+  the hook input. Kiro does not, so each Kiro agent declares its own hook with
+  `--principal <id>`. The main conversation is `onboarding`; any agent without an
+  ADOP policy (Explore, general-purpose, plugin helpers) is `general`.
+- **Agents write only their documented outputs.** For example, the metadata
+  agent writes `config/` and its tests; the DAG agent writes `dags/`, its spec,
+  and its tests. See `shared/policies/agent_authorization/`.
+- **Sub-agents have no AWS access.** MCP tools, Kiro `use_aws`, and the `aws`
+  CLI in a shell are all denied. The one exception is the ontology agent, which
+  may call `get_table`.
+- **No agent can edit the rules.** `shared/policies/**` and
+  `run/deploy_gate.json` are write-protected for every agent, including the
+  main conversation, whether the edit is a file write, `sed -i`, `rm`, a
+  redirect, or `git checkout`. Policy changes are made by a human. The IaC
+  agent stages Cedar drafts at `workloads/<name>/iac/policies/` for a human to
+  promote.
+- **General agents** may write under `workloads/`, but may not write run state
+  or audit records, because that would forge a human gate.
+- **Fails closed.** A missing `cedarpy`, an unreadable mode file, or an
+  evaluation error denies the call.
+
+**Mode.** `shared/policies/enforcement.json` sets `audit` or `enforce`. In
+`audit`, every decision is logged to `logs/cedar_decisions.jsonl` and nothing is
+blocked; in `enforce`, denies are blocked. Only a human changes the mode.
+Restart the client after changing hooks or the mode.
+
+### Deployment safety
+
+Phase 5 deploys only through the shared gates in
+`shared/utils/deployment_checks.py`, the same on all three platforms:
+
+1. `preflight` refuses to run unless `run/requirements_audit.json` passes, matches
+   the current run, and is newer than every config and generated artifact.
+2. `simulate` runs read-only IAM simulation for the MWAA role (`glue:GetJob`,
+   `glue:StartJobRun`, `iam:PassRole`) and the Glue role (catalog and KMS).
+3. `active-runs` blocks a manual job start while another run is in flight.
+4. `post_deployment_verifier.py` (Step 5.9) checks tables, Athena, LF-Tags,
+   TBAC, KMS, the MWAA DAG (including import errors), both roles, and CloudTrail.
+
+### Limits
+
+- Files a sub-agent writes through a shell, such as the renderer's output, are
+  not checked as file writes. Shell commands are checked for `aws` CLI use and
+  for writes to policies or the deploy gate.
+- Pipeline guardrails (DQ, INT, OPS, SEC-002 to SEC-004) depend on run-time
+  data and are evaluated by the pipeline, not at tool-call time.
+- The installable Claude Code plugin does not ship `shared/policies/` or the
+  Cedar engine. Amazon Q Developer is not covered by these hooks.
+
+Tests: `core/tests/test_cedar_enforcement.py`, `core/tests/test_audit_deploy_gate.py`,
+`core/tests/test_deployment_checks.py`. Details: [docs/security.md](docs/security.md).
 
 ## Dynamic workflows
 

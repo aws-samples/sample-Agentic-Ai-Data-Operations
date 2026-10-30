@@ -19,13 +19,10 @@
 permit (
     principal == DataOnboarding::AgentPrincipal::"quality",
     action == DataOnboarding::Action::"ReadData",
-    resource in [
-        DataOnboarding::DataZone::"claims_landing",
-        DataOnboarding::DataZone::"claims_publish",
-        DataOnboarding::DataZone::"claims_staging"
-    ]
+    resource
 )
 when {
+    [DataOnboarding::DataZone::"claims_landing", DataOnboarding::DataZone::"claims_publish", DataOnboarding::DataZone::"claims_staging"].contains(resource) &&
     principal.workloadName == "claims" &&
     resource.workloadName == "claims"
 };
@@ -33,12 +30,10 @@ when {
 permit (
     principal == DataOnboarding::AgentPrincipal::"transformation",
     action == DataOnboarding::Action::"ReadData",
-    resource in [
-        DataOnboarding::DataZone::"claims_landing",
-        DataOnboarding::DataZone::"claims_staging"
-    ]
+    resource
 )
 when {
+    [DataOnboarding::DataZone::"claims_landing", DataOnboarding::DataZone::"claims_staging"].contains(resource) &&
     principal.workloadName == "claims" &&
     resource.workloadName == "claims"
 };

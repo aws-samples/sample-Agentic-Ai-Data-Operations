@@ -1,0 +1,148 @@
+{
+  "dataset_name": "customer_orders",
+  "schema_version": "v1",
+  "source_table": "glue_catalog.customer_orders_db.bronze_customer_orders",
+  "primary_key": ["order_id"],
+  "dedup_strategy": "none",
+  "null_handling": {
+    "strategy": "quarantine",
+    "critical_columns": [
+      "order_id",
+      "customer_id",
+      "order_date",
+      "product_id",
+      "quantity",
+      "unit_price",
+      "discount_pct",
+      "payment_method",
+      "order_status"
+    ],
+    "fill_values": {}
+  },
+  "type_casts": [
+    {
+      "column": "order_date",
+      "from_type": "STRING",
+      "to_type": "DATE",
+      "format": "yyyy-MM-dd",
+      "on_error": "quarantine"
+    },
+    {
+      "column": "ship_date",
+      "from_type": "STRING",
+      "to_type": "DATE",
+      "format": "yyyy-MM-dd",
+      "on_error": "quarantine"
+    },
+    {
+      "column": "quantity",
+      "from_type": "STRING",
+      "to_type": "INTEGER",
+      "on_error": "quarantine"
+    },
+    {
+      "column": "unit_price",
+      "from_type": "STRING",
+      "to_type": "DECIMAL",
+      "params": {
+        "precision": 10,
+        "scale": 2
+      },
+      "on_error": "quarantine"
+    },
+    {
+      "column": "discount_pct",
+      "from_type": "STRING",
+      "to_type": "DECIMAL",
+      "params": {
+        "precision": 5,
+        "scale": 2
+      },
+      "on_error": "quarantine"
+    }
+  ],
+  "pii_masking": {
+    "enabled": true,
+    "columns": [
+      {
+        "name": "customer_email",
+        "method": "hash"
+      },
+      {
+        "name": "customer_phone",
+        "method": "mask_partial"
+      },
+      {
+        "name": "credit_card_number",
+        "method": "tokenize",
+        "target_column": "credit_card_token",
+        "token_secret_id": "${CUSTOMER_ORDERS_TOKEN_SECRET_ID}"
+      },
+      {
+        "name": "customer_name",
+        "method": "mask_partial"
+      },
+      {
+        "name": "shipping_address",
+        "method": "redact"
+      },
+      {
+        "name": "city",
+        "method": "redact"
+      },
+      {
+        "name": "state",
+        "method": "redact"
+      },
+      {
+        "name": "zip_code",
+        "method": "redact"
+      }
+    ]
+  },
+  "derived_columns": [
+    {
+      "name": "revenue",
+      "expression": "CAST(ROUND(quantity * unit_price * (1 - discount_pct), 2) AS DECIMAL(12,2))",
+      "description": "USD revenue, half-up rounded to DECIMAL(12,2)."
+    },
+    {
+      "name": "data_subject_id",
+      "expression": "customer_id",
+      "description": "GDPR demo data-subject identifier."
+    },
+    {
+      "name": "consent_given",
+      "expression": "CAST(true AS BOOLEAN)",
+      "description": "GDPR demo fixture; replace before production."
+    },
+    {
+      "name": "consent_timestamp",
+      "expression": "CAST('2026-10-22 18:18:44' AS TIMESTAMP)",
+      "description": "GDPR demo ingestion timestamp fixed to the persisted run start; replace with source ingestion time before production."
+    },
+    {
+      "name": "is_deleted",
+      "expression": "CAST(false AS BOOLEAN)",
+      "description": "GDPR right-to-erasure soft-delete flag."
+    },
+    {
+      "name": "deletion_requested_at",
+      "expression": "CAST(NULL AS TIMESTAMP)",
+      "description": "GDPR demo erasure-request timestamp."
+    }
+  ],
+  "drop_columns": [
+    "credit_card_number"
+  ],
+  "quality_threshold": 0.8,
+  "iceberg_partition_spec": [],
+  "iceberg_database": "customer_orders_db",
+  "iceberg_table": "silver_customer_orders",
+  "publish_via_gate": false,
+  "quarantine": {
+    "enabled": true,
+    "location": "${CUSTOMER_ORDERS_QUARANTINE_URI}",
+    "retention_days": 365
+  }
+}

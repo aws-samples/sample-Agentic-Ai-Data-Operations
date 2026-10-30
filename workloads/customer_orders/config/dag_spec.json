@@ -1,0 +1,102 @@
+{
+  "dataset_name": "customer_orders",
+  "schema_version": "v1",
+  "dag_id": "customer_orders_pipeline",
+  "schedule": {
+    "cron": "0 9 * * *",
+    "timezone": "America/New_York",
+    "catchup": false,
+    "max_active_runs": 1,
+    "start_date": "2026-10-22"
+  },
+  "retries": {
+    "count": 3,
+    "delay_seconds": 300,
+    "backoff": true,
+    "max_delay_seconds": 3600
+  },
+  "tasks": [
+    {
+      "task_id": "bronze_to_silver",
+      "type": "glue_job",
+      "script_path": "workloads/customer_orders/scripts/transform/bronze_to_silver.py",
+      "depends_on": [],
+      "timeout_minutes": 60,
+      "params": {
+        "job_name": "customer_orders_bronze_to_silver",
+        "glue_version": "4.0",
+        "worker_type": "G.1X",
+        "number_of_workers": 2,
+        "arguments": {
+          "--enable-glue-datacatalog": "true",
+          "--enable-data-lineage": "true",
+          "--ADOP_RUN_ID": "{{ run_id }}",
+          "--CUSTOMER_ORDERS_QUARANTINE_URI": "{{ var.value.CUSTOMER_ORDERS_QUARANTINE_URI }}",
+          "--CUSTOMER_ORDERS_TOKEN_SECRET_ID": "{{ var.value.CUSTOMER_ORDERS_TOKEN_SECRET_ID }}"
+        }
+      }
+    },
+    {
+      "task_id": "quality_check_silver",
+      "type": "quality_check",
+      "script_path": "workloads/customer_orders/scripts/quality/check_silver.py",
+      "depends_on": ["bronze_to_silver"],
+      "timeout_minutes": 30,
+      "params": {
+        "zone": "silver",
+        "threshold": 0.8,
+        "table_name": "glue_catalog.customer_orders_db.silver_customer_orders",
+        "quality_rules_path": "workloads/customer_orders/config/quality_rules.yaml"
+      }
+    },
+    {
+      "task_id": "silver_to_gold",
+      "type": "glue_job",
+      "script_path": "workloads/customer_orders/scripts/transform/silver_to_gold.py",
+      "depends_on": ["quality_check_silver"],
+      "timeout_minutes": 60,
+      "params": {
+        "job_name": "customer_orders_silver_to_gold",
+        "glue_version": "4.0",
+        "worker_type": "G.1X",
+        "number_of_workers": 2,
+        "arguments": {
+          "--enable-glue-datacatalog": "true",
+          "--enable-data-lineage": "true",
+          "--ADOP_RUN_ID": "{{ run_id }}"
+        }
+      }
+    },
+    {
+      "task_id": "quality_check_gold",
+      "type": "quality_check",
+      "script_path": "workloads/customer_orders/scripts/quality/check_gold.py",
+      "depends_on": ["silver_to_gold"],
+      "timeout_minutes": 30,
+      "params": {
+        "zone": "gold",
+        "threshold": 0.95,
+        "table_name": "glue_catalog.customer_orders_db.gold_customer_orders",
+        "quality_rules_path": "workloads/customer_orders/config/quality_rules.yaml"
+      }
+    }
+  ],
+  "failure_handling": {
+    "on_failure_callback": "sns_alert",
+    "notification_channel": "{{ var.value.ADOP_SNS_ALERT_TOPIC }}",
+    "escalation_after_minutes": 60
+  },
+  "sla": {
+    "deadline_minutes": 180,
+    "critical_tasks": [
+      "quality_check_silver",
+      "quality_check_gold"
+    ]
+  },
+  "tags": [
+    "customer_orders",
+    "gdpr",
+    "daily",
+    "bronze_silver_gold"
+  ]
+}

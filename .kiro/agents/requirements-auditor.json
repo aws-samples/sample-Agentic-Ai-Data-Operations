@@ -95,5 +95,15 @@
     "file://.kiro/steering/**/*.md",
     "file://core/requirements-auditor.md",
     "file://core/shared/requirements/auditor.py"
+  ],
+  "hooks": [
+    {
+      "name": "adop-cedar-gate",
+      "trigger": "PreToolUse",
+      "action": {
+        "type": "command",
+        "command": ".kiro/hooks/adop-hook.sh cedar_gate.py --principal requirements_auditor"
+      }
+    }
   ]
 }

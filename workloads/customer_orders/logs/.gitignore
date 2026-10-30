@@ -1,0 +1,4 @@
+# Logs directory for customer_orders pipeline
+*.jsonl
+run_*/
+!README.md

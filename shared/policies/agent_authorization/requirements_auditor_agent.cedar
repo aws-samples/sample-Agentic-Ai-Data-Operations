@@ -1,5 +1,5 @@
-// Requirements Auditor: evidence-only workflow conformance gate.
-// It can inspect run state and artifacts and write only its audit report.
+// Requirements Auditor: writes run/requirements_audit.json and appends run/decisions.jsonl and logs/trace_events.jsonl. Read-only over every pipeline artifact.
+// Writes are an allowlist of file types; anything else is denied.
 
 permit (
     principal == DataOnboarding::AgentPrincipal::"requirements_auditor",
@@ -13,7 +13,7 @@ permit (
     resource
 )
 when {
-    resource.fileType == "audit"
+    resource.fileType == "audit" || resource.fileType == "decisions" || resource.fileType == "log"
 };
 
 forbid (
@@ -21,8 +21,8 @@ forbid (
     action == DataOnboarding::Action::"WriteFile",
     resource
 )
-when {
-    resource.fileType != "audit"
+unless {
+    resource.fileType == "audit" || resource.fileType == "decisions" || resource.fileType == "log"
 };
 
 forbid (
@@ -43,6 +43,7 @@ forbid (
     resource
 );
 
+// Sub-agents have no MCP or AWS access (includes the aws CLI via a shell).
 forbid (
     principal == DataOnboarding::AgentPrincipal::"requirements_auditor",
     action == DataOnboarding::Action::"InvokeTool",

@@ -1,8 +1,5 @@
-// Ontology Staging Agent: reads semantic.yaml + Glue schema dict, writes
-// OWL/R2RML/manifest artifacts to workloads/{name}/config/. Cannot publish,
-// cannot reason, cannot touch VKG. When the AWS Semantic Layer platform deploys, a separate
-// ontology-publish-agent (distinct principal) will gain the AWS write
-// permissions; this principal stays read-only + file-only.
+// Ontology Staging Agent: stages ontology.ttl, mappings.ttl and the manifest under config/, plus its tests. No AWS writes; the Semantic Layer publish agent will be a separate principal.
+// Writes are an allowlist of file types; anything else is denied.
 
 permit (
     principal == DataOnboarding::AgentPrincipal::"ontology_staging",
@@ -16,8 +13,23 @@ permit (
     resource
 )
 when {
-    resource.fileType == "config" || resource.fileType == "script"
+    resource.fileType == "config" || resource.fileType == "test" || resource.fileType == "decisions" || resource.fileType == "handoff"
 };
+
+forbid (
+    principal == DataOnboarding::AgentPrincipal::"ontology_staging",
+    action == DataOnboarding::Action::"WriteFile",
+    resource
+)
+unless {
+    resource.fileType == "config" || resource.fileType == "test" || resource.fileType == "decisions" || resource.fileType == "handoff"
+};
+
+forbid (
+    principal == DataOnboarding::AgentPrincipal::"ontology_staging",
+    action == DataOnboarding::Action::"ReadData",
+    resource
+);
 
 forbid (
     principal == DataOnboarding::AgentPrincipal::"ontology_staging",
@@ -27,6 +39,25 @@ forbid (
 
 forbid (
     principal == DataOnboarding::AgentPrincipal::"ontology_staging",
-    action == DataOnboarding::Action::"InvokeTool",
+    action == DataOnboarding::Action::"PromoteData",
     resource
 );
+
+// The one tool this agent is granted in its definition.
+permit (
+    principal == DataOnboarding::AgentPrincipal::"ontology_staging",
+    action == DataOnboarding::Action::"InvokeTool",
+    resource
+)
+when {
+    resource.serverName == "glue-athena" && resource.toolName == "get_table"
+};
+
+forbid (
+    principal == DataOnboarding::AgentPrincipal::"ontology_staging",
+    action == DataOnboarding::Action::"InvokeTool",
+    resource
+)
+unless {
+    resource.serverName == "glue-athena" && resource.toolName == "get_table"
+};

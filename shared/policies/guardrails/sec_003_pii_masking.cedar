@@ -6,5 +6,6 @@ forbid (
 )
 when {
     context.guardrailCode == "SEC-003" &&
+    context has piiColumnsMasked &&
     context.piiColumnsMasked == false
 };

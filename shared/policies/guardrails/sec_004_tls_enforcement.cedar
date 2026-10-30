@@ -6,5 +6,6 @@ forbid (
 )
 when {
     context.guardrailCode == "SEC-004" &&
+    context has tlsEnforced &&
     context.tlsEnforced == false
 };

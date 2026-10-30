@@ -6,5 +6,6 @@ forbid (
 )
 when {
     context.guardrailCode == "OPS-001" &&
+    context has checksumMatch &&
     context.checksumMatch == false
 };

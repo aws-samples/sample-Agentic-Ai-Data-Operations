@@ -6,5 +6,6 @@ forbid (
 )
 when {
     context.guardrailCode == "SEC-002" &&
+    context has kmsAliasValid &&
     context.kmsAliasValid == false
 };

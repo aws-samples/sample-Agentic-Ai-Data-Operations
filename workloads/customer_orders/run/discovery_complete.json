@@ -1,0 +1,7 @@
+{
+  "status": "complete",
+  "workload_name": "customer_orders",
+  "run_id": "regen-20261023-customer-orders",
+  "confirmed_at": "2026-10-26T15:30:10Z",
+  "confirmation": "User confirmed the proposed discovery answers for the existing workload."
+}

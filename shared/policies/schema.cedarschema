@@ -11,7 +11,8 @@ namespace DataOnboarding {
 
     entity AgentPrincipal = {
         // router | onboarding | metadata | transformation | quality | dag |
-        // ontology_staging | requirements_auditor | analysis
+        // ontology_staging | requirements_auditor | iac | general | analysis
+        // (general = any agent with no ADOP-specific principal)
         "agentType": String,
         // main_conversation | sub_agent
         "executionContext": String,
@@ -32,7 +33,9 @@ namespace DataOnboarding {
     };
 
     entity WorkloadFile = {
-        // config | script | dag | sql | test
+        // config | script | dag | sql | test | iac | decisions | handoff |
+        // run_state | audit | deploy_gate | log | policy | other
+        // Classified from the path by shared/utils/cedar_gate.py.
         "fileType": String,
         "zone": String,
     };

@@ -6,5 +6,6 @@ forbid (
 )
 when {
     context.guardrailCode == "OPS-003" &&
+    context has auditLogWritten &&
     context.auditLogWritten == false
 };

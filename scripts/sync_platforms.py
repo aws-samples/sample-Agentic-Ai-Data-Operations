@@ -273,6 +273,48 @@ def check_deploy_phase(errors: list[str]) -> None:
                 errors.append(f"deploy phase: {relative} is missing {anchor!r}")
 
 
+CEDAR_GATE_HOOK = ".claude/hooks/cedar_gate.py"
+CEDAR_GATE_COPIES = tuple(path.replace("deploy_gate", "cedar_gate") for path in DEPLOY_GATE_COPIES)
+KIRO_CEDAR_PRINCIPALS = {
+    "metadata-agent": "metadata",
+    "transformation-agent": "transformation",
+    "quality-agent": "quality",
+    "dag-agent": "dag",
+    "ontology-agent": "ontology_staging",
+    "requirements-auditor": "requirements_auditor",
+    "iac-agent": "iac",
+}
+
+
+def check_cedar_gate(errors: list[str]) -> None:
+    """Cedar enforcement: identical hook everywhere, registered, Kiro per-agent principals."""
+    source = ROOT / CEDAR_GATE_HOOK
+    if not source.is_file():
+        errors.append(f"cedar gate: missing {CEDAR_GATE_HOOK}")
+        return
+    expected = source.read_bytes()
+    for relative in CEDAR_GATE_COPIES:
+        path = ROOT / relative
+        if not path.is_file():
+            errors.append(f"cedar gate: missing {relative}")
+        elif path.read_bytes() != expected:
+            errors.append(f"cedar gate: {relative} has drifted from {CEDAR_GATE_HOOK}")
+    for relative in (".claude/settings.json", ".codex/hooks.json"):
+        config = load_json(Path(relative), errors)
+        entries = config.get("hooks", {}).get("PreToolUse", []) if config else []
+        if not any("cedar_gate.py" in str(e) and "matcher" not in e for e in entries):
+            errors.append(f"cedar gate: {relative} must register cedar_gate.py with no matcher")
+    for base in (".kiro/agents", "adapters/kiro/.kiro/agents"):
+        for name, principal in KIRO_CEDAR_PRINCIPALS.items():
+            config = load_json(Path(base) / f"{name}.json", errors)
+            commands = [str(h.get("action", {}).get("command", "")) for h in config.get("hooks", []) or []]
+            if f"cedar_gate.py --principal {principal}" not in " ".join(commands):
+                errors.append(f"cedar gate: {base}/{name}.json lacks --principal {principal}")
+    mode = load_json(Path("shared/policies/enforcement.json"), errors).get("mode")
+    if mode not in ("audit", "enforce"):
+        errors.append("cedar gate: shared/policies/enforcement.json mode must be audit or enforce")
+
+
 def check_deploy_gate_hook(errors: list[str]) -> None:
     source = ROOT / DEPLOY_GATE_HOOK
     if not source.is_file():
@@ -309,6 +351,7 @@ def check() -> list[str]:
     check_paths(errors)
     check_deploy_phase(errors)
     check_deploy_gate_hook(errors)
+    check_cedar_gate(errors)
     check_active_mcp_profiles(errors)
     check_optional_profiles(errors)
     check_workloads(errors)

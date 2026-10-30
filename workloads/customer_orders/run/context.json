@@ -1,0 +1,46 @@
+{
+  "schema_version": "v1",
+  "run_id": "regen-20261023-customer-orders",
+  "workload_name": "customer_orders",
+  "started_at": "2026-10-23T00:00:00Z",
+  "template_version": "1.0.0",
+  "current_phase": "4.3",
+  "input_hash": "c088235bc0ed7fbf",
+  "random_seed": 42,
+  "timestamp_mode": "fixed",
+  "human_answers": {
+    "zones": ["bronze", "silver", "gold"],
+    "recorded_at": "2026-10-22T18:18:44Z",
+    "primary_key": ["order_id"],
+    "dedup_strategy": "none",
+    "null_handling": "quarantine rows with null critical columns: order_id, customer_id, order_date, product_id, quantity, unit_price, discount_pct, payment_method, order_status",
+    "transformations": "Use the human-approved workloads/customer_orders/config/transformations.yaml as-is.",
+    "pii_columns": ["customer_email", "customer_phone", "credit_card_number", "customer_name", "shipping_address", "city", "state", "zip_code"],
+    "compliance": ["GDPR"],
+    "quality_thresholds": {
+      "silver": 0.8,
+      "gold": 0.95
+    },
+    "schedule": "0 9 * * *",
+    "schedule_timezone": "America/New_York",
+    "source_path": "${CUSTOMER_ORDERS_SOURCE_URI}",
+    "credentials": "IAM role ${CUSTOMER_ORDERS_SOURCE_IAM_ROLE}",
+    "ingestion_pattern": "daily batch, full load",
+    "retention": "365 days",
+    "business_outcome": "order-level sales reporting",
+    "kpis": ["order_count", "revenue"],
+    "aggregation_grain": "order_id",
+    "gold_schema_choice": "flat_iceberg",
+    "ontology_opt_in": false,
+    "notes": ["Existing approved workload. Regenerate/validate artifacts against existing configs; do not change human decisions."]
+  },
+  "previous_phases": [
+    {
+      "phase": 3,
+      "agent": "metadata",
+      "output_hash": "c088235bc0ed7fbf",
+      "status": "success",
+      "completed_at": "2026-10-22T18:18:44Z"
+    }
+  ]
+}

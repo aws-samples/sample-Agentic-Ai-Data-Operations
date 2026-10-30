@@ -6,5 +6,6 @@ forbid (
 )
 when {
     context.guardrailCode == "OPS-004" &&
+    context has icebergMetadataExists &&
     context.icebergMetadataExists == false
 };

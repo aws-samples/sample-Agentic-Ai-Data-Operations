@@ -13,7 +13,7 @@ from shared.orchestration.workflow_driver import AgentInvocation
 from shared.templates.agent_output_schema import AgentOutput
 
 from .definitions import DefinitionLoader
-from .models import AgentOutputModel
+from .models import AgentOutputModel, SourceProfileModel
 from .tools import make_tools
 
 
@@ -53,6 +53,8 @@ class StrandsRunner:
                 "'pip install -e \".[strands]\"'."
             ) from exc
 
+        from .cedar_hook import CedarToolGate
+
         definition = self.definitions.load(invocation.agent)
         model_id = invocation.model or self.model_id or self.model_map.get("standard")
         model = BedrockModel(
@@ -73,6 +75,8 @@ class StrandsRunner:
                 ),
             ),
             structured_output_model=AgentOutputModel,
+            # Same Cedar policies as Claude Code, Codex and Kiro (shared/policies/).
+            hooks=[CedarToolGate(self.repo_root, invocation.agent)],
             trace_attributes={
                 "adop.runtime": "strands",
                 "adop.agent": definition.name,
@@ -87,6 +91,77 @@ class StrandsRunner:
         if not output.decisions:
             raise ValueError(f"Strands agent {invocation.agent} returned no decisions")
         return self._stamp(output, invocation, started_at)
+
+    def profile(
+        self,
+        source: dict[str, Any],
+        *,
+        athena_output: Optional[str] = None,
+        athena_workgroup: Optional[str] = None,
+        client_factory: Any = None,
+    ) -> dict[str, Any]:
+        """Phase 3: profile the source with read-only AWS tools; return candidates.
+
+        Runs as the metadata principal (Cedar permits it the aws_ro_* tools and
+        nothing else on AWS). The result is written to
+        workloads/{name}/run/source_profile.json by this runner, not by the
+        model, and contains candidates only: the human confirms PK, PII, dedup
+        and quality rules in the client before anything is generated.
+        """
+        if self.dry_run:
+            result = SourceProfileModel(source_format="dry-run", decisions=[{
+                "decision_id": "p-001", "category": "runtime",
+                "reasoning": "Dry-run: no AWS or Bedrock calls were made.",
+                "choice_made": "return_valid_profile", "confidence": "high"}]).model_dump()
+        else:
+            from strands import Agent
+            from strands.models import BedrockModel
+
+            from .aws_readonly import make_readonly_aws_tools
+            from .cedar_hook import CedarToolGate
+
+            definition = self.definitions.load("adop-build-metadata")
+            model_id = self.model_id or self.model_map.get("standard")
+            agent = Agent(
+                model=BedrockModel(region_name=self.region,
+                                   **({"model_id": model_id} if model_id else {})),
+                name="adop-build-metadata",
+                description="Phase 3 source profiler (read-only)",
+                system_prompt=self.definitions.system_prompt(definition),
+                tools=[
+                    *make_tools(self.repo_root, (), ("fs_read",)),
+                    *make_readonly_aws_tools(self.region or "", athena_output,
+                                             athena_workgroup, client_factory),
+                ],
+                structured_output_model=SourceProfileModel,
+                hooks=[CedarToolGate(self.repo_root, "adop-build-metadata")],
+                trace_attributes={"adop.runtime": "strands", "adop.agent": "adop-build-metadata",
+                                  "adop.phase": "3"},
+            )
+            task = (
+                "Phase 3 profiling. Read-only: use only the aws_ro_* tools.\n"
+                f"Source (human-provided): {json.dumps(source, sort_keys=True)}\n"
+                "1. Find the schema (Glue table if catalogued, otherwise sample the S3 objects).\n"
+                "2. Profile with row-capped SELECTs: row count, null rate and distinct count per column.\n"
+                "3. List PK candidates (unique and non-null) and PII candidates with the evidence.\n"
+                "4. Record risks you see. Do NOT decide PK, PII handling, dedup or thresholds; "
+                "those are the human's decisions. Report candidates only."
+            )
+            structured = agent(task).structured_output
+            if structured is None:
+                raise ValueError("profiler returned no structured output")
+            result = structured.model_dump()
+        record = {
+            "phase": "3", "runtime": "strands", "run_id": self.run_id,
+            "workload_name": self.workload, "profiled_at": _now(),
+            "dry_run": self.dry_run, "status": "candidates_pending_human_confirmation",
+            "profile": result,
+        }
+        if self.workload:
+            out = self.repo_root / "workloads" / self.workload / "run" / "source_profile.json"
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        return record
 
     def _stamp(self, output: AgentOutput, invocation: AgentInvocation,
                started_at: str) -> AgentOutput:

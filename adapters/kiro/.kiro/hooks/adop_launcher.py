@@ -168,21 +168,25 @@ def _additional_context(decision: dict) -> str | None:
 def main(argv: list[str]) -> int:
     raw = sys.stdin.read()
 
+    payload = _as_json(raw)
+    gating = _is_gating(payload)
+
+    # A gate that is missing cannot deliver a verdict; on a tool-gating event
+    # that must deny, exactly like a gate that crashes (point 6 above).
     if len(argv) < 2 or not argv[1]:
         print("adop-hook: no hook script named", file=sys.stderr)
-        return 0  # launcher misuse must not wedge the session
+        return 2 if gating else 0
     hook = HOOK_DIR / argv[1]
     if not hook.is_file():
         print(f"adop-hook: cannot locate hook '{argv[1]}' under {HOOK_DIR}", file=sys.stderr)
-        return 0
-
-    payload = _as_json(raw)
-    gating = _is_gating(payload)
+        return 2 if gating else 0
     stdin_text = raw if payload is None else json.dumps(_normalise(payload))
 
     try:
         completed = subprocess.run(
-            [sys.executable, str(hook)],
+            # argv[2:] lets one gate serve several agents, e.g. cedar_gate.py
+            # --principal metadata in each Kiro agent's own hook.
+            [sys.executable, str(hook), *argv[2:]],
             input=stdin_text,
             text=True,
             capture_output=True,

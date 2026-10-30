@@ -191,6 +191,29 @@ def test_mwaa_role_check_requires_inputs(monkeypatch: pytest.MonkeyPatch) -> Non
     assert not result.passed and result.step == "5.9i"
 
 
+def test_run_all_does_not_skip_mandatory_checks_when_inputs_are_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from shared.utils.post_deployment_verifier import CheckResult
+
+    verifier = _verifier(monkeypatch)
+    monkeypatch.setattr(
+        verifier,
+        "check_kms_encryption",
+        lambda alias: CheckResult("KMS", "5.9e", True, "ok"),
+    )
+    monkeypatch.setattr(
+        verifier,
+        "check_cloudtrail_events",
+        lambda: CheckResult("CloudTrail", "5.9h", True, "ok"),
+    )
+    results = verifier.run_all()
+    by_step = {result.step: result for result in results}
+    assert not by_step["5.9f"].passed
+    assert not by_step["5.9i"].passed
+    assert not by_step["5.9j"].passed
+
+
 def test_mwaa_role_check_reports_denied_passrole(monkeypatch: pytest.MonkeyPatch) -> None:
     import shared.utils.post_deployment_verifier as pdv
 

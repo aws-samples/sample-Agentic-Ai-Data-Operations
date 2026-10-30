@@ -6,5 +6,6 @@ forbid (
 )
 when {
     context.guardrailCode == "DQ-002" &&
+    context has criticalFailureCount &&
     context.criticalFailureCount > 0
 };

@@ -6,5 +6,6 @@ forbid (
 )
 when {
     context.guardrailCode == "INT-003" &&
+    context has formulaVerified &&
     context.formulaVerified == false
 };

@@ -6,5 +6,6 @@ forbid (
 )
 when {
     context.guardrailCode == "OPS-002" &&
+    context has keysAreDifferent &&
     context.keysAreDifferent == false
 };

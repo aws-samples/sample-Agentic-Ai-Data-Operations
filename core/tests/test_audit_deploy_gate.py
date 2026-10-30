@@ -147,7 +147,17 @@ def _hook(tool_name: str, tool_input: dict, cwd: Path) -> subprocess.CompletedPr
         ("Bash", {"command": "set -e && " + AWS_GLUE_CREATE + " --name orders_silver"}),
         ("Bash", {"command": "aws" + " s3 cp dags/orders_dag.py s3://mwaa-env/dags/"}),
         ("call_aws", {"command": "glue create-job --name orders_silver"}),
-        ("use_aws", {"service_name": "glue", "operation_name": "create_job"}),
+        ("mcp__aws-mcp__call_aws", {"service": "s3", "operation": "put_object",
+                                     "key": "dags/orders_dag.py", "workload": "orders"}),
+        ("mcp__aws-mcp__run_script",
+         {"script": "aws s3 cp dags/orders_dag.py s3://mwaa-env/dags/orders_dag.py",
+          "workload": "orders"}),
+        ("Bash", {"command": "aws s3api put-object --bucket mwaa-env "
+                            "--key dags/orders_dag.py --body dag.py"}),
+        ("mcp__lakeformation__revoke_permissions", {"database": "orders_db"}),
+        ("mcp__lakeformation__create_lf_tag", {"tag_key": "PII_Type", "workload": "orders"}),
+        ("use_aws", {"service_name": "glue", "operation_name": "create_job",
+                     "workload": "orders"}),
     ],
 )
 def test_hook_denies_deploy_calls_without_a_gate(
@@ -204,6 +214,18 @@ def test_hook_allows_the_deploy_call_once_the_gate_is_written(tmp_path: Path) ->
     dc.write_deploy_gate(workload, dc.require_passing_audit(workload))
     result = _hook("mcp__glue-athena__create_job", {"job_name": "orders_silver"}, tmp_path)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_hook_requires_a_workload_match_even_when_another_gate_is_open(tmp_path: Path) -> None:
+    workload = _workload(tmp_path)
+    dc.write_deploy_gate(workload, dc.require_passing_audit(workload))
+    result = _hook(
+        "mcp__glue-athena__create_job",
+        {"job_name": "unrelated_job"},
+        tmp_path,
+    )
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "cannot identify a workload" in result.stdout
 
 
 def test_hook_fails_closed_when_the_shared_module_is_unreachable(tmp_path: Path) -> None:

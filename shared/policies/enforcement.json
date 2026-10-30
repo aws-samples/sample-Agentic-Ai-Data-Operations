@@ -1,0 +1,4 @@
+{
+  "mode": "audit",
+  "why": "Audit until the human reviews the amended agent policies (2026-10-30). In audit mode every decision is logged to logs/cedar_decisions.jsonl and nothing is blocked. Set to \"enforce\" to block. Agents cannot edit this file once enforcing (global_protection.cedar)."
+}

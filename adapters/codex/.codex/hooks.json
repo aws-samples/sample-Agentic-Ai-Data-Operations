@@ -38,6 +38,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .codex/hooks/cedar_gate.py",
+            "timeout": 25
+          }
+        ]
       }
     ],
     "SessionStart": [

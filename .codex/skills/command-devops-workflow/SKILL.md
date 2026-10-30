@@ -192,7 +192,7 @@ status "blocked" — do NOT derive grants from the PII columns in source.yaml an
 NOT grant to the current IAM caller.
 
 Write files under workloads/{workload_name}/iac/{framework}/ plus
-shared/policies/workloads/{workload_name}/permits.cedar. Generation only — no apply, no
+workloads/{workload_name}/iac/policies/permits.cedar. Generation only — no apply, no
 deploy, no AWS calls.
 
 End your final message with a single fenced json block conforming to AgentOutput

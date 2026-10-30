@@ -1,4 +1,6 @@
-// DAG Agent: reads all configs, writes DAG files only, no direct data access
+// DAG Agent: writes the DAG spec under config/, renders dags/{workload}_dag.py, and its tests (Step 4.5).
+// Writes are an allowlist of file types; anything else is denied.
+
 permit (
     principal == DataOnboarding::AgentPrincipal::"dag",
     action == DataOnboarding::Action::"ReadFile",
@@ -11,7 +13,7 @@ permit (
     resource
 )
 when {
-    resource.fileType == "dag"
+    resource.fileType == "dag" || resource.fileType == "config" || resource.fileType == "test" || resource.fileType == "decisions" || resource.fileType == "handoff"
 };
 
 forbid (
@@ -19,8 +21,8 @@ forbid (
     action == DataOnboarding::Action::"WriteFile",
     resource
 )
-when {
-    resource.fileType != "dag"
+unless {
+    resource.fileType == "dag" || resource.fileType == "config" || resource.fileType == "test" || resource.fileType == "decisions" || resource.fileType == "handoff"
 };
 
 forbid (
@@ -35,6 +37,13 @@ forbid (
     resource
 );
 
+forbid (
+    principal == DataOnboarding::AgentPrincipal::"dag",
+    action == DataOnboarding::Action::"PromoteData",
+    resource
+);
+
+// Sub-agents have no MCP or AWS access (includes the aws CLI via a shell).
 forbid (
     principal == DataOnboarding::AgentPrincipal::"dag",
     action == DataOnboarding::Action::"InvokeTool",

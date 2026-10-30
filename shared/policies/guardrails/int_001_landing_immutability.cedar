@@ -6,5 +6,6 @@ forbid (
 )
 when {
     context.guardrailCode == "INT-001" &&
+    context has landingFileWritten &&
     context.landingFileWritten == false
 };

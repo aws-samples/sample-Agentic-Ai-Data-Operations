@@ -7,5 +7,7 @@ forbid (
 )
 when {
     context.guardrailCode == "INT-002" &&
+    context has fkPassRate &&
+    context has fkThreshold &&
     context.fkPassRate < context.fkThreshold
 };

@@ -95,13 +95,29 @@ class PostDeploymentVerifier:
         results.append(self.check_kms_encryption(kms_key_alias))
 
         if dag_id:
-            # A DAG with no environment to check is a failure, not a skip.
             results.append(self.check_mwaa_dag(dag_id))
-            results.append(self.check_mwaa_role_permissions(
-                mwaa_role_arn, glue_role_arn, glue_job_names or []))
+        else:
+            results.append(CheckResult(
+                name="MWAA DAG Health",
+                step="5.9f",
+                passed=False,
+                message="dag_id is required",
+            ))
+
+        # These checks are mandatory even when their inputs are absent; the
+        # individual check returns a failed result for missing arguments.
+        results.append(self.check_mwaa_role_permissions(
+            mwaa_role_arn, glue_role_arn, glue_job_names or []))
 
         if glue_role_arn:
             results.append(self.check_glue_role_permissions(glue_role_arn, kms_key_arn))
+        else:
+            results.append(CheckResult(
+                name="Glue Role Permissions",
+                step="5.9j",
+                passed=False,
+                message="glue_role_arn is required",
+            ))
 
         results.append(self.check_cloudtrail_events())
 
@@ -567,13 +583,13 @@ if __name__ == "__main__":
     parser.add_argument("--tables", nargs="+", required=True)
     parser.add_argument("--region", default="us-east-1")
     parser.add_argument("--kms-key", default="alias/hipaa-phi-key")
-    parser.add_argument("--mwaa-env", default=None)
-    parser.add_argument("--dag-id", default=None)
-    parser.add_argument("--query-principal-arn", default=None)
-    parser.add_argument("--mwaa-role-arn", default=None)
-    parser.add_argument("--glue-role-arn", default=None)
-    parser.add_argument("--glue-jobs", nargs="+", default=None)
-    parser.add_argument("--kms-key-arn", default=None)
+    parser.add_argument("--mwaa-env", required=True)
+    parser.add_argument("--dag-id", required=True)
+    parser.add_argument("--query-principal-arn", required=True)
+    parser.add_argument("--mwaa-role-arn", required=True)
+    parser.add_argument("--glue-role-arn", required=True)
+    parser.add_argument("--glue-jobs", nargs="+", required=True)
+    parser.add_argument("--kms-key-arn", required=True)
     args = parser.parse_args()
 
     verifier = PostDeploymentVerifier(

@@ -1,0 +1,351 @@
+dataset_name: customer_orders
+schema_version: v1
+
+rules:
+  completeness:
+    - rule_id: completeness_order_id
+      column: order_id
+      check_type: not_null
+      threshold: 1.0
+      severity: critical
+      zone: both
+      params:
+        failure_action: quarantine
+      description: "Quarantine rows with a null primary key."
+
+    - rule_id: completeness_customer_id
+      column: customer_id
+      check_type: not_null
+      threshold: 1.0
+      severity: critical
+      zone: silver
+      params:
+        failure_action: quarantine
+      description: "Quarantine rows with a null critical customer_id."
+
+    - rule_id: completeness_order_date
+      column: order_date
+      check_type: not_null
+      threshold: 1.0
+      severity: critical
+      zone: silver
+      params:
+        failure_action: quarantine
+      description: "Quarantine rows with a null critical order_date."
+
+    - rule_id: completeness_product_id
+      column: product_id
+      check_type: not_null
+      threshold: 1.0
+      severity: critical
+      zone: silver
+      params:
+        failure_action: quarantine
+      description: "Quarantine rows with a null critical product_id."
+
+    - rule_id: completeness_quantity
+      column: quantity
+      check_type: not_null
+      threshold: 1.0
+      severity: critical
+      zone: silver
+      params:
+        failure_action: quarantine
+      description: "Quarantine rows with a null critical quantity."
+
+    - rule_id: completeness_unit_price
+      column: unit_price
+      check_type: not_null
+      threshold: 1.0
+      severity: critical
+      zone: silver
+      params:
+        failure_action: quarantine
+      description: "Quarantine rows with a null critical unit_price."
+
+    - rule_id: completeness_discount_pct
+      column: discount_pct
+      check_type: not_null
+      threshold: 1.0
+      severity: critical
+      zone: silver
+      params:
+        failure_action: quarantine
+      description: "Quarantine rows with a null critical discount_pct."
+
+    - rule_id: completeness_payment_method
+      column: payment_method
+      check_type: not_null
+      threshold: 1.0
+      severity: critical
+      zone: silver
+      params:
+        failure_action: quarantine
+      description: "Quarantine rows with a null critical payment_method."
+
+    - rule_id: completeness_order_status
+      column: order_status
+      check_type: not_null
+      threshold: 1.0
+      severity: critical
+      zone: both
+      params:
+        failure_action: quarantine
+      description: "Quarantine rows with a null critical order_status."
+
+    - rule_id: completeness_revenue
+      column: revenue
+      check_type: not_null
+      threshold: 1.0
+      severity: critical
+      zone: both
+      params:
+        failure_action: quarantine
+      description: "Revenue must not be null."
+
+  uniqueness:
+    - rule_id: uniqueness_order_id
+      column: order_id
+      check_type: unique
+      threshold: 1.0
+      severity: critical
+      zone: both
+      params:
+        failure_action: block_promotion
+        duplicate_strategy: block_promotion
+      description: "Any duplicate order_id blocks zone promotion; duplicates are not silently deduplicated."
+
+  validity:
+    - rule_id: validity_order_date_format
+      column: order_date
+      check_type: regex
+      threshold: 1.0
+      severity: critical
+      zone: silver
+      params:
+        pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        date_format: "YYYY-MM-DD"
+        timezone: "America/New_York"
+        failure_action: quarantine
+      description: "Invalid YYYY-MM-DD order dates are quarantined; dates are interpreted in America/New_York."
+
+    - rule_id: validity_order_date_not_future
+      column: order_date
+      check_type: custom_sql
+      threshold: 1.0
+      severity: critical
+      zone: silver
+      params:
+        sql: "to_date(order_date, 'yyyy-MM-dd') IS NOT NULL AND to_date(order_date, 'yyyy-MM-dd') <= to_date('2026-10-22')"
+        reference_date: "2026-10-22"
+        timezone: "America/New_York"
+        failure_action: quarantine
+      description: "Future order_date values are quarantined; the fixed reference date is the persisted demo run date."
+
+    - rule_id: validity_quantity_minimum
+      column: quantity
+      check_type: custom_sql
+      threshold: 1.0
+      severity: warning
+      zone: silver
+      params:
+        sql: "quantity >= 1"
+        minimum: 1
+      description: "Report quantity values below the demo minimum of 1 as range anomalies."
+
+    - rule_id: validity_discount_pct_range
+      column: discount_pct
+      check_type: range
+      threshold: 1.0
+      severity: warning
+      zone: silver
+      params:
+        min: 0
+        max: 1
+        representation: "fraction [0,1]"
+      description: "Report discount_pct values outside the demo fraction range [0,1] as range anomalies."
+
+    - rule_id: validity_revenue_decimal
+      column: revenue
+      check_type: custom_sql
+      threshold: 1.0
+      severity: critical
+      zone: both
+      params:
+        sql: "revenue IS NOT NULL AND revenue = CAST(revenue AS DECIMAL(12,2))"
+        expected_type: "DECIMAL(12,2)"
+        rounding: HALF_UP
+        scale: 2
+        failure_action: quarantine
+      description: "revenue must use the demo DECIMAL(12,2), half-up rounded to two decimals; type failures are quarantined."
+
+  consistency:
+    - rule_id: consistency_order_ship_dates
+      column: order_date
+      check_type: custom_sql
+      threshold: 1.0
+      severity: warning
+      zone: silver
+      params:
+        fields:
+          - order_date
+          - ship_date
+        sql: "ship_date IS NULL OR (to_date(order_date, 'yyyy-MM-dd') IS NOT NULL AND to_date(ship_date, 'yyyy-MM-dd') IS NOT NULL AND to_date(order_date, 'yyyy-MM-dd') <= to_date(ship_date, 'yyyy-MM-dd'))"
+        failure_action: warn
+      description: "When ship_date exists, order_date must be no later than ship_date; date consistency anomalies warn."
+
+    - rule_id: consistency_ship_date_status
+      column: ship_date
+      check_type: custom_sql
+      threshold: 1.0
+      severity: warning
+      zone: silver
+      params:
+        fields:
+          - ship_date
+          - order_status
+        sql: "ship_date IS NOT NULL OR order_status IN ('processing', 'cancelled')"
+        nullable_statuses:
+          - processing
+          - cancelled
+        failure_action: warn
+      description: "ship_date may be null for processing/cancelled orders; other date consistency anomalies warn."
+
+  accuracy:
+    - rule_id: accuracy_revenue_formula
+      column: revenue
+      check_type: custom_sql
+      threshold: 1.0
+      severity: warning
+      zone: silver
+      params:
+        sql: "revenue = ROUND(quantity * unit_price * (1 - discount_pct), 2)"
+        formula: "quantity * unit_price * (1 - discount_pct)"
+        rounding: HALF_UP
+        scale: 2
+        failure_action: warn
+      description: "Report revenue values that do not match the persisted demo calculation."
+
+    - rule_id: accuracy_revenue_formula_gold
+      column: revenue
+      check_type: custom_sql
+      threshold: 1.0
+      severity: warning
+      zone: gold
+      params:
+        sql: "revenue = ROUND(revenue, 2)"
+        expected_type: "DECIMAL(12,2)"
+        rounding: HALF_UP
+        scale: 2
+        failure_action: warn
+      description: "Gold revenue remains half-up rounded to two decimals."
+
+quality_gates:
+  bronze_to_silver:
+    overall_score: 0.8
+    critical_failures: 0
+    action_on_failure: block
+  silver_to_gold:
+    overall_score: 0.95
+    critical_failures: 0
+    action_on_failure: block
+
+gate_before_publish: false
+
+anomaly_detection:
+  enabled: true
+  methods:
+    - z_score
+    - iqr
+    - volume_change
+    - null_spike
+    - distribution_shift
+  volume_threshold_pct: 20
+
+compliance_rules:
+  regulation: GDPR
+  phi_columns:
+    - customer_email
+    - customer_phone
+    - credit_card_number
+    - customer_name
+    - shipping_address
+    - city
+    - state
+    - zip_code
+  audit_retention_days: 2555
+  rules:
+    - rule_id: gdpr_consent_not_null_for_active
+      column: consent_given
+      check_type: custom_sql
+      threshold: 1.0
+      severity: critical
+      zone: both
+      params:
+        sql: "is_deleted = true OR consent_given IS NOT NULL"
+        active_record_condition: "is_deleted = false"
+        failure_action: block_promotion
+      description: "GDPR consent_given must be present for every active record."
+
+    - rule_id: gdpr_consent_timestamp_for_active
+      column: consent_timestamp
+      check_type: custom_sql
+      threshold: 1.0
+      severity: critical
+      zone: both
+      params:
+        sql: "is_deleted = true OR consent_timestamp IS NOT NULL"
+        active_record_condition: "is_deleted = false"
+        expected_value: "ingestion timestamp"
+        failure_action: block_promotion
+      description: "GDPR consent_timestamp must be present for every active record."
+
+    - rule_id: gdpr_is_deleted_flag
+      column: is_deleted
+      check_type: custom_sql
+      threshold: 1.0
+      severity: critical
+      zone: both
+      params:
+        sql: "is_deleted IS NOT NULL"
+        failure_action: block_promotion
+      description: "GDPR is_deleted must be present to support right to erasure; both false and true are valid states."
+
+    - rule_id: gdpr_data_subject_id
+      column: data_subject_id
+      check_type: custom_sql
+      threshold: 1.0
+      severity: critical
+      zone: both
+      params:
+        sql: "data_subject_id IS NOT NULL AND data_subject_id = customer_id"
+        source_column: customer_id
+        failure_action: block_promotion
+      description: "GDPR data_subject_id must identify the customer_id data subject."
+
+    - rule_id: gdpr_deletion_request_semantics
+      column: deletion_requested_at
+      check_type: custom_sql
+      threshold: 1.0
+      severity: critical
+      zone: both
+      params:
+        sql: "is_deleted = false OR deletion_requested_at IS NOT NULL"
+        deleted_record_condition: "is_deleted = true"
+        failure_action: block_promotion
+      description: "Deleted records must carry deletion_requested_at for the erasure workflow."
+
+    - rule_id: gdpr_retention_configuration_warning
+      column: order_id
+      check_type: custom_sql
+      threshold: 1.0
+      severity: warning
+      zone: both
+      params:
+        sql: "true"
+        pii_retention_days: 365
+        audit_retention_days: 2555
+        observed_audit_retention_days: 90
+        warning_only: true
+        failure_action: warn
+      description: "Retention warning: persisted GDPR targets are 365 days for personal data and 2555 days for audit logs; the run records an observed 90-day audit-bucket default. No row-age anchor was inferred."

@@ -77,5 +77,15 @@
     "file://.codex/skills/pipeline-conventions/SKILL.md",
     "file://.codex/skills/decision-engine/SKILL.md",
     "file://.codex/skills/data-compliance/SKILL.md"
+  ],
+  "hooks": [
+    {
+      "name": "adop-cedar-gate",
+      "trigger": "PreToolUse",
+      "action": {
+        "type": "command",
+        "command": ".kiro/hooks/adop-hook.sh cedar_gate.py --principal dag"
+      }
+    }
   ]
 }

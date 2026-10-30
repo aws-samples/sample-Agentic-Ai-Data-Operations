@@ -128,6 +128,17 @@
       },
       "timeout_ms": 10000,
       "enabled": true
+    },
+    {
+      "name": "adop-cedar-gate",
+      "description": "Evaluates every tool call against the Cedar policies in shared/policies/ as the main-conversation principal (onboarding). Sub-agents carry their own adop-cedar-gate hook with --principal, because Kiro sends no agent identity in the payload. No matcher: the engine classifies the call. Fails closed.",
+      "trigger": "PreToolUse",
+      "action": {
+        "type": "command",
+        "command": ".kiro/hooks/adop-hook.sh cedar_gate.py --principal onboarding"
+      },
+      "timeout_ms": 25000,
+      "enabled": true
     }
   ]
 }
