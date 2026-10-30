@@ -10,6 +10,159 @@ artifacts and evidence.
 
 ![ADOP overview](docs/diagrams/adop-overview.png)
 
+## Prompting ADOP
+
+A good prompt includes:
+
+- **Source** — S3 path, Kafka topic, Kinesis stream, JDBC table, or endpoint.
+- **Sink cadence** — daily batch, micro-batch, or streaming.
+- **Target zones** — Silver quality and cleansing rules, plus Gold
+  transformations and serving shape.
+- **Compliance** — GDPR, CCPA, HIPAA, SOX, PCI DSS, or none.
+
+The examples below use the Claude Code `/onboard-workflow` command. In Codex,
+use the equivalent `$command-onboard-workflow` skill. The workflow still
+requires human confirmation for missing primary keys, deduplication, null
+handling, transformations, PII, quality thresholds, schedules, and ontology
+preferences.
+
+### Example 1 — Batch from S3 with Dynamic Workflow
+
+```text
+/onboard-workflow HIPAA
+
+Onboard claims data from
+s3://data-lake-<account>-us-east-1/bronze/claims/ingestion_date=YYYY-MM-DD/claims.csv
+into Silver with deduplication on claim_id and a not-null policy_number rule,
+and into a flat denormalized Gold Iceberg table with derived measures
+(net_paid_ratio, days_to_submission, denial_category).
+
+Run daily at 03:00 UTC. Apply HIPAA controls with PHI masking in Silver and
+PHI suppression in Gold.
+```
+
+For Claude Code, the `/onboard-workflow HIPAA` prefix enables the parallel
+Dynamic Workflow. HIPAA is compliance-critical, so Phase 4 build agents use
+Opus. Omit the prefix for sequential mode.
+
+### Example 2 — Streaming from Kafka with Glue Streaming ETL
+
+```text
+/onboard-workflow PCI
+
+Onboard transaction events from Kafka topic `payments.auth.v1` using IAM
+authentication and AWS Glue Streaming ETL. Land micro-batches every 60 seconds
+into Bronze Iceberg on S3, deduplicate on event_id in Silver with schema
+validation, and aggregate to five-minute Gold windows with fraud_score by
+merchant and rolling auth_rate.
+
+Apply PCI DSS: tokenize PAN, drop CVV, and add a Luhn check as a quality rule.
+```
+
+### Example 3 — Streaming from Kinesis with Glue Streaming ETL
+
+```text
+/onboard-workflow GDPR
+
+Onboard clickstream events from Kinesis Data Stream `web-events-prod` using
+AWS Glue Streaming ETL with a checkpoint on S3. Write Bronze Iceberg on
+one-minute triggers, use session stitching on user_id with a 30-minute
+inactivity gap in Silver, and create hourly Gold rollups for page_views,
+unique_users, and bounce_rate by traffic_source.
+
+Apply GDPR with a consent-based filter on user_id, 365-day retention, and a
+right-to-erasure hook.
+```
+
+### Prompt depth: brief versus detailed
+
+You can start with a brief request or provide every decision up front. The
+agent may profile the source and present observations, but it must ask for
+human confirmation when a required decision is missing.
+
+Brief request:
+
+```text
+Onboard e-commerce orders from s3://your-landing-bucket/ecommerce_orders/.
+
+- CSV, 50 rows, GDPR, daily 09:30 UTC batch
+- Gold: flat denormalized table for ad-hoc queries
+- DQ: completeness > 85%, validate dates/emails/phones, quarantine bad rows
+- Transforms: mask credit cards, standardize phones, cast dates, derive
+  order_month and days_to_ship
+
+Print a status box after each phase.
+```
+
+Detailed request:
+
+```text
+Onboard a new e-commerce orders dataset.
+
+Source:
+- Location: s3://your-landing-bucket/ecommerce_orders/
+- Format: CSV, 50 rows, batch ingestion
+- Refresh: Daily at 09:30 UTC
+
+Compliance: GDPR
+- PII columns: customer_email, customer_phone, credit_card_number,
+  customer_name, shipping_address
+- Require consent tracking, right-to-erasure support, and 365-day retention
+
+Gold: flat denormalized table for ad-hoc analytics.
+
+Data quality:
+- Completeness threshold: 85%; block promotion if below
+- Validate order_date format and customer_email format
+- Validate customer_phone format
+- Flag invalid credit_card_number values
+- Flag rows missing city, state, or zip as incomplete
+- Flag orders where total_amount != quantity × unit_price × (1 - discount_pct)
+
+Bronze → Silver:
+- Standardize phone to E.164 format
+- Mask credit_card_number, showing only the last four digits
+- Cast order_date and ship_date to DATE
+- Trim whitespace on string columns
+- Quarantine rows with invalid dates
+
+Silver → Gold:
+- Flatten columns into one wide table
+- Add order_month, days_to_ship, is_returned, and is_high_value
+- Keep delivered and returned orders; exclude processing and cancelled orders
+
+Schedule: daily batch at 09:30 UTC, retries=3, exponential backoff,
+alert on failure.
+```
+
+### Repository example: `customer_orders`
+
+```text
+$command-onboard-workflow GDPR
+
+Onboard customer_orders from ${CUSTOMER_ORDERS_SOURCE_URI} into Bronze, Silver,
+and Gold using a daily full-load batch. Use IAM role
+${CUSTOMER_ORDERS_SOURCE_IAM_ROLE} for access and retain data for 365 days.
+
+Use order_id as the primary key and do not deduplicate. Quarantine rows with
+null values in order_id, customer_id, order_date, product_id, quantity,
+unit_price, discount_pct, payment_method, or order_status.
+
+Apply the approved transformations in
+workloads/customer_orders/config/transformations.yaml. Treat customer_email,
+customer_phone, credit_card_number, customer_name, shipping_address, city,
+state, and zip_code as PII and apply GDPR controls.
+
+Use Silver quality threshold 0.80 and Gold quality threshold 0.95. Produce a
+flat Iceberg Gold table at order_id grain for order-level sales reporting,
+including order_count and revenue KPIs. Run at 09:00 America/New_York.
+Ontology enrichment is opt-out.
+```
+
+After submitting a prompt, watch the agent run, review the plan it presents,
+and approve it before artifacts are written under `workloads/<name>/`
+(`config/`, `scripts/`, `dags/`, `sql/`, `tests/`, and optional ontology).
+
 ## One goal, four client paths plus optional Strands
 
 Claude Code, Codex, Amazon Q Developer, and Kiro use different native
@@ -145,51 +298,6 @@ writes workload artifacts, so run it on a workload whose files you can
 review and revert. The ontology agent's Glue `get_table` tool is not yet
 wired through Strands, and AgentCore Runtime deployment is not implemented.
 The `strands-agentcore` extra is reserved for that future production target.
-
-## Prompt format
-
-Give the agent the business outcome and confirmed constraints:
-
-```text
-Onboard <source> into <target zones>.
-Source: <location, type, format, cadence>
-Business outcome: <what Gold must answer>
-Transformations: <confirmed cleaning and derived-column rules>
-PII/compliance: <columns and framework, or none>
-Quality: <thresholds and critical rules, or "use defaults">
-Schedule: <cron and IANA timezone>
-Ontology: <opt in/out and consumers>
-```
-
-### Example: `customer_orders`
-
-This example shows the shape of a complete, human-approved Codex request:
-
-```text
-$command-onboard-workflow GDPR
-
-Onboard customer_orders from ${CUSTOMER_ORDERS_SOURCE_URI} into Bronze, Silver,
-and Gold using a daily full-load batch. Use IAM role
-${CUSTOMER_ORDERS_SOURCE_IAM_ROLE} for access and retain data for 365 days.
-
-Use order_id as the primary key and do not deduplicate. Quarantine rows with
-null values in order_id, customer_id, order_date, product_id, quantity,
-unit_price, discount_pct, payment_method, or order_status.
-
-Apply the approved transformations in
-workloads/customer_orders/config/transformations.yaml. Treat customer_email,
-customer_phone, credit_card_number, customer_name, shipping_address, city,
-state, and zip_code as PII and apply GDPR controls.
-
-Use Silver quality threshold 0.80 and Gold quality threshold 0.95. Produce a
-flat Iceberg Gold table at order_id grain for order-level sales reporting,
-including order_count and revenue KPIs. Run at 09:00 America/New_York.
-Ontology enrichment is opt-out.
-```
-
-The agent may profile schema, nulls, row counts, and formats, but it must ask
-the human to confirm missing business decisions. It must not guess primary
-keys, deduplication, null handling, PII, schedules, or transformations.
 
 ## Workflow phases
 
