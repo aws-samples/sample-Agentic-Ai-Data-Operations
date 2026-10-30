@@ -64,8 +64,11 @@ def check_local() -> list[str]:
     # like a spec problem rather than an install problem.
     for rel, what in (
         ("lib/shared/codegen/renderer.py", "the renderer"),
+        ("lib/shared/codegen/contract_resolver.py", "contract enforcement"),
         ("lib/shared/templates/VERSION", "template versions"),
         ("lib/contracts/v1", "the spec contracts"),
+        ("lib/contracts/policies/organization/default.yaml", "organization zone defaults"),
+        ("lib/contracts/policies/zone_policy.schema.json", "policy schema"),
         ("scripts/adop_render.py", "the render CLI"),
     ):
         p = PLUGIN_ROOT / rel

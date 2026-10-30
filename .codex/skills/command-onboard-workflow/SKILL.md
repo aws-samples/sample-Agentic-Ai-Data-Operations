@@ -82,7 +82,8 @@ later verify artifact evidence.
 ```
 [ ] Data source type (S3 / PostgreSQL / RDS / API / other)
 [ ] Exact path, table, or endpoint
-[ ] Data format (CSV / Parquet / JSON / JDBC / other)
+[ ] Data format (CSV / Parquet / JSON / Avro / ORC / XML / log text / JDBC / other)
+[ ] XML row tag or log type (nginx / Apache / Syslog / CloudTrail / application / custom)
 [ ] Credentials or connection method (Secrets Manager reference — NEVER store credentials)
 ```
 

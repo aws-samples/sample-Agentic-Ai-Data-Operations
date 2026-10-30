@@ -48,6 +48,19 @@ Ask:
 
 Skip (auto-discover): Silver schema, available dimensions, row counts
 
+## Contract Questions (Every Onboarding Run)
+
+Present the inherited organization/domain/project Bronze, Silver, and Gold
+defaults before generation. If the user accepts the defaults, continue without
+repeating zone contract questions. If the user requests changes, record only
+stricter per-run overrides.
+
+Collect source and target contracts separately. Source questions depend on the
+connector and include location, format, credentials reference, ingestion mode,
+schema evolution, replay, watermark, and failure handling. Target questions
+include technology, database/schema/table, write mode, schema evolution,
+partitioning, credentials reference, access, and publishing behavior.
+
 ## Multi-Zone Requests
 
 If user says "onboard from Bronze through Gold" — ask questions for ALL zones, grouped by zone. Present Bronze questions first, then Silver, then Gold. Do not ask Gold questions until Bronze+Silver answers are confirmed.
@@ -55,7 +68,8 @@ If user says "onboard from Bronze through Gold" — ask questions for ALL zones,
 ## What to Auto-Discover Before Asking
 
 ```
-- File format (CSV, Parquet, JSON)
+- File format (CSV, Parquet, JSON, Avro, ORC, XML, or log text)
+- XML row tag or log type (nginx, Apache, Syslog, CloudTrail, application, or custom)
 - Schema (column names, types)
 - Row count and file sizes
 - Null percentages per column

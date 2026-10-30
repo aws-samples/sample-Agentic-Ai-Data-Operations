@@ -63,7 +63,7 @@ from shared.codegen.spec_loader import load_spec  # noqa: E402
 # naming a key, so they take the family key matching their template. TEMPLATE_VERSION
 # is the fallback for anything with no family of its own.
 TEMPLATES = {
-    "bronze_ingestion": ("bronze", "bronze", "TRANSFORMATION_TEMPLATE_VERSION"),
+    "bronze_ingestion": ("bronze", "bronze", "BRONZE_INGESTION_TEMPLATE_VERSION"),
     "silver_transform": ("silver", "silver", "TRANSFORMATION_TEMPLATE_VERSION"),
     "gold_aggregate": ("gold", "gold", "TRANSFORMATION_TEMPLATE_VERSION"),
     "quality_check": ("quality", "quality", "QUALITY_RULES_TEMPLATE_VERSION"),
@@ -166,6 +166,7 @@ def main() -> int:
             template_version=template_version(args.template),
             output_path=Path(args.out),
             run_started_at=rendered_at,
+            schema_version=spec.get("schema_version", "v1"),
         )
     except SpecValidationError as e:
         print(f"error: spec validation failed for {spec_path}\n  {e}", file=sys.stderr)

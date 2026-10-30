@@ -291,7 +291,11 @@ def _cmd_preflight(args: argparse.Namespace) -> int:
     try:
         report = require_passing_audit(workload_dir)
         context = json.loads(context_path.read_text(encoding="utf-8"))
-        result = validate_deployment_preflight(context, glue_role_name=args.glue_role)
+        result = validate_deployment_preflight(
+            context,
+            glue_role_name=args.glue_role,
+            workload_dir=workload_dir,
+        )
     except DeploymentGuardrailError as exc:
         _print({"check": "preflight", "status": "blocked", "error": str(exc)})
         return 2

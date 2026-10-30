@@ -64,6 +64,10 @@ copy:
     source: tests/fixtures/replay_workload/config/silver.yaml
   - target: lib/contracts/README.md
     source: contracts/README.md
+  - target: lib/contracts/policies/organization/default.yaml
+    source: contracts/policies/organization/default.yaml
+  - target: lib/contracts/policies/zone_policy.schema.json
+    source: contracts/policies/zone_policy.schema.json
   - target: lib/contracts/v1/bronze_spec.schema.json
     source: contracts/v1/bronze_spec.schema.json
   - target: lib/contracts/v1/dag_spec.schema.json
@@ -78,12 +82,16 @@ copy:
     source: contracts/v1/silver_spec.schema.json
   - target: lib/contracts/v1/source_profile.schema.json
     source: contracts/v1/source_profile.schema.json
+  - target: lib/contracts/v1/target_profile.schema.json
+    source: contracts/v1/target_profile.schema.json
   - target: lib/contracts/v1/workload_manifest.schema.json
     source: contracts/v1/workload_manifest.schema.json
   - target: lib/shared/__init__.py
     source: shared/__init__.py
   - target: lib/shared/codegen/__init__.py
     source: shared/codegen/__init__.py
+  - target: lib/shared/codegen/contract_resolver.py
+    source: shared/codegen/contract_resolver.py
   - target: lib/shared/codegen/drift_validator.py
     source: shared/codegen/drift_validator.py
   - target: lib/shared/codegen/exceptions.py

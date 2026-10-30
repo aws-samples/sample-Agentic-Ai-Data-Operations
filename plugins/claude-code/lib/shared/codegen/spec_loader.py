@@ -8,12 +8,14 @@ import jsonschema
 import yaml
 
 from .exceptions import SchemaVersionError, SpecHashMismatchError, SpecValidationError
+from .contract_resolver import ContractPolicyError, validate_zone_contract
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 CONTRACTS_DIR = PROJECT_ROOT / "contracts"
 
 SPEC_TYPE_TO_SCHEMA = {
     "source": "source_profile.schema.json",
+    "target": "target_profile.schema.json",
     "bronze": "bronze_spec.schema.json",
     "silver": "silver_spec.schema.json",
     "gold": "gold_spec.schema.json",
@@ -61,15 +63,18 @@ def validate_spec(spec: dict, spec_type: str, schema_version: str = "v1") -> lis
     return [err.message for err in validator.iter_errors(spec)]
 
 
-def load_spec(path: Path, spec_type: str, schema_version: str = "v1") -> tuple[dict, str]:
+def load_spec(
+    path: Path, spec_type: str, schema_version: str | None = None
+) -> tuple[dict, str]:
     """
     Load a YAML/JSON spec file, validate against its contract, return (spec, spec_hash).
 
     Args:
         path: Path to the spec YAML or JSON file.
-        spec_type: One of 'source', 'bronze', 'silver', 'gold', 'quality', 'dag',
-            'manifest', 'run_context'.
-        schema_version: Contract version directory (default 'v1').
+        spec_type: One of 'source', 'target', 'bronze', 'silver', 'gold',
+            'quality', 'dag', 'manifest', 'run_context'.
+        schema_version: Optional explicit contract version. If omitted, use
+            the spec's schema_version, defaulting to v1 for profile specs.
 
     Returns:
         Tuple of (spec_dict, spec_hash) where spec_hash is SHA-256 hex of canonical JSON.
@@ -89,11 +94,25 @@ def load_spec(path: Path, spec_type: str, schema_version: str = "v1") -> tuple[d
         else:
             spec = yaml.safe_load(f)
 
-    errors = validate_spec(spec, spec_type, schema_version)
+    selected_version = schema_version or spec.get("schema_version", "v1")
+    errors = validate_spec(spec, spec_type, selected_version)
     if errors:
         schema_file = SPEC_TYPE_TO_SCHEMA.get(spec_type, spec_type)
         raise SpecValidationError(
-            f"contracts/{schema_version}/{schema_file}", errors
+            f"contracts/{selected_version}/{schema_file}", errors
+        )
+
+    try:
+        policy_errors = validate_zone_contract(
+            spec,
+            spec_type,
+            path.parent.parent if path.parent.name == "config" else path.parent,
+        )
+    except ContractPolicyError as exc:
+        raise SpecValidationError("contracts/policies/zone_policy.schema.json", [str(exc)]) from exc
+    if policy_errors:
+        raise SpecValidationError(
+            "contracts/policies/organization/default.yaml", policy_errors
         )
 
     spec_hash = compute_spec_hash(spec)

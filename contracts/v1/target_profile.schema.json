@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://adop.internal/contracts/v1/target_profile.schema.json",
+  "title": "Target Profile Spec",
+  "description": "Defines the workload-specific target contract.",
+  "type": "object",
+  "required": ["dataset_name", "version", "target"],
+  "additionalProperties": false,
+  "properties": {
+    "dataset_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,40}$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "target": {
+      "type": "object",
+      "required": ["type", "write_mode"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["iceberg", "snowflake", "rds", "s3", "jdbc"]
+        },
+        "location": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "format": {
+          "type": "string",
+          "enum": ["iceberg", "parquet", "csv", "json", "snowflake_table", "jdbc_table"]
+        },
+        "write_mode": {
+          "type": "string",
+          "enum": ["append", "overwrite", "merge", "upsert"]
+        },
+        "schema_evolution": {
+          "type": "string",
+          "enum": ["strict", "additive", "compatible"]
+        },
+        "credentials": {
+          "type": "object",
+          "required": ["type", "connection_id"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["secrets_manager", "airflow_connection", "iam"]
+            },
+            "connection_id": { "type": "string", "minLength": 1 }
+          }
+        },
+        "database": { "type": "string" },
+        "schema": { "type": "string" },
+        "table": { "type": "string" },
+        "partition_keys": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

@@ -42,6 +42,30 @@
       "pattern": "^([0-5](\\.[0-9]{1,2})?|complete)$",
       "description": "Furthest phase or step the orchestrator has entered, e.g. \"4.3\". Read by the SessionStart hook to restore place after a compaction; a value of 5 or above (or \"complete\") means the run is no longer in flight."
     },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "organization": { "type": "string", "minLength": 1 },
+        "domain": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,60}$" },
+        "project": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,60}$" }
+      },
+      "description": "Optional policy scope used to resolve organization, domain, and project zone contracts."
+    },
+    "effective_contract": {
+      "type": "object",
+      "required": ["effective_hash", "organization_version"],
+      "additionalProperties": false,
+      "properties": {
+        "effective_hash": { "$ref": "#/$defs/short_hash" },
+        "organization_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "domain_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "project_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "source_contract_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "target_contract_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" }
+      },
+      "description": "Resolved contract evidence captured by the orchestrator. Missing for legacy runs during gradual migration."
+    },
     "input_hash": {
       "$ref": "#/$defs/short_hash"
     },
@@ -169,6 +193,31 @@
           "type": "array",
           "items": { "type": "string" },
           "description": "Anything else the human said that a downstream agent should not lose"
+        },
+        "contract_overrides": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "zones": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "bronze": { "$ref": "#/$defs/contract_zone_override" },
+                "silver": { "$ref": "#/$defs/contract_zone_override" },
+                "gold": { "$ref": "#/$defs/contract_zone_override" }
+              }
+            },
+            "controls": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "pii_detection_required": { "type": "boolean" },
+                "encryption_at_rest": { "type": "string", "enum": ["kms"] },
+                "encryption_in_transit": { "type": "string", "enum": ["tls"] }
+              }
+            }
+          },
+          "description": "Optional per-run changes. They may only tighten the effective inherited contract."
         }
       }
     },
@@ -197,6 +246,27 @@
       "type": "string",
       "pattern": "^[a-f0-9]{16,64}$",
       "description": "SHA-256 hex digest, truncated to 16 chars by compute_input_hash() or full 64"
+    },
+    "contract_zone_override": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mutability": { "type": "string", "enum": ["immutable", "updatable"] },
+        "required_format": { "type": "string", "enum": ["iceberg"] },
+        "minimum_quality_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "allowed_source_formats": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": ["csv", "parquet", "json", "avro", "orc"]
+          }
+        }
+      }
     }
   }
 }

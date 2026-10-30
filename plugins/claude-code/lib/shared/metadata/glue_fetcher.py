@@ -117,6 +117,10 @@ class GlueFetcher:
                 format_name = 'csv'
             elif 'json' in format_type.lower():
                 format_name = 'json'
+            elif 'xml' in format_type.lower():
+                format_name = 'xml'
+            elif any(token in format_type.lower() for token in ('log', 'text', 'regex')):
+                format_name = 'log'
             else:
                 format_name = 'unknown'
 

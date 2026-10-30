@@ -17,7 +17,13 @@ small.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any, Dict, Mapping, Optional
+
+from shared.codegen.contract_resolver import (
+    ContractPolicyError,
+    resolve_effective_policy,
+)
 
 
 class DeploymentGuardrailError(ValueError):
@@ -154,6 +160,7 @@ def validate_deployment_preflight(
     *,
     glue_role_name: Optional[str] = None,
     glue_policy: Optional[Mapping[str, Any]] = None,
+    workload_dir: Optional[str | Path] = None,
 ) -> Dict[str, Any]:
     """Validate all deployment inputs before touching AWS."""
     answers = run_context.get("human_answers")
@@ -181,12 +188,30 @@ def validate_deployment_preflight(
     principals = require_tbac_principals(answers)
     query_principal = require_query_principal(answers)
     workload_name = str(run_context.get("workload_name", ""))
+    contract_dir = Path(workload_dir) if workload_dir else Path("workloads") / workload_name
+    try:
+        effective_contract = resolve_effective_policy(contract_dir)
+    except ContractPolicyError as exc:
+        raise DeploymentGuardrailError(f"effective contract is invalid: {exc}") from exc
+    recorded_contract = run_context.get("effective_contract")
+    if isinstance(recorded_contract, Mapping):
+        recorded_hash = recorded_contract.get("effective_hash")
+        if recorded_hash and recorded_hash != effective_contract["effective_hash"]:
+            raise DeploymentGuardrailError(
+                "run_context.effective_contract is stale; resolve and record the "
+                "current organization/domain/project/run contract before deployment"
+            )
     result: Dict[str, Any] = {
         "workload_name": workload_name,
         "iac_target_framework": framework,
         "iac_target_frameworks": list(selected),
         "iac_tbac_principals": principals,
         "iac_query_principal_arn": query_principal,
+        "effective_contract_hash": effective_contract["effective_hash"],
+        "effective_contract_version": effective_contract.get("version"),
+        "organization_contract_version": effective_contract.get("organization_version"),
+        "domain_contract_version": effective_contract.get("domain_version"),
+        "project_contract_version": effective_contract.get("project_version"),
     }
 
     if glue_role_name is not None:

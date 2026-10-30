@@ -14,6 +14,7 @@ from .exceptions import (
     TemplateNotFoundError,
     UnsupportedSpecValueError,
 )
+from .contract_resolver import ContractPolicyError, validate_zone_contract
 from .slot_extractor import parse_required_slots_header
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -168,6 +169,30 @@ def render(
     Raises:
         TemplateNotFoundError, MissingSlotError, RenderError
     """
+    template_contract = {
+        "bronze_ingestion": "bronze",
+        "silver_transform": "silver",
+        "gold_aggregate": "gold",
+    }.get(template_id)
+    if template_contract:
+        try:
+            workload_dir = Path(output_path)
+            for candidate in (workload_dir.parent, *workload_dir.parents):
+                if (candidate / "config").is_dir():
+                    workload_dir = candidate
+                    break
+            policy_errors = validate_zone_contract(
+                spec, template_contract, workload_dir
+            )
+        except ContractPolicyError as exc:
+            raise RenderError(template_id, str(exc)) from exc
+        if policy_errors:
+            raise RenderError(
+                template_id,
+                "effective zone contract rejected the spec: "
+                + "; ".join(policy_errors),
+            )
+
     source, template_hash, template_path = _load_template(template_id)
     _validate_slots(source, spec, template_id)
 
@@ -228,11 +253,31 @@ def render_dry_run(
     template_version: str,
     run_started_at: str,
     schema_version: str = "v1",
+    workload_dir: Path | None = None,
 ) -> tuple[bytes, str]:
     """
     Render without writing to disk. For drift validation and previews.
     Returns (rendered_bytes, artifact_hash).
     """
+    template_contract = {
+        "bronze_ingestion": "bronze",
+        "silver_transform": "silver",
+        "gold_aggregate": "gold",
+    }.get(template_id)
+    if template_contract:
+        try:
+            policy_errors = validate_zone_contract(
+                spec, template_contract, workload_dir or Path.cwd()
+            )
+        except ContractPolicyError as exc:
+            raise RenderError(template_id, str(exc)) from exc
+        if policy_errors:
+            raise RenderError(
+                template_id,
+                "effective zone contract rejected the spec: "
+                + "; ".join(policy_errors),
+            )
+
     source, template_hash, template_path = _load_template(template_id)
     _validate_slots(source, spec, template_id)
 

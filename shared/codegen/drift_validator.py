@@ -141,6 +141,7 @@ def verify_artifact(artifact_path: Path) -> DriftReport:
             template_version="1.0.0",
             run_started_at=header["rendered_at"],
             schema_version=header["schema_version"],
+            workload_dir=workload_dir,
         )
     except Exception as e:
         return DriftReport(

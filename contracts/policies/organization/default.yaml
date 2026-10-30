@@ -1,0 +1,28 @@
+contract_id: adop.organization.zone-default
+version: "1.0.0"
+scope: organization
+
+zones:
+  bronze:
+    mutability: immutable
+    allowed_source_formats:
+      - csv
+      - parquet
+      - json
+      - avro
+      - orc
+      - xml
+      - log
+  silver:
+    mutability: updatable
+    required_format: iceberg
+    minimum_quality_threshold: 0.80
+  gold:
+    mutability: updatable
+    required_format: iceberg
+    minimum_quality_threshold: 0.95
+
+controls:
+  pii_detection_required: true
+  encryption_at_rest: kms
+  encryption_in_transit: tls

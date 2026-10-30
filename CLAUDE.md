@@ -27,6 +27,10 @@ This is a human-in-the-loop gate. The HUMAN provides the rules. The agent does N
 2. **Quality** → thresholds per dimension, critical vs warning rules
 3. **Scheduling** → cron expression, **IANA timezone** (`dag_spec.schedule.timezone` is
    required — never infer it), dependencies, failure handling
+4. **Contracts** → show the inherited organization/domain/project Bronze, Silver, and Gold
+   defaults. Ask whether the user wants stricter per-run overrides. If no, continue with
+   the defaults. Then collect separate source and target contract answers for the selected
+   connectors.
 
 **Auto-discover first** (schema, format, nulls, row count) — then ask only what you couldn't discover. Present findings before questions.
 
@@ -41,6 +45,8 @@ This is a human-in-the-loop gate. The HUMAN provides the rules. The agent does N
 [ ] Schedule + timezone explicitly stated by user
 [ ] Ontology collection preference confirmed (opt-in/opt-out for semantic layer enrichment via Ontology agent)
 [ ] If ontology YES: use cases + consumers confirmed (NL→SQL, discovery, BI, ML, compliance — who uses it?)
+[ ] Inherited zone contract accepted or stricter per-run override validated
+[ ] Source contract and target contract captured separately
 ```
 
 **If ANY item is missing, ASK THE USER. Do not proceed.**
@@ -115,7 +121,7 @@ policies in `shared/policies/` by the `cedar_gate.py` PreToolUse hook
 
 ```
 workloads/{name}/
-├── config/    # source.yaml, semantic.yaml, transformations.yaml, quality_rules.yaml, schedule.yaml
+├── config/    # source.yaml, target.yaml, zone specs, quality_rules.yaml, schedule.yaml
 ├── scripts/   # extract/, transform/, quality/, load/
 ├── dags/      # {name}_dag.py
 ├── sql/       # bronze/, silver/, gold/

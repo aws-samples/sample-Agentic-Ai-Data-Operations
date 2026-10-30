@@ -41,7 +41,7 @@ from shared.codegen.spec_loader import load_spec  # noqa: E402
 
 
 TEMPLATES = {
-    "bronze_ingestion": ("bronze", "bronze", "TRANSFORMATION_TEMPLATE_VERSION"),
+    "bronze_ingestion": ("bronze", "bronze", "BRONZE_INGESTION_TEMPLATE_VERSION"),
     "silver_transform": ("silver", "silver", "TRANSFORMATION_TEMPLATE_VERSION"),
     "gold_aggregate": ("gold", "gold", "TRANSFORMATION_TEMPLATE_VERSION"),
     "quality_check": ("quality", "quality", "QUALITY_RULES_TEMPLATE_VERSION"),
@@ -116,6 +116,7 @@ def main() -> int:
             template_version=versions[version_key],
             output_path=Path(args.out),
             run_started_at=rendered_at,
+            schema_version=spec.get("schema_version", "v1"),
         )
     except SpecValidationError as exc:
         print(f"error: spec validation failed: {exc}", file=sys.stderr)

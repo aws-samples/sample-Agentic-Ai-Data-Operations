@@ -20,6 +20,9 @@ Before acting:
    human discovery answers are complete.
 5. Preserve the deterministic renderer, Cedar checks, requirements audit,
    tracing, and workload evidence required by the repository.
+6. Present inherited organization/domain/project zone contracts and accept them
+   by default, or record only stricter per-run overrides. Keep source and target
+   contracts separate and ask connector-specific questions.
 
 The plugin does not replace the repository's project hooks or policy files.
 Use the native `.codex/` workflow as the implementation authority. Never infer

@@ -27,6 +27,10 @@ This is a human-in-the-loop gate. The HUMAN provides the rules. The agent does N
 2. **Quality** → thresholds per dimension, critical vs warning rules
 3. **Scheduling** → cron expression, **IANA timezone** (`dag_spec.schedule.timezone` is
    required — never infer it), dependencies, failure handling
+4. **Contracts** → show the inherited organization/domain/project Bronze, Silver, and Gold
+   defaults. Ask whether the user wants stricter per-run overrides. If no, continue with
+   the defaults. Then collect the separate source and target contract answers required by
+   the selected connectors.
 
 **Regulation detection:** Before treating compliance as unspecified, scan the user's
 onboarding request with `shared.compliance.regulation_detector.detect_regulations()`.
@@ -47,6 +51,8 @@ inactive, and a regulation must never be inferred from column names or observed 
 [ ] Schedule + timezone explicitly stated by user
 [ ] Ontology collection preference confirmed (opt-in/opt-out for semantic layer enrichment via Ontology agent)
 [ ] If ontology YES: use cases + consumers confirmed (NL→SQL, discovery, BI, ML, compliance — who uses it?)
+[ ] Inherited zone contract accepted or stricter per-run override validated
+[ ] Source contract and target contract captured separately
 ```
 
 **If ANY item is missing, ASK THE USER. Do not proceed.**

@@ -24,6 +24,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from shared.requirements.auditor import audit_workload  # noqa: E402
+from shared.codegen.contract_resolver import (  # noqa: E402
+    ContractPolicyError,
+    resolve_effective_policy,
+)
 from shared.utils import deployment_checks  # noqa: E402
 
 
@@ -179,6 +183,11 @@ def discovery_gate(workload: str) -> int:
         blockers.append(
             "human_answers.ontology_use_cases is required when ontology_opt_in is true"
         )
+    try:
+        effective_contract = resolve_effective_policy(run_dir.parent)
+    except ContractPolicyError as exc:
+        blockers.append(f"effective zone contract is invalid: {exc}")
+        effective_contract = None
     if blockers:
         print("PHASE 1 BLOCKED")
         for blocker in sorted(set(blockers)):
@@ -191,6 +200,8 @@ def discovery_gate(workload: str) -> int:
         {"run_id": run_id, "phase": "discovery", "status": "pass"},
     )
     print(f"PHASE 1 PASS: {workload}")
+    if effective_contract:
+        print(f"effective_contract_hash={effective_contract['effective_hash']}")
     return 0
 
 

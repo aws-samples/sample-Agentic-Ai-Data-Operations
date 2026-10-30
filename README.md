@@ -308,13 +308,19 @@ The `strands-agentcore` extra is reserved for that future production target.
 | 0. Health and discovery | Check workloads, source metadata, credentials, and tools | Source and access confirmed |
 | 1. Requirements | Capture source, zone, transformation, PII, quality, schedule, and ontology decisions | All mandatory answers provided |
 | 2. Deduplication and context | Detect overlap and create the run context and requirements ledger | Conflicts resolved |
+| 2.1 Contract resolution | Resolve organization → domain → project → per-run zone policy and capture source/target contracts | Effective contract accepted and validated |
 | 3. Profiling | Inspect representative data and present quality/PII observations | Human confirms handling |
 | 4. Build and test | Validate specs, render artifacts, and run tests | Plan and tests approved |
 | Audit | Compare Q&A with context, decisions, traces, tests, artifacts, and deployment evidence | Requirements audit passes |
 | 5. Deploy and verify | Deploy through approved tools and run post-deployment checks | Human approval and verification |
+| 5.10 E2E test offer | Offer a full Bronze → Silver → Gold test after verification | Human chooses run or skip |
+| 5.11 DevOps readiness | Audit inventory, generate approved IaC, monitoring, alerting, cost controls, and runbook | Human confirms formats, products, principals, and apply |
 
-After deployment, the workflow offers the optional E2E pipeline test and DevOps
-production-readiness workflow.
+DevOps is called only after deployment verification and the E2E test offer.
+It first runs the requirements auditor, presents the artifact/product inventory,
+then waits for explicit human confirmation of IaC formats, target products, IAM
+principals, and deployment scope. See the detailed
+[post-deployment and DevOps flow](docs/workflow-diagrams.md#7-post-deployment-and-devops-production-readiness).
 
 ## Provider-neutral extension model
 
@@ -423,7 +429,7 @@ Each workload records the source contract in
 
 | Source | Required decisions |
 |---|---|
-| CSV, Parquet, JSON, Avro | Location, format, partitioning, schema evolution, malformed-record, retention, replay |
+| CSV, Parquet, JSON, Avro, XML, log text | Location, format, parser options, schema evolution, malformed-record, retention, replay |
 | JDBC | Secret reference, table/query, PK, watermark, consistency, extraction window, failure handling |
 | Kafka | Cluster/topic, event key, consumer group, offsets, schema, ordering, late events |
 | Kinesis | Stream, partition key, checkpoint, retention, trigger, throughput, late events |
@@ -431,10 +437,47 @@ Each workload records the source contract in
 Contracts are created and confirmed before artifact generation. Generated
 artifacts are evidence of the contract; they cannot override it.
 
-Implementation status: the source contract accepts `jdbc`, `kafka`, and
-`kinesis`, but the `bronze_ingestion` template reads only file sources
-(`csv`, `parquet`, `json`, `avro`, `orc`) from S3. Those three types are
-contract-level only until an ingestion template exists for them.
+Implementation status: the Bronze template reads S3 file sources including
+`csv`, `parquet`, `json`, `avro`, `orc`, `xml`, and raw `log` text. XML uses a
+declared `row_tag`; logs remain raw in Bronze and carry a declared `log_type`
+(for example `nginx`, `syslog`, `cloudtrail`, or `custom`) to guide approved
+Silver transformations. JDBC, Kafka, and Kinesis remain source-contract types until their
+dedicated ingestion templates are selected.
+
+### Supported data formats
+
+ADOP separates the source transport from the payload format:
+
+| Transport | Formats and behavior |
+|---|---|
+| S3 files | CSV, Parquet, JSON, JSON Lines, Avro, ORC, XML, and raw log text |
+| Kafka | Streaming payload contract; declare JSON, Avro, or text and the topic/schema details |
+| Kinesis | Streaming payload contract; declare JSON, Avro, or text and the stream/schema details |
+| JDBC/RDS | Tabular rows; declare the table/query, primary key, watermark, and extraction rules |
+
+Format-specific options belong in the source and Bronze contracts:
+
+```yaml
+source:
+  type: xml
+  format: xml
+  format_options:
+    row_tag: customer
+```
+
+```yaml
+source:
+  type: log
+  format: log
+  format_options:
+    log_type: nginx
+    multiline: false
+    encoding: utf-8
+```
+
+XML ingestion requires an approved Glue XML reader with DTD and external
+entity resolution disabled. Logs are preserved as raw Bronze text; parsing,
+normalization, PII handling, and quarantine rules are defined for Silver.
 
 ### How contracts are wired
 
@@ -462,6 +505,13 @@ contracts/vN/<type>.schema.json    shape of the spec (JSON Schema 2020-12)
 | Quality | `quality_spec` | `config/quality_rules.yaml` | `quality_check` | quality agent |
 | Orchestration | `dag_spec` (v1, v2) | `config/schedule.yaml` | `airflow_dag`, `glue_job_config` | DAG agent |
 | Run state | `run_context` | `run/context.json` | none | orchestrator only |
+| Target | `target_profile` | `config/target.yaml` | target adapter/IaC | onboarding and DevOps |
+
+Zone contracts are organization defaults shared by every domain and project.
+The effective policy resolves as `organization → domain → project → per-run
+override`; lower layers may only tighten inherited rules. Source and target
+contracts remain workload-specific because they vary by connector and customer
+technology.
 
 ### Extending contracts
 

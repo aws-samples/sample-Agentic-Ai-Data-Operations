@@ -53,6 +53,8 @@
             "parquet",
             "json",
             "avro",
+            "xml",
+            "log",
             "jdbc",
             "kafka",
             "kinesis"
@@ -72,7 +74,9 @@
             "parquet",
             "json",
             "avro",
-            "orc"
+            "orc",
+            "xml",
+            "log"
           ]
         },
         "frequency": {
@@ -85,6 +89,31 @@
             "streaming",
             "one_time"
           ]
+        },
+        "format_options": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "encoding": { "type": "string", "minLength": 1 },
+            "multiline": { "type": "boolean" },
+            "row_tag": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$"
+            },
+            "log_type": {
+              "type": "string",
+              "enum": [
+                "apache_common",
+                "apache_combined",
+                "nginx",
+                "syslog",
+                "cloudtrail",
+                "application",
+                "json_lines",
+                "custom"
+              ]
+            }
+          }
         },
         "credentials": {
           "type": "object",

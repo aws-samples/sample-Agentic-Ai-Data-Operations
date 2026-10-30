@@ -91,6 +91,9 @@ Gold questions until Bronze and Silver answers are confirmed.
 1. **PII and compliance** — which columns are PII; GDPR / CCPA / HIPAA / SOX / PCI?
 2. **Quality** — thresholds per dimension; which rules are critical versus warning
 3. **Scheduling** — cron expression, dependencies, failure handling
+4. **Contracts** — present the inherited organization/domain/project Bronze, Silver, and Gold
+   defaults. Accept them by default or record only stricter per-run overrides. Then collect
+   separate source and target contract answers for the selected connectors.
 
 ## Ontology enrichment — always ask, never assume "no"
 
@@ -121,6 +124,8 @@ column names:
 [ ] PII columns and compliance requirements confirmed by the user
 [ ] Quality thresholds explicitly stated, or the user said "use defaults"
 [ ] Schedule explicitly stated by the user
+[ ] Inherited zone contract accepted or stricter per-run override validated
+[ ] Source contract and target contract captured separately
 [ ] Ontology opt-in confirmed
 [ ] If ontology yes: entities, relationships, use cases, consumers and business terms confirmed
 ```

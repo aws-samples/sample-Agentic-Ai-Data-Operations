@@ -29,6 +29,8 @@ the ontology follow-ups and the worked contrasts.
 [ ] PII columns and compliance requirements confirmed by the user
 [ ] Quality thresholds explicitly stated, or the user said "use defaults"
 [ ] Schedule explicitly stated by the user
+[ ] Inherited organization/domain/project zone contract accepted or stricter per-run override validated
+[ ] Source contract and target contract captured separately
 [ ] Ontology opt-in confirmed
 [ ] If ontology yes: entities, relationships, use cases, consumers, business terms confirmed
 ```
@@ -48,6 +50,12 @@ If any item is missing, ASK. Do not proceed.
 
 You MAY profile data and PRESENT observations, then you MUST ask: "How would you like to handle
 these?"
+
+Before generation, show the inherited organization/domain/project Bronze,
+Silver, and Gold defaults. If the user accepts them, continue without extra
+zone questions. Source and target contracts are collected separately using
+connector-specific questions. User overrides apply only to the current run
+and may only tighten inherited rules.
 
 ---
 
@@ -91,7 +99,8 @@ anything NOT covered in the prompt.
 ```
 [ ] Data source type (S3 / PostgreSQL / RDS / API / other)
 [ ] Exact path, table, or endpoint
-[ ] Data format (CSV / Parquet / JSON / JDBC / other)
+[ ] Data format (CSV / Parquet / JSON / Avro / ORC / XML / log text / JDBC / other)
+[ ] XML row tag or log type (nginx / Apache / Syslog / CloudTrail / application / custom)
 [ ] Credentials or connection method (Secrets Manager reference — NEVER store credentials)
 ```
 

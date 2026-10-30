@@ -47,7 +47,18 @@ flowchart TD
             QUALITY_Q --> SCHED[Scheduling<br/>cron, dependencies, failure handling]
         end
 
-        SCHED --> PHASE2
+    SCHED --> CONTRACTS
+
+        subgraph CONTRACT_GATE["CONTRACT RESOLUTION"]
+            CONTRACTS[Load organization defaults]
+            CONTRACTS --> OVERLAYS[Apply optional domain/project policies]
+            OVERLAYS --> USER_CONTRACT{User accepts defaults?}
+            USER_CONTRACT -->|Yes| SOURCE_TARGET[Capture separate source and target contracts]
+            USER_CONTRACT -->|No| OVERRIDE[Validate stricter per-run override]
+            OVERRIDE --> SOURCE_TARGET
+        end
+
+    SOURCE_TARGET --> PHASE2
 
         subgraph P2["PHASE 2: Dedup & Validation (inline)"]
             PHASE2[Duplicate Detection]
@@ -368,3 +379,104 @@ workloads/sales_data/
 │
 └── README.md                    ← Orchestrator (Phase 4.6)
 ```
+
+## 7. Post-Deployment and DevOps Production Readiness
+
+DevOps is called only after onboarding deployment and post-deployment verification
+pass. It is not part of the initial pipeline build.
+
+```mermaid
+flowchart TD
+    DEPLOY[Phase 5: Deploy workload] --> VERIFY[Post-deployment verification]
+    VERIFY --> VERIFY_GATE{All verification checks pass?}
+    VERIFY_GATE -->|No| FIX[Fix deployment issue]
+    FIX --> DEPLOY
+    VERIFY_GATE -->|Yes| E2E_OFFER{Offer E2E pipeline test}
+
+    E2E_OFFER -->|Run E2E| E2E[Trigger Bronze → Silver → Gold<br/>and query Gold]
+    E2E_OFFER -->|Skip| DEVOPS_OFFER
+    E2E --> E2E_GATE{E2E succeeds?}
+    E2E_GATE -->|No| E2E_FIX[Fix and re-run or stop]
+    E2E_FIX --> E2E_OFFER
+    E2E_GATE -->|Yes| DEVOPS_OFFER
+
+    DEVOPS_OFFER{Offer DevOps Agent}
+    DEVOPS_OFFER -->|Skip| DONE[Production readiness deferred]
+    DEVOPS_OFFER -->|Run| AUDIT[Requirements auditor]
+    AUDIT --> AUDIT_GATE{Audit passes?}
+    AUDIT_GATE -->|No| AUDIT_BLOCK[Report evidence gaps<br/>and stop]
+    AUDIT_GATE -->|Yes| INVENTORY[Present artifact and product inventory]
+    INVENTORY --> HUMAN[Human confirms IaC formats,<br/>target products, principals and scope]
+    HUMAN --> PREFLIGHT[Deployment preflight]
+    PREFLIGHT --> PREFLIGHT_GATE{Preflight passes?}
+    PREFLIGHT_GATE -->|No| PREFLIGHT_BLOCK[Stop and request correction]
+    PREFLIGHT_GATE -->|Yes| IAC[Generate IaC per selected format]
+
+    IAC --> TF[Terraform]
+    IAC --> CFN[CloudFormation]
+    IAC --> CDK[AWS CDK Python/TypeScript]
+
+    TF --> OPS
+    CFN --> OPS
+    CDK --> OPS
+    OPS[Monitoring, alerting, cost controls,<br/>backup/DR and runbook]
+    OPS --> APPROVAL[Human reviews and approves]
+    APPROVAL --> APPLY[Human or approved CI/CD applies IaC]
+    APPLY --> OPS_VERIFY[Validate infrastructure and operations]
+
+    style VERIFY_GATE fill:#fce4ec,stroke:#e91e63
+    style AUDIT_GATE fill:#fce4ec,stroke:#e91e63
+    style PREFLIGHT_GATE fill:#fce4ec,stroke:#e91e63
+    style HUMAN fill:#fff3e0,stroke:#ff9800
+    style APPROVAL fill:#fff3e0,stroke:#ff9800
+    style DONE fill:#e8f5e9,stroke:#4caf50
+```
+
+### DevOps call sequence
+
+```mermaid
+sequenceDiagram
+    participant H as Human
+    participant O as ADOP Orchestrator
+    participant A as Requirements Auditor
+    participant I as IaC Agent(s)
+    participant M as Monitoring/Cost/Runbook Agents
+    participant D as Deployment Gate
+
+    O->>H: Offer E2E pipeline test
+    H-->>O: Run or skip
+    O->>H: Offer DevOps Agent
+    H-->>O: Run DevOps
+
+    O->>A: Audit requirements and collect artifact inventory
+    A-->>O: PASS/FAIL + products, services and evidence
+    alt Audit fails
+        O->>H: Show missing or conflicting evidence
+    else Audit passes
+        O->>H: Confirm IaC formats, target products and IAM principals
+        H-->>O: Explicit selections
+        O->>D: Run preflight and role checks
+        D-->>O: PASS/FAIL
+        alt Preflight passes
+            par One job per selected IaC format
+                O->>I: Generate Terraform/CloudFormation/CDK
+            and
+                O->>M: Generate monitoring, cost controls and runbook
+            end
+            I-->>O: IaC artifacts and Cedar permit draft
+            M-->>O: Operations artifacts
+            O->>H: Present results for approval
+            H-->>O: Approve apply
+            O->>D: Apply only through approved deployment path
+            D-->>O: Deployment and verification result
+        else Preflight fails
+            O->>H: Stop and request corrected human inputs
+        end
+    end
+```
+
+IAM roles are treated as security dependencies, not automatically selected
+products. The auditor reports role references found in the workload, but the
+human must confirm exact role ARNs and access scope. The IaC agents must not
+use the current caller, invent roles, or grant Lake Formation access from PII
+column names.

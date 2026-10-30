@@ -23,7 +23,7 @@ def test_bronze_spec_script_and_downstream_source_agree():
         bronze,
         spec_hash,
         "bronze_ingestion",
-        "1.6.0",
+            "1.7.0",
         "2026-10-22T18:18:44Z",
         schema_version="v2",
     )

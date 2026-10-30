@@ -1,5 +1,5 @@
 {# template_id: bronze_ingestion #}
-{# template_version: 1.3.0 #}
+{# template_version: 1.4.0 #}
 {# required_slots: dataset_name, source_path, source_format, landing_zone #}
 {# schema_version: v1 #}
 import sys
@@ -109,6 +109,25 @@ def ingest(glue_context, args):
     df = spark.read.format("json") \
 {% if format_options is defined and format_options.multiline is defined %}
         .option("multiLine", "{{ format_options.multiline | lower }}") \
+{% endif %}
+        .load(source_path)
+{% elif source_format == "xml" %}
+    # The Glue runtime must provide an approved XML reader with DTD and
+    # external-entity resolution disabled; untrusted XML must never enable XXE.
+    df = spark.read.format("xml") \
+{% if format_options is defined and format_options.row_tag is defined %}
+        .option("rowTag", "{{ format_options.row_tag }}") \
+{% endif %}
+        .option("mode", "FAILFAST") \
+        .load(source_path)
+{% elif source_format == "log" %}
+    # Keep logs raw in Bronze; parse Apache, Nginx, Syslog, or custom records in Silver.
+    df = spark.read.format("text") \
+{% if format_options is defined and format_options.multiline is defined %}
+        .option("wholetext", "{{ format_options.multiline | lower }}") \
+{% endif %}
+{% if format_options is defined and format_options.encoding is defined %}
+        .option("encoding", "{{ format_options.encoding }}") \
 {% endif %}
         .load(source_path)
 {% else %}

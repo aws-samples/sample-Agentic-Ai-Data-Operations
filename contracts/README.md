@@ -2,6 +2,11 @@
 
 Versioned JSON Schemas (Draft 2020-12) that define the shape of every workload configuration file. The codegen renderer validates specs against these contracts before rendering artifacts.
 
+Zone contracts are organization defaults: Bronze, Silver, and Gold rules apply
+to every domain and project. Optional domain/project policy files and per-run
+user answers may only tighten those defaults. Source and target contracts are
+separate because they vary by workload and connector.
+
 For how contracts connect to templates, the renderer and the drift validator, and how to extend them to new zones, data sources and data targets, see [How contracts are wired](../README.md#how-contracts-are-wired) and [Extending contracts](../README.md#extending-contracts) in the main README.
 
 ## Versioning Policy
@@ -17,6 +22,7 @@ For how contracts connect to templates, the renderer and the drift validator, an
 | Schema | v1 | v2 | Validates | Used By |
 |--------|----|----|-----------|---------|
 | `source_profile.schema.json` | ✓ | | `config/source.yaml` | Phase 3 profiling output |
+| `target_profile.schema.json` | ✓ | | `config/target.yaml` | Target contract for the selected sink |
 | `bronze_spec.schema.json` | ✓ | ✓ | `config/bronze.yaml` | `bronze_ingestion` template |
 | `silver_spec.schema.json` | ✓ | | `config/silver.yaml` | `silver_transform`, `iceberg_ddl` templates |
 | `gold_spec.schema.json` | ✓ | ✓ | `config/gold.yaml` | `gold_aggregate`, `iceberg_ddl` templates |
@@ -26,6 +32,30 @@ For how contracts connect to templates, the renderer and the drift validator, an
 | `run_context.schema.json` | ✓ | | `run/context.json` | Orchestrator (writes end of Phase 2), every sub-agent (reads) |
 
 What v2 changed: `bronze_spec` v2 makes `catalog_database`, `catalog_table` and `idempotency_key` required. `gold_spec` v2 and `dag_spec` v2 keep the v1 fields and required list; the version selects different template behavior. A v2 DAG renders the IANA schedule timezone into the Airflow start date, and v2 Gold adds approved passthrough controls.
+
+## Governance contract hierarchy
+
+The effective zone policy is resolved before rendering:
+
+```text
+organization default → domain policy → project policy → per-run override
+```
+
+The organization default is stored in
+`contracts/policies/organization/default.yaml`. Domain and project files are
+optional. A user can accept the inherited policy and continue without extra
+zone questions, or provide a per-run override in
+`run/context.json#human_answers.contract_overrides`.
+
+Lower layers cannot reduce a quality threshold, disable PII detection, change
+the required Iceberg format, or contradict an inherited immutability or
+encryption rule. The resolver records an effective policy hash for deployment
+preflight.
+
+Bronze supports CSV, Parquet, JSON, Avro, ORC, XML, and raw log text. XML
+requires a `row_tag`; logs remain raw in Bronze and declare a `log_type` to
+guide approved Silver transformations. XML readers must disable DTD and
+external-entity resolution.
 
 ## Validation
 

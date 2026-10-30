@@ -22,7 +22,7 @@
     },
     "source_format": {
       "type": "string",
-      "enum": ["csv", "parquet", "json", "avro", "orc"]
+      "enum": ["csv", "parquet", "json", "avro", "orc", "xml", "log"]
     },
     "landing_zone": {
       "type": "string",
@@ -50,7 +50,22 @@
         "null_value": { "type": "string" },
         "date_format": { "type": "string" },
         "timestamp_format": { "type": "string" },
-        "multiline": { "type": "boolean" }
+        "multiline": { "type": "boolean" },
+        "encoding": { "type": "string", "minLength": 1 },
+        "row_tag": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$" },
+        "log_type": {
+          "type": "string",
+          "enum": [
+            "apache_common",
+            "apache_combined",
+            "nginx",
+            "syslog",
+            "cloudtrail",
+            "application",
+            "json_lines",
+            "custom"
+          ]
+        }
       }
     },
     "retention": {
