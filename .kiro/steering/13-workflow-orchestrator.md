@@ -41,9 +41,9 @@ calls. `verify` is Step 5.9; its MWAA check fails on any `dags list-import-error
 `preflight` and `simulate` refuse to run until `run/requirements_audit.json` has
 `status: pass` for the current `run_id` and is newer than `context.json` and everything
 under `config/`, `scripts/`, `dags/` and `sql/`. A passing `preflight` writes
-`run/deploy_gate.json`, and the `adop-deploy-gate` PreToolUse hook denies every deploy
-mutation until that file exists — so the audit cannot be bypassed by calling an AWS tool
-directly instead of going through the driver. Never hand-write `deploy_gate.json`.
+`run/deploy_gate.json`. When `ADOP_DEPLOY_GATE=1` is set, the `adop-deploy-gate`
+PreToolUse hook denies every deploy mutation until that file exists; the hook is disabled
+by default. Never hand-write `deploy_gate.json`.
 These are the same `shared.utils.deployment_checks` gates Claude Code and Codex run.
 
 The driver never guesses a business answer, creates pipeline code, or mutates AWS;

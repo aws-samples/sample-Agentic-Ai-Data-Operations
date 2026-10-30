@@ -277,6 +277,12 @@ def main() -> int:
         "scripts/kiro_workflow.py",
         "scripts/sync_platforms.py",
         "docs/platform-integration.md",
+        "plugins/adop/README.md",
+        "plugins/adop/skills/setup/SKILL.md",
+        "plugins/adop/skills/command-onboard-workflow/SKILL.md",
+        "plugins/adop/skills/command-devops-workflow/SKILL.md",
+        "plugins/adop/skills/security-review/SKILL.md",
+        ".agents/plugins/marketplace.json",
         "mcp-profiles/third-party/snowflake.json",
         "mcp-profiles/third-party/databricks.json",
         "mcp-profiles/third-party/teradata.json",
@@ -292,6 +298,8 @@ def main() -> int:
         "adapters/kiro/.kiro/settings/mcp.json",
         "adapters/kiro/.kiro/agents/requirements-auditor.json",
         "adapters/kiro/.kiro/hooks/adop-gates.json",
+        "plugins/adop/.codex-plugin/plugin.json",
+        ".agents/plugins/marketplace.json",
     ):
         check_json(ROOT / relative, errors)
 
@@ -305,7 +313,7 @@ def main() -> int:
             print(f"  - {error}")
         return 1
 
-    print("PASS: four native adapters and shared requirements auditor are present")
+    print("PASS: four native adapters, ADOP Codex plugin, and shared requirements auditor are present")
     return 0
 
 

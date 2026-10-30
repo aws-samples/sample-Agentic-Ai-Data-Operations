@@ -118,6 +118,9 @@ REQUIRED_SHARED_PATHS = (
     "mcp-servers/README.md",
     "tool-registry/servers.yaml",
     "scripts/start_codex.py",
+    "plugins/adop/.codex-plugin/plugin.json",
+    "plugins/adop/README.md",
+    ".agents/plugins/marketplace.json",
 )
 
 # Every platform's onboarding flow must carry the Phase 5 Deploy gates.  The

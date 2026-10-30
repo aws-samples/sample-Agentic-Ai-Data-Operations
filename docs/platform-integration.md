@@ -39,7 +39,7 @@ workloads/          Dataset-specific generated pipeline artifacts
 .kiro/              Kiro project configuration
 
 adapters/           Portable native snapshots for distribution/comparison
-plugins/            Installable Claude Code plugin package
+plugins/            Installable Claude Code and Codex plugin packages
 docs/               Human-facing documentation
 scripts/            Repository validation and workflow utilities
 ```
@@ -55,9 +55,19 @@ It vendors the runtime and plugin metadata needed outside an ADOP checkout.
 The root `.claude/` surface is what works when Claude Code is launched inside
 the cloned repository.
 
-Codex has no separate installable plugin package in this repository. Its
-clone-ready project rules are in `.codex/` and `AGENTS.md`. Because the Codex
-CLI stores runtime configuration under `CODEX_HOME`, use
+The ADOP Codex plugin is available at `plugins/adop/`. Add the repository-local
+marketplace and install it from Codex:
+
+```bash
+codex plugin marketplace add .
+codex
+```
+
+Then open `/plugins` and install `adop`. The plugin provides setup, onboarding,
+DevOps, and security-review skills. Its clone-ready project rules remain in
+`.codex/` and `AGENTS.md`, which are still required for the repository's hooks
+and enforcement behavior. Because the Codex CLI stores runtime configuration
+under `CODEX_HOME`, use
 `python3 scripts/start_codex.py` to load this checkout's AWS MCP profile without
 overwriting the user's global Codex configuration. `adapters/codex/` is the
 portable snapshot.

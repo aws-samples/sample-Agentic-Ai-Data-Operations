@@ -45,6 +45,9 @@ that required files exist and that the security hooks (`cedar_gate.py`,
 `deploy_gate.py`) are identical and registered on every platform; it does not
 compare other file contents.
 
+The deploy gate is opt-in and disabled by default. Set `ADOP_DEPLOY_GATE=1` to
+activate hook-level blocking of deploy mutations after the requirements audit.
+
 ## Quick start
 
 ```bash
@@ -77,8 +80,23 @@ Use the plugin when ADOP should operate in another repository. Install the
 Claude plugin from the configured marketplace or local plugin path, run its
 preflight, and invoke `/adop:onboard-workflow`.
 
-Codex, Amazon Q, and Kiro use their native project surfaces; they do not
-require the Claude plugin.
+### Codex plugin
+
+The installable ADOP Codex plugin is under `plugins/adop/`. From the repository
+root, register the local marketplace:
+
+```bash
+codex plugin marketplace add .
+codex
+```
+
+Open `/plugins` and install `adop`. The plugin provides setup, onboarding,
+DevOps, and security-review skills. Keep the repository's `AGENTS.md` and
+`.codex/` surfaces active because they provide the native hooks, policies, MCP
+configuration, and enforcement controls.
+
+Amazon Q and Kiro use their native project surfaces; they do not require the
+Claude or Codex plugin.
 
 ### Headless AWS Strands runtime
 
@@ -115,7 +133,7 @@ python3 scripts/run_strands.py run --args args.json \
 writes workload artifacts, so run it on a workload whose files you can
 review and revert. The ontology agent's Glue `get_table` tool is not yet
 wired through Strands, and AgentCore Runtime deployment is not implemented.
-The `strands-agentcore` extra is reserved for that.
+The `strands-agentcore` extra is reserved for that future production target.
 
 ## Prompt format
 
@@ -394,11 +412,41 @@ stops registering it.
 | SEC-001 secrets | No hardcoded keys, private keys, or password literals in any write | Cedar | Cedar | Cedar + `block_credentials.py` |
 | Discovery gate | No pipeline artifacts before the human answers Phase 1 | `check-discovery-gate.sh` | `discovery_gate.py` | `phase_gate.py` |
 | Template codegen | `scripts/`, `dags/`, `sql/` written only by the renderer | `enforce_template_codegen.py` | `enforce_template_codegen.py` | `enforce_template_codegen.py` |
-| Audit before deploy | No Glue/IAM/Lake Formation/DAG mutation until the requirements audit passes | `deploy_gate.py` | `deploy_gate.py` | `deploy_gate.py` + `kiro_workflow.py deploy-check` |
+| Audit before deploy | When enabled, no Glue/IAM/Lake Formation/DAG mutation until the requirements audit passes | `deploy_gate.py` | `deploy_gate.py` | `deploy_gate.py` + `kiro_workflow.py deploy-check` |
 
 The optional headless Strands runtime (Phase 4, started from any of the three
 clients) applies the same Cedar policies through a Strands `BeforeToolCallEvent`
 hook, so a tool call gets the same verdict on all four runtimes.
+
+### Security features by layer
+
+| Layer | Security features |
+|---|---|
+| Agent and tool access | Cedar authorization for every tool call; agent-specific write permissions; unknown and general helper agents cannot invoke AWS/MCP tools; hardcoded secrets are blocked; agents cannot edit policies or deployment gate records. |
+| Human approval and workflow | Discovery gates require explicit human answers before pipeline generation; compliance, PII, quality, transformation, schedule, and ontology decisions are recorded as requirements and decisions. |
+| Code and artifact generation | Deterministic renderer-only generation for pipeline scripts, DAGs, and SQL; schema validation, drift detection, and template/codegen hooks prevent unauthorized generated-artifact changes. |
+| Data and pipeline | PII detection and tagging; Lake Formation LF-Tags and TBAC; Bronze immutability; quality gates block Silver/Gold promotion; no credentials or infrastructure identifiers in workload code. |
+| Deployment and infrastructure | Requirements audit and preflight checks; optional deploy hook (`ADOP_DEPLOY_GATE=1`); workload-scoped least-privilege IAM; read-only IAM simulation; active-run protection; no hand-written deployment gate records. |
+| Runtime and operations | KMS encryption, TLS in transit, structured logs, agent traces, CloudTrail audit events, deployment verification, and post-deployment checks for Glue, Athena, MWAA, IAM, KMS, Lake Formation, and TBAC. |
+
+**Production deployment boundary (required target state).** When ADOP runs in
+production, package and deploy the ADOP agents into the Amazon Bedrock
+AgentCore Runtime. Expose MCP servers through the AgentCore Gateway, keep
+Cedar authorization in the AgentCore policy layer, and require authenticated
+access to the AgentCore Gateway before any agent can use an MCP tool. Use
+workload-scoped identities and short-lived credentials; never place gateway,
+MCP, AWS, or Cedar credentials in agent code or configuration.
+
+This AgentCore production deployment is a target-state requirement and is not
+implemented in the current repository. Local development and the current
+headless build path continue to use the supported native clients and optional
+Strands runtime.
+
+The deploy hook is disabled by default and becomes active when
+`ADOP_DEPLOY_GATE=1` is set. Cedar decisions are logged to
+`logs/cedar_decisions.jsonl`; the repository currently has Cedar in `audit` mode,
+so a human must change the protected enforcement configuration to `enforce` before
+policy denials block tool calls globally.
 
 ### Cedar policies
 
@@ -408,14 +456,15 @@ The engine is `shared/utils/cedar_gate.py`. It uses the real Cedar evaluator
 
 - **Who is calling.** Claude Code and Codex send the subagent's `agent_type` in
   the hook input. Kiro does not, so each Kiro agent declares its own hook with
-  `--principal <id>`. The main conversation is `onboarding`; any agent without an
-  ADOP policy (Explore, general-purpose, plugin helpers) is `general`.
+  `--principal <id>`. The main conversation is `onboarding`; recognized helper
+  agents (Explore, general-purpose, plugin helpers) are `general`; unknown
+  identities resolve to `unknown` and fail closed.
 - **Agents write only their documented outputs.** For example, the metadata
   agent writes `config/` and its tests; the DAG agent writes `dags/`, its spec,
   and its tests. See `shared/policies/agent_authorization/`.
 - **Sub-agents have no AWS access.** MCP tools, Kiro `use_aws`, and the `aws`
-  CLI in a shell are all denied. The one exception is the ontology agent, which
-  may call `get_table`.
+  CLI in a shell are denied for ADOP sub-agents and general/unknown helpers. The
+  one exception is the ontology agent, which may call `get_table`.
 - **No agent can edit the rules.** `shared/policies/**` and
   `run/deploy_gate.json` are write-protected for every agent, including the
   main conversation, whether the edit is a file write, `sed -i`, `rm`, a

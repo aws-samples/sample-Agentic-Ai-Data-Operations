@@ -201,6 +201,23 @@ def test_general_agents_may_write_workloads(agent: str) -> None:
         assert out["record"]["principal"] == "general"
 
 
+@pytest.mark.parametrize("agent", ["Explore", "general-purpose", "some-plugin:helper"])
+def test_general_agents_cannot_invoke_mcp_tools(agent: str) -> None:
+    event = {"tool_name": "mcp__aws-mcp__call_aws", "agent_type": agent,
+             "cwd": str(ROOT), "tool_input": {"service": "glue", "operation": "get_table"}}
+    out = _decide(event)
+    assert not out["allow"], f"{agent} was allowed to invoke an MCP tool"
+    assert out["record"]["principal"] == "general"
+
+
+def test_unknown_agent_is_fail_closed() -> None:
+    event = {"tool_name": "mcp__aws-mcp__call_aws", "agent_type": "unregistered-agent",
+             "cwd": str(ROOT), "tool_input": {"service": "glue", "operation": "get_table"}}
+    out = _decide(event)
+    assert not out["allow"]
+    assert out["record"]["principal"] == "unknown"
+
+
 def test_general_agents_may_not_forge_gate_records() -> None:
     for path in (f"{W}/run/discovery_complete.json", f"{W}/run/context.json",
                  f"{W}/run/requirements_audit.json"):

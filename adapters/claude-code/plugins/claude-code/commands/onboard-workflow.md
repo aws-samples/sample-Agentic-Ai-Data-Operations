@@ -607,8 +607,10 @@ output to the user, and do not continue until it passes.
    This refuses to run unless `run/requirements_audit.json` has `status: pass`, matches the
    current `run_id`, and is newer than `context.json` and everything under
    `config/`, `scripts/`, `dags/` and `sql/`. On pass it writes `run/deploy_gate.json`.
-   **The `deploy_gate.py` PreToolUse hook denies every deploy mutation until that file
-   exists**, so this step cannot be skipped — not by you, and not by a sub-agent.
+   When enabled with `ADOP_DEPLOY_GATE=1`, the `deploy_gate.py` PreToolUse hook denies
+   every deploy mutation until that file exists. The hook is disabled by default, so
+   enable it for sessions that require hook-level deployment enforcement. The
+   preflight remains mandatory regardless.
    If the audit is missing, stale or blocked, re-run the `requirements-auditor` and fix
    what it reports. Never hand-write `deploy_gate.json`.
 3. **S3 upload, Glue catalog, IAM** (Steps 5.1–5.3) via MCP.

@@ -1,0 +1,43 @@
+{
+  "name": "adop",
+  "version": "0.1.0",
+  "description": "Secure, human-approved Bronze-to-Gold data onboarding with ADOP.",
+  "author": {
+    "name": "AWS Samples",
+    "url": "https://github.com/aws-samples"
+  },
+  "homepage": "https://github.com/aws-samples/sample-Agentic-Ai-Data-Operations",
+  "repository": "https://github.com/aws-samples/sample-Agentic-Ai-Data-Operations",
+  "license": "Apache-2.0",
+  "keywords": [
+    "aws",
+    "data-onboarding",
+    "bronze-silver-gold",
+    "cedar",
+    "mcp"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "ADOP",
+    "shortDescription": "Secure Bronze-to-Gold data onboarding",
+    "longDescription": "Run ADOP discovery, onboarding, security review, and production-readiness workflows from Codex while preserving human approval, Cedar authorization, deterministic code generation, and deployment evidence.",
+    "developerName": "ADOP",
+    "category": "Developer tools",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Run the ADOP onboarding workflow for this dataset.",
+      "Review this ADOP workload for security and production readiness."
+    ]
+  },
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./skills/setup/SKILL.md",
+      "publication": {
+        "release_notes": "Initial ADOP Codex plugin with onboarding, DevOps, security-review, and setup skills."
+      }
+    }
+  }
+}

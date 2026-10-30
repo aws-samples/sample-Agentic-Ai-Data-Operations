@@ -12,8 +12,9 @@ Pipeline per tool call:
 1. **Principal.** Claude Code and Codex put `agent_type` in the hook input
    inside a subagent and omit it in the main conversation. Kiro has no such
    field, so each Kiro agent declares its own hook with `--principal <id>`.
-   ADOP agent names map to their Cedar principal; any other agent is
-   `general`; no agent at all is `onboarding` in the main conversation.
+   ADOP agent names map to their Cedar principal; recognized helper agents map
+   to `general`; unrecognized identities map to `unknown`; no agent at all is
+   `onboarding` in the main conversation.
 2. **Requests.** The call is translated into Cedar requests:
    file writes -> `WriteFile` on a `WorkloadFile` whose `fileType` is
    classified from the path; MCP / AWS tools and `aws` CLI commands ->
@@ -68,7 +69,10 @@ AGENT_PRINCIPALS = {
     "adop-router": "router",
     "adop-orchestrator": "onboarding",
 }
-KNOWN_PRINCIPALS = set(AGENT_PRINCIPALS.values()) | {"onboarding", "router", "general"}
+_GENERAL_AGENT_NAMES = {"explore", "general-purpose", "helper"}
+KNOWN_PRINCIPALS = set(AGENT_PRINCIPALS.values()) | {
+    "onboarding", "router", "general", "unknown",
+}
 
 _WRITE_TOOLS = {
     "write", "edit", "multiedit", "notebookedit",            # Claude Code
@@ -105,14 +109,22 @@ _SECRET = re.compile(
 def resolve_principal(event: Dict[str, Any], explicit: Optional[str] = None) -> Tuple[str, str]:
     """Return (principal_id, execution_context)."""
     if explicit:
-        pid = AGENT_PRINCIPALS.get(explicit.strip(), explicit.strip())
-        return (pid if pid in KNOWN_PRINCIPALS else "general",
+        name = explicit.strip()
+        normalized = name.lower()
+        pid = AGENT_PRINCIPALS.get(normalized, normalized)
+        if pid not in KNOWN_PRINCIPALS:
+            pid = "general" if normalized in _GENERAL_AGENT_NAMES else "unknown"
+        return (pid,
                 "main_conversation" if pid == "onboarding" else "sub_agent")
     agent = str(event.get("agent_type") or event.get("agentType") or "").strip()
     if not agent:
         return "onboarding", "main_conversation"
     name = agent.rsplit(":", 1)[-1]          # plugin agents: "adop:metadata-agent"
-    return AGENT_PRINCIPALS.get(name, "general"), "sub_agent"
+    normalized = name.lower()
+    principal = AGENT_PRINCIPALS.get(normalized)
+    if principal is None:
+        principal = "general" if normalized in _GENERAL_AGENT_NAMES else "unknown"
+    return principal, "sub_agent"
 
 
 # ── resources ───────────────────────────────────────────────────────────────
@@ -297,6 +309,10 @@ def evaluate(principal: str, context_kind: str, requests: Iterable[Dict[str, Any
             entities,
         )
         allowed = str(result.decision).endswith("Allow")
+        if principal in {"general", "unknown"} and req["action"] == "InvokeTool":
+            # General/unknown helpers may work with permitted local workload
+            # files, but they are never trusted to reach AWS or MCP services.
+            allowed = False
         decisions.append({
             "action": req["action"], "resource": eid, "allowed": allowed,
             "attrs": req["attrs"], "context": req.get("context", {}),

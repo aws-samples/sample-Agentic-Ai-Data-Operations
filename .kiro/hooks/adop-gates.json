@@ -120,7 +120,7 @@
     },
     {
       "name": "adop-deploy-gate",
-      "description": "Denies Phase 5 deploy mutations (Glue job/table create-update, IAM role policy, Lake Formation grants/tags, job starts, DAG upload) until run/requirements_audit.json passes and preflight has written run/deploy_gate.json. Runs on every PreToolUse and classifies the call itself: a matcher listing tool names would silently miss a deploy path (an MCP tool, a new AWS tool spelling), and a gate that does not fire is worse than one that exits 0 quickly. Non-deploy calls return immediately without importing anything.",
+      "description": "Optional Phase 5 deploy gate. Disabled by default; set ADOP_DEPLOY_GATE=1 to deny deploy mutations (Glue job/table create-update, IAM role policy, Lake Formation grants/tags, job starts, DAG upload) until run/requirements_audit.json passes and preflight has written run/deploy_gate.json. Runs on every PreToolUse and classifies the call itself. Non-deploy calls return immediately without importing anything.",
       "trigger": "PreToolUse",
       "action": {
         "type": "command",

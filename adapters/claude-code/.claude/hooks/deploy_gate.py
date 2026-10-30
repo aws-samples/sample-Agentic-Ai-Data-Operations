@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""Deny Phase 5 deploy mutations until the requirements audit has passed.
+"""Optionally deny Phase 5 deploy mutations until the requirements audit has passed.
 
 One file, byte-identical in .claude/hooks, .codex/hooks and .kiro/hooks (and the
 adapter copies); `scripts/sync_platforms.py check` enforces that.
+
+The hook is disabled by default. Set `ADOP_DEPLOY_GATE=1` (also accepting
+`true`, `yes` or `on`) to activate it for a session.
 
 A tool call is a deploy mutation if it creates or changes Glue jobs/tables,
 IAM role policies, Lake Formation grants/tags, starts a Glue job, or uploads a
@@ -59,6 +62,7 @@ _GENERIC_DEPLOY = re.compile(
     re.IGNORECASE,
 )
 _SHELL_TOOLS = {"bash", "shell", "exec_command", "execute_bash", "executebash", "local_shell"}
+_DEPLOY_GATE_ENV = "ADOP_DEPLOY_GATE"
 
 
 def _normalized_text(value: Any) -> str:
@@ -125,7 +129,13 @@ def _deny(reason: str) -> int:
     return 2
 
 
+def _enabled() -> bool:
+    return os.environ.get(_DEPLOY_GATE_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def main() -> int:
+    if not _enabled():
+        return 0
     try:
         event = json.loads(sys.stdin.read() or "{}")
     except (json.JSONDecodeError, OSError):

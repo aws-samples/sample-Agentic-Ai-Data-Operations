@@ -1,4 +1,4 @@
-"""The requirements audit is a hard gate on deployment, on every platform.
+"""The requirements audit is an optional deployment gate on every platform.
 
 The audit itself is covered by test_requirements_auditor.py. These tests cover
 enforcement: that a missing, failing, mismatched or stale audit blocks the
@@ -123,13 +123,25 @@ def test_preflight_cli_blocks_without_an_audit_and_writes_no_gate(tmp_path: Path
 # ── PreToolUse hook ─────────────────────────────────────────────────────────
 
 
-def _hook(tool_name: str, tool_input: dict, cwd: Path) -> subprocess.CompletedProcess[str]:
+def _hook(
+    tool_name: str,
+    tool_input: dict,
+    cwd: Path,
+    *,
+    enabled: bool | None = True,
+) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    if enabled is None:
+        env.pop("ADOP_DEPLOY_GATE", None)
+    else:
+        env["ADOP_DEPLOY_GATE"] = "1" if enabled else "0"
     return subprocess.run(
         [sys.executable, str(HOOK)],
         input=json.dumps({"tool_name": tool_name, "tool_input": tool_input, "cwd": str(cwd)}),
         text=True,
         capture_output=True,
         cwd=ROOT,
+        env=env,
         check=False,
     )
 
@@ -168,6 +180,18 @@ def test_hook_denies_deploy_calls_without_a_gate(
     assert result.returncode == 2, result.stdout + result.stderr
     assert "requirements audit must pass" in result.stdout
     assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+
+def test_hook_is_disabled_by_default(tmp_path: Path) -> None:
+    _workload(tmp_path, audit=None)
+    result = _hook(
+        "mcp__glue-athena__create_job",
+        {"job_name": "orders_silver"},
+        tmp_path,
+        enabled=None,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout == ""
 
 
 @pytest.mark.parametrize(
@@ -232,6 +256,8 @@ def test_hook_fails_closed_when_the_shared_module_is_unreachable(tmp_path: Path)
     """A gate that cannot reach its own implementation must deny, not allow."""
     bare = tmp_path / "nowhere"
     bare.mkdir()
+    env = os.environ.copy()
+    env["ADOP_DEPLOY_GATE"] = "1"
     result = subprocess.run(
         [sys.executable, str(HOOK)],
         input=json.dumps(
@@ -244,6 +270,7 @@ def test_hook_fails_closed_when_the_shared_module_is_unreachable(tmp_path: Path)
         text=True,
         capture_output=True,
         cwd=bare,
+        env=env,
         check=False,
     )
     assert result.returncode == 2, result.stdout + result.stderr
