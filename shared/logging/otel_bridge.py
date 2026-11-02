@@ -40,6 +40,7 @@ class OpenTelemetryBridge:
         *,
         run_id: str,
         workload_name: str,
+        cost_dimensions: Optional[Dict[str, Any]] = None,
         enabled: Optional[bool] = None,
         endpoint: Optional[str] = None,
     ):
@@ -83,19 +84,21 @@ class OpenTelemetryBridge:
                 if exporter_endpoint
                 else OTLPSpanExporter()
             )
-            resource = Resource.create(
-                {
-                    "service.name": os.environ.get(
-                        "OTEL_SERVICE_NAME", "adop-data-onboarding"
-                    ),
-                    "service.namespace": "adop",
-                    "service.version": os.environ.get(
-                        "ADOP_VERSION", "development"
-                    ),
-                    "adop.run_id": run_id,
-                    "adop.workload": workload_name,
-                }
-            )
+            resource_attributes = {
+                "service.name": os.environ.get(
+                    "OTEL_SERVICE_NAME", "adop-data-onboarding"
+                ),
+                "service.namespace": "adop",
+                "service.version": os.environ.get(
+                    "ADOP_VERSION", "development"
+                ),
+                "adop.run_id": run_id,
+                "adop.workload": workload_name,
+            }
+            for key, value in (cost_dimensions or {}).items():
+                if value not in (None, ""):
+                    resource_attributes[f"adop.cost.{key}"] = _attribute_value(value)
+            resource = Resource.create(resource_attributes)
             provider = TracerProvider(resource=resource)
             provider.add_span_processor(BatchSpanProcessor(exporter))
             tracer = provider.get_tracer("adop", "1.0.0")

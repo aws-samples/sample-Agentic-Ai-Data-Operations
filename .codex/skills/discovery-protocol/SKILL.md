@@ -94,6 +94,9 @@ Gold questions until Bronze and Silver answers are confirmed.
 4. **Contracts** — present the inherited organization/domain/project Bronze, Silver, and Gold
    defaults. Accept them by default or record only stricter per-run overrides. Then collect
    separate source and target contract answers for the selected connectors.
+5. **Cost attribution** — project, environment, cost center, and owner/team. For Bedrock
+   chargeback, ask for the approved Application Inference Profile or record that the
+   deployment phase must provision one before any model call.
 
 ## Ontology enrichment — always ask, never assume "no"
 
@@ -126,6 +129,7 @@ column names:
 [ ] Schedule explicitly stated by the user
 [ ] Inherited zone contract accepted or stricter per-run override validated
 [ ] Source contract and target contract captured separately
+[ ] Cost attribution confirmed: project, environment, cost center, owner/team
 [ ] Ontology opt-in confirmed
 [ ] If ontology yes: entities, relationships, use cases, consumers and business terms confirmed
 ```

@@ -65,6 +65,21 @@ Then collect the separate source and target contract questions:
 The user override is recorded for the current run only. It cannot weaken a
 higher-level contract.
 
+## Cost Attribution Questions (Every Onboarding Run)
+
+Ask explicitly:
+
+1. What project should own this workload's Bedrock and AgentCore costs?
+2. Which environment is this (`dev`, `staging`, `prod`, or another approved value)?
+3. Which cost center should receive the charge?
+4. Who is the owner/team?
+5. Should Bedrock use an existing Application Inference Profile, or should deployment
+   provision one for this project?
+
+Never infer these values from the workload name, Git branch, current AWS caller, or
+the source path. Record the answers under `human_answers.cost_attribution` and
+`config/cost_attribution.yaml`.
+
 ## Multi-Zone Requests
 
 If user says "onboard from Bronze through Gold" — ask questions for ALL zones, grouped by zone. Present Bronze questions first, then Silver, then Gold. Do not ask Gold questions until Bronze+Silver answers are confirmed.

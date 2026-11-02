@@ -129,7 +129,32 @@
           "type": "string",
           "description": "IANA timezone for the schedule, stated by the human. dag_spec.schedule.timezone is required, so without this the DAG agent would have to invent one — ask instead."
         },
+        "source_path": {
+          "type": "string",
+          "description": "Bronze source location, explicitly confirmed by the human."
+        },
+        "credentials": {
+          "type": "string",
+          "description": "Bronze source credential reference, explicitly confirmed by the human; never a secret value."
+        },
+        "ingestion_pattern": {
+          "type": "string",
+          "description": "Bronze ingestion pattern, explicitly confirmed by the human."
+        },
         "retention": { "type": "string" },
+        "business_outcome": {
+          "type": "string",
+          "description": "Gold business outcome, explicitly confirmed by the human."
+        },
+        "kpis": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Gold KPIs, explicitly confirmed by the human."
+        },
+        "aggregation_grain": {
+          "type": "string",
+          "description": "Gold aggregation grain, explicitly confirmed by the human."
+        },
         "gold_schema_choice": {
           "type": "string",
           "enum": ["star_schema", "flat_iceberg", "iceberg_dynamodb"]
@@ -138,6 +163,45 @@
         "ontology_use_cases": {
           "type": "array",
           "items": { "type": "string" }
+        },
+        "cost_attribution": {
+          "type": "object",
+          "required": ["project", "environment", "cost_center", "owner"],
+          "additionalProperties": false,
+          "properties": {
+            "project": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_-]{1,60}$"
+            },
+            "environment": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_-]{1,30}$"
+            },
+            "cost_center": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "owner": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "bedrock_inference_profile_arn": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "agent_inference_profiles": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              }
+            }
+          },
+          "description": "Human-approved billing dimensions. Required for new Bedrock-backed runs; legacy contexts may omit it."
         },
         "iac_target_frameworks": {
           "type": "array",
@@ -183,6 +247,11 @@
               }
             }
           }
+        },
+        "iac_query_principal_arn": {
+          "type": "string",
+          "pattern": "^arn:(aws|aws-us-gov|aws-cn):iam::[0-9]{12}:role/[^*]+$",
+          "description": "IAM role ARN explicitly named by the human for Athena/query verification. Never defaulted to the current caller."
         },
         "notes": {
           "type": "array",

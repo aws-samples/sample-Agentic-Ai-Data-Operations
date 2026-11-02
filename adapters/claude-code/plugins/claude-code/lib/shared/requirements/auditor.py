@@ -50,6 +50,7 @@ def append_user_turn(
     phase: int | str | None = None,
     thread_id: str | None = None,
     turn_id: str | None = None,
+    agent_name: str = "orchestrator",
 ) -> str:
     """Append one user-facing exchange to the authoritative requirement ledger.
 
@@ -59,19 +60,34 @@ def append_user_turn(
     """
 
     turn_id = turn_id or f"turn-{uuid.uuid4().hex[:12]}"
-    _json_line(
-        Path(run_dir) / LEDGER_NAME,
-        {
-            "record_type": "user_turn",
-            "turn_id": turn_id,
-            "timestamp": _now(),
-            "phase": phase,
-            "thread_id": thread_id,
-            "prompt": prompt,
-            "response": response,
-            "requirement_ids": [],
-        },
-    )
+    run_path = Path(run_dir)
+    record = {
+        "record_type": "user_turn",
+        "turn_id": turn_id,
+        "timestamp": _now(),
+        "phase": phase,
+        "thread_id": thread_id,
+        "agent_name": agent_name,
+        "prompt": prompt,
+        "response": response,
+        "requirement_ids": [],
+    }
+    try:
+        from shared.utils.cost_attribution import optional_dimensions_for_workload
+
+        record.update(
+            optional_dimensions_for_workload(
+                run_path.parent,
+                workload=run_path.parent.name,
+                phase=phase,
+                agent=agent_name,
+            )
+        )
+    except Exception:
+        # Requirements capture is never allowed to fail because optional
+        # cost-attribution metadata is absent or malformed.
+        pass
+    _json_line(run_path / LEDGER_NAME, record)
     return turn_id
 
 

@@ -14,6 +14,11 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from shared.requirements.auditor import append_user_turn
+from shared.utils.cost_attribution import (
+    CostAttribution,
+    CostAttributionError,
+    append_usage_event_from_payload,
+)
 
 
 def _text(value: Any) -> str:
@@ -73,6 +78,7 @@ def capture_turn(
     phase: int | str | None = None,
     cwd: str | Path = ".",
     thread_id: str | None = None,
+    agent_name: str = "orchestrator",
 ) -> str | None:
     """Append one user turn, buffering it until the run directory exists."""
 
@@ -88,6 +94,7 @@ def capture_turn(
         response=response,
         phase=phase,
         thread_id=thread_id or f"thr-{uuid.uuid4().hex[:8]}",
+        agent_name=agent_name,
     )
 
 
@@ -105,6 +112,34 @@ def capture_event(
     workload = detect_workload(event, cwd)
     phase = event.get("phase") or os.environ.get("ADOP_PHASE")
     thread_id = event.get("thread_id")
+    agent_name = str(
+        event.get("agent_name")
+        or event.get("agent")
+        or os.environ.get("ADOP_AGENT_NAME")
+        or "orchestrator"
+    )
+    run_dir = _run_dir(workload, cwd)
+    if run_dir is not None:
+        try:
+            attribution = CostAttribution.from_workload(run_dir.parent)
+            run_id = ""
+            context_path = run_dir / "context.json"
+            if context_path.is_file():
+                context = json.loads(context_path.read_text(encoding="utf-8"))
+                if isinstance(context, Mapping):
+                    run_id = str(context.get("run_id", ""))
+            append_usage_event_from_payload(
+                run_dir,
+                attribution=attribution,
+                workload=workload,
+                run_id=run_id,
+                agent=agent_name,
+                phase=phase,
+                payload=event,
+            )
+        except (CostAttributionError, OSError, TypeError, ValueError, json.JSONDecodeError):
+            # Usage telemetry is additive; it must never block conversation capture.
+            pass
     tool_input = event.get("tool_input")
     tool_result = event.get("tool_result")
     captured: list[str] = []
@@ -126,6 +161,7 @@ def capture_event(
                 phase=phase,
                 cwd=cwd,
                 thread_id=thread_id,
+                agent_name=agent_name,
             )
             if turn_id:
                 captured.append(turn_id)
@@ -146,6 +182,7 @@ def capture_event(
         phase=phase,
         cwd=cwd,
         thread_id=thread_id,
+        agent_name=agent_name,
     )
     if turn_id:
         captured.append(turn_id)

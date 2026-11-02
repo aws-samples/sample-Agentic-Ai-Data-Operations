@@ -21,6 +21,7 @@ def append_user_turn(
     phase: int | str | None = None,
     thread_id: str | None = None,
     turn_id: str | None = None,
+    agent_name: str = "orchestrator",
 ) -> str:
     """Append an unclassified user turn to the authoritative ledger."""
 
@@ -35,6 +36,7 @@ def append_user_turn(
                 "timestamp": _now(),
                 "phase": phase,
                 "thread_id": thread_id,
+                "agent_name": agent_name,
                 "prompt": prompt,
                 "response": response,
                 "requirement_ids": [],

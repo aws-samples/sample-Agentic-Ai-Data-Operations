@@ -43,6 +43,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from shared.logging.otel_bridge import OpenTelemetryBridge
+from shared.utils.cost_attribution import (
+    CostAttribution,
+    append_usage_event,
+)
+
 
 VALID_SURFACES = {"operational", "cognitive", "contextual"}
 
@@ -65,6 +71,7 @@ class TraceContext:
         self.name = name
         self.start_time = start_time
         self.end_time: Optional[datetime] = None
+        self.otel_span = None
 
     @property
     def duration_ms(self) -> Optional[float]:
@@ -89,11 +96,32 @@ class AgentTracer:
     def __init__(self, run_id: str, workload_name: str, *,
                  trace_id: Optional[str] = None,
                  output_path: Optional[str] = None,
-                 write_to_stdout: bool = False):
+                 cost_attribution: Optional[CostAttribution] = None,
+                 cost_events_path: Optional[str] = None,
+                 write_to_stdout: bool = False,
+                 otel_enabled: Optional[bool] = None,
+                 otel_endpoint: Optional[str] = None):
         self.run_id = run_id
         self.workload_name = workload_name
-        self.trace_id = trace_id or str(uuid.uuid4())[:12]
+        self.cost_attribution = cost_attribution
+        self.cost_events_path = Path(cost_events_path) if cost_events_path else None
         self.write_to_stdout = write_to_stdout
+        cost_dimensions = (
+            cost_attribution.dimensions(workload=workload_name, run_id=run_id)
+            if cost_attribution
+            else {}
+        )
+        self._otel = OpenTelemetryBridge(
+            run_id=run_id,
+            workload_name=workload_name,
+            cost_dimensions=cost_dimensions,
+            enabled=otel_enabled,
+            endpoint=otel_endpoint,
+        )
+        # A native OTel trace ID is used when the bridge is active.  The
+        # fallback remains backward-compatible for callers that provide a
+        # custom trace_id.
+        self.trace_id = self._otel.trace_id or trace_id or uuid.uuid4().hex
 
         # Output destination
         if output_path:
@@ -110,7 +138,9 @@ class AgentTracer:
 
     @property
     def current_span_id(self) -> Optional[str]:
-        return self._span_stack[-1].span_id if self._span_stack else None
+        if self._span_stack:
+            return self._span_stack[-1].span_id
+        return self._otel.root_span_id
 
     @property
     def events(self) -> List[Dict[str, Any]]:
@@ -126,15 +156,25 @@ class AgentTracer:
               payload: Optional[Dict[str, Any]] = None):
         """Core emit method — builds and writes one trace event."""
         self._sequence_counter += 1
+        event_span_id = (
+            span_id
+            or (self._span_stack[-1].span_id if self._span_stack else None)
+            or self._otel.current_span_id
+            or uuid.uuid4().hex[:16]
+        )
+        parent = parent_span_id
+        if parent is None:
+            if len(self._span_stack) > 1:
+                parent = self._span_stack[-2].span_id
+            elif len(self._span_stack) == 1:
+                parent = self._otel.root_span_id
+
         event = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "run_id": self.run_id,
             "trace_id": self.trace_id,
-            "span_id": span_id or self.current_span_id or str(uuid.uuid4())[:8],
-            "parent_span_id": parent_span_id or (
-                self._span_stack[-2].span_id if len(self._span_stack) > 1
-                else None
-            ),
+            "span_id": event_span_id,
+            "parent_span_id": parent,
             "sequence_number": self._sequence_counter,
             "thread_id": thread_id,
             "surface": surface,
@@ -147,8 +187,42 @@ class AgentTracer:
             "duration_ms": duration_ms,
             "payload": payload or {},
         }
+        if self.cost_attribution:
+            dimensions = self.cost_attribution.dimensions(
+                workload=self.workload_name,
+                run_id=self.run_id,
+                agent=agent_name,
+                phase=phase,
+            )
+            event["project"] = dimensions["project"]
+            event["environment"] = dimensions["environment"]
+            event["cost_center"] = dimensions["cost_center"]
+            event["owner"] = dimensions["owner"]
+            event["inference_profile_arn"] = dimensions[
+                "bedrock_inference_profile_arn"
+            ]
 
         self._events.append(event)
+        self._otel.event(
+            event_type,
+            attributes={
+                "adop.run_id": self.run_id,
+                "adop.workload": self.workload_name,
+                "adop.surface": surface,
+                "adop.event_type": event_type,
+                "adop.agent_name": agent_name,
+                "adop.phase": phase,
+                "adop.data_zone": data_zone,
+                "adop.status": status,
+                "adop.duration_ms": duration_ms,
+                "adop.payload": payload or {},
+                "adop.project": event.get("project"),
+                "adop.environment": event.get("environment"),
+                "adop.cost_center": event.get("cost_center"),
+                "adop.owner": event.get("owner"),
+                "adop.inference_profile_arn": event.get("inference_profile_arn"),
+            },
+        )
         line = json.dumps(event, default=str)
 
         if self.write_to_stdout:
@@ -186,7 +260,7 @@ class AgentTracer:
     def span(self, name: str, *, agent_name: str = "",
              phase: Optional[int] = None, data_zone: str = ""):
         """Context manager for span lifecycle."""
-        span_id = str(uuid.uuid4())[:8]
+        span_id = uuid.uuid4().hex[:16]
         parent_id = self.current_span_id
         ctx = TraceContext(
             span_id=span_id,
@@ -194,20 +268,42 @@ class AgentTracer:
             name=name,
             start_time=datetime.now(timezone.utc),
         )
+        ctx.otel_span = self._otel.start_span(
+            name,
+            {
+                "adop.run_id": self.run_id,
+                "adop.workload": self.workload_name,
+                "adop.agent_name": agent_name,
+                "adop.phase": phase,
+                "adop.data_zone": data_zone,
+            },
+        )
+        if ctx.otel_span is not None:
+            ctx.span_id = self._otel.current_span_id or ctx.span_id
         self._span_stack.append(ctx)
 
         self._emit("operational", f"{name}_start", agent_name=agent_name,
                     phase=phase, data_zone=data_zone, status="running",
-                    span_id=span_id, parent_span_id=parent_id)
+                    span_id=ctx.span_id, parent_span_id=parent_id)
+        error = None
         try:
             yield ctx
+        except BaseException as exc:
+            error = exc
+            self._otel.event(
+                f"{name}_error",
+                attributes={"adop.error": str(exc)},
+                error=exc,
+            )
+            raise
         finally:
             ctx.close()
-            self._span_stack.pop()
             self._emit("operational", f"{name}_end", agent_name=agent_name,
                         phase=phase, data_zone=data_zone, status="complete",
                         duration_ms=ctx.duration_ms,
-                        span_id=span_id, parent_span_id=parent_id)
+                        span_id=ctx.span_id, parent_span_id=parent_id)
+            self._span_stack.pop()
+            self._otel.end_span(ctx.otel_span, error=error)
 
     def ingest_agent_decisions(self, agent_output_dict: Dict[str, Any],
                                agent_name: str = "",
@@ -229,6 +325,10 @@ class AgentTracer:
         with open(out, "w") as f:
             for event in self._events:
                 f.write(json.dumps(event, default=str) + "\n")
+
+    def close(self):
+        """Flush native OTel spans while preserving the JSONL audit trace."""
+        self._otel.close()
 
     def format_exchange(
         self,
@@ -282,6 +382,55 @@ class AgentTracer:
                 "tokens": tokens,
                 "latency": latency,
             },
+        )
+
+    def model_usage(
+        self,
+        usage: Dict[str, Any],
+        *,
+        agent_name: str = "",
+        phase: Optional[int] = None,
+        provider: str = "bedrock",
+        model_id: str = "",
+        request_id: str = "",
+        source: str = "runtime",
+        estimated_cost_usd: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Record model usage in the trace and the append-only cost ledger."""
+        payload = {
+            "provider": provider,
+            "model_id": model_id,
+            "request_id": request_id,
+            "source": source,
+            "usage": dict(usage),
+            "estimated_cost_usd": estimated_cost_usd,
+            "inference_profile_arn": (
+                self.cost_attribution.profile_for_agent(agent_name)
+                if self.cost_attribution
+                else None
+            ),
+        }
+        self.operational_event(
+            "model_usage",
+            agent_name=agent_name,
+            phase=phase,
+            payload=payload,
+        )
+        if not self.cost_attribution or not self.cost_events_path:
+            return payload
+        return append_usage_event(
+            self.cost_events_path.parent,
+            attribution=self.cost_attribution,
+            workload=self.workload_name,
+            run_id=self.run_id,
+            agent=agent_name,
+            phase=phase,
+            usage=usage,
+            provider=provider,
+            model_id=model_id,
+            request_id=request_id,
+            source=source,
+            estimated_cost_usd=estimated_cost_usd,
         )
 
     # ── Conversation Flow Capture ──────────────────────────────────────

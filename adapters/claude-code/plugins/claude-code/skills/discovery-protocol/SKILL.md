@@ -89,6 +89,9 @@ Gold questions until Bronze and Silver answers are confirmed.
 1. **PII and compliance** — which columns are PII; GDPR / CCPA / HIPAA / SOX / PCI?
 2. **Quality** — thresholds per dimension; which rules are critical versus warning
 3. **Scheduling** — cron expression, dependencies, failure handling
+4. **Cost attribution** — project, environment, cost center, and owner/team. For Bedrock
+   chargeback, ask for the approved Application Inference Profile or record that the
+   deployment phase must provision one before any model call.
 
 ## Ontology enrichment — always ask, never assume "no"
 
@@ -119,6 +122,7 @@ column names:
 [ ] PII columns and compliance requirements confirmed by the user
 [ ] Quality thresholds explicitly stated, or the user said "use defaults"
 [ ] Schedule explicitly stated by the user
+[ ] Cost attribution confirmed: project, environment, cost center, owner/team
 [ ] Ontology opt-in confirmed
 [ ] If ontology yes: entities, relationships, use cases, consumers and business terms confirmed
 ```

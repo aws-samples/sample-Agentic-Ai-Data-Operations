@@ -78,6 +78,8 @@ copy:
     source: contracts/v1/quality_spec.schema.json
   - target: lib/contracts/v1/run_context.schema.json
     source: contracts/v1/run_context.schema.json
+  - target: lib/contracts/v1/cost_attribution.schema.json
+    source: contracts/v1/cost_attribution.schema.json
   - target: lib/contracts/v1/silver_spec.schema.json
     source: contracts/v1/silver_spec.schema.json
   - target: lib/contracts/v1/source_profile.schema.json
@@ -108,6 +110,8 @@ copy:
     source: shared/logging/__init__.py
   - target: lib/shared/logging/agent_tracer.py
     source: shared/logging/agent_tracer.py
+  - target: lib/shared/logging/otel_bridge.py
+    source: shared/logging/otel_bridge.py
   - target: lib/shared/logging/trace_viewer.py
     source: shared/logging/trace_viewer.py
   - target: lib/shared/requirements/__init__.py
@@ -150,6 +154,8 @@ copy:
     source: shared/templates/silver_transform.py.j2
   - target: lib/shared/utils/__init__.py
     source: shared/utils/__init__.py
+  - target: lib/shared/utils/cost_attribution.py
+    source: shared/utils/cost_attribution.py
   - target: lib/shared/utils/ascii_display.py
     source: shared/utils/ascii_display.py
   - target: lib/shared/utils/deterministic_yaml.py

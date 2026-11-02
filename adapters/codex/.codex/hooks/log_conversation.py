@@ -22,7 +22,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from shared.requirements.auditor import append_user_turn
+from shared.requirements.capture import capture_event
+from shared.utils.cost_attribution import optional_dimensions_for_workload
 
 
 TRACE_LOG_DIR = Path("logs")
@@ -63,6 +64,16 @@ def main() -> int:
     phase = _detect_phase()
     thread_id = _generate_thread_id()
     ts = datetime.now(timezone.utc).isoformat()
+    cost_dimensions = (
+        optional_dimensions_for_workload(
+            Path("workloads") / workload,
+            workload=workload,
+            phase=phase,
+            agent="orchestrator",
+        )
+        if workload != "unknown"
+        else {}
+    )
 
     questions = tool_input.get("questions", [])
     answers = tool_result.get("answers", {})
@@ -78,15 +89,17 @@ def main() -> int:
         # conversation trace. Requirement linkage stays empty until the
         # orchestrator classifies the answer explicitly.
         if workload != "unknown":
-            run_dir = Path("workloads") / workload / "run"
-            if run_dir.is_dir():
-                append_user_turn(
-                    run_dir,
-                    prompt=question_text,
-                    response=answer_text,
-                    phase=phase,
-                    thread_id=thread_id,
-                )
+            capture_event(
+                {
+                    "workload_name": workload,
+                    "phase": phase,
+                    "thread_id": thread_id,
+                    "agent_name": "orchestrator",
+                    "user_prompt": question_text,
+                    "response": answer_text,
+                },
+                cwd=PROJECT_ROOT,
+            )
 
         entries.append({
             "timestamp": ts,
@@ -96,6 +109,11 @@ def main() -> int:
             "surface": "contextual",
             "event_type": "question_asked",
             "agent_name": "orchestrator",
+            **{
+                key: cost_dimensions[key]
+                for key in ("project", "environment", "cost_center", "owner")
+                if key in cost_dimensions
+            },
             "payload": {
                 "question_text": question_text,
                 "options": options,
@@ -113,6 +131,11 @@ def main() -> int:
                 "surface": "contextual",
                 "event_type": "user_responded",
                 "agent_name": "orchestrator",
+                **{
+                    key: cost_dimensions[key]
+                    for key in ("project", "environment", "cost_center", "owner")
+                    if key in cost_dimensions
+                },
                 "payload": {
                     "answer_text": answer_text,
                     "selected_options": selected,

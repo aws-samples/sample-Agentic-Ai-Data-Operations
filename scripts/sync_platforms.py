@@ -17,11 +17,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 import tomllib
 from pathlib import Path
 from typing import Any
-
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -110,10 +110,12 @@ REQUIRED_SHARED_PATHS = (
     "shared/codegen/contract_resolver.py",
     "shared/logging/agent_tracer.py",
     "shared/utils/structured_logger.py",
+    "shared/utils/cost_attribution.py",
     "shared/utils/deployment_checks.py",
     "shared/utils/post_deployment_verifier.py",
     "shared/policies/schema.cedarschema",
     "contracts/v1/run_context.schema.json",
+    "contracts/v1/cost_attribution.schema.json",
     "contracts/v1/target_profile.schema.json",
     "contracts/policies/organization/default.yaml",
     "contracts/policies/zone_policy.schema.json",
@@ -381,6 +383,34 @@ def sync_active_json_profiles() -> list[str]:
     return []
 
 
+def sync_plugin_copy_surfaces() -> list[str]:
+    """Refresh the Claude plugin files needed by the cost-attribution runtime."""
+
+    errors: list[str] = []
+    copy_paths = (
+        ("contracts/v1/cost_attribution.schema.json", "lib/contracts/v1/cost_attribution.schema.json"),
+        ("contracts/v1/run_context.schema.json", "lib/contracts/v1/run_context.schema.json"),
+        ("shared/logging/agent_tracer.py", "lib/shared/logging/agent_tracer.py"),
+        ("shared/logging/otel_bridge.py", "lib/shared/logging/otel_bridge.py"),
+        ("shared/requirements/auditor.py", "lib/shared/requirements/auditor.py"),
+        ("shared/requirements/capture.py", "lib/shared/requirements/capture.py"),
+        ("shared/utils/__init__.py", "lib/shared/utils/__init__.py"),
+        ("shared/utils/cost_attribution.py", "lib/shared/utils/cost_attribution.py"),
+    )
+    for plugin_root in (Path("plugins/claude-code"), Path("adapters/claude-code/plugins/claude-code")):
+        for source_relative, target_relative in copy_paths:
+            source = ROOT / source_relative
+            target = ROOT / plugin_root / target_relative
+            if not source.is_file():
+                errors.append(f"plugin copy source missing: {source_relative}")
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if not target.is_file() or source.read_bytes() != target.read_bytes():
+                shutil.copyfile(source, target)
+                print(f"updated {plugin_root / target_relative}")
+    return errors
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("check", "sync"))
@@ -396,6 +426,7 @@ def main() -> int:
             print("DRY RUN: use --apply to synchronize active JSON MCP profiles")
         else:
             errors = sync_active_json_profiles()
+            errors.extend(sync_plugin_copy_surfaces())
             if errors:
                 for error in errors:
                     print(f"FAIL: {error}")

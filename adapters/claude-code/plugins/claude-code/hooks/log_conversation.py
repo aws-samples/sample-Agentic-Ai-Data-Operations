@@ -42,6 +42,7 @@ sys.path.insert(0, str(LIB_ROOT))
 sys.path.insert(1, str(Path(__file__).resolve().parent))
 from _stand_down import stand_down_if_project_owns  # noqa: E402
 from shared.requirements.capture import capture_event  # noqa: E402
+from shared.utils.cost_attribution import optional_dimensions_for_workload  # noqa: E402
 
 
 def _detect_workload() -> str:
@@ -88,6 +89,16 @@ def main() -> int:
     hook_log_path = _conversation_log_path(workload)
     thread_id = _generate_thread_id()
     ts = datetime.now(timezone.utc).isoformat()
+    cost_dimensions = (
+        optional_dimensions_for_workload(
+            Path.cwd() / "workloads" / workload,
+            workload=workload,
+            phase=phase,
+            agent="orchestrator",
+        )
+        if workload != "unknown"
+        else {}
+    )
 
     questions = tool_input.get("questions", [])
     answers = tool_result.get("answers", {})
@@ -106,6 +117,11 @@ def main() -> int:
             "surface": "contextual",
             "event_type": "question_asked",
             "agent_name": "orchestrator",
+            **{
+                key: cost_dimensions[key]
+                for key in ("project", "environment", "cost_center", "owner")
+                if key in cost_dimensions
+            },
             "payload": {
                 "question_text": question_text,
                 "options": options,
@@ -124,6 +140,11 @@ def main() -> int:
                 "surface": "contextual",
                 "event_type": "user_responded",
                 "agent_name": "orchestrator",
+                **{
+                    key: cost_dimensions[key]
+                    for key in ("project", "environment", "cost_center", "owner")
+                    if key in cost_dimensions
+                },
                 "payload": {
                     "answer_text": answer_text,
                     "selected_options": selected,

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://adop.internal/contracts/v1/cost_attribution.schema.json",
+  "title": "ADOP Cost Attribution",
+  "description": "Human-approved billing dimensions and Bedrock inference-profile routing for one workload.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "project",
+    "environment",
+    "cost_center",
+    "owner"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "v1"
+    },
+    "project": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{1,60}$"
+    },
+    "environment": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{1,30}$"
+    },
+    "cost_center": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "bedrock_inference_profile_arn": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "description": "Default Application Inference Profile ARN. May be an exact ${ENV_VAR} reference."
+    },
+    "agent_inference_profiles": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2048
+      },
+      "description": "Optional per-agent profile ARNs. Use these when Bedrock chargeback must be visible per agent in CUR."
+    },
+    "tags": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Za-z0-9_.:/=+@-]{1,128}$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 256
+      }
+    }
+  }
+}

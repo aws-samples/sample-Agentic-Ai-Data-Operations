@@ -49,6 +49,8 @@ REQUIRED = {
         "adapters/kiro/.kiro/steering/13-workflow-orchestrator.md",
         "adapters/kiro/shared/requirements/capture.py",
         "adapters/kiro/shared/requirements/auditor.py",
+        "adapters/kiro/shared/utils/__init__.py",
+        "adapters/kiro/shared/utils/cost_attribution.py",
     ),
 }
 

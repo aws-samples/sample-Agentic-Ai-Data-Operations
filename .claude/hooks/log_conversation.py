@@ -22,6 +22,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from shared.requirements.capture import capture_event
+from shared.utils.cost_attribution import optional_dimensions_for_workload
 
 
 def _detect_workload() -> str:
@@ -68,6 +69,16 @@ def main() -> int:
     hook_log_path = _conversation_log_path(workload)
     thread_id = _generate_thread_id()
     ts = datetime.now(timezone.utc).isoformat()
+    cost_dimensions = (
+        optional_dimensions_for_workload(
+            PROJECT_ROOT / "workloads" / workload,
+            workload=workload,
+            phase=phase,
+            agent="orchestrator",
+        )
+        if workload != "unknown"
+        else {}
+    )
 
     questions = tool_input.get("questions", [])
     answers = tool_result.get("answers", {})
@@ -86,6 +97,11 @@ def main() -> int:
             "surface": "contextual",
             "event_type": "question_asked",
             "agent_name": "orchestrator",
+            **{
+                key: cost_dimensions[key]
+                for key in ("project", "environment", "cost_center", "owner")
+                if key in cost_dimensions
+            },
             "payload": {
                 "question_text": question_text,
                 "options": options,
@@ -104,6 +120,11 @@ def main() -> int:
                 "surface": "contextual",
                 "event_type": "user_responded",
                 "agent_name": "orchestrator",
+                **{
+                    key: cost_dimensions[key]
+                    for key in ("project", "environment", "cost_center", "owner")
+                    if key in cost_dimensions
+                },
                 "payload": {
                     "answer_text": answer_text,
                     "selected_options": selected,

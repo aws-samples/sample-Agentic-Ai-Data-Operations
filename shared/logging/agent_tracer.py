@@ -44,6 +44,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from shared.logging.otel_bridge import OpenTelemetryBridge
+from shared.utils.cost_attribution import (
+    CostAttribution,
+    append_usage_event,
+)
 
 
 VALID_SURFACES = {"operational", "cognitive", "contextual"}
@@ -92,15 +96,25 @@ class AgentTracer:
     def __init__(self, run_id: str, workload_name: str, *,
                  trace_id: Optional[str] = None,
                  output_path: Optional[str] = None,
+                 cost_attribution: Optional[CostAttribution] = None,
+                 cost_events_path: Optional[str] = None,
                  write_to_stdout: bool = False,
                  otel_enabled: Optional[bool] = None,
                  otel_endpoint: Optional[str] = None):
         self.run_id = run_id
         self.workload_name = workload_name
+        self.cost_attribution = cost_attribution
+        self.cost_events_path = Path(cost_events_path) if cost_events_path else None
         self.write_to_stdout = write_to_stdout
+        cost_dimensions = (
+            cost_attribution.dimensions(workload=workload_name, run_id=run_id)
+            if cost_attribution
+            else {}
+        )
         self._otel = OpenTelemetryBridge(
             run_id=run_id,
             workload_name=workload_name,
+            cost_dimensions=cost_dimensions,
             enabled=otel_enabled,
             endpoint=otel_endpoint,
         )
@@ -173,6 +187,20 @@ class AgentTracer:
             "duration_ms": duration_ms,
             "payload": payload or {},
         }
+        if self.cost_attribution:
+            dimensions = self.cost_attribution.dimensions(
+                workload=self.workload_name,
+                run_id=self.run_id,
+                agent=agent_name,
+                phase=phase,
+            )
+            event["project"] = dimensions["project"]
+            event["environment"] = dimensions["environment"]
+            event["cost_center"] = dimensions["cost_center"]
+            event["owner"] = dimensions["owner"]
+            event["inference_profile_arn"] = dimensions[
+                "bedrock_inference_profile_arn"
+            ]
 
         self._events.append(event)
         self._otel.event(
@@ -188,6 +216,11 @@ class AgentTracer:
                 "adop.status": status,
                 "adop.duration_ms": duration_ms,
                 "adop.payload": payload or {},
+                "adop.project": event.get("project"),
+                "adop.environment": event.get("environment"),
+                "adop.cost_center": event.get("cost_center"),
+                "adop.owner": event.get("owner"),
+                "adop.inference_profile_arn": event.get("inference_profile_arn"),
             },
         )
         line = json.dumps(event, default=str)
@@ -349,6 +382,55 @@ class AgentTracer:
                 "tokens": tokens,
                 "latency": latency,
             },
+        )
+
+    def model_usage(
+        self,
+        usage: Dict[str, Any],
+        *,
+        agent_name: str = "",
+        phase: Optional[int] = None,
+        provider: str = "bedrock",
+        model_id: str = "",
+        request_id: str = "",
+        source: str = "runtime",
+        estimated_cost_usd: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Record model usage in the trace and the append-only cost ledger."""
+        payload = {
+            "provider": provider,
+            "model_id": model_id,
+            "request_id": request_id,
+            "source": source,
+            "usage": dict(usage),
+            "estimated_cost_usd": estimated_cost_usd,
+            "inference_profile_arn": (
+                self.cost_attribution.profile_for_agent(agent_name)
+                if self.cost_attribution
+                else None
+            ),
+        }
+        self.operational_event(
+            "model_usage",
+            agent_name=agent_name,
+            phase=phase,
+            payload=payload,
+        )
+        if not self.cost_attribution or not self.cost_events_path:
+            return payload
+        return append_usage_event(
+            self.cost_events_path.parent,
+            attribution=self.cost_attribution,
+            workload=self.workload_name,
+            run_id=self.run_id,
+            agent=agent_name,
+            phase=phase,
+            usage=usage,
+            provider=provider,
+            model_id=model_id,
+            request_id=request_id,
+            source=source,
+            estimated_cost_usd=estimated_cost_usd,
         )
 
     # ── Conversation Flow Capture ──────────────────────────────────────

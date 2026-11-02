@@ -36,6 +36,13 @@ Shared behavior:
 - Cedar authorization and MCP guardrails;
 - deterministic rendering, tests, traces, and deployment evidence.
 
+Cost attribution is shared across Claude Code, Codex, and Kiro. Each workload
+asks the user during Phase 1 to confirm its project, environment, cost center,
+owner/team, and Bedrock Application Inference Profile (or approve provisioning
+one). It then records usage by project, workload, run, phase, and agent; live
+Bedrock execution is blocked when the approved attribution config is missing.
+See [`docs/cost-attribution.md`](docs/cost-attribution.md).
+
 Platform-specific behavior is kept in the native root folders and portable
 snapshots under [`adapters/`](adapters/). The Claude Code plugin is separately
 installable for use from another repository.

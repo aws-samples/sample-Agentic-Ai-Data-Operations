@@ -7,10 +7,15 @@ import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Mapping, Optional
 
 from shared.orchestration.workflow_driver import AgentInvocation
 from shared.templates.agent_output_schema import AgentOutput
+from shared.utils.cost_attribution import (
+    CostAttribution,
+    CostAttributionError,
+    append_usage_event,
+)
 
 from .definitions import DefinitionLoader
 from .models import AgentOutputModel, SourceProfileModel
@@ -39,6 +44,24 @@ class StrandsRunner:
         self.model_id = model_id
         self.dry_run = dry_run
         self.definitions = DefinitionLoader(self.repo_root)
+        self.cost_attribution = self._load_cost_attribution()
+
+    def _load_cost_attribution(self) -> Optional[CostAttribution]:
+        if not self.workload:
+            return None
+        path = self.repo_root / "workloads" / self.workload / "config" / "cost_attribution.yaml"
+        if not path.is_file():
+            if not self.dry_run:
+                raise RuntimeError(
+                    f"missing Bedrock cost attribution config: {path}. "
+                    "Record human-approved project, environment, cost center, owner, "
+                    "and an Application Inference Profile before live Bedrock execution."
+                )
+            return None
+        try:
+            return CostAttribution.from_file(path, require_bedrock_profile=not self.dry_run)
+        except CostAttributionError as exc:
+            raise RuntimeError(f"invalid cost attribution config: {path}: {exc}") from exc
 
     def invoke(self, invocation: AgentInvocation) -> AgentOutput:
         if self.dry_run:
@@ -56,7 +79,10 @@ class StrandsRunner:
         from .cedar_hook import CedarToolGate
 
         definition = self.definitions.load(invocation.agent)
-        model_id = invocation.model or self.model_id or self.model_map.get("standard")
+        model_id = self._model_id_for_agent(
+            invocation.agent,
+            invocation.model or self.model_id or self.model_map.get("standard"),
+        )
         model = BedrockModel(
             region_name=self.region,
             **({"model_id": model_id} if model_id else {}),
@@ -77,13 +103,16 @@ class StrandsRunner:
             structured_output_model=AgentOutputModel,
             # Same Cedar policies as Claude Code, Codex and Kiro (shared/policies/).
             hooks=[CedarToolGate(self.repo_root, invocation.agent)],
-            trace_attributes={
-                "adop.runtime": "strands",
-                "adop.agent": definition.name,
-            },
+            trace_attributes=self._trace_attributes(definition.name),
         )
         started_at = _now()
         result = agent(invocation.task)
+        self._record_result_usage(
+            result,
+            agent_name=invocation.agent,
+            model_id=model_id or "",
+            phase=None,
+        )
         structured = result.structured_output
         if structured is None:
             raise ValueError(f"Strands agent {invocation.agent} returned no structured output")
@@ -121,7 +150,10 @@ class StrandsRunner:
             from .cedar_hook import CedarToolGate
 
             definition = self.definitions.load("adop-build-metadata")
-            model_id = self.model_id or self.model_map.get("standard")
+            model_id = self._model_id_for_agent(
+                "adop-build-metadata",
+                self.model_id or self.model_map.get("standard"),
+            )
             agent = Agent(
                 model=BedrockModel(region_name=self.region,
                                    **({"model_id": model_id} if model_id else {})),
@@ -135,8 +167,7 @@ class StrandsRunner:
                 ],
                 structured_output_model=SourceProfileModel,
                 hooks=[CedarToolGate(self.repo_root, "adop-build-metadata")],
-                trace_attributes={"adop.runtime": "strands", "adop.agent": "adop-build-metadata",
-                                  "adop.phase": "3"},
+                trace_attributes=self._trace_attributes("adop-build-metadata", phase=3),
             )
             task = (
                 "Phase 3 profiling. Read-only: use only the aws_ro_* tools.\n"
@@ -147,7 +178,14 @@ class StrandsRunner:
                 "4. Record risks you see. Do NOT decide PK, PII handling, dedup or thresholds; "
                 "those are the human's decisions. Report candidates only."
             )
-            structured = agent(task).structured_output
+            profile_result = agent(task)
+            structured = profile_result.structured_output
+            self._record_result_usage(
+                profile_result,
+                agent_name="adop-build-metadata",
+                model_id=model_id or "",
+                phase=3,
+            )
             if structured is None:
                 raise ValueError("profiler returned no structured output")
             result = structured.model_dump()
@@ -162,6 +200,108 @@ class StrandsRunner:
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return record
+
+    def _model_id_for_agent(self, agent_name: str, fallback: Optional[str]) -> Optional[str]:
+        """Prefer the human-approved project/agent inference profile when present."""
+        if self.cost_attribution:
+            profile = self.cost_attribution.profile_for_agent(agent_name)
+            if profile:
+                return profile
+        return fallback
+
+    def _trace_attributes(self, agent_name: str, phase: int | str | None = None) -> dict[str, Any]:
+        """Return low-cardinality ADOP dimensions for Strands traces."""
+        attributes: dict[str, Any] = {
+            "adop.runtime": "strands",
+            "adop.agent": agent_name,
+        }
+        if phase is not None:
+            attributes["adop.phase"] = str(phase)
+        if self.cost_attribution:
+            dimensions = self.cost_attribution.dimensions(
+                workload=self.workload or "",
+                run_id=self.run_id,
+                agent=agent_name,
+                phase=phase,
+            )
+            attributes.update(
+                {
+                    "adop.project": dimensions["project"],
+                    "adop.environment": dimensions["environment"],
+                    "adop.cost_center": dimensions["cost_center"],
+                    "adop.owner": dimensions["owner"],
+                    "adop.inference_profile_arn": dimensions[
+                        "bedrock_inference_profile_arn"
+                    ],
+                }
+            )
+        return attributes
+
+    def _record_result_usage(
+        self,
+        result: Any,
+        *,
+        agent_name: str,
+        model_id: str,
+        phase: int | str | None,
+    ) -> None:
+        """Best-effort extraction across Strands versions.
+
+        Usage is recorded only when the model response exposes it and a
+        human-approved cost attribution contract exists. Missing metrics must
+        not turn a successful build into a failure.
+        """
+        if not self.cost_attribution or self.dry_run or result is None or not self.workload:
+            return
+        candidates = [
+            getattr(result, "metrics", None),
+            getattr(result, "usage", None),
+        ]
+        usage: Optional[dict[str, Any]] = None
+        request_id = ""
+        for candidate in candidates:
+            if not isinstance(candidate, Mapping):
+                continue
+            request_id = str(
+                candidate.get("request_id")
+                or candidate.get("requestId")
+                or candidate.get("invocation_id")
+                or ""
+            )
+            for key in ("usage", "accumulated_usage", "token_usage", "tokens"):
+                nested = candidate.get(key)
+                if isinstance(nested, Mapping):
+                    usage = dict(nested)
+                    break
+            if usage is None and any(
+                key in candidate
+                for key in (
+                    "inputTokens",
+                    "outputTokens",
+                    "input_tokens",
+                    "output_tokens",
+                    "prompt_tokens",
+                    "completion_tokens",
+                )
+            ):
+                usage = dict(candidate)
+            if usage:
+                break
+        if not usage:
+            return
+        append_usage_event(
+            self.repo_root / "workloads" / self.workload / "run",
+            attribution=self.cost_attribution,
+            workload=self.workload,
+            run_id=self.run_id,
+            agent=agent_name,
+            phase=phase,
+            usage=usage,
+            provider="bedrock",
+            model_id=model_id,
+            request_id=request_id,
+            source="strands",
+        )
 
     def _stamp(self, output: AgentOutput, invocation: AgentInvocation,
                started_at: str) -> AgentOutput:

@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from shared.logging.agent_tracer import AgentTracer
+from shared.utils.cost_attribution import CostAttribution, CostAttributionError
 
 
 def _default_trace_path(workload_name: str) -> str:
@@ -55,11 +56,20 @@ class OrchestratorLogger:
     """
 
     def __init__(self, workload_name: str, run_id: str, *,
-                 trace_output_path: Optional[str] = None):
+                 trace_output_path: Optional[str] = None,
+                 cost_attribution: Optional[CostAttribution] = None):
         self.workload = workload_name
         self.run_id = run_id
         self.start_time = datetime.now(timezone.utc)
         self.phase_log: List[Dict] = []
+        if cost_attribution is None:
+            config_path = Path("workloads") / workload_name / "config" / "cost_attribution.yaml"
+            if config_path.is_file():
+                try:
+                    cost_attribution = CostAttribution.from_file(config_path)
+                except CostAttributionError as exc:
+                    raise ValueError(f"invalid cost attribution for {workload_name}: {exc}") from exc
+        self.cost_attribution = cost_attribution
 
         # Default trace path: workloads/{name}/logs/{datetime}_{name}.jsonl
         output_path = trace_output_path or _default_trace_path(workload_name)
@@ -70,6 +80,10 @@ class OrchestratorLogger:
             run_id=run_id,
             workload_name=workload_name,
             output_path=output_path,
+            cost_attribution=cost_attribution,
+            cost_events_path=str(
+                Path("workloads") / workload_name / "run" / "cost_events.jsonl"
+            ),
         )
 
         # Emit pipeline start contextual event

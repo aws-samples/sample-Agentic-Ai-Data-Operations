@@ -31,6 +31,9 @@ This is a human-in-the-loop gate. The HUMAN provides the rules. The agent does N
    defaults. Ask whether the user wants stricter per-run overrides. If no, continue with
    the defaults. Then collect the separate source and target contract answers required by
    the selected connectors.
+5. **Cost attribution** → project, environment, cost center, and owner/team. If Bedrock
+   model costs must be billed to this workload, ask for the approved Application
+   Inference Profile or record that infrastructure will provision one before deployment.
 
 **Regulation detection:** Before treating compliance as unspecified, scan the user's
 onboarding request with `shared.compliance.regulation_detector.detect_regulations()`.
@@ -53,6 +56,7 @@ inactive, and a regulation must never be inferred from column names or observed 
 [ ] If ontology YES: use cases + consumers confirmed (NL→SQL, discovery, BI, ML, compliance — who uses it?)
 [ ] Inherited zone contract accepted or stricter per-run override validated
 [ ] Source contract and target contract captured separately
+[ ] Cost attribution confirmed: project, environment, cost center, owner/team
 ```
 
 **If ANY item is missing, ASK THE USER. Do not proceed.**
