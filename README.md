@@ -121,6 +121,18 @@ review and revert. The ontology agent's Glue `get_table` tool is not yet
 wired through Strands, and AgentCore Runtime deployment is not implemented.
 The `strands-agentcore` extra is reserved for that.
 
+### Deterministic by design, proven with AWS Strands
+
+The headless AWS Strands runtime shows ADOP's determinism most clearly, because
+no one is at the keyboard to catch a mistake. The model has one job: propose a
+spec. Everything after that is deterministic.
+
+![The model proposes; contracts, gates, and templates decide what gets built](docs/diagrams/strands-determinism.png)
+
+*The model proposes; contracts, gates, and templates decide what gets built.*
+
+See [`docs/determinism.md`](docs/determinism.md) for details.
+
 ## Prompt format
 
 Give the agent the business outcome and confirmed constraints:
