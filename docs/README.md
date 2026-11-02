@@ -11,6 +11,8 @@ This folder contains actively referenced documentation and diagrams for the Agen
 | `Architecture-Diagram.png` | 4-agent architecture diagram (exported PNG) | README.md |
 | `architecture.excalidraw` | Architecture diagram source (editable) | - |
 | `flow.excalidraw` | Workflow diagram source (editable) | - |
+| `adop-execution-paths.excalidraw` | Interactive and headless ADOP execution paths (editable) | README.md |
+| `adop-execution-paths.svg` | Exported ADOP execution-path diagram | README.md |
 
 **To update diagrams**:
 1. Edit `.excalidraw` files at https://excalidraw.com

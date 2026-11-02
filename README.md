@@ -10,158 +10,9 @@ artifacts and evidence.
 
 ![ADOP overview](docs/diagrams/adop-overview.png)
 
-## Prompting ADOP
+## Demo
 
-A good prompt includes:
-
-- **Source** — S3 path, Kafka topic, Kinesis stream, JDBC table, or endpoint.
-- **Sink cadence** — daily batch, micro-batch, or streaming.
-- **Target zones** — Silver quality and cleansing rules, plus Gold
-  transformations and serving shape.
-- **Compliance** — GDPR, CCPA, HIPAA, SOX, PCI DSS, or none.
-
-The examples below use the Claude Code `/onboard-workflow` command. In Codex,
-use the equivalent `$command-onboard-workflow` skill. The workflow still
-requires human confirmation for missing primary keys, deduplication, null
-handling, transformations, PII, quality thresholds, schedules, and ontology
-preferences.
-
-### Example 1 — Batch from S3 with Dynamic Workflow
-
-```text
-/onboard-workflow HIPAA
-
-Onboard claims data from
-s3://data-lake-<account>-us-east-1/bronze/claims/ingestion_date=YYYY-MM-DD/claims.csv
-into Silver with deduplication on claim_id and a not-null policy_number rule,
-and into a flat denormalized Gold Iceberg table with derived measures
-(net_paid_ratio, days_to_submission, denial_category).
-
-Run daily at 03:00 UTC. Apply HIPAA controls with PHI masking in Silver and
-PHI suppression in Gold.
-```
-
-For Claude Code, the `/onboard-workflow HIPAA` prefix enables the parallel
-Dynamic Workflow. HIPAA is compliance-critical, so Phase 4 build agents use
-Opus. Omit the prefix for sequential mode.
-
-### Example 2 — Streaming from Kafka with Glue Streaming ETL
-
-```text
-/onboard-workflow PCI
-
-Onboard transaction events from Kafka topic `payments.auth.v1` using IAM
-authentication and AWS Glue Streaming ETL. Land micro-batches every 60 seconds
-into Bronze Iceberg on S3, deduplicate on event_id in Silver with schema
-validation, and aggregate to five-minute Gold windows with fraud_score by
-merchant and rolling auth_rate.
-
-Apply PCI DSS: tokenize PAN, drop CVV, and add a Luhn check as a quality rule.
-```
-
-### Example 3 — Streaming from Kinesis with Glue Streaming ETL
-
-```text
-/onboard-workflow GDPR
-
-Onboard clickstream events from Kinesis Data Stream `web-events-prod` using
-AWS Glue Streaming ETL with a checkpoint on S3. Write Bronze Iceberg on
-one-minute triggers, use session stitching on user_id with a 30-minute
-inactivity gap in Silver, and create hourly Gold rollups for page_views,
-unique_users, and bounce_rate by traffic_source.
-
-Apply GDPR with a consent-based filter on user_id, 365-day retention, and a
-right-to-erasure hook.
-```
-
-### Prompt depth: brief versus detailed
-
-You can start with a brief request or provide every decision up front. The
-agent may profile the source and present observations, but it must ask for
-human confirmation when a required decision is missing.
-
-Brief request:
-
-```text
-Onboard e-commerce orders from s3://your-landing-bucket/ecommerce_orders/.
-
-- CSV, 50 rows, GDPR, daily 09:30 UTC batch
-- Gold: flat denormalized table for ad-hoc queries
-- DQ: completeness > 85%, validate dates/emails/phones, quarantine bad rows
-- Transforms: mask credit cards, standardize phones, cast dates, derive
-  order_month and days_to_ship
-
-Print a status box after each phase.
-```
-
-Detailed request:
-
-```text
-Onboard a new e-commerce orders dataset.
-
-Source:
-- Location: s3://your-landing-bucket/ecommerce_orders/
-- Format: CSV, 50 rows, batch ingestion
-- Refresh: Daily at 09:30 UTC
-
-Compliance: GDPR
-- PII columns: customer_email, customer_phone, credit_card_number,
-  customer_name, shipping_address
-- Require consent tracking, right-to-erasure support, and 365-day retention
-
-Gold: flat denormalized table for ad-hoc analytics.
-
-Data quality:
-- Completeness threshold: 85%; block promotion if below
-- Validate order_date format and customer_email format
-- Validate customer_phone format
-- Flag invalid credit_card_number values
-- Flag rows missing city, state, or zip as incomplete
-- Flag orders where total_amount != quantity × unit_price × (1 - discount_pct)
-
-Bronze → Silver:
-- Standardize phone to E.164 format
-- Mask credit_card_number, showing only the last four digits
-- Cast order_date and ship_date to DATE
-- Trim whitespace on string columns
-- Quarantine rows with invalid dates
-
-Silver → Gold:
-- Flatten columns into one wide table
-- Add order_month, days_to_ship, is_returned, and is_high_value
-- Keep delivered and returned orders; exclude processing and cancelled orders
-
-Schedule: daily batch at 09:30 UTC, retries=3, exponential backoff,
-alert on failure.
-```
-
-### Repository example: `customer_orders`
-
-```text
-$command-onboard-workflow GDPR
-
-Onboard customer_orders from ${CUSTOMER_ORDERS_SOURCE_URI} into Bronze, Silver,
-and Gold using a daily full-load batch. Use IAM role
-${CUSTOMER_ORDERS_SOURCE_IAM_ROLE} for access and retain data for 365 days.
-
-Use order_id as the primary key and do not deduplicate. Quarantine rows with
-null values in order_id, customer_id, order_date, product_id, quantity,
-unit_price, discount_pct, payment_method, or order_status.
-
-Apply the approved transformations in
-workloads/customer_orders/config/transformations.yaml. Treat customer_email,
-customer_phone, credit_card_number, customer_name, shipping_address, city,
-state, and zip_code as PII and apply GDPR controls.
-
-Use Silver quality threshold 0.80 and Gold quality threshold 0.95. Produce a
-flat Iceberg Gold table at order_id grain for order-level sales reporting,
-including order_count and revenue KPIs. Run at 09:00 America/New_York.
-Ontology enrichment is opt-out.
-```
-
-After submitting a prompt, watch the agent run, review the plan it presents,
-and approve it before artifacts are written under `workloads/<name>/`
-(`config/`, `scripts/`, `dags/`, `sql/`, `tests/`, and optional ontology).
+[Watch the ADOP demo on YouTube](https://youtu.be/YiEm9c8kat0)
 
 ## One goal, four client paths plus optional Strands
 
@@ -186,8 +37,8 @@ Shared behavior:
 - deterministic rendering, tests, traces, and deployment evidence.
 
 Platform-specific behavior is kept in the native root folders and portable
-snapshots under [`adapters/`](adapters/). The Claude Code and Codex plugins are
-separately installable for use from another repository.
+snapshots under [`adapters/`](adapters/). The Claude Code plugin is separately
+installable for use from another repository.
 
 The platforms coexist in one checkout. Each has its own hook wiring
 (`.claude/settings.json`, `.codex/hooks.json`, `.kiro/hooks/adop-gates.json`,
@@ -230,39 +81,8 @@ Use the plugin when ADOP should operate in another repository. Install the
 Claude plugin from the configured marketplace or local plugin path, run its
 preflight, and invoke `/adop:onboard-workflow`.
 
-### Codex plugin
-
-The installable ADOP Codex plugin is under `plugins/adop/`. Its manifest is
-`plugins/adop/.codex-plugin/plugin.json`, and the repository marketplace is
-defined in `.agents/plugins/marketplace.json`. The marketplace source tracks
-the `main` branch and loads `plugins/adop`, so the same plugin can be installed
-from the repository checkout or from its published GitHub source.
-
-From the repository root, start Codex and open the plugin browser:
-
-```bash
-codex
-```
-
-In Codex, open `/plugins`, select the `adop` plugin from the ADOP marketplace,
-install it, and start a new session. The plugin provides these entry points:
-
-- `setup` — verify the ADOP checkout and required enforcement surfaces;
-- `command-onboard-workflow` — run human-approved Bronze-to-Silver-to-Gold onboarding;
-- `command-devops-workflow` — prepare a completed workload for production;
-- `security-review` — review changes for security and policy-bypass risks.
-
-The plugin is an entry point, not a replacement for the repository controls.
-Keep `AGENTS.md` and `.codex/` active: they provide the native hooks, Cedar
-policies, MCP configuration, deterministic renderer, and deployment checks.
-The plugin contains no credentials or production MCP endpoints.
-
-The explicit `codex plugin marketplace add ...` command is only needed when
-adding this marketplace from a different checkout or when the repository
-marketplace is not already configured in the current Codex workspace.
-
-Amazon Q and Kiro use their native project surfaces; they do not require the
-Claude or Codex plugin.
+Codex, Amazon Q, and Kiro use their native project surfaces; they do not
+require the Claude plugin.
 
 ### Headless AWS Strands runtime
 
@@ -299,7 +119,26 @@ python3 scripts/run_strands.py run --args args.json \
 writes workload artifacts, so run it on a workload whose files you can
 review and revert. The ontology agent's Glue `get_table` tool is not yet
 wired through Strands, and AgentCore Runtime deployment is not implemented.
-The `strands-agentcore` extra is reserved for that future production target.
+The `strands-agentcore` extra is reserved for that.
+
+## Prompt format
+
+Give the agent the business outcome and confirmed constraints:
+
+```text
+Onboard <source> into <target zones>.
+Source: <location, type, format, cadence>
+Business outcome: <what Gold must answer>
+Transformations: <confirmed cleaning and derived-column rules>
+PII/compliance: <columns and framework, or none>
+Quality: <thresholds and critical rules, or "use defaults">
+Schedule: <cron and IANA timezone>
+Ontology: <opt in/out and consumers>
+```
+
+The agent may profile schema, nulls, row counts, and formats, but it must ask
+the human to confirm missing business decisions. It must not guess primary
+keys, deduplication, null handling, PII, schedules, or transformations.
 
 ## Workflow phases
 
@@ -308,19 +147,13 @@ The `strands-agentcore` extra is reserved for that future production target.
 | 0. Health and discovery | Check workloads, source metadata, credentials, and tools | Source and access confirmed |
 | 1. Requirements | Capture source, zone, transformation, PII, quality, schedule, and ontology decisions | All mandatory answers provided |
 | 2. Deduplication and context | Detect overlap and create the run context and requirements ledger | Conflicts resolved |
-| 2.1 Contract resolution | Resolve organization → domain → project → per-run zone policy and capture source/target contracts | Effective contract accepted and validated |
 | 3. Profiling | Inspect representative data and present quality/PII observations | Human confirms handling |
 | 4. Build and test | Validate specs, render artifacts, and run tests | Plan and tests approved |
 | Audit | Compare Q&A with context, decisions, traces, tests, artifacts, and deployment evidence | Requirements audit passes |
 | 5. Deploy and verify | Deploy through approved tools and run post-deployment checks | Human approval and verification |
-| 5.10 E2E test offer | Offer a full Bronze → Silver → Gold test after verification | Human chooses run or skip |
-| 5.11 DevOps readiness | Audit inventory, generate approved IaC, monitoring, alerting, cost controls, and runbook | Human confirms formats, products, principals, and apply |
 
-DevOps is called only after deployment verification and the E2E test offer.
-It first runs the requirements auditor, presents the artifact/product inventory,
-then waits for explicit human confirmation of IaC formats, target products, IAM
-principals, and deployment scope. See the detailed
-[post-deployment and DevOps flow](docs/workflow-diagrams.md#7-post-deployment-and-devops-production-readiness).
+After deployment, the workflow offers the optional E2E pipeline test and DevOps
+production-readiness workflow.
 
 ## Provider-neutral extension model
 
@@ -429,7 +262,7 @@ Each workload records the source contract in
 
 | Source | Required decisions |
 |---|---|
-| CSV, Parquet, JSON, Avro, XML, log text | Location, format, parser options, schema evolution, malformed-record, retention, replay |
+| CSV, Parquet, JSON, Avro | Location, format, partitioning, schema evolution, malformed-record, retention, replay |
 | JDBC | Secret reference, table/query, PK, watermark, consistency, extraction window, failure handling |
 | Kafka | Cluster/topic, event key, consumer group, offsets, schema, ordering, late events |
 | Kinesis | Stream, partition key, checkpoint, retention, trigger, throughput, late events |
@@ -437,47 +270,10 @@ Each workload records the source contract in
 Contracts are created and confirmed before artifact generation. Generated
 artifacts are evidence of the contract; they cannot override it.
 
-Implementation status: the Bronze template reads S3 file sources including
-`csv`, `parquet`, `json`, `avro`, `orc`, `xml`, and raw `log` text. XML uses a
-declared `row_tag`; logs remain raw in Bronze and carry a declared `log_type`
-(for example `nginx`, `syslog`, `cloudtrail`, or `custom`) to guide approved
-Silver transformations. JDBC, Kafka, and Kinesis remain source-contract types until their
-dedicated ingestion templates are selected.
-
-### Supported data formats
-
-ADOP separates the source transport from the payload format:
-
-| Transport | Formats and behavior |
-|---|---|
-| S3 files | CSV, Parquet, JSON, JSON Lines, Avro, ORC, XML, and raw log text |
-| Kafka | Streaming payload contract; declare JSON, Avro, or text and the topic/schema details |
-| Kinesis | Streaming payload contract; declare JSON, Avro, or text and the stream/schema details |
-| JDBC/RDS | Tabular rows; declare the table/query, primary key, watermark, and extraction rules |
-
-Format-specific options belong in the source and Bronze contracts:
-
-```yaml
-source:
-  type: xml
-  format: xml
-  format_options:
-    row_tag: customer
-```
-
-```yaml
-source:
-  type: log
-  format: log
-  format_options:
-    log_type: nginx
-    multiline: false
-    encoding: utf-8
-```
-
-XML ingestion requires an approved Glue XML reader with DTD and external
-entity resolution disabled. Logs are preserved as raw Bronze text; parsing,
-normalization, PII handling, and quarantine rules are defined for Silver.
+Implementation status: the source contract accepts `jdbc`, `kafka`, and
+`kinesis`, but the `bronze_ingestion` template reads only file sources
+(`csv`, `parquet`, `json`, `avro`, `orc`) from S3. Those three types are
+contract-level only until an ingestion template exists for them.
 
 ### How contracts are wired
 
@@ -505,13 +301,6 @@ contracts/vN/<type>.schema.json    shape of the spec (JSON Schema 2020-12)
 | Quality | `quality_spec` | `config/quality_rules.yaml` | `quality_check` | quality agent |
 | Orchestration | `dag_spec` (v1, v2) | `config/schedule.yaml` | `airflow_dag`, `glue_job_config` | DAG agent |
 | Run state | `run_context` | `run/context.json` | none | orchestrator only |
-| Target | `target_profile` | `config/target.yaml` | target adapter/IaC | onboarding and DevOps |
-
-Zone contracts are organization defaults shared by every domain and project.
-The effective policy resolves as `organization → domain → project → per-run
-override`; lower layers may only tighten inherited rules. Source and target
-contracts remain workload-specific because they vary by connector and customer
-technology.
 
 ### Extending contracts
 
@@ -525,7 +314,7 @@ directory (`v2` added required catalog and idempotency fields to
 
 1. Add the type to `source.type` (and `format` if needed) in
    `source_profile.schema.json`, plus any source-specific fields. Credentials
-   are always a reference (`credentials.type` + `connection_id`), never a value.
+add    are always a reference (`credentials.type` + `connection_id`), never a value.
 2. Add the source's discovery questions to
    `.claude/rules/00-zone-questions.md` and its copies in
    `.kiro/steering/` and `.amazonq/rules/`. Codex has no copy of this file;
@@ -625,19 +414,6 @@ hook, so a tool call gets the same verdict on all four runtimes.
 | Data and pipeline | PII detection and tagging; Lake Formation LF-Tags and TBAC; Bronze immutability; quality gates block Silver/Gold promotion; no credentials or infrastructure identifiers in workload code. |
 | Deployment and infrastructure | Requirements audit and preflight checks; optional deploy hook (`ADOP_DEPLOY_GATE=1`); workload-scoped least-privilege IAM; read-only IAM simulation; active-run protection; no hand-written deployment gate records. |
 | Runtime and operations | KMS encryption, TLS in transit, structured logs, agent traces, CloudTrail audit events, deployment verification, and post-deployment checks for Glue, Athena, MWAA, IAM, KMS, Lake Formation, and TBAC. |
-
-**Production deployment boundary (required target state).** When ADOP runs in
-production, package and deploy the ADOP agents into the Amazon Bedrock
-AgentCore Runtime. Expose MCP servers through the AgentCore Gateway, keep
-Cedar authorization in the AgentCore policy layer, and require authenticated
-access to the AgentCore Gateway before any agent can use an MCP tool. Use
-workload-scoped identities and short-lived credentials; never place gateway,
-MCP, AWS, or Cedar credentials in agent code or configuration.
-
-This AgentCore production deployment is a target-state requirement and is not
-implemented in the current repository. Local development and the current
-headless build path continue to use the supported native clients and optional
-Strands runtime.
 
 The deploy hook is disabled by default and becomes active when
 `ADOP_DEPLOY_GATE=1` is set. Cedar decisions are logged to

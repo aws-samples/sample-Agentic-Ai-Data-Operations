@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="960" viewBox="0 0 1440 960" role="img" aria-labelledby="title desc">
+  <title id="title">ADOP — One Governed Workflow, Multiple Execution Paths</title>
+  <desc id="desc">Interactive clients and AWS Strands use the shared ADOP control plane to execute governed data pipelines on Glue, Iceberg, dbt, Snowflake, and future adapters.</desc>
+  <defs>
+    <marker id="arrow-green" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2e7d32"/>
+    </marker>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1565c0"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ef6c00"/>
+    </marker>
+    <style>
+      .title { font: 700 32px Arial, sans-serif; fill: #1e1e1e; }
+      .subtitle { font: 18px Arial, sans-serif; fill: #616161; }
+      .heading { font: 700 21px Arial, sans-serif; }
+      .body { font: 18px Arial, sans-serif; }
+      .small { font: 16px Arial, sans-serif; fill: #757575; }
+      .center { text-anchor: middle; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="960" fill="#ffffff"/>
+  <text x="720" y="52" class="title center">ADOP — One Governed Workflow, Multiple Execution Paths</text>
+  <text x="720" y="88" class="subtitle center">Interactive clients for human decisions • Strands for headless automation</text>
+
+  <rect x="55" y="145" width="510" height="205" rx="18" fill="#e8f5e9" stroke="#2e7d32" stroke-width="3"/>
+  <text x="310" y="182" class="heading center" fill="#1b5e20">INTERACTIVE CLIENTS</text>
+  <text x="310" y="220" class="body center" fill="#1b5e20">Claude Code • Codex • Kiro • Amazon Q</text>
+  <text x="310" y="262" class="body center" fill="#1b5e20">Phases 0–2: discovery, requirements,</text>
+  <text x="310" y="287" class="body center" fill="#1b5e20">contracts, and human approval</text>
+  <text x="310" y="322" class="body center" fill="#1b5e20">Phase 5: deploy, verify, and DevOps</text>
+
+  <rect x="875" y="145" width="510" height="235" rx="18" fill="#e3f2fd" stroke="#1565c0" stroke-width="3"/>
+  <text x="1130" y="182" class="heading center" fill="#0d47a1">HEADLESS AUTOMATION</text>
+  <text x="1130" y="220" class="body center" fill="#0d47a1">AWS Strands + Amazon Bedrock</text>
+  <text x="1130" y="262" class="body center" fill="#0d47a1">CI/CD • API • Scheduler • Service</text>
+  <text x="1130" y="297" class="body center" fill="#0d47a1">Phase 3: read-only profiling</text>
+  <text x="1130" y="322" class="body center" fill="#0d47a1">Phase 4: build, test, and review</text>
+  <text x="1130" y="346" class="small center" fill="#0d47a1">Deterministic specs → renderer → hashed artifacts</text>
+
+  <path d="M310 350 L520 445" fill="none" stroke="#2e7d32" stroke-width="4" marker-end="url(#arrow-green)"/>
+  <path d="M1130 380 L920 445" fill="none" stroke="#1565c0" stroke-width="4" marker-end="url(#arrow-blue)"/>
+
+  <rect x="220" y="445" width="1000" height="210" rx="18" fill="#f3e5f5" stroke="#6a1b9a" stroke-width="3"/>
+  <text x="720" y="485" class="heading center" fill="#4a148c">SHARED ADOP CONTROL PLANE</text>
+  <text x="720" y="530" class="body center" fill="#4a148c">Versioned contracts • Cedar authorization • deterministic renderer</text>
+  <text x="720" y="565" class="body center" fill="#4a148c">Test gates • requirements audit • tracing • deployment evidence</text>
+  <text x="720" y="615" class="body center" fill="#4a148c">Both execution paths use the same governance and artifact rules.</text>
+
+  <path d="M720 655 L720 735" fill="none" stroke="#ef6c00" stroke-width="4" marker-end="url(#arrow-orange)"/>
+  <rect x="120" y="735" width="1200" height="135" rx="18" fill="#fff3e0" stroke="#ef6c00" stroke-width="3"/>
+  <text x="720" y="778" class="heading center" fill="#e65100">EXECUTION BACKENDS</text>
+  <text x="720" y="825" class="body center" fill="#e65100">Glue / Iceberg     •     dbt / Snowflake     •     future adapters</text>
+
+  <text x="720" y="915" class="small center">Future target: package agents in Bedrock AgentCore</text>
+</svg>
