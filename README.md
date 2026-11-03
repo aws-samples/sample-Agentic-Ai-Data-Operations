@@ -12,9 +12,9 @@ artifacts and evidence.
 
 ## Demo
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/YiEm9c8kat0?si=5X2BuDqq5HCOtwIq" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+[![Watch the ADOP demo on YouTube](https://img.youtube.com/vi/YiEm9c8kat0/maxresdefault.jpg)](https://youtu.be/YiEm9c8kat0)
 
-[Watch the ADOP demo on YouTube](https://youtu.be/YiEm9c8kat0)
+▶ Click the image to watch the ADOP demo on YouTube.
 
 ## One goal, four client paths plus optional Strands
 
