@@ -568,6 +568,15 @@ ADOP can act as an A2A orchestrator and validator, with Cortex and Genie as remo
 
 This is **optional and off by default**. Without opt-in, no A2A questions are asked, nothing connects to Cortex or Genie, and the standard Phase 0–5 flow and Step 5.9 checks are unchanged.
 
+### Common lineage across AWS, Snowflake and Databricks (possible, planned)
+
+ADOP can keep one shared lineage record across AWS, Snowflake and Databricks using [OpenLineage](https://openlineage.io/). OpenLineage defines the event format but does not store anything, so the shared store would be an append-only Iceberg table on S3, `adop_ops.lineage_events` (fixed columns plus the raw OpenLineage JSON):
+- AWS Glue and MWAA send events through the Airflow OpenLineage provider and `openlineage-spark`.
+- Databricks Spark clusters send events through `openlineage-spark`.
+- Snowflake lineage is read from `ACCESS_HISTORY` and converted to OpenLineage events.
+
+ADOP adds its quality scores, PII tags and contract hash to each event. All three platforms can query the table directly: Athena and QuickSight, Snowflake through its Iceberg catalog integration, and Databricks through Unity Catalog federation. Amazon DataZone or Marquez can optionally read the same events to draw lineage graphs. Today ADOP relies on native Glue Data Lineage (`--enable-data-lineage`), so this is an additive, optional step.
+
 ## Repository structure
 
 ```text
