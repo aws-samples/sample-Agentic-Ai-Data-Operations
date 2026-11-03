@@ -29,3 +29,6 @@ env/
 
 # Cedar gate decision log (local, per machine)
 logs/cedar_decisions.jsonl
+
+# Local design documents (not committed)
+design-docs/

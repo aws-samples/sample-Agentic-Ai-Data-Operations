@@ -12,6 +12,8 @@ artifacts and evidence.
 
 ## Demo
 
+<iframe width="560" height="315" src="https://www.youtube.com/embed/YiEm9c8kat0?si=5X2BuDqq5HCOtwIq" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
 [Watch the ADOP demo on YouTube](https://youtu.be/YiEm9c8kat0)
 
 ## One goal, four client paths plus optional Strands
@@ -271,6 +273,23 @@ Human Q&A → concept contract → versioned schema → Cedar/quality gates
 
 Default gates are Silver ≥ 0.80 and Gold ≥ 0.95. Critical failures block
 promotion.
+
+### Data KPI contracts (mandatory, planned)
+
+Every workload will publish technical data KPIs. These are defined in the organization contract (`contracts/policies/organization/default.yaml`) and cover:
+- quality score
+- completeness, uniqueness and validity
+- quarantine rate and row-count reconciliation
+- volume anomaly
+- run success and duration, plus mean time to recovery
+- freshness lag and SLA attainment
+- schema drift
+- PII tag coverage
+- cost per run
+
+The organization contract also sets thresholds, cadence, storage and dashboard settings. Domains may add KPIs or tighten thresholds; projects and per-run overrides cannot change them. Once a KPI is set it can only be enhanced, never removed or loosened.
+
+Results append to an Iceberg table with a JSON payload, so new KPIs need no schema change. From there they are published to CloudWatch with no SNS notifications, and they can be queried from QuickSight or Quick Suite.
 
 ### Source contracts
 
@@ -539,6 +558,15 @@ artifacts.
 
 See [`mcp-profiles/third-party/README.md`](mcp-profiles/third-party/README.md)
 for the disabled profiles and provider-specific setup references.
+
+### A2A with Snowflake Cortex and Databricks Genie (optional, planned)
+
+ADOP can act as an A2A orchestrator and validator, with Cortex and Genie as remote agents reached through ADOP-side adapters. It uses them for three things:
+- checking after deployment that Gold tables are visible to them
+- reconciling KPI answers against Athena ground truth
+- dry-run-then-approve semantic-layer handoff
+
+This is **optional and off by default**. Without opt-in, no A2A questions are asked, nothing connects to Cortex or Genie, and the standard Phase 0–5 flow and Step 5.9 checks are unchanged.
 
 ## Repository structure
 
