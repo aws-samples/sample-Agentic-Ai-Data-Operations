@@ -71,12 +71,22 @@ BUCKET="$(aws cloudformation describe-stacks --region "$REGION" --stack-name "$S
   --query "Stacks[0].Outputs[?OutputKey=='UiBucketName'].OutputValue" --output text)"
 aws s3 sync "$ROOT/ui" "s3://$BUCKET" --region "$REGION" \
   --exclude "chromium.*" \
+  --exclude "*.spec.js" \
+  --exclude "node_modules/*" \
   --exclude "README.md" \
   --exclude ".gitignore" \
+  --exclude "package.json" \
+  --exclude "package-lock.json" \
+  --exclude "playwright.config.cjs" \
   --exclude "test-results/*" \
   --exclude "*.map" \
   --delete
 
+DISTRIBUTION_ID="$(aws cloudformation list-stack-resources --region "$REGION" --stack-name "$STACK" \
+  --query "StackResourceSummaries[?LogicalResourceId=='UiDistribution'].PhysicalResourceId" --output text)"
+aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths "/*" >/dev/null
+
 echo "Console deployed. Upload target: s3://$BUCKET"
+echo "CloudFront invalidation submitted: $DISTRIBUTION_ID"
 aws cloudformation describe-stacks --region "$REGION" --stack-name "$STACK" \
   --query "Stacks[0].Outputs[?OutputKey=='ConsoleUrl'].OutputValue" --output text
