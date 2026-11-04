@@ -91,6 +91,7 @@ button { cursor: pointer; }
   display: flex; align-items: center; gap: 11px; width: 100%; border: 0; border-radius: 9px;
   color: #9eb2b9; background: transparent; padding: 10px 12px; font-size: 12px; text-align: left;
 }
+.nav-item[hidden] { display: none; }
 .nav-item:hover { color: #f1f8f9; background: rgba(255,255,255,.06); }
 .nav-item.active { color: #efffff; background: var(--teal-dark); box-shadow: inset 3px 0 0 #67cec2; }
 .nav-icon { width: 17px; color: #8eabb3; font-size: 16px; text-align: center; }
