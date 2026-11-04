@@ -1,0 +1,13 @@
+{
+  "name": "adop-console-ui",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ADOP Console browser tests",
+  "scripts": {
+    "test:chromium": "playwright test",
+    "test:chromium:local": "playwright test chromium.smoke.spec.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1"
+  }
+}

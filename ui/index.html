@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="ADOP Console — contracts, policies, connectors, approvals, and pipeline runs"
+    />
+    <title>ADOP Console</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="auth-root" class="auth-root"></div>
+    <div id="app-shell" class="app-shell" hidden>
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg class="brand-glyph" viewBox="0 0 42 42" role="img">
+              <path d="M21 4 35.5 12.5v17L21 38 6.5 29.5v-17L21 4Z" fill="none" stroke="currentColor" stroke-width="2.2"/>
+              <path d="m11 16 10 6 10-6M21 22v11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="11" cy="16" r="2.4" fill="currentColor"/>
+              <circle cx="31" cy="16" r="2.4" fill="currentColor"/>
+              <circle cx="21" cy="33" r="2.4" fill="currentColor"/>
+            </svg>
+          </div>
+          <div>
+            <div class="brand-name">ADOP</div>
+            <div class="brand-caption">CONTROL PLANE</div>
+          </div>
+        </div>
+
+        <div class="workspace-switcher">
+          <div class="eyebrow">WORKSPACE</div>
+          <button class="workspace-button" type="button">
+            <span class="workspace-avatar">S</span>
+            <span class="workspace-copy">
+              <strong id="workspace-name">Sales domain</strong>
+              <small id="workspace-subtitle">acme / production</small>
+            </span>
+            <span class="chevron">⌄</span>
+          </button>
+        </div>
+
+        <nav class="primary-nav" aria-label="Primary navigation">
+          <div class="nav-label">MONITOR</div>
+          <button class="nav-item active" data-view="home" type="button">
+            <span class="nav-icon">⌂</span><span>Home</span>
+          </button>
+          <button class="nav-item" data-view="workloads" data-feature="workloads.read" type="button">
+            <span class="nav-icon">◈</span><span>Workloads</span><span class="nav-count">12</span>
+          </button>
+          <button class="nav-item" data-view="runs" data-feature="runs.read" type="button">
+            <span class="nav-icon">◷</span><span>Runs</span>
+          </button>
+
+          <div class="nav-label nav-spacer">RULES ENGINE</div>
+          <button class="nav-item" data-view="contracts" data-feature="contracts.read" type="button">
+            <span class="nav-icon">⌘</span><span>Contracts</span>
+          </button>
+          <button class="nav-item" data-view="policies" data-feature="policies.read" type="button">
+            <span class="nav-icon">◉</span><span>Policies</span>
+          </button>
+
+          <div class="nav-label nav-spacer">INTEGRATIONS</div>
+          <button class="nav-item" data-view="connectors" data-feature="connectors.read" type="button">
+            <span class="nav-icon">⌁</span><span>Connectors</span><span class="nav-count muted">3</span>
+          </button>
+
+          <div class="nav-label nav-spacer">GOVERNANCE</div>
+          <button class="nav-item" data-view="approvals" data-feature="approvals.read" type="button">
+            <span class="nav-icon">✓</span><span>Approvals</span><span class="nav-count alert">3</span>
+          </button>
+          <button class="nav-item" data-view="audit" data-feature="audit.read" type="button">
+            <span class="nav-icon">≡</span><span>Audit log</span>
+          </button>
+          <div class="nav-label nav-spacer admin-nav-label">ADMINISTER</div>
+          <button class="nav-item" data-view="workspaces" data-feature="users.manage" type="button">
+            <span class="nav-icon">▦</span><span>Workspaces</span>
+          </button>
+          <button class="nav-item" data-view="access" data-feature="users.manage" type="button">
+            <span class="nav-icon">♙</span><span>Access</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="prototype-note">
+            <span class="status-dot blue"></span>
+            <div>
+              <strong>Control-plane connected</strong>
+              <small>Git-backed proposals</small>
+            </div>
+          </div>
+          <div class="user-card">
+            <div id="user-avatar" class="avatar">MC</div>
+            <div class="user-copy">
+              <strong id="user-name">Maya Chen</strong>
+              <small id="user-role">Domain owner</small>
+            </div>
+            <button class="more user-menu-button" type="button" data-action="logout" aria-label="Sign out">•••</button>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div class="breadcrumbs"><span>ADOP Console</span><span>/</span><strong id="breadcrumb">Home</strong></div>
+          <div class="topbar-actions">
+            <span class="environment-pill"><span class="status-dot green"></span> Production</span>
+            <button class="icon-button" type="button" aria-label="Help">?</button>
+            <button class="icon-button notification" type="button" aria-label="Notifications">♢<span></span></button>
+            <button id="top-avatar" class="top-avatar" type="button" data-action="logout" aria-label="Sign out">MC</button>
+          </div>
+        </header>
+
+        <div id="app" class="page-wrap"></div>
+      </main>
+    </div>
+
+    <div id="modal-root"></div>
+    <div id="toast-root" class="toast-root" aria-live="polite"></div>
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

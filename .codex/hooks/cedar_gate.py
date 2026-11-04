@@ -21,12 +21,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-# Tools that never produce a Cedar request (reads, search, planning). Skipping
-# them keeps the hook off the hot path for most calls.
+# Tools that never produce a Cedar request (planning and web/search tools).
+# Path-based reads are intentionally governed so workspace isolation covers
+# visibility as well as writes.
 _NEVER_GOVERNED = {
-    "read", "glob", "grep", "ls", "todowrite", "todoread", "webfetch", "websearch",
-    "fs_read", "fsread", "readfile", "fs_list", "list_directory", "listdirectory",
-    "grep_search", "file_search", "grepsearch", "filesearch", "view_image",
+    "todowrite", "todoread", "webfetch", "websearch", "view_image",
     "update_plan", "knowledge", "web_fetch", "web_search", "toolsearch",
 }
 

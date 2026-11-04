@@ -6,11 +6,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/check-discovery-gate.sh"
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check-discovery-gate.sh"
           },
           {
             "type": "command",
-            "command": ".claude/hooks/check-logging.sh"
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check-logging.sh"
           }
         ]
       },
@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/hooks/enforce_template_codegen.py",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/enforce_template_codegen.py",
             "timeout": 5
           }
         ]
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/hooks/deploy_gate.py"
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/deploy_gate.py"
           }
         ]
       },
@@ -36,7 +36,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/hooks/cedar_gate.py",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/cedar_gate.py",
             "timeout": 25
           }
         ]
@@ -47,7 +47,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/hooks/inject_run_context.py",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/inject_run_context.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workspace_session.py",
             "timeout": 5
           }
         ]
@@ -58,7 +63,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/hooks/capture_user_turn.py",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/capture_user_turn.py",
             "timeout": 3
           }
         ]
@@ -70,7 +75,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/hooks/log_conversation.py",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/log_conversation.py",
             "timeout": 3
           }
         ]

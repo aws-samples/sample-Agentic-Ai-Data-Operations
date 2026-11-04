@@ -1,0 +1,10 @@
+# Runtime dependencies for the CloudFormation/SAM control-plane Lambda.
+# Keep this list aligned with the API surface. PostgreSQL is included because
+# the AWS connector path must be able to authenticate to RDS; SaaS drivers
+# remain optional and should be deployed as separate layers when enabled.
+boto3>=1.34,<2
+jsonschema==4.23.0
+PyYAML>=6.0,<7
+Jinja2==3.1.4
+cedarpy==4.12.2
+psycopg[binary]>=3.2,<4

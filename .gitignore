@@ -7,6 +7,7 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+test-results/
 
 # Local environments and secrets
 .venv/
@@ -32,3 +33,11 @@ logs/cedar_decisions.jsonl
 
 # Local design documents (not committed)
 design-docs/
+
+# CloudFormation/SAM deployment output
+.aws-sam/
+infra/cloudformation/.build/
+
+# Runtime conversation/hook logs (local, per machine; may contain account or endpoint details)
+logs/conversation_events.jsonl
+logs/hook_blocks.jsonl

@@ -35,6 +35,28 @@
       "enabled": true
     },
     {
+      "name": "adop-workspace-context-session",
+      "description": "Shows the shared ADOP identity and selected organization/domain/project workspace at Kiro session start.",
+      "trigger": "SessionStart",
+      "action": {
+        "type": "command",
+        "command": ".kiro/hooks/adop-hook.sh workspace_session.py"
+      },
+      "timeout_ms": 10000,
+      "enabled": true
+    },
+    {
+      "name": "adop-workspace-context-spawn",
+      "description": "Shows the shared ADOP identity and selected organization/domain/project workspace when a Kiro CLI agent is spawned.",
+      "trigger": "AgentSpawn",
+      "action": {
+        "type": "command",
+        "command": ".kiro/hooks/adop-hook.sh workspace_session.py"
+      },
+      "timeout_ms": 10000,
+      "enabled": true
+    },
+    {
       "name": "adop-block-credentials",
       "description": "Denies writes containing hardcoded credentials or infrastructure identifiers.",
       "trigger": "PreToolUse",

@@ -81,6 +81,11 @@ _WRITE_TOOLS = {
 }
 _PATCH_TOOLS = {"apply_patch"}                                # Codex
 _RENDER_TOOLS = {"render_artifact"}                           # Strands runtime
+_READ_TOOLS = {
+    "read", "glob", "grep", "ls", "fs_read", "fsread", "readfile",
+    "fs_list", "list_directory", "listdirectory", "grep_search",
+    "grepsearch", "file_search", "filesearch",
+}
 _SHELL_TOOLS = {"bash", "shell", "exec_command", "execute_bash", "executebash",
                 "local_shell", "execute_pwsh"}
 _GENERIC_AWS_TOOLS = re.compile(r"(?:^|[_/.@-])(call_aws|run_script|use_aws|useaws|aws)$")
@@ -150,8 +155,11 @@ def classify_path(rel: str) -> Tuple[str, str]:
     if rel.startswith("logs/"):
         return "log", ""
     parts = rel.split("/")
-    if len(parts) >= 3 and parts[0] == "workloads":
-        workload, section = parts[1], parts[2]
+    if len(parts) >= 2 and parts[0] == "workloads":
+        workload = parts[1]
+        if len(parts) == 2:
+            return "other", workload
+        section = parts[2]
         rest = "/".join(parts[3:])
         mapping = {"config": "config", "scripts": "script", "dags": "dag", "sql": "sql",
                    "tests": "test", "iac": "iac", ".handoffs": "handoff", "logs": "log"}
@@ -183,6 +191,15 @@ def _written_content(tool_input: Dict[str, Any]) -> str:
     return "\n".join(str(c) for c in chunks if c)
 
 
+def _scope_hint(tool_input: Dict[str, Any]) -> Optional[Dict[str, str]]:
+    """Read an explicit organization/domain/project hint from a tool call."""
+    try:
+        from shared.control_plane.workspace_context import _scope_hint as read_scope
+    except ImportError:
+        return None
+    return read_scope(tool_input)
+
+
 def _mcp_parts(name: str) -> Optional[Tuple[str, str]]:
     if name.startswith("mcp__"):
         rest = name[len("mcp__"):]
@@ -206,12 +223,14 @@ def build_requests(event: Dict[str, Any]) -> List[Dict[str, Any]]:
     lowered = tool_name.strip().lower()
     requests: List[Dict[str, Any]] = []
 
+    explicit_scope = _scope_hint(tool_input)
+
     def write(raw_path: str, content: str = "") -> None:
         rel = _relative(raw_path, cwd)
         file_type, workload = classify_path(rel)
         requests.append({"action": "WriteFile", "resource": ("WorkloadFile", rel),
                          "attrs": {"fileType": file_type, "zone": ""}, "workload": workload,
-                         "path": rel})
+                         "scope": explicit_scope, "path": rel})
         if content:
             requests.append({"action": "PassSecurityCheck", "resource": ("PipelineStep", rel),
                              "attrs": {"stepNumber": 0, "stepName": "agent_file_write",
@@ -219,13 +238,35 @@ def build_requests(event: Dict[str, Any]) -> List[Dict[str, Any]]:
                              "context": {"guardrailCode": "SEC-001",
                                          "secretPatternFound": bool(_SECRET.search(content)),
                                          "filePath": rel},
-                             "workload": workload, "path": rel})
+                             "workload": workload, "scope": explicit_scope, "path": rel})
 
     def invoke(server: str, tool: str) -> None:
         requests.append({"action": "InvokeTool", "resource": ("McpTool", f"{server}/{tool}"),
-                         "attrs": {"serverName": server, "toolName": tool}, "workload": ""})
+                         "attrs": {"serverName": server, "toolName": tool},
+                         "workload": "", "scope": explicit_scope})
 
-    if lowered in _WRITE_TOOLS:
+    if lowered in _READ_TOOLS:
+        raw_path = (
+            tool_input.get("file_path")
+            or tool_input.get("path")
+            or tool_input.get("notebook_path")
+            or tool_input.get("pattern")
+            or tool_input.get("query_path")
+        )
+        if raw_path:
+            rel = _relative(str(raw_path), cwd)
+            file_type, workload = classify_path(rel)
+            requests.append(
+                {
+                    "action": "ReadFile",
+                    "resource": ("WorkloadFile", rel),
+                    "attrs": {"fileType": file_type, "zone": ""},
+                    "workload": workload,
+                    "scope": explicit_scope,
+                    "path": rel,
+                }
+            )
+    elif lowered in _WRITE_TOOLS:
         path = tool_input.get("file_path") or tool_input.get("path") or tool_input.get("notebook_path")
         if path:
             write(str(path), _written_content(tool_input))
@@ -331,19 +372,71 @@ def _log(record: Dict[str, Any]) -> None:
         pass  # logging must never decide the outcome
 
 
+def _workspace_context(event: Dict[str, Any]) -> Dict[str, Any] | None:
+    """Load the user-selected workspace for this repository, if one exists."""
+    try:
+        from shared.control_plane.workspace_context import current_context
+    except ImportError:
+        return None
+    try:
+        return current_context(event.get("cwd") or ROOT)
+    except Exception:
+        # Workspace context is an additional guard. Cedar itself still fails
+        # closed if its own evaluation cannot run.
+        return None
+
+
+def _workspace_decisions(
+    context: Dict[str, Any] | None, requests: Iterable[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """Return hard scope decisions for requests carrying workload/scope data."""
+    from shared.control_plane.workspace_context import authorize
+
+    decisions: List[Dict[str, Any]] = []
+    for req in requests:
+        workload = str(req.get("workload") or "")
+        scope = req.get("scope")
+        if not workload and not scope:
+            continue
+        allowed, reason = authorize(context, workload=workload or None, scope=scope)
+        decisions.append(
+            {
+                "action": req["action"],
+                "resource": req["resource"][1],
+                "allowed": allowed,
+                "reason": reason,
+                "workload": workload,
+                "scope": scope,
+            }
+        )
+    return decisions
+
+
 def decide(event: Dict[str, Any], explicit_principal: Optional[str] = None) -> Tuple[bool, str, Dict[str, Any]]:
     """Return (allow, reason, record). `allow` already accounts for the mode."""
     mode = load_mode()
     principal, context_kind = resolve_principal(event, explicit_principal)
     requests = build_requests(event)
+    workspace = _workspace_context(event)
     record: Dict[str, Any] = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "mode": mode, "principal": principal, "execution_context": context_kind,
         "agent_type": event.get("agent_type", ""), "tool_name": event.get("tool_name", ""),
         "session_id": event.get("session_id", ""),
     }
+    if workspace:
+        identity = workspace.get("identity") or {}
+        record["workspace"] = workspace.get("workspace")
+        record["user"] = identity.get("email", "")
+        record["workspace_session_id"] = workspace.get("session_id", "")
     if not requests:
         return True, "", record
+
+    # Evaluate workspace scope independently from Cedar. This boundary must
+    # still deny a cross-project operation if the optional Cedar dependency is
+    # missing or Cedar policy evaluation is otherwise unavailable.
+    workspace_decisions = _workspace_decisions(workspace, requests)
+    workspace_denied = [d for d in workspace_decisions if not d["allowed"]]
 
     try:
         decisions = evaluate(principal, context_kind, requests)
@@ -357,9 +450,29 @@ def decide(event: Dict[str, Any], explicit_principal: Optional[str] = None) -> T
     except Exception as exc:  # cedarpy missing or evaluation failure: fail closed
         decisions, denied = [], [{"error": f"{type(exc).__name__}: {exc}"}]
         reason = f"Cedar engine unavailable ({type(exc).__name__}: {exc})"
-    record.update({"decisions": decisions, "denied": bool(denied), "reason": reason})
+    if workspace_denied:
+        workspace_reason = "; ".join(d["reason"] for d in workspace_denied)
+        reason = f"{reason}; " if reason else ""
+        reason += f"workspace isolation: {workspace_reason}"
+    record.update(
+        {
+            "decisions": decisions,
+            "workspace_decisions": workspace_decisions,
+            "denied": bool(denied),
+            "workspace_denied": bool(workspace_denied),
+            "reason": reason,
+        }
+    )
     _log(record)
 
+    # Workspace scope is an application authorization boundary, independent of
+    # Cedar's audit/enforce review mode. This keeps project isolation active
+    # while the static policy set is being reviewed.
+    if workspace_denied:
+        return False, (
+            f"ADOP workspace isolation denies {principal} ({context_kind}): {reason}. "
+            "Choose an accessible workspace with `adop workspace use`."
+        ), record
     if not denied:
         return True, "", record
     if mode == "audit":

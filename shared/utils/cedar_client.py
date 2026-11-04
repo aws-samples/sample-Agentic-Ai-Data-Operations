@@ -583,7 +583,7 @@ class _AvpEvaluator:
                 reason += f" (errors: {response['errors']})"
             return allowed, reason
         except Exception as exc:
-            return True, f"AVP error (defaulting to ALLOW): {exc}"
+            return False, f"AVP authorization failed: {exc}"
 
     def is_agent_authorized(
         self,

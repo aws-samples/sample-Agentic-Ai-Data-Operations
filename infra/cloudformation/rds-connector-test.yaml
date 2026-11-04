@@ -1,0 +1,115 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Temporary ADOP connector integration test database. This stack is intentionally
+  separate from the ADOP Console stack and must be deleted after the test.
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Two or more subnets in different Availability Zones.
+  AllowedClientCidr:
+    Type: String
+    Description: Test runner public IPv4 address in CIDR notation, for example 203.0.113.10/32.
+    AllowedPattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}/32$"
+  DatabaseName:
+    Type: String
+    Default: adoptest
+    AllowedPattern: "^[a-z][a-z0-9_]{0,62}$"
+  MasterUsername:
+    Type: String
+    Default: adoptest
+    NoEcho: true
+    AllowedPattern: "^[a-z][a-z0-9_]{0,15}$"
+
+Resources:
+  ConnectorSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      GroupDescription: Temporary ADOP connector integration test access
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: !Ref AllowedClientCidr
+          Description: Temporary PostgreSQL access for the approved test runner
+      Tags:
+        - Key: adop-purpose
+          Value: temporary-connector-test
+
+  ConnectorSecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Name: !Sub adop/temporary/${AWS::StackName}/postgres
+      Description: Temporary ADOP connector test credential
+      GenerateSecretString:
+        SecretStringTemplate: !Sub '{"username":"${MasterUsername}","engine":"postgres"}'
+        GenerateStringKey: password
+        PasswordLength: 32
+        ExcludeCharacters: '"@/\\'
+      Tags:
+        - Key: adop-purpose
+          Value: temporary-connector-test
+
+  ConnectorSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      DBSubnetGroupDescription: Temporary ADOP connector test subnets
+      SubnetIds: !Ref SubnetIds
+      Tags:
+        - Key: adop-purpose
+          Value: temporary-connector-test
+
+  ConnectorDatabase:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      DBInstanceIdentifier: !Sub adop-connector-${AWS::StackName}
+      Engine: postgres
+      EngineVersion: "18.3"
+      DBInstanceClass: db.t4g.micro
+      AllocatedStorage: 20
+      StorageType: gp3
+      StorageEncrypted: true
+      PubliclyAccessible: true
+      MultiAZ: false
+      BackupRetentionPeriod: 0
+      DeletionProtection: false
+      DeleteAutomatedBackups: true
+      DBName: !Ref DatabaseName
+      MasterUsername: !Ref MasterUsername
+      MasterUserPassword: !Sub
+        - "{{resolve:secretsmanager:${SecretArn}:SecretString:password}}"
+        - SecretArn: !Ref ConnectorSecret
+      DBSubnetGroupName: !Ref ConnectorSubnetGroup
+      VPCSecurityGroups:
+        - !GetAtt ConnectorSecurityGroup.GroupId
+      Tags:
+        - Key: adop-purpose
+          Value: temporary-connector-test
+
+Outputs:
+  DatabaseIdentifier:
+    Value: !Ref ConnectorDatabase
+  Endpoint:
+    Value: !GetAtt ConnectorDatabase.Endpoint.Address
+  Port:
+    Value: !GetAtt ConnectorDatabase.Endpoint.Port
+  DatabaseName:
+    Value: !Ref DatabaseName
+  SecretArn:
+    Value: !Ref ConnectorSecret
+  SecurityGroupId:
+    Value: !GetAtt ConnectorSecurityGroup.GroupId

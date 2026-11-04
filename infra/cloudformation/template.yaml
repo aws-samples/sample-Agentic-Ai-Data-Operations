@@ -1,0 +1,365 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Environment-neutral ADOP Console foundation. The same template can be
+  deployed to dev, test, staging, or production with parameter changes only.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: dev
+    AllowedPattern: "^[a-z][a-z0-9-]{0,20}$"
+  CallbackUrl:
+    Type: String
+    Description: Browser callback URL registered with the Cognito Hosted UI.
+  LogoutUrl:
+    Type: String
+    Description: Browser logout URL registered with the Cognito Hosted UI.
+  HostedUiDomainPrefix:
+    Type: String
+    Description: Globally unique Cognito Hosted UI domain prefix.
+    AllowedPattern: "^[a-z0-9-]{3,63}$"
+  AllowedOrigin:
+    Type: String
+    Description: Exact CloudFront/browser origin, for example https://console.example.com.
+    AllowedPattern: "^https://[^*]+$"
+
+  ExternalOidcProviderName:
+    Type: String
+    Default: ""
+    Description: Optional Cognito provider name, for example Okta or EntraOIDC.
+  ExternalOidcIssuer:
+    Type: String
+    Default: ""
+    Description: Optional OIDC issuer URL for the external provider.
+  ExternalOidcClientId:
+    Type: String
+    Default: ""
+    Description: Optional OIDC client ID registered with the external provider.
+  ExternalOidcClientSecret:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: Optional OIDC client secret. Do not commit this value.
+  ExternalOidcScopes:
+    Type: String
+    Default: "openid email profile"
+    Description: OIDC scopes requested from the external provider.
+
+Conditions:
+  HasExternalOidc: !Not [!Equals [!Ref ExternalOidcProviderName, ""]]
+
+Resources:
+  ConsoleUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub adop-console-${EnvironmentName}
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      # Users are provisioned by administrators only. This must be explicit:
+      # the Cognito default allows public self sign-up, and a stack update
+      # would otherwise silently re-enable it.
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      # Keep the base deployment self-contained. OPTIONAL/ON requires Cognito
+      # phone/SMS configuration or a TOTP enrollment flow before promotion.
+      MfaConfiguration: "OFF"
+      UserPoolTags:
+        adop: console
+        environment: !Ref EnvironmentName
+
+  OrganizationAdmins:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: adop-org-admins
+      UserPoolId: !Ref ConsoleUserPool
+      Description: ADOP organization administrators
+      Precedence: 1
+
+  DomainOwners:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: adop-domain-owners
+      UserPoolId: !Ref ConsoleUserPool
+      Description: ADOP domain owners
+      Precedence: 2
+
+  ProjectUsers:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: adop-project-users
+      UserPoolId: !Ref ConsoleUserPool
+      Description: ADOP project users
+      Precedence: 3
+
+  ConsoleUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref ConsoleUserPool
+      ClientName: !Sub adop-console-${EnvironmentName}
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - profile
+      CallbackURLs:
+        - !Ref CallbackUrl
+      LogoutURLs:
+        - !Ref LogoutUrl
+      SupportedIdentityProviders:
+        - COGNITO
+        - !If [HasExternalOidc, !Ref ExternalOidcProviderName, !Ref AWS::NoValue]
+
+  ExternalOidcProvider:
+    Condition: HasExternalOidc
+    Type: AWS::Cognito::UserPoolIdentityProvider
+    Properties:
+      UserPoolId: !Ref ConsoleUserPool
+      ProviderName: !Ref ExternalOidcProviderName
+      ProviderType: OIDC
+      ProviderDetails:
+        client_id: !Ref ExternalOidcClientId
+        client_secret: !Ref ExternalOidcClientSecret
+        oidc_issuer: !Ref ExternalOidcIssuer
+        authorize_scopes: !Ref ExternalOidcScopes
+        attributes_request_method: GET
+      AttributeMapping:
+        email: email
+        username: sub
+
+  ConsoleUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Ref HostedUiDomainPrefix
+      UserPoolId: !Ref ConsoleUserPool
+
+  ControlPlaneTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub adop-control-plane-${EnvironmentName}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: adop
+          Value: console
+        - Key: environment
+          Value: !Ref EnvironmentName
+
+  ConsoleApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins:
+          - !Ref AllowedOrigin
+        AllowHeaders:
+          - content-type
+          - authorization
+          - x-adop-workspace
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+      Auth:
+        Authorizers:
+          CognitoJwt:
+            JwtConfiguration:
+              issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${ConsoleUserPool}
+              audience:
+                - !Ref ConsoleUserPoolClient
+            IdentitySource: "$request.header.Authorization"
+        DefaultAuthorizer: CognitoJwt
+
+  ControlPlaneFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../..
+      Handler: api.control_plane.handler
+      Runtime: python3.12
+      Timeout: 30
+      MemorySize: 512
+      Environment:
+        Variables:
+          ADOP_ENV: aws
+          ADOP_AUTH_MODE: oidc
+          ADOP_AUTH_PROVIDER: Cognito
+          ADOP_CONTROL_PLANE_BACKEND: dynamodb
+          ADOP_CONTROL_PLANE_TABLE: !Ref ControlPlaneTable
+          ADOP_ALLOWED_ORIGIN: !Ref AllowedOrigin
+          ADOP_OIDC_ISSUER: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${ConsoleUserPool}
+          ADOP_OIDC_CLIENT_ID: !Ref ConsoleUserPoolClient
+          ADOP_OIDC_AUTHORIZE_URL: !Sub https://${HostedUiDomainPrefix}.auth.${AWS::Region}.amazoncognito.com/oauth2/authorize
+          ADOP_OIDC_TOKEN_URL: !Sub https://${HostedUiDomainPrefix}.auth.${AWS::Region}.amazoncognito.com/oauth2/token
+          ADOP_OIDC_LOGOUT_URL: !Sub https://${HostedUiDomainPrefix}.auth.${AWS::Region}.amazoncognito.com/logout
+          ADOP_OIDC_REDIRECT_URI: !Ref CallbackUrl
+          ADOP_OIDC_PROVIDER_HINT: !If [HasExternalOidc, !Ref ExternalOidcProviderName, ""]
+          ADOP_COGNITO_USER_POOL_ID: !Ref ConsoleUserPool
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ControlPlaneTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminListGroupsForUser
+                - cognito-idp:AdminGetUser
+              Resource: !GetAtt ConsoleUserPool.Arn
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Sub arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:adop/${EnvironmentName}/*
+      Events:
+        PublicAuthConfig:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ConsoleApi
+            Path: /api/v1/auth/config
+            Method: GET
+            Auth:
+              Authorizer: NONE
+        ProtectedApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ConsoleApi
+            Path: /api/v1/{proxy+}
+            Method: ANY
+            Auth:
+              Authorizer: CognitoJwt
+
+  UiBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: adop
+          Value: console
+        - Key: environment
+          Value: !Ref EnvironmentName
+
+  UiOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub adop-console-${EnvironmentName}
+        Description: Private S3 origin for ADOP Console
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  UiDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        HttpVersion: http2
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: ui-s3
+            DomainName: !GetAtt UiBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt UiOriginAccessControl.Id
+            S3OriginConfig: {}
+          - Id: control-plane-api
+            DomainName: !Select [1, !Split ["//", !GetAtt ConsoleApi.ApiEndpoint]]
+            CustomOriginConfig:
+              HTTPSPort: 443
+              OriginProtocolPolicy: https-only
+        DefaultCacheBehavior:
+          TargetOriginId: ui-s3
+          ViewerProtocolPolicy: redirect-to-https
+          Compress: true
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+          ForwardedValues:
+            QueryString: true
+        CacheBehaviors:
+          - PathPattern: /api/*
+            TargetOriginId: control-plane-api
+            ViewerProtocolPolicy: https-only
+            AllowedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+            CachedMethods:
+              - GET
+              - HEAD
+            ForwardedValues:
+              QueryString: true
+              Headers:
+                - Authorization
+                - Origin
+                - Access-Control-Request-Headers
+                - Access-Control-Request-Method
+                - x-adop-workspace
+        # No CustomErrorResponses: they apply distribution-wide and would turn API
+        # 403/404 denials under /api/* into "200 index.html". The console is a
+        # single-page app served from "/" and needs no error-page rewrites.
+
+  UiBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref UiBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontRead
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub ${UiBucket.Arn}/*
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${UiDistribution}
+
+Outputs:
+  ConsoleUrl:
+    Description: CloudFront URL for the ADOP Console
+    Value: !Sub https://${UiDistribution.DomainName}
+  ApiEndpoint:
+    Description: Direct API Gateway endpoint
+    Value: !GetAtt ConsoleApi.ApiEndpoint
+  UiBucketName:
+    Description: Upload the built UI assets to this bucket
+    Value: !Ref UiBucket
+  UserPoolId:
+    Value: !Ref ConsoleUserPool
+  UserPoolClientId:
+    Value: !Ref ConsoleUserPoolClient
+  HostedUiBaseUrl:
+    Description: Cognito Hosted UI base URL
+    Value: !Sub https://${HostedUiDomainPrefix}.auth.${AWS::Region}.amazoncognito.com

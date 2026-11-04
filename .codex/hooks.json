@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .codex/hooks/discovery_gate.py"
+            "command": "sh -c 'python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/discovery_gate.py\"'"
           }
         ],
         "matcher": "apply_patch"
@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .codex/hooks/logging_gate.py"
+            "command": "sh -c 'python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/logging_gate.py\"'"
           }
         ],
         "matcher": "apply_patch"
@@ -24,7 +24,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .codex/hooks/enforce_template_codegen.py",
+            "command": "sh -c 'python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/enforce_template_codegen.py\"'",
             "timeout": 5
           }
         ],
@@ -34,7 +34,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .codex/hooks/deploy_gate.py",
+            "command": "sh -c 'python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/deploy_gate.py\"'",
             "timeout": 5
           }
         ]
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .codex/hooks/cedar_gate.py",
+            "command": "sh -c 'python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/cedar_gate.py\"'",
             "timeout": 25
           }
         ]
@@ -54,7 +54,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .codex/hooks/inject_run_context.py",
+            "command": "sh -c 'python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/inject_run_context.py\"'",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "sh -c 'python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/workspace_session.py\"'",
             "timeout": 5
           }
         ]
@@ -65,7 +70,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .codex/hooks/log_conversation.py",
+            "command": "sh -c 'python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/log_conversation.py\"'",
             "timeout": 3
           }
         ],

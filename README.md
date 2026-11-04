@@ -68,6 +68,239 @@ git clone https://github.com/aws-samples/sample-Agentic-Ai-Data-Operations.git
 cd sample-Agentic-Ai-Data-Operations
 ```
 
+## ADOP deployment modes
+
+ADOP has a deliberate path from local experimentation to a shared AWS
+environment:
+
+```text
+1. Local mode       → test the UI, CLI, policies, contracts, and workspaces
+2. AWS Dev mode     → validate shared identity, persistence, connectors, and AWS integration
+3. AWS staging/prod → promote the same application with environment-specific controls
+```
+
+Use **Local mode first** for testing and proof-of-concept work. Use **AWS Dev
+mode** when you are ready to test real AWS persistence, SSO, Secrets Manager,
+connector networking, and shared access. Do not point a local proof-of-concept
+at production credentials or production configuration.
+
+| Mode | Use it for | UI and API | Source of truth | Identity and isolation |
+|---|---|---|---|---|
+| **Local mode** | POCs, development, demos, offline CLI work | Local Python API and static UI on `localhost` | Local JSON control-plane store and repository configuration | Seeded test users with soft organization/domain/project isolation |
+| **AWS Dev mode** | Shared development and integration testing | CloudFront/S3 UI, API Gateway, and Lambda | DynamoDB versions, approvals, current pointers, and audit records | Cognito or external OIDC such as Okta/Entra, with API authorization |
+| **AWS staging/production** | Controlled shared or customer-facing operation | Same deployable AWS architecture with stricter environment controls | DynamoDB and Secrets Manager with backups, monitoring, and change controls | SSO, IAM, KMS, VPC/private connectivity, and environment boundaries |
+
+### 1. Local mode: the recommended starting point
+
+Start the local control plane:
+
+```bash
+python3 -m api.local_server
+```
+
+Open `http://127.0.0.1:4173`. For CLI testing, use the local identity and
+workspace commands:
+
+```bash
+adop login --user hcherian@example.com
+adop workspace list
+adop workspace use project/orders
+adop whoami
+```
+
+Local mode keeps the API, policy projection, connector metadata, and test
+workspaces on the machine. It uses the same organization/domain/project
+vocabulary, contract validation, approval intent, and UI/CLI authorization
+rules as AWS mode, but it is only **soft isolation inside one checkout**. Use
+disposable test credentials or environment-variable references; never use
+production passwords, tokens, or private keys locally.
+
+The local API binds to loopback and accepts identity headers only from its
+local UI origin. This prevents an unrelated webpage from impersonating a test
+user through the browser. For a shared or remote environment, use AWS mode;
+local mode is not a tenant boundary.
+
+### 2. AWS Dev mode: the first shared environment
+
+After local UI and CLI tests pass, deploy the CloudFormation foundation to an
+AWS development account. Use environment-specific values for the callback
+URLs and hosted UI:
+
+```bash
+./infra/cloudformation/deploy.sh \
+  --stack adop-console-dev \
+  --region us-east-1 \
+  --environment dev \
+  --callback-url https://<dev-console-domain>/ \
+  --logout-url https://<dev-console-domain>/ \
+  --hosted-ui-prefix adop-console-dev-<unique-suffix> \
+  --allowed-origin https://<dev-console-domain>
+```
+
+The AWS CLI and runtime use the same AWS control-plane store as the UI:
+
+```bash
+export ADOP_ENV=aws
+export ADOP_CONTROL_PLANE_BACKEND=dynamodb
+export ADOP_CONTROL_PLANE_TABLE=adop-control-plane-dev
+export AWS_REGION=us-east-1
+
+adop workspace list
+adop whoami
+```
+
+AWS Dev is where to validate real SSO claims, DynamoDB persistence, approval
+flows, connector health, Secrets Manager references, and shared workspace
+visibility. The CLI must use an approved AWS identity; do not copy browser
+tokens into the repository.
+
+The AWS UI saves a connector before a health check is run. Draft health checks
+are intentionally disabled in AWS mode so a user cannot make the Lambda probe
+an arbitrary host and port. The saved connector resolves its destination from
+the authorized environment-scoped secret.
+
+For connector health checks, store development secrets under the environment
+prefix `adop/dev/` (for example, `adop/dev/orders/snowflake`). The Lambda role
+can read only `adop/dev/*` in this stack. Keep staging and production secrets
+under their matching environment prefixes.
+
+### 3. AWS staging and production
+
+Staging and production use the same application and CloudFormation assets as
+AWS Dev, but with separate stacks, accounts or environments, tables, secrets,
+KMS keys, domains, and identity configuration. Promote only after the AWS Dev
+tests pass. Add the environment's required backups, monitoring, WAF, audit
+retention, least-privilege IAM, and private connector networking before calling
+it production-ready.
+
+The CloudFormation foundation is in
+[`infra/cloudformation/template.yaml`](infra/cloudformation/template.yaml).
+The complete deployment contract and environment checklist are in
+[`docs/console-deployment-modes.md`](docs/console-deployment-modes.md).
+
+### UI and API: Local mode versus AWS mode
+
+| Capability | Local mode | AWS mode |
+|---|---|---|
+| Browser | `http://127.0.0.1:4173` | CloudFront/private S3-hosted console |
+| API | Local Python process | API Gateway → Lambda |
+| Login | Local test users | Cognito or Okta/Entra/OIDC-backed SSO |
+| Contracts and policies | Local proposal/approval store and repository projection | Versioned DynamoDB proposals and snapshots; policy changes remain reviewable |
+| Workspaces | Local registry with soft isolation | DynamoDB workspace registry plus IdP membership and API enforcement |
+| Connectors | Disposable local/test references | Secrets Manager, KMS, VPC/Glue/private connector path |
+| CLI | Reads the local control-plane store | Uses the same AWS-backed authorization and configuration model as the UI |
+| Runtime snapshot | Local resolved configuration and hash | Approved DynamoDB snapshot and hash recorded for the run |
+
+The UI is therefore not a separate configuration system. In Local mode it
+reads and writes the local control-plane adapter. In AWS mode it reads and
+writes the shared API, which persists approved configuration in DynamoDB and
+keeps secret values in Secrets Manager. Both modes must pass the same
+authorization and contract-validation tests, and a run must capture a resolved
+configuration snapshot so a mid-run UI change cannot alter an in-flight run.
+
+The control-plane UI/API and both persistence adapters are implemented and
+tested. One integration boundary remains explicit: the ADOP run bootstrap must
+select `FileConfigProvider` in Local mode or `DynamoConfigProvider` in AWS mode
+before a deployment can claim end-to-end runtime promotion from an approved
+UI change. Until that bootstrap wiring is enabled, AWS proposals and snapshot
+records are safely persisted and auditable, but they do not silently override
+repository-based workload configuration.
+
+### SSO login and roles
+
+ADOP does not store user roles. Every request derives the role from the
+signed-in identity, so access is managed in your identity provider.
+
+**Browser login (AWS mode).** The console uses the OIDC authorization-code
+flow with PKCE against the stack's Cognito Hosted UI. To sign in with Okta,
+Entra ID, or another OIDC provider, deploy with the `ExternalOidcProviderName`,
+`ExternalOidcIssuer`, `ExternalOidcClientId`, and `ExternalOidcClientSecret`
+parameters; Cognito then brokers that provider. The client secret is a
+deployment parameter only and never reaches the browser. User creation is
+admin-only (`AllowAdminCreateUserOnly: true`); there is no public self sign-up.
+
+**Groups become roles.** Add users to these Cognito (or federated IdP) groups:
+
+| Group | ADOP role | Typical access |
+|---|---|---|
+| `adop-org-admins` | Organization admin | Everything, including workspace creation and user directory |
+| `adop-security-admins` | Security admin | Cedar policy proposals and policy approvals |
+| `adop-connector-admins` | Connector admin | Connector creation and health checks |
+| `adop-auditors` | Auditor | Read-only, including the audit log |
+| `adop-domain-owners` + `adop-domain-<name>-owners` | Domain owner | The domain and its projects |
+| `adop-project-users` + `adop-project-<name>-users` | Project user | Only that project |
+| none | Viewer | Signed in, no workspace access |
+
+Tenant groups (`adop-domain-sales-owners`, `adop-project-orders-users`) decide
+*which* domains and projects a user can see; domain owners inherit their
+domain's projects. Role changes take effect at the user's next login. The API
+enforces every rule server-side: two-person approval (authors cannot approve
+their own change), tighten-only contracts, and per-project isolation.
+
+**Local mode** skips SSO. The login screen offers seeded test users such as
+`hcherian@example.com` (organization admin) and `oliver.orders@example.com`
+(orders project user), defined in `shared/control_plane/authorization.py`.
+Test login is refused whenever `ADOP_ENV` is not `local`.
+
+**CLI and agents.** `adop login` stores the identity and selected workspace in
+`~/.adop/sessions/` (never tokens or secrets). Locally, use a seeded user; in
+AWS mode, provide the SSO identity through `ADOP_IDENTITY_JSON` or
+`ADOP_USER_EMAIL`. Claude Code, Codex, and Kiro inherit that session: the Cedar
+gate only allows workload writes inside the selected workspace, so an agent
+never has more access than the person who signed in. See
+[`docs/cli-workspaces.md`](docs/cli-workspaces.md).
+
+### Console UI
+
+The same console runs in both modes: at `http://127.0.0.1:4173` locally, or
+behind CloudFront in AWS. The sidebar groups pages by purpose:
+
+| Section | Page | What it is for |
+|---|---|---|
+| Operate | **Home** | Four headline metrics, then tabs: **Overview** (active data product and its Bronze → Silver → Gold path), **Approvals** (changes waiting on you), **Health** (30-day quality, freshness, PII-tag, and schema KPIs) |
+| | Workloads, Runs | Workload details and run history |
+| Govern | Contracts | Organization, domain, and project zone contracts, with tighten-only proposals |
+| | Connectors | JDBC, Snowflake, Teradata, and Databricks connectors; credentials are Secrets Manager references and are never shown back |
+| | Policies | Cedar policies and proposals |
+| | Approvals, Audit log | Two-person review queue and the full change history |
+| Administer | Workspaces | Create domains and projects (organization admins) |
+| | Access | Your role, workspace memberships, feature permissions, and directory users |
+
+The workspace switcher at the top of the sidebar changes the selected
+organization, domain, or project. Pages and API results are filtered to that
+scope and to your memberships, so project users see only their own project.
+
+### Fresh-clone validation
+
+From a clean clone, install the Python runtime and run the local console:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -e .
+python3 -m api.local_server
+```
+
+In another terminal, install the browser-test dependency and run the local
+Chromium suite:
+
+```bash
+cd ui
+npm install
+npm run test:chromium:local
+```
+
+Playwright starts or reuses the local API at `127.0.0.1:4173`. Test reports,
+traces, browser output, SAM build output, caches, and local control-plane data
+are ignored by Git. The AWS suite is opt-in and requires
+`ADOP_AWS_CONSOLE_URL`, `ADOP_AWS_TEST_USER`, and `ADOP_AWS_TEST_PASSWORD`.
+
+The real AWS connector/RDS experiment is not part of the default stack. It is
+an explicitly gated, temporary test environment described in
+[`docs/control-plane-e2e-plan.md`](docs/control-plane-e2e-plan.md). This keeps
+local startup free of billable resources and prevents an accidental RDS
+creation during normal CloudFormation deployment.
+
 Open the repository with one supported client:
 
 - Claude Code: start at the repository root and run `/onboard-workflow`.
